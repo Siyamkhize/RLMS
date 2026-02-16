@@ -64,6 +64,7 @@ class AppConfig {
   static String get learnerImagesUrl => '$baseUrl/learnerImages';
   static String get signaturesUrl => '$baseUrl/signatures';
   static String get getSdpUrl => '$baseUrl/get_sdp.php';
+  static String get getSdpProjectsUrl => '$baseUrl/get_sdp_projects.php';
   static String get syncSitesUrl => '$baseUrl/sync_sites.php';
   static String get syncClassUrl => '$baseUrl/sync_class.php';
   static String get syncLearningPathwayUrl =>

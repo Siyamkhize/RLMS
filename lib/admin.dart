@@ -11,11 +11,15 @@ import 'config.dart'; // Import AppConfig
 class AdminPage extends StatefulWidget {
   final String sdp;
   final List<dynamic> data;
+  final String? projectId;
+  final String? pathwayId;
 
   const AdminPage({
     super.key,
     required this.sdp,
     required this.data,
+    this.projectId,
+    this.pathwayId,
   });
 
   @override
@@ -131,7 +135,19 @@ class _AdminPageState extends State<AdminPage> {
           int.tryParse(widget.sdp) ?? 0; // Default to 0 if parsing fails
 
       // Now pass the sdpId to your database method
-      final offlineSites = await dbHelper.getSitesBySdpId(sdpId);
+      List<Map<String, dynamic>> offlineSites;
+
+      if (widget.projectId != null) {
+        // Filter by project
+        final db = await dbHelper.database;
+        offlineSites = await db.query(
+          'sites',
+          where: 'sdp_id = ? AND project_id = ?',
+          whereArgs: [sdpId, int.tryParse(widget.projectId!) ?? 0],
+        );
+      } else {
+        offlineSites = await dbHelper.getSitesBySdpId(sdpId);
+      }
 
       setState(() {
         _siteData = offlineSites;
@@ -158,7 +174,7 @@ class _AdminPageState extends State<AdminPage> {
 
   Future<void> _searchLearnerById() async {
     final idNumber = _searchController.text.trim();
-    
+
     if (idNumber.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -175,7 +191,7 @@ class _AdminPageState extends State<AdminPage> {
 
     try {
       Map<String, dynamic>? learner;
-      
+
       if (_isOnline) {
         // Search online via API
         learner = await _searchLearnerOnline(idNumber);
@@ -184,10 +200,12 @@ class _AdminPageState extends State<AdminPage> {
         learner = await _searchLearnerOffline(idNumber);
       }
 
-      if (learner != null && learner['learner_id'] != null && learner['class_id'] != null) {
+      if (learner != null &&
+          learner['learner_id'] != null &&
+          learner['class_id'] != null) {
         // Navigate to LearnerListPage (class page) where we can scan documents and update profiles
         final classId = learner['class_id'].toString();
-        
+
         if (classId.isNotEmpty) {
           Navigator.push(
             context,
@@ -277,7 +295,7 @@ class _AdminPageState extends State<AdminPage> {
   Future<Map<String, dynamic>?> _searchLearnerOffline(String idNumber) async {
     try {
       final dbHelper = DatabaseHelper();
-      
+
       // Get SDP identifier
       String sdpIdentifier = widget.sdp.trim();
       if (sdpIdentifier.isEmpty) {
@@ -293,7 +311,7 @@ class _AdminPageState extends State<AdminPage> {
 
       // Get all learners for this SDP
       final learners = await dbHelper.getLearnersBySdp(sdpIdentifier);
-      
+
       // Find learner by ID number
       for (final learner in learners) {
         final learnerIdNumber = learner['IDNumber']?.toString().trim();
@@ -329,22 +347,24 @@ class _AdminPageState extends State<AdminPage> {
     }
 
     if (identifier.isEmpty) {
-      print('[ADMIN] ERROR: No SDP identifier found. widget.sdp="${widget.sdp}", _siteData count=${_siteData.length}');
+      print(
+          '[ADMIN] ERROR: No SDP identifier found. widget.sdp="${widget.sdp}", _siteData count=${_siteData.length}');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('SDP identifier not available. Please log out and log in again.'),
+          content: Text(
+              'SDP identifier not available. Please log out and log in again.'),
           duration: Duration(seconds: 4),
         ),
       );
       return;
     }
-    
+
     print('[ADMIN] Opening SDP learners with identifier: $identifier');
 
     final dynamic inferredName = _siteData.isNotEmpty
         ? (_siteData.first['sdp_name'] ??
-        _siteData.first['sdpName'] ??
-        _siteData.first['client_name'])
+            _siteData.first['sdpName'] ??
+            _siteData.first['client_name'])
         : null;
 
     Navigator.push(
@@ -366,7 +386,7 @@ class _AdminPageState extends State<AdminPage> {
       ),
       body: SingleChildScrollView(
         scrollDirection:
-        Axis.vertical, // Vertical scrolling for the entire page
+            Axis.vertical, // Vertical scrolling for the entire page
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -375,7 +395,7 @@ class _AdminPageState extends State<AdminPage> {
               Text(
                 'Class Information for ${widget.sdp}',
                 style:
-                const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               // Search bar for learner by ID number
@@ -392,7 +412,8 @@ class _AdminPageState extends State<AdminPage> {
                             hintText: 'Search learner by ID number...',
                             prefixIcon: Icon(Icons.search),
                             border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
                           ),
                           onSubmitted: (_) => _searchLearnerById(),
                         ),
@@ -404,7 +425,8 @@ class _AdminPageState extends State<AdminPage> {
                               child: SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               ),
                             )
                           : IconButton(
@@ -429,49 +451,49 @@ class _AdminPageState extends State<AdminPage> {
               _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : SingleChildScrollView(
-                scrollDirection:
-                Axis.horizontal, // Horizontal scrolling for the table
-                child: DataTable(
-                  columns: const [
-                    DataColumn(label: Text('Site Name')),
-                    DataColumn(label: Text('Beneficiaries')),
-                    DataColumn(label: Text('Classes')),
-                    DataColumn(label: Text('Learning Pathway')),
-                    DataColumn(label: Text('Coordinates')),
-                    DataColumn(label: Text('Province')),
-                    DataColumn(label: Text('Action')),
-                  ],
-                  rows: _siteData.map<DataRow>((item) {
-                    return DataRow(cells: [
-                      DataCell(Text(item['siteName'] ?? 'N/A')),
-                      DataCell(Text(item['beneficiaries'] ?? 'N/A')),
-                      DataCell(Text(item['classes'] ?? 'N/A')),
-                      DataCell(Text(item['project_pathway'] ?? 'N/A')),
-                      DataCell(Text(item['coordinates'] ?? 'N/A')),
-                      DataCell(Text(item['province'] ?? 'N/A')),
-                      DataCell(
-                        ElevatedButton(
-                          onPressed: () {
-                            // Pass the siteID to the next page
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ClassDetailsPage(
-                                  siteID: item['siteID'].toString(),
+                      scrollDirection:
+                          Axis.horizontal, // Horizontal scrolling for the table
+                      child: DataTable(
+                        columns: const [
+                          DataColumn(label: Text('Site Name')),
+                          DataColumn(label: Text('Beneficiaries')),
+                          DataColumn(label: Text('Classes')),
+                          DataColumn(label: Text('Learning Pathway')),
+                          DataColumn(label: Text('Coordinates')),
+                          DataColumn(label: Text('Province')),
+                          DataColumn(label: Text('Action')),
+                        ],
+                        rows: _siteData.map<DataRow>((item) {
+                          return DataRow(cells: [
+                            DataCell(Text(item['siteName'] ?? 'N/A')),
+                            DataCell(Text(item['beneficiaries'] ?? 'N/A')),
+                            DataCell(Text(item['classes'] ?? 'N/A')),
+                            DataCell(Text(item['project_pathway'] ?? 'N/A')),
+                            DataCell(Text(item['coordinates'] ?? 'N/A')),
+                            DataCell(Text(item['province'] ?? 'N/A')),
+                            DataCell(
+                              ElevatedButton(
+                                onPressed: () {
+                                  // Pass the siteID to the next page
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => ClassDetailsPage(
+                                        siteID: item['siteID'].toString(),
+                                      ),
+                                    ),
+                                  );
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue,
                                 ),
+                                child: const Text('Open Class'),
                               ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                          ),
-                          child: const Text('Open Class'),
-                        ),
+                            ),
+                          ]);
+                        }).toList(),
                       ),
-                    ]);
-                  }).toList(),
-                ),
-              ),
+                    ),
             ],
           ),
         ),
