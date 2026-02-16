@@ -57,7 +57,8 @@ build/
 # Git backup
 .git_backup_corrupted/
 
-# Large files
-*.hprof
-*.sql
-android/*.hprof
+# APK files - don't upload
+*.apk
+*.aab
+build/
+android/app/build/
