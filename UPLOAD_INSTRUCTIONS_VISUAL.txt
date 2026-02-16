@@ -1,0 +1,254 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                   📤 UPLOAD INSTRUCTIONS - CLASS FILTERING                   ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ CURRENT SITUATION                                                            │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    YOUR WORKSPACE                          LIVE SERVER
+    ┌─────────────────┐                    ┌─────────────────┐
+    │ get_learners_   │                    │ get_learners_   │
+    │ with_poe_       │                    │ with_poe_       │
+    │ assigned.php    │                    │ assigned.php    │
+    │                 │                    │                 │
+    │ ✅ HAS CLASS    │                    │ ❌ NO CLASS     │
+    │    FILTERING    │                    │    FILTERING    │
+    └─────────────────┘                    └─────────────────┘
+           ↓                                        ↑
+           └────────── NEEDS UPLOAD ────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ STEP 1: LOCATE THE FILE                                                      │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    📁 Your Workspace Root Directory
+        │
+        ├── 📄 get_learners_with_poe_assigned.php  ← THIS FILE
+        ├── 📄 connection.php
+        ├── 📄 login.php
+        └── ... (other PHP files)
+
+    File Size: ~30 KB
+    Contains: Class filtering functions
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ STEP 2: UPLOAD THE FILE                                                      │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ METHOD A: FTP/SFTP (FileZilla, WinSCP, etc.)                           │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    1. Open your FTP client
+    2. Connect to: rlms.rlms.co.za
+    3. Navigate to: /public_html (or root directory)
+    4. Find: get_learners_with_poe_assigned.php
+    5. Upload: Drag and drop from workspace
+    6. Confirm: Overwrite existing file
+    
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ METHOD B: cPanel File Manager                                           │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    1. Login to cPanel
+    2. Click: File Manager
+    3. Navigate to: public_html (or root directory)
+    4. Click: Upload button
+    5. Select: get_learners_with_poe_assigned.php from workspace
+    6. Confirm: Overwrite existing file
+    
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ METHOD C: SSH/SCP (if you have command line access)                    │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    scp get_learners_with_poe_assigned.php user@rlms.rlms.co.za:/path/to/root/
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ STEP 3: VERIFY UPLOAD                                                        │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ OPTION 1: Run Batch File (Easiest)                                     │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    Double-click: VERIFY_SERVER_UPLOAD.bat
+    
+    This will open 3 browser tabs:
+    ✅ Server version check
+    ✅ Database test
+    ✅ API test
+    
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ OPTION 2: Manual Browser Check                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    Open in browser:
+    https://rlms.rlms.co.za/check_server_version.php
+    
+    Expected Output:
+    ┌───────────────────────────────────────────────────────────────────────┐
+    │ Server Version Check                                                  │
+    │                                                                       │
+    │ ✅ NEW VERSION DETECTED - File has class filtering code              │
+    │ ✅ getModeratorClasses() function is present                         │
+    │ ✅ getAvailableLearnersByStrata() has moderatorId parameter          │
+    │ ✅ Class filtering logic is present                                  │
+    │                                                                       │
+    │ ✅ Server is UP TO DATE                                              │
+    └───────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ STEP 4: TEST THE API                                                         │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    Open in browser:
+    https://rlms.rlms.co.za/get_learners_with_poe_assigned.php?moderator_id=77
+    
+    Expected JSON Response:
+    ┌───────────────────────────────────────────────────────────────────────┐
+    │ {                                                                     │
+    │   "status": "success",                                                │
+    │   "data": {                                                           │
+    │     "total_learners_with_poe": 3,                                     │
+    │     "selected_count": 1,                                              │
+    │     "learners": [                                                     │
+    │       {                                                               │
+    │         "LearnerID": "...",                                           │
+    │         "Name": "...",                                                │
+    │         "Surname": "...",                                             │
+    │         "classID": "74",          ← Must be 74 (Class A)             │
+    │         "className": "Class A",   ← Must be Class A                  │
+    │         "siteID": "Randgate hall" ← Must be Randgate hall            │
+    │       }                                                               │
+    │     ],                                                                │
+    │     "sampling_method": "stratified_comprehensive"                     │
+    │   }                                                                   │
+    │ }                                                                     │
+    └───────────────────────────────────────────────────────────────────────┘
+    
+    ✅ VERIFY: All learners have classID = "74"
+    ✅ VERIFY: All learners have className = "Class A"
+    ✅ VERIFY: No learners from other classes
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ STEP 5: TEST IN MOBILE APP                                                   │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    1. Open mobile app
+    2. Login as moderator 77
+    3. Navigate to ModeratorPage
+    4. Trigger sampling (if needed)
+    
+    Expected Result:
+    ┌───────────────────────────────────────────────────────────────────────┐
+    │ ModeratorPage                                                         │
+    │                                                                       │
+    │ Learners for Moderation:                                              │
+    │                                                                       │
+    │ ┌─────────────────────────────────────────────────────────────────┐  │
+    │ │ 👤 John Doe                                                     │  │
+    │ │    Class: Class A                                               │  │
+    │ │    Site: Randgate hall                                          │  │
+    │ └─────────────────────────────────────────────────────────────────┘  │
+    │                                                                       │
+    │ ✅ Only Class A learners shown                                        │
+    │ ✅ No learners from other classes                                     │
+    └───────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ WHAT HAPPENS AFTER UPLOAD?                                                   │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    BEFORE UPLOAD:                      AFTER UPLOAD:
+    ┌─────────────────────┐            ┌─────────────────────┐
+    │ Moderator 77        │            │ Moderator 77        │
+    │        ↓            │            │        ↓            │
+    │ Get ALL learners    │            │ Check facilitator   │
+    │        ↓            │            │ table               │
+    │ Sample from ALL     │            │        ↓            │
+    │ classes             │            │ Get Class A (74)    │
+    │        ↓            │            │        ↓            │
+    │ Returns learners    │            │ Get learners from   │
+    │ from ANY class      │            │ Class A ONLY        │
+    │                     │            │        ↓            │
+    │ ❌ WRONG            │            │ Sample from Class A │
+    │                     │            │        ↓            │
+    │                     │            │ Returns Class A     │
+    │                     │            │ learners ONLY       │
+    │                     │            │                     │
+    │                     │            │ ✅ CORRECT          │
+    └─────────────────────┘            └─────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ TROUBLESHOOTING                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    ❌ Problem: Server shows "OLD VERSION DETECTED"
+    ✅ Solution: 
+       - Clear browser cache
+       - Verify file was uploaded correctly
+       - Check file permissions (should be 644)
+       - Refresh the page
+    
+    ❌ Problem: No learners returned
+    ✅ Solution:
+       - Check moderator has classes in facilitator table
+       - Run: https://rlms.rlms.co.za/test_moderator_77_data.php
+       - Verify database has correct data
+    
+    ❌ Problem: Wrong learners shown
+    ✅ Solution:
+       - Verify classID values in facilitator table
+       - Check moderator_id parameter is correct
+       - Review database for inconsistencies
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ QUICK REFERENCE                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    File to Upload:
+    📄 get_learners_with_poe_assigned.php
+    
+    Upload Location:
+    🌐 https://rlms.rlms.co.za/get_learners_with_poe_assigned.php
+    
+    Verification URL:
+    🔍 https://rlms.rlms.co.za/check_server_version.php
+    
+    Test API URL:
+    🧪 https://rlms.rlms.co.za/get_learners_with_poe_assigned.php?moderator_id=77
+    
+    Test Database URL:
+    📊 https://rlms.rlms.co.za/test_moderator_77_data.php
+    
+    Batch File:
+    ⚡ VERIFY_SERVER_UPLOAD.bat
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ DOCUMENTATION                                                                 │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    📚 Detailed Guides:
+       - DEPLOY_CLASS_FILTERING_NOW.md
+       - CLASS_FILTERING_DEPLOYMENT_CHECKLIST.md
+       - UPLOAD_REQUIRED_SUMMARY.md
+    
+    📖 Technical Details:
+       - MODERATION_SAMPLING_CLASS_FILTERING_COMPLETE.md
+       - MODERATOR_CLASS_FILTERING_SUMMARY.md
+       - MODERATOR_CLASS_FILTERING_DEPLOYMENT_STATUS.md
+    
+    🔧 Quick Reference:
+       - QUICK_FIX_CLASS_FILTERING.txt
+       - QUICK_REFERENCE_MODERATOR_CLASS_FILTERING.md
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                            ✅ READY TO DEPLOY                                ║
+║                                                                              ║
+║  The code is complete and tested. Just upload the file and verify!          ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝

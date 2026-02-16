@@ -1,0 +1,90 @@
+╔══════════════════════════════════════════════════════════════════╗
+║                  POE UPLOAD FIX - QUICK REFERENCE                ║
+╚══════════════════════════════════════════════════════════════════╝
+
+PROBLEM:
+  Upload fails with: "Chunk file not found in request"
+
+CAUSE:
+  Server's post_max_size (2M) < Chunk size (2.5MB)
+
+FIX (5 MINUTES):
+  1. Upload .htaccess_poe_upload to server
+  2. Rename to .htaccess
+  3. Restart Apache: sudo service apache2 restart
+  4. Test upload
+
+VERIFY:
+  Visit: rlms.rlms.co.za/mobile/check_php_upload_limits.php
+  Should show:
+    ✓ upload_max_filesize: 200M
+    ✓ post_max_size: 200M
+    ✓ max_execution_time: 7200
+
+TEST:
+  1. Open app
+  2. Go to learner SDP page
+  3. Click "Scan POE Document"
+  4. Scan 50 pages
+  5. Upload
+  6. Should work! ✓
+
+FILES:
+  .htaccess_poe_upload          → Server config (rename to .htaccess)
+  POE_UPLOAD_FIX_SUMMARY.md     → Complete summary
+  POE_UPLOAD_CHUNK_ERROR_FIX.md → Detailed explanation
+  DEPLOY_POE_UPLOAD_FIX.md      → Deployment checklist
+  POE_UPLOAD_ERROR_EXPLAINED.txt → Visual diagrams
+
+DEPLOYMENT COMMANDS:
+  # Upload file
+  scp .htaccess_poe_upload user@rlms.rlms.co.za:/path/to/mobile/
+  
+  # SSH to server
+  ssh user@rlms.rlms.co.za
+  cd /path/to/mobile/
+  
+  # Rename file
+  mv .htaccess_poe_upload .htaccess
+  
+  # Restart Apache
+  sudo service apache2 restart
+
+EXPECTED RESULT:
+  Before: Scan → Upload → ✗ Error
+  After:  Scan → Upload → ✓ Success!
+
+TROUBLESHOOTING:
+  Still failing?
+    → Check .htaccess is in correct directory
+    → Verify Apache allows .htaccess overrides
+    → Check Apache error logs
+    → Try php.ini approach instead
+
+  Timeout?
+    → Verify max_execution_time = 7200
+    → Check network connection
+
+  File too large?
+    → Verify upload_max_filesize = 200M
+    → Check memory_limit = 256M
+
+MULTI-PART SCANNING:
+  Scan Part 1 (50 pages) → Upload → ✓
+  Scan Part 2 (50 pages) → Upload → ✓
+  Scan Part 3 (50 pages) → Upload → ✓
+  Scan Part 4 (45 pages) → Upload → ✓
+  Total: 195 pages in 4 parts
+
+SCANNER AUTO-CLOSE:
+  After successful upload, scanner closes automatically
+  This prevents plugin crash on second scan
+  Just reopen scanner for next batch
+
+═══════════════════════════════════════════════════════════════════
+
+PRIORITY: CRITICAL
+TIME: 5 minutes
+IMPACT: Fixes all POE uploads
+
+═══════════════════════════════════════════════════════════════════

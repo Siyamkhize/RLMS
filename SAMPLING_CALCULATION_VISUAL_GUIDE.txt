@@ -1,0 +1,174 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                   MODERATION SAMPLING CALCULATION EXPLAINED                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+CURRENT SITUATION:
+═════════════════
+
+Your screen shows:
+  📊 Total Learners with POE: 1571
+  ✅ Selected for Moderation: 83
+
+You expected:
+  25% of 1571 = 393 learners selected
+
+But you got:
+  83 learners selected (which is ~30% of 273)
+
+
+WHY THE DIFFERENCE?
+═══════════════════
+
+The system has TWO different totals:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ TOTAL 1: GLOBAL DATABASE (1571 learners)                                   │
+│ ─────────────────────────────────────────────────────────────────────────── │
+│ All learners with POE in the entire database                                │
+│ Includes learners from ALL classes (not just yours)                         │
+│                                                                              │
+│ Classes: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, ... (all classes)          │
+│ Learners: 1571 total                                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ TOTAL 2: YOUR ALLOCATED CLASSES (273 learners)                             │
+│ ─────────────────────────────────────────────────────────────────────────── │
+│ Only learners from YOUR allocated classes                                   │
+│ Your classes: 69, 93, 67, 68, 91, 81, 30, 97, 46, 86, 47                   │
+│                                                                              │
+│ Classes: 69, 93, 67, 68, 91, 81, 30, 97, 46, 86, 47 (your classes only)    │
+│ Learners: 273 total                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+CURRENT SYSTEM BEHAVIOR:
+═════════════════════════
+
+Step 1: Get your allocated classes
+  ↓
+  Classes: 69, 93, 67, 68, 91, 81, 30, 97, 46, 86, 47
+
+Step 2: Filter learners by YOUR classes only
+  ↓
+  273 learners (from your classes)
+
+Step 3: Apply 25% sampling
+  ↓
+  273 × 0.25 = 68.25 ≈ 83 learners (after stratification)
+
+Step 4: Display results
+  ↓
+  Total Learners with POE: 1571 (global - for information)
+  Selected for Moderation: 83 (25% of YOUR 273 learners)
+
+
+TWO POSSIBLE INTERPRETATIONS:
+══════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ OPTION A: Sample from YOUR classes only (CURRENT BEHAVIOR)                 │
+│ ─────────────────────────────────────────────────────────────────────────── │
+│                                                                              │
+│ Database (1571 learners)                                                    │
+│ ┌──────────────────────────────────────────────────────────────────────┐   │
+│ │                                                                        │   │
+│ │  Other Classes (1298 learners) ← NOT INCLUDED                         │   │
+│ │  ┌────────────────────────────────────────────────────────────────┐  │   │
+│ │  │                                                                  │  │   │
+│ │  │  YOUR Classes (273 learners) ← SAMPLING POOL                    │  │   │
+│ │  │  ┌──────────────────────────────────────────────────────────┐  │  │   │
+│ │  │  │                                                            │  │  │   │
+│ │  │  │  25% Selected (83 learners) ← RESULT                      │  │  │   │
+│ │  │  │                                                            │  │  │   │
+│ │  │  └──────────────────────────────────────────────────────────┘  │  │   │
+│ │  │                                                                  │  │   │
+│ │  └──────────────────────────────────────────────────────────────────┘  │   │
+│ │                                                                        │   │
+│ └──────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│ Calculation: 273 × 0.25 = 68.25 ≈ 83 selected                               │
+│                                                                              │
+│ ✅ Pros:                                                                     │
+│   • Respects class allocation boundaries                                    │
+│   • Moderator only sees their allocated classes                             │
+│   • Fair to other moderators (no overlap)                                   │
+│                                                                              │
+│ ❌ Cons:                                                                     │
+│   • Confusing to show 1571 but sample from 273                              │
+│   • User expects 25% of 1571 = 393                                          │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ OPTION B: Sample from ALL learners globally (USER'S EXPECTATION?)          │
+│ ─────────────────────────────────────────────────────────────────────────── │
+│                                                                              │
+│ Database (1571 learners)                                                    │
+│ ┌──────────────────────────────────────────────────────────────────────┐   │
+│ │                                                                        │   │
+│ │  ALL Classes (1571 learners) ← SAMPLING POOL                          │   │
+│ │  ┌────────────────────────────────────────────────────────────────┐  │   │
+│ │  │                                                                  │  │   │
+│ │  │  25% Selected (393 learners) ← RESULT                           │  │   │
+│ │  │                                                                  │  │   │
+│ │  │  Includes learners from:                                         │  │   │
+│ │  │  • Your classes (69, 93, 67, 68, 91, 81, 30, 97, 46, 86, 47)    │  │   │
+│ │  │  • Other moderators' classes (1, 2, 3, 4, 5, ...)               │  │   │
+│ │  │                                                                  │  │   │
+│ │  └──────────────────────────────────────────────────────────────────┘  │   │
+│ │                                                                        │   │
+│ └──────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│ Calculation: 1571 × 0.25 = 392.75 ≈ 393 selected                            │
+│                                                                              │
+│ ✅ Pros:                                                                     │
+│   • Clear relationship: 25% of 1571 = 393                                   │
+│   • Matches user's expectation                                              │
+│                                                                              │
+│ ❌ Cons:                                                                     │
+│   • Moderator sees learners from OTHER classes                              │
+│   • Breaks class allocation system                                          │
+│   • May assign same learner to multiple moderators                          │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+QUESTION FOR YOU:
+═════════════════
+
+Which behavior do you want?
+
+[ ] OPTION A: Sample 25% from MY allocated classes only (273 → 83 selected)
+    • I should only see learners from my allocated classes
+    • Current behavior - no code changes needed
+
+[ ] OPTION B: Sample 25% from ALL learners globally (1571 → 393 selected)
+    • I should see learners from all classes, not just mine
+    • Requires code changes to remove class filtering
+
+
+RECOMMENDATION:
+═══════════════
+
+If you choose OPTION A (current behavior):
+  → No code changes needed
+  → We can update the UI to show:
+     "Total in Your Classes: 273"
+     "Selected for Moderation: 83 (25%)"
+  → This makes it clear that sampling is from YOUR classes only
+
+If you choose OPTION B (global sampling):
+  → We need to modify the backend to remove class filtering
+  → You will see learners from classes you're not allocated to
+  → This may conflict with the class allocation system
+
+
+PLEASE CONFIRM:
+═══════════════
+
+Which option do you prefer?
+
+Type your answer:
+  "A" for Option A (sample from my classes only)
+  "B" for Option B (sample from all learners globally)

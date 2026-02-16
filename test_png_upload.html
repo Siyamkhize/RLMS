@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test PNG Upload</title>
+</head>
+<body>
+    <h2>Test PNG Upload for "Other" Document Type</h2>
+    
+    <form id="testForm">
+        <div>
+            <label>Document Type:</label>
+            <select id="documentType" name="documentType">
+                <option value="ID Document">ID Document</option>
+                <option value="Other">Other</option>
+            </select>
+        </div>
+        <br>
+        <div>
+            <label>File:</label>
+            <input type="file" id="fileInput" name="learner_document" accept="*">
+        </div>
+        <br>
+        <button type="button" onclick="testUpload()">Test Upload</button>
+    </form>
+    
+    <div id="result"></div>
+    
+    <script>
+    function testUpload() {
+        const fileInput = document.getElementById('fileInput');
+        const documentType = document.getElementById('documentType').value;
+        const file = fileInput.files[0];
+        
+        if (!file) {
+            document.getElementById('result').innerHTML = '<p style="color: red;">Please select a file</p>';
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('learner_document', file);
+        formData.append('documentType', documentType);
+        
+        console.log('Sending:', {
+            documentType: documentType,
+            fileName: file.name,
+            fileType: file.type
+        });
+        
+        fetch('upload_temp_document.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Response:', data);
+            document.getElementById('result').innerHTML = 
+                '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('result').innerHTML = 
+                '<p style="color: red;">Error: ' + error + '</p>';
+        });
+    }
+    </script>
+</body>
+</html>

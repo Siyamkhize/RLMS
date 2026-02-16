@@ -1,0 +1,251 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    SINGLE SMART BUTTON - USER FLOW                           ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+                              ┌─────────────────────┐
+                              │   USER OPENS PAGE   │
+                              └──────────┬──────────┘
+                                         │
+                                         ▼
+                              ┌─────────────────────┐
+                              │  BUTTON INITIAL     │
+                              │  "Open Checklist"   │
+                              │  🟠 ORANGE          │
+                              │  📁 Folder Icon     │
+                              └──────────┬──────────┘
+                                         │
+                                         │ USER CLICKS
+                                         ▼
+                              ┌─────────────────────┐
+                              │  CHECK STATUS       │
+                              │  • Local Database   │
+                              │  • Server (if online│
+                              └──────────┬──────────┘
+                                         │
+                    ┌────────────────────┼────────────────────┐
+                    │                    │                    │
+                    ▼                    ▼                    ▼
+         ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+         │  SCANNED FOUND   │ │  SYSTEM FOUND    │ │  NONE FOUND      │
+         └────────┬─────────┘ └────────┬─────────┘ └────────┬─────────┘
+                  │                    │                    │
+                  ▼                    ▼                    ▼
+         ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+         │  BUTTON CHANGES  │ │  BUTTON CHANGES  │ │  BUTTON CHANGES  │
+         │  "View Scanned   │ │  "View Checklist"│ │  "Create         │
+         │   Document"      │ │  🔵 BLUE         │ │   Checklist"     │
+         │  🔵 BLUE         │ │  👁️ Eye Icon     │ │  🟢 GREEN        │
+         │  📄 PDF Icon     │ └────────┬─────────┘ │  ➕ Add Icon     │
+         └────────┬─────────┘          │           └────────┬─────────┘
+                  │                    │                    │
+                  │ USER CLICKS        │ USER CLICKS        │ USER CLICKS
+                  ▼                    ▼                    ▼
+         ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+         │  OPEN PDF        │ │  LOAD FORM DATA  │ │  SHOW DIALOG     │
+         │  VIEWER          │ │  INTO FORM       │ │  • Scan Document │
+         └──────────────────┘ └──────────────────┘ │  • Fill Form     │
+                                                    └────────┬─────────┘
+                                                             │
+                                                ┌────────────┴────────────┐
+                                                │                         │
+                                                ▼                         ▼
+                                     ┌──────────────────┐    ┌──────────────────┐
+                                     │  USER SELECTS    │    │  USER SELECTS    │
+                                     │  "Scan Document" │    │  "Fill Form"     │
+                                     └────────┬─────────┘    └────────┬─────────┘
+                                              │                       │
+                                              ▼                       ▼
+                                     ┌──────────────────┐    ┌──────────────────┐
+                                     │  OPEN CAMERA     │    │  USER FILLS      │
+                                     │  SCANNER         │    │  FORM BELOW      │
+                                     └────────┬─────────┘    └────────┬─────────┘
+                                              │                       │
+                                              ▼                       ▼
+                                     ┌──────────────────┐    ┌──────────────────┐
+                                     │  SCAN & SAVE     │    │  CLICK SAVE      │
+                                     │  DOCUMENT        │    │  BUTTON          │
+                                     └────────┬─────────┘    └────────┬─────────┘
+                                              │                       │
+                                              ▼                       ▼
+                                     ┌──────────────────┐    ┌──────────────────┐
+                                     │  BUTTON BECOMES  │    │  BUTTON BECOMES  │
+                                     │  "View Scanned   │    │  "View Checklist"│
+                                     │   Document"      │    │  🔵 BLUE         │
+                                     │  🔵 BLUE         │    └──────────────────┘
+                                     └──────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         BUTTON STATE DIAGRAM                                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                        INITIAL STATE                             │
+    │  ┌────────────────────────────────────────────────────────────┐ │
+    │  │  Label: "Open Checklist"                                   │ │
+    │  │  Color: 🟠 Orange                                          │ │
+    │  │  Icon:  📁 Folder                                          │ │
+    │  │  Action: Check if checklist exists                         │ │
+    │  └────────────────────────────────────────────────────────────┘ │
+    └───────────────────────────┬─────────────────────────────────────┘
+                                │
+                                │ CLICK
+                                ▼
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                      CHECKING STATE                              │
+    │  ┌────────────────────────────────────────────────────────────┐ │
+    │  │  Label: "Checking..."                                      │ │
+    │  │  Color: 🟠 Orange                                          │ │
+    │  │  Icon:  ⏳ Loading Spinner                                 │ │
+    │  │  Action: Querying database and server                      │ │
+    │  └────────────────────────────────────────────────────────────┘ │
+    └───────────────────────────┬─────────────────────────────────────┘
+                                │
+                ┌───────────────┼───────────────┐
+                │               │               │
+                ▼               ▼               ▼
+    ┌──────────────────┐ ┌──────────────┐ ┌──────────────────┐
+    │  SCANNED STATE   │ │ SYSTEM STATE │ │  EMPTY STATE     │
+    ├──────────────────┤ ├──────────────┤ ├──────────────────┤
+    │ "View Scanned    │ │ "View        │ │ "Create          │
+    │  Document"       │ │  Checklist"  │ │  Checklist"      │
+    │ 🔵 Blue          │ │ 🔵 Blue      │ │ 🟢 Green         │
+    │ 📄 PDF           │ │ 👁️ Eye       │ │ ➕ Add           │
+    │                  │ │              │ │                  │
+    │ CLICK → Open PDF │ │ CLICK → Load │ │ CLICK → Show     │
+    │         Viewer   │ │         Form │ │         Options  │
+    └──────────────────┘ └──────────────┘ └──────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                      COLOR CODING MEANING                                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+    🟠 ORANGE  →  "I need to check something"
+                  (Initial state, checking status)
+
+    🔵 BLUE    →  "Something exists, I can show it to you"
+                  (View scanned document or view system checklist)
+
+    🟢 GREEN   →  "Nothing exists yet, let's create something"
+                  (Create new checklist)
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                      ICON MEANING                                            ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+    📁 Folder      →  "Open/Check for checklist"
+    ⏳ Spinner     →  "Loading/Checking..."
+    📄 PDF         →  "View scanned document"
+    👁️ Eye         →  "View/Read checklist"
+    ➕ Add         →  "Create new checklist"
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    OFFLINE vs ONLINE BEHAVIOR                                ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+    OFFLINE MODE
+    ════════════
+    ┌─────────────────────────────────────────────────────────────┐
+    │  1. Check LOCAL database only                               │
+    │  2. If scanned document found → Show "View Scanned Document"│
+    │  3. If nothing found → Show "Create Checklist"              │
+    │  4. System checklists NOT available (need server)           │
+    └─────────────────────────────────────────────────────────────┘
+
+    ONLINE MODE
+    ═══════════
+    ┌─────────────────────────────────────────────────────────────┐
+    │  1. Check LOCAL database first (fast)                       │
+    │  2. If found → Show appropriate button                      │
+    │  3. If not found → Check SERVER                             │
+    │  4. Update button based on server response                  │
+    │  5. All checklist types available                           │
+    └─────────────────────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         EXAMPLE SCENARIOS                                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+SCENARIO 1: First Time User
+═══════════════════════════
+    Step 1: User sees "Open Checklist" (🟠)
+    Step 2: User clicks button
+    Step 3: System checks → Nothing found
+    Step 4: Button becomes "Create Checklist" (🟢)
+    Step 5: User clicks → Dialog shows options
+    Step 6: User chooses "Fill Form"
+    Step 7: User fills form and saves
+    Step 8: Button becomes "View Checklist" (🔵)
+
+SCENARIO 2: Returning User (Has Scanned Doc)
+═════════════════════════════════════════════
+    Step 1: User sees "Open Checklist" (🟠)
+    Step 2: User clicks button
+    Step 3: System checks → Scanned doc found
+    Step 4: Button becomes "View Scanned Document" (🔵)
+    Step 5: User clicks → PDF opens
+    Step 6: User views their scanned checklist ✅
+
+SCENARIO 3: Returning User (Has System Checklist)
+══════════════════════════════════════════════════
+    Step 1: User sees "Open Checklist" (🟠)
+    Step 2: User clicks button
+    Step 3: System checks → System checklist found
+    Step 4: Button becomes "View Checklist" (🔵)
+    Step 5: User clicks → Form loads with data
+    Step 6: User views/edits their checklist ✅
+
+SCENARIO 4: Offline User Wants to Scan
+═══════════════════════════════════════
+    Step 1: User sees "Open Checklist" (🟠)
+    Step 2: User clicks button (no internet)
+    Step 3: System checks local → Nothing found
+    Step 4: Button becomes "Create Checklist" (🟢)
+    Step 5: User clicks → Dialog shows options
+    Step 6: User chooses "Scan Document"
+    Step 7: Camera opens, user scans
+    Step 8: Document saved locally
+    Step 9: Button becomes "View Scanned Document" (🔵)
+    Step 10: When online → Auto-syncs to server ✅
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                      KEY ADVANTAGES                                          ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+    ✅ SINGLE BUTTON
+       • No confusion about which button to press
+       • Clear, focused interface
+       • One action at a time
+
+    ✅ SELF-EXPLANATORY
+       • Button label tells you exactly what will happen
+       • No guessing required
+       • Reduces user errors
+
+    ✅ ADAPTIVE
+       • Changes based on context
+       • Shows relevant action
+       • Guides user through process
+
+    ✅ VISUAL FEEDBACK
+       • Color indicates status
+       • Icon reinforces action
+       • Clear state transitions
+
+    ✅ EFFICIENT
+       • Fewer clicks to accomplish task
+       • No unnecessary dialogs
+       • Direct path to goal
+
+    ✅ OFFLINE CAPABLE
+       • Works without internet
+       • Checks local first
+       • Graceful degradation
+
+
+═══════════════════════════════════════════════════════════════════════════════

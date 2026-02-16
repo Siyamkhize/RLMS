@@ -1,0 +1,193 @@
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                    MODERATOR CLASS FILTERING FLOW DIAGRAM                     ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+BEFORE (Old System):
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────┐
+│  Moderator A    │
+│  (ID: 123)      │
+└────────┬────────┘
+         │
+         │ Request Sampling
+         ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         ALL LEARNERS WITH POE                               │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │
+│  │ Class A  │  │ Class B  │  │ Class C  │  │ Class D  │  │ Class E  │    │
+│  │ 20 lrnrs │  │ 15 lrnrs │  │ 25 lrnrs │  │ 18 lrnrs │  │ 22 lrnrs │    │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘  └──────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+         │
+         │ Sample 25% from ALL classes
+         ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    ASSIGNED TO MODERATOR A                                  │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │
+│  │ Class A  │  │ Class B  │  │ Class C  │  │ Class D  │  │ Class E  │    │
+│  │ 5 lrnrs  │  │ 4 lrnrs  │  │ 6 lrnrs  │  │ 5 lrnrs  │  │ 5 lrnrs  │    │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘  └──────────┘    │
+│                                                                             │
+│  ❌ PROBLEM: Moderator A sees learners from ALL classes!                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+AFTER (New System with Class Filtering):
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────┐
+│  Moderator A    │
+│  (ID: 123)      │
+└────────┬────────┘
+         │
+         │ Request Sampling
+         ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    STEP 1: GET MODERATOR'S CLASSES                          │
+│                                                                             │
+│  Query: SELECT classID FROM facilitator WHERE facilitator_id = '123'       │
+│                                                                             │
+│  Result: Moderator A is allocated to:                                      │
+│  ┌──────────┐  ┌──────────┐                                                │
+│  │ Class A  │  │ Class C  │                                                │
+│  └──────────┘  └──────────┘                                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                STEP 2: FILTER LEARNERS BY MODERATOR'S CLASSES               │
+│                                                                             │
+│  ALL LEARNERS WITH POE:                                                     │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │
+│  │ Class A  │  │ Class B  │  │ Class C  │  │ Class D  │  │ Class E  │    │
+│  │ 20 lrnrs │  │ 15 lrnrs │  │ 25 lrnrs │  │ 18 lrnrs │  │ 22 lrnrs │    │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘  └──────────┘    │
+│       ✓             ✗             ✓             ✗             ✗           │
+│   (included)    (excluded)    (included)    (excluded)    (excluded)      │
+│                                                                             │
+│  FILTERED RESULT (Only Moderator A's classes):                             │
+│  ┌──────────┐  ┌──────────┐                                                │
+│  │ Class A  │  │ Class C  │                                                │
+│  │ 20 lrnrs │  │ 25 lrnrs │                                                │
+│  └──────────┘  └──────────┘                                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+         │
+         │ Sample 25% from FILTERED classes only
+         ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    STEP 3: STRATIFIED SAMPLING (25%)                        │
+│                                                                             │
+│  Apply stratification across 5 dimensions:                                 │
+│  • Class (A, C)                                                             │
+│  • Site                                                                     │
+│  • POE Completeness (Complete/Partial/Incomplete)                          │
+│  • Marking Status (Marked/Not Marked)                                      │
+│  • Performance Level (High/Medium/Low/Not Assessed)                        │
+│                                                                             │
+│  Sample 25% from each stratum:                                             │
+│  ┌──────────┐  ┌──────────┐                                                │
+│  │ Class A  │  │ Class C  │                                                │
+│  │ 5 lrnrs  │  │ 6 lrnrs  │                                                │
+│  └──────────┘  └──────────┘                                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    ASSIGNED TO MODERATOR A                                  │
+│  ┌──────────┐  ┌──────────┐                                                │
+│  │ Class A  │  │ Class C  │                                                │
+│  │ 5 lrnrs  │  │ 6 lrnrs  │                                                │
+│  └──────────┘  └──────────┘                                                │
+│                                                                             │
+│  ✅ SUCCESS: Moderator A only sees learners from their allocated classes!  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+MULTIPLE MODERATORS SCENARIO:
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
+│  Moderator A    │         │  Moderator B    │         │  Moderator C    │
+│  (ID: 123)      │         │  (ID: 456)      │         │  (ID: 789)      │
+└────────┬────────┘         └────────┬────────┘         └────────┬────────┘
+         │                           │                           │
+         │ Allocated Classes:        │ Allocated Classes:        │ Allocated Classes:
+         │ • Class A                 │ • Class B                 │ • Class D
+         │ • Class C                 │ • Class E                 │ • Class E
+         │                           │                           │
+         ▼                           ▼                           ▼
+┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
+│ Gets learners   │         │ Gets learners   │         │ Gets learners   │
+│ from:           │         │ from:           │         │ from:           │
+│ • Class A       │         │ • Class B       │         │ • Class D       │
+│ • Class C       │         │ • Class E       │         │ • Class E       │
+└─────────────────┘         └─────────────────┘         └─────────────────┘
+
+✅ No overlap between moderators (except shared classes like E)
+✅ Each moderator only sees their scope
+✅ Fair workload distribution within each moderator's classes
+
+
+DATABASE RELATIONSHIPS:
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────┐
+│   facilitator       │  ← Links moderators to classes
+├─────────────────────┤
+│ facilitator_id (PK) │  ← Moderator ID
+│ classID             │  ← Class ID
+│ ...                 │
+└──────────┬──────────┘
+           │
+           │ JOIN
+           ▼
+┌─────────────────────┐
+│   class             │  ← Class information
+├─────────────────────┤
+│ classID (PK)        │
+│ className           │
+│ siteID              │
+│ ...                 │
+└──────────┬──────────┘
+           │
+           │ JOIN
+           ▼
+┌─────────────────────┐
+│   learnerdetails    │  ← Learner information
+├─────────────────────┤
+│ LearnerID (PK)      │
+│ classID (FK)        │  ← Links learner to class
+│ Name                │
+│ Surname             │
+│ ...                 │
+└──────────┬──────────┘
+           │
+           │ JOIN
+           ▼
+┌─────────────────────┐
+│   poe               │  ← POE documents
+├─────────────────────┤
+│ learnerID (FK)      │
+│ filePath            │
+│ exercise            │
+│ ...                 │
+└─────────────────────┘
+
+
+KEY POINTS:
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ Moderators must be in facilitator table with their classes
+✅ One moderator can have multiple classes
+✅ Multiple moderators can share the same class
+✅ Learners are filtered by moderator's classes BEFORE sampling
+✅ Stratified sampling (25%) still applies within filtered pool
+✅ No database schema changes required
+✅ Backward compatible with existing data
+
+⚠️  If moderator has NO classes in facilitator table → sees 0 learners
+⚠️  If moderator's classes have NO learners with POE → sees 0 learners
+⚠️  If all eligible learners already assigned → sees 0 learners
+
+═══════════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,186 @@
+BULK DOCUMENT DOWNLOAD - SYSTEM FLOW
+=====================================
+
+USER INTERFACE (bulk_down_register.php)
+┌─────────────────────────────────────────────────────────────┐
+│  1. User selects filters:                                   │
+│     - District: "Gauteng"                                   │
+│     - Site: "Johannesburg Central"                          │
+│     - Date Range: 2024-01-01 to 2024-03-31                 │
+│                                                              │
+│  2. User clicks "📈 Generate Report"                        │
+│     → Displays learners in table                            │
+│                                                              │
+│  3. User clicks "📎 Bulk Download Documents" button         │
+│     → JavaScript: startBulkDownloadDocuments()              │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│  JAVASCRIPT PROCESSING                                       │
+│  ─────────────────────────                                  │
+│  • Extract learner IDs from table                           │
+│  • Get date range from form                                 │
+│  • Show confirmation dialog                                 │
+│  • Display progress indicator                               │
+│  • Make AJAX POST request to:                               │
+│    bulk_download_documents.php                              │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│  BACKEND PROCESSING (bulk_download_documents.php)           │
+│  ────────────────────────────────────────────────           │
+│                                                              │
+│  FOR EACH LEARNER:                                          │
+│  ┌────────────────────────────────────────────────┐        │
+│  │ 1. Get learner details from database           │        │
+│  │    - Name, Surname, ID Number                  │        │
+│  │                                                 │        │
+│  │ 2. Call getLearnerDocuments()                  │        │
+│  │    ├─→ getSickNotes()                          │        │
+│  │    │   • Query sick_note table                 │        │
+│  │    │   • Check file paths                      │        │
+│  │    │   • Return array of sick notes            │        │
+│  │    │                                            │        │
+│  │    └─→ getManualRegisters()                    │        │
+│  │        • Query manual_clocking table           │        │
+│  │        • Check file paths                      │        │
+│  │        • Return array of registers             │        │
+│  │                                                 │        │
+│  │ 3. Create learner folder structure:            │        │
+│  │    temp_documents_[timestamp]/                 │        │
+│  │    └── [Surname]_[Name]_[IDNumber]/            │        │
+│  │        ├── Sick_Notes/                         │        │
+│  │        │   ├── SickNote_2024-01-15_to_...pdf   │        │
+│  │        │   └── SickNote_2024-02-20_to_...jpg   │        │
+│  │        └── Manual_Attendance/                  │        │
+│  │            ├── ManualAttendance_2024-01-10.pdf │        │
+│  │            └── ManualAttendance_2024-01-25.pdf │        │
+│  │                                                 │        │
+│  │ 4. Copy files to folders                       │        │
+│  │    • Rename with date-based naming             │        │
+│  │    • Track statistics                          │        │
+│  └────────────────────────────────────────────────┘        │
+│                                                              │
+│  5. Create ZIP file:                                        │
+│     temp_reports/Documents_[Site]_[Date].zip                │
+│                                                              │
+│  6. Add all learner folders to ZIP                          │
+│                                                              │
+│  7. Add DOWNLOAD_SUMMARY.txt                                │
+│     • Total learners processed                              │
+│     • Total documents included                              │
+│     • Any errors encountered                                │
+│                                                              │
+│  8. Clean up temporary directories                          │
+│                                                              │
+│  9. Return JSON response:                                   │
+│     {                                                        │
+│       "success": true,                                       │
+│       "download_url": "bulk_down_register.php?temp_file=...",│
+│       "stats": { ... }                                       │
+│     }                                                        │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│  JAVASCRIPT RESPONSE HANDLING                               │
+│  ────────────────────────────                               │
+│  • Update progress bar to 100%                              │
+│  • Show success message with stats                          │
+│  • Auto-download ZIP file via:                              │
+│    window.location.href = download_url                      │
+│  • Clean up progress indicator                              │
+│  • Re-enable button                                         │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│  FILE DOWNLOAD                                              │
+│  ─────────────                                              │
+│  • Browser downloads ZIP file                               │
+│  • User extracts and reviews documents                      │
+│  • Organized by learner and document type                   │
+└─────────────────────────────────────────────────────────────┘
+
+
+DATABASE TABLES USED
+====================
+
+sick_note
+─────────
+• note_id
+• learner_id
+• document_path ← File location
+• date_from
+• date_to
+• status (approved/pending/rejected)
+
+manual_clocking
+───────────────
+• manual_id
+• LearnerID
+• clock_date
+• fdp_document ← File location
+• status
+
+learnerdetails
+──────────────
+• LearnerID
+• Name
+• Surname
+• IDNumber
+• activity_statu (filter for active learners)
+
+
+FILE PATH CHECKING LOGIC
+=========================
+
+For Sick Notes:
+1. Original path from database
+2. mobile/sicknotes/[filename]
+3. /public_html/mobile/sicknotes/[filename]
+4. ../mobile/sicknotes/[filename]
+5. __DIR__/mobile/sicknotes/[filename]
+
+For Manual Registers:
+1. Original path from database
+2. uploads/[filename]
+3. /public_html/uploads/[filename]
+4. ../uploads/[filename]
+5. __DIR__/uploads/[filename]
+
+
+ERROR HANDLING
+==============
+
+✓ Learner not found → Skip, log error
+✓ Document file missing → Skip, continue with others
+✓ No documents for learner → Create NO_DOCUMENTS_FOUND.txt
+✓ ZIP creation fails → Return error JSON
+✓ Directory creation fails → Return error JSON
+✓ Database query fails → Return error JSON
+
+All errors are:
+• Logged to PHP error log
+• Included in DOWNLOAD_SUMMARY.txt
+• Returned in JSON response
+
+
+PERFORMANCE OPTIMIZATION
+========================
+
+• Direct file operations (no external tools)
+• Efficient database queries (prepared statements)
+• Single ZIP creation (no multiple archives)
+• Temporary directory cleanup
+• Progress feedback to user
+
+
+SECURITY MEASURES
+=================
+
+✓ Validate learner IDs (integer only)
+✓ Sanitize file names (remove special chars)
+✓ Check file existence before copying
+✓ Only active learners (activity_statu filter)
+✓ Date range validation
+✓ Temporary file cleanup
+✓ Error logging for audit trail

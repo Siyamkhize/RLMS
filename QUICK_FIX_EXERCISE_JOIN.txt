@@ -1,0 +1,45 @@
+========================================
+QUICK FIX: EXERCISE COLUMN JOIN
+========================================
+
+PROBLEM:
+- Marking Status always "Not Marked"
+- Performance Level always "Not Assessed"
+- Unit Standards Count always 0
+
+ROOT CAUSE:
+- marks.type column is wrong (all set to "Formative")
+- Need to join with assessments table to get correct type
+
+SOLUTION:
+Join marks with assessments using exercise column (text field)
+
+  FROM marks m
+  INNER JOIN assessments a ON m.exercise = a.exercise
+  WHERE a.assessment_type = 'Summative'
+
+FILES UPDATED:
+✅ get_learners_with_poe_assigned.php (lines 311, 356)
+✅ test_temp_tables_logic.php (lines 98, 143)
+
+UPLOAD:
+Run: UPLOAD_EXERCISE_JOIN_FIX.bat
+
+TEST:
+1. http://102.130.118.179/test_temp_tables_logic.php?moderator_id=77
+   - Check Step 3: temp_learner_marks should have ROWS
+   - Check Step 5: Should show "Marked" and performance levels
+
+2. http://102.130.118.179/get_learners_with_poe_assigned.php?moderator_id=77
+   - Check marking_status: "Marked"
+   - Check performance_level: "High"/"Medium"/"Low"
+   - Check unit_standards_count: > 0
+
+EXPECTED RESULTS:
+✅ temp_learner_marks has rows (not empty)
+✅ Marking Status: "Marked"
+✅ Performance Level: "High", "Medium", or "Low"
+✅ Unit Standards Count: > 0
+✅ Average Marks: > 0
+
+========================================

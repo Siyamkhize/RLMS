@@ -1,0 +1,167 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    MODERATION SAMPLING - UI DISPLAY GUIDE                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+WHAT THE MODERATOR WILL SEE
+═══════════════════════════════════════════════════════════════════════════════
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ MODERATOR PAGE                                                               │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  [Get Learners with POE] ← Click this button                                │
+│                                                                              │
+│  Loading... Applying stratified sampling...                                 │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+AFTER LOADING (2-5 seconds)
+═══════════════════════════════════════════════════════════════════════════════
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ SAMPLING SUMMARY                                                             │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ✓ Comprehensive stratified random sampling applied                         │
+│  ✓ 25% selected from each stratum across 5 dimensions                       │
+│                                                                              │
+│  Total Learners with POE: 50                                                │
+│  Selected for Moderation: 13                                                │
+│  Sampling Method: Stratified Comprehensive                                  │
+│  Total Strata: 8                                                            │
+│                                                                              │
+│  Stratification Dimensions:                                                 │
+│    • Class                                                                  │
+│    • Site                                                                   │
+│    • POE Completeness (Complete/Partial/Incomplete)                         │
+│    • Marking Status (Marked/Not Marked)                                     │
+│    • Performance Level (High/Medium/Low/Not Assessed)                       │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ STRATA BREAKDOWN                                                             │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Stratum 1:                                                                 │
+│    Class: Class A                                                           │
+│    Site: Site 1                                                             │
+│    POE Completeness: Complete                                               │
+│    Marking Status: Marked                                                   │
+│    Performance Level: High                                                  │
+│    Total in Stratum: 5                                                      │
+│    Selected: 2 (40%)                                                        │
+│                                                                              │
+│  Stratum 2:                                                                 │
+│    Class: Class A                                                           │
+│    Site: Site 1                                                             │
+│    POE Completeness: Partial                                                │
+│    Marking Status: Marked                                                   │
+│    Performance Level: Medium                                                │
+│    Total in Stratum: 8                                                      │
+│    Selected: 2 (25%)                                                        │
+│                                                                              │
+│  Stratum 3:                                                                 │
+│    Class: Class B                                                           │
+│    Site: Site 2                                                             │
+│    POE Completeness: Complete                                               │
+│    Marking Status: Not Marked                                               │
+│    Performance Level: Not Assessed                                          │
+│    Total in Stratum: 12                                                     │
+│    Selected: 3 (25%)                                                        │
+│                                                                              │
+│  ... (more strata)                                                          │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ LEARNERS LIST                                                                │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  1. John Doe (ID: 12345)                                                    │
+│     Class: Class A | Site: Site 1                                           │
+│     POE: Complete (5 docs) | Marked | Performance: High                     │
+│     [View Details] [Moderate]                                               │
+│                                                                              │
+│  2. Jane Smith (ID: 12346)                                                  │
+│     Class: Class A | Site: Site 1                                           │
+│     POE: Partial (2 docs) | Marked | Performance: Medium                    │
+│     [View Details] [Moderate]                                               │
+│                                                                              │
+│  3. Bob Johnson (ID: 12347)                                                 │
+│     Class: Class B | Site: Site 2                                           │
+│     POE: Complete (4 docs) | Not Marked | Performance: Not Assessed         │
+│     [View Details] [Moderate]                                               │
+│                                                                              │
+│  ... (more learners)                                                        │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+WHAT EACH FIELD MEANS
+═══════════════════════════════════════════════════════════════════════════════
+
+POE Completeness:
+  • Complete   - 3 or more POE documents across all tables
+  • Partial    - 1-2 POE documents
+  • Incomplete - 0 POE documents
+
+Marking Status:
+  • Marked     - Has assessment marks in marks or logbook_marks tables
+  • Not Marked - No assessment marks yet
+
+Performance Level:
+  • High          - Average marks 70% or higher
+  • Medium        - Average marks 50-69%
+  • Low           - Average marks below 50%
+  • Not Assessed  - No marks available
+
+IMPORTANT NOTES
+═══════════════════════════════════════════════════════════════════════════════
+
+1. PERSISTENT ASSIGNMENT
+   Once you get your learners, they are saved to your account.
+   Clicking "Get Learners with POE" again will show the SAME learners.
+   This ensures consistency in moderation.
+
+2. FAIR REPRESENTATION
+   The 25% sampling ensures you get a fair mix of:
+   • Different classes and sites
+   • Learners with complete and incomplete POE
+   • Both marked and unmarked learners
+   • High, medium, and low performers
+
+3. NO "UNKNOWN" VALUES
+   All stratification data is calculated and stored.
+   You should NOT see "Unknown" for any field.
+   If you do, there's a data issue.
+
+4. FAST LOADING
+   First time: 2-5 seconds (calculates and stores)
+   Subsequent times: <1 second (retrieves stored data)
+
+TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════════
+
+If you see errors:
+  ✗ "Unknown column 'class_id'"
+    → Upload the fixed get_learners_with_poe_assigned.php file
+
+  ✗ "504 Gateway Timeout"
+    → The fix reduces query complexity and adds limits
+
+  ✗ "Unknown system variable"
+    → The fix removes MariaDB incompatible commands
+
+  ✗ All fields show "Unknown"
+    → Table columns missing - API will add them automatically
+
+If you see "Unknown" values:
+  • Check that learners have class assignments
+  • Check that POE documents are uploaded
+  • Check that marks are recorded
+
+To reset your assignment:
+  • Ask admin to run: TRUNCATE TABLE moderator_assignments;
+  • Then click "Get Learners with POE" again for new random sample
+
+═══════════════════════════════════════════════════════════════════════════════

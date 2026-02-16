@@ -1,0 +1,101 @@
+╔═══════════════════════════════════════════════════════════════╗
+║                  ✅ COMBINED FILE READY ✅                    ║
+╚═══════════════════════════════════════════════════════════════╝
+
+ONE FILE DOES EVERYTHING:
+═══════════════════════════════════════════════════════════════
+
+  📄 test_live_poe_direct.php
+
+  This file now works in TWO MODES:
+  
+  1. Command Line Test (for testing)
+  2. HTTP API Endpoint (for production)
+
+
+RUN THIS COMMAND NOW:
+═══════════════════════════════════════════════════════════════
+
+  php test_live_poe_direct.php
+
+
+WHAT YOU'LL SEE:
+═══════════════════════════════════════════════════════════════
+
+  === SIMPLE POE QUERY TEST (LIVE SERVER) ===
+  Server: rlms.rlms.co.za
+  Moderator ID: 77
+  
+  ✅ Database connected
+  
+  Step 1: Getting moderator's classes...
+  Found 13 classes: 69, 93, 67, 68, 91, 81, 30, 97, 46, 86, 47
+  
+  Step 2: Getting learners with POE...
+  ✅ Query completed successfully
+  
+  === RESULTS ===
+  
+  Total learners with POE: 1571
+  
+  ✅ SUCCESS! Got 1571 learners (expected ~1571)
+  
+  First 10 learners:
+    1. Surname, Name (ID: 123, Class: Class Name)
+    ...
+  
+  === TEST COMPLETE ===
+
+
+AFTER TESTING:
+═══════════════════════════════════════════════════════════════
+
+If test is successful:
+
+1. Upload the SAME file to server:
+   https://rlms.rlms.co.za/mobile/test_live_poe_direct.php
+
+2. Test via HTTP:
+   https://rlms.rlms.co.za/mobile/test_live_poe_direct.php?moderator_id=77
+
+3. Update Flutter app to use this endpoint
+
+
+WHY THIS IS BETTER:
+═══════════════════════════════════════════════════════════════
+
+BEFORE:
+  ❌ test_live_poe_direct.php (test only)
+  ❌ get_learners_with_poe_simple.php (API only)
+  ❌ Two files to maintain
+  ❌ Two files to upload
+
+NOW:
+  ✅ test_live_poe_direct.php (test + API)
+  ✅ ONE file does everything
+  ✅ Test locally, upload once
+  ✅ Automatic mode detection
+
+
+HOW IT WORKS:
+═══════════════════════════════════════════════════════════════
+
+The file detects how it's being run:
+
+  Command Line:
+    php test_live_poe_direct.php
+    → Shows detailed test output
+    → Uses moderator ID 77
+    → Perfect for testing
+
+  HTTP Request:
+    https://...?moderator_id=77
+    → Returns JSON response
+    → Gets ID from URL
+    → Ready for Flutter app
+
+
+═══════════════════════════════════════════════════════════════
+                    RUN THIS COMMAND NOW:
+                 php test_live_poe_direct.php
+═══════════════════════════════════════════════════════════════

@@ -1,0 +1,20 @@
+<!-- HTML changes needed in sdp_learnerView.php -->
+
+<!-- BEFORE (around line 443-446): -->
+<!--
+<label for="document">Upload Document: <span class="text-muted">(PDF only, max 30MB)</span></label>
+<div class="custom-file-input-wrapper">
+    <input type="file" class="form-control-file" id="document" name="learner_document" accept="application/pdf" required>
+    <div class="custom-file-input-display" id="fileInputDisplay">
+-->
+
+<!-- AFTER: -->
+<label for="document">Upload Document: <span class="text-muted" id="fileTypeHint">(PDF only, max 30MB)</span></label>
+<div class="custom-file-input-wrapper">
+    <input type="file" class="form-control-file" id="document" name="learner_document" accept="application/pdf" required>
+    <div class="custom-file-input-display" id="fileInputDisplay">
+
+<!-- The key changes:
+1. Added id="fileTypeHint" to the span so JavaScript can update the text
+2. The accept attribute will be dynamically changed by JavaScript when "Other" is selected
+-->

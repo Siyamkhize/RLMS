@@ -1,0 +1,125 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    STRATIFICATION FIX - QUICK REFERENCE                      ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+PROBLEM:
+--------
+Unit standards count, performance level, and marking status all showing incorrect
+values (0, "Not Assessed", "Not Marked") after implementing class filtering.
+
+ROOT CAUSE:
+-----------
+REGEXP pattern '^[0-9]' was matching exercise numbers like "1.2" and "3.21" as
+unit standards, causing incorrect calculations.
+
+SOLUTION:
+---------
+Changed REGEXP pattern to '^[0-9]{4,5}$' to match ONLY 4-5 digit unit standard
+IDs (e.g., 9964, 14555), not exercise numbers (e.g., 1.2, 3.21).
+
+FILES MODIFIED:
+---------------
+1. get_learners_with_poe_assigned.php (4 REGEXP patterns updated)
+2. test_temp_tables_logic.php (4 REGEXP patterns updated)
+
+NEW FILES CREATED:
+------------------
+1. test_regexp_fix.php - Test REGEXP pattern
+2. test_unit_standard_extraction.php - Test extraction from database
+3. STRATIFICATION_REGEXP_FIX_COMPLETE.md - Detailed documentation
+4. DEPLOY_STRATIFICATION_FIX.md - Deployment guide
+5. STRATIFICATION_FIX_SUMMARY.md - Complete summary
+6. QUICK_FIX_STRATIFICATION.txt - This quick reference
+
+TESTING URLS:
+-------------
+1. Test REGEXP:
+   https://rlms.rlms.co.za/test_regexp_fix.php
+
+2. Test Extraction:
+   https://rlms.rlms.co.za/test_unit_standard_extraction.php?moderator_id=77&learner_id=1231
+
+3. Test Temp Tables:
+   https://rlms.rlms.co.za/test_temp_tables_logic.php?moderator_id=77
+
+4. Test API:
+   https://rlms.rlms.co.za/get_learners_with_poe_assigned.php?moderator_id=77
+
+EXPECTED RESULTS:
+-----------------
+BEFORE FIX:
+  Learner: Boitumelo Shai (ID: 1231)
+  - POE Count: 0 ❌
+  - Completeness: Incomplete ❌
+  - Marking: Not Marked ❌
+  - Performance: Not Assessed ❌
+
+AFTER FIX:
+  Learner: Boitumelo Shai (ID: 1231)
+  - POE Count: 3 ✅
+  - Completeness: Partial ✅
+  - Marking: Marked ✅
+  - Performance: High ✅
+
+DEPLOYMENT STEPS:
+-----------------
+1. Upload files to server:
+   - get_learners_with_poe_assigned.php
+   - test_temp_tables_logic.php
+   - test_regexp_fix.php
+   - test_unit_standard_extraction.php
+
+2. Test in order:
+   - test_regexp_fix.php (verify pattern works)
+   - test_unit_standard_extraction.php (verify extraction)
+   - test_temp_tables_logic.php (verify temp tables)
+   - get_learners_with_poe_assigned.php (verify API)
+
+3. Optional: Clear cache
+   DELETE FROM moderator_assignments WHERE moderator_id = '77';
+
+4. Test in Flutter app
+
+SUCCESS CRITERIA:
+-----------------
+✅ Unit standards count > 0 for learners with POE
+✅ Performance level matches average marks
+✅ Marking status is "Marked" for learners with summative marks
+✅ POE completeness matches unit standards count
+✅ Class filtering still works (only moderator's classes)
+
+TECHNICAL DETAILS:
+------------------
+Unit Standard IDs: 4-5 digit numbers (9964, 14555, 13958)
+Exercise Numbers: Decimals (1.2, 3.21) - NOT unit standards
+
+REGEXP Pattern:
+  OLD: '^[0-9]'     → Matches ANY digit start (WRONG)
+  NEW: '^[0-9]{4,5}$' → Matches ONLY 4-5 digits (CORRECT)
+
+Extraction Logic:
+  SUBSTRING_INDEX(SUBSTRING_INDEX(m.exercise, '\t', 1), ' ', 1)
+  → Extracts first part before tab or space
+
+Examples:
+  "9964 - Apply health..." → "9964" → MATCH ✅
+  "1.2 Draw symbols..." → "1.2" → REJECT ❌
+  "3.21\tWhy is it..." → "3.21" → REJECT ❌
+
+STATUS:
+-------
+✅ FIXED - REGEXP pattern updated
+✅ TESTED - Diagnostic tools created
+✅ DOCUMENTED - Complete documentation
+⏳ PENDING - Upload to server and test
+
+CONTACT:
+--------
+If issues persist, check:
+1. Database structure (marks table has type column?)
+2. Exercise column format (contains unit standard IDs?)
+3. Temp table creation (any SQL errors?)
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                              END OF QUICK REFERENCE                          ║
+╚══════════════════════════════════════════════════════════════════════════════╝

@@ -1,0 +1,225 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    OFFLINE-FIRST CLOCKING ARCHITECTURE                        ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          CURRENT PROBLEM (ONLINE-FIRST)                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    App Starts
+        │
+        ├─→ Check Internet
+        │       │
+        │       ├─→ [ONLINE] → Sync from Server
+        │       │                    │
+        │       │                    ├─→ DELETE all local learners
+        │       │                    ├─→ INSERT new learners from server
+        │       │                    └─→ Load learners ✓
+        │       │
+        │       └─→ [OFFLINE/BLOCKED] → Try to sync
+        │                                     │
+        │                                     └─→ FAIL → No local data
+        │                                                      │
+        │                                                      └─→ ❌ CLOCKING FAILS
+        │
+        └─→ Load from Local DB
+                │
+                └─→ Empty (no previous sync) → ❌ CLOCKING FAILS
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      NEW SOLUTION (OFFLINE-FIRST)                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    App Starts
+        │
+        ├─→ ALWAYS Load from Local DB First
+        │       │
+        │       ├─→ Has Data → ✓ Show learners immediately
+        │       │                    │
+        │       │                    └─→ ✓ CLOCKING WORKS
+        │       │
+        │       └─→ No Data → Show "Sync Required" message
+        │
+        └─→ Check Internet (in background)
+                │
+                ├─→ [ONLINE] → Background Sync
+                │                    │
+                │                    ├─→ For each learner from server:
+                │                    │       │
+                │                    │       ├─→ Exists locally?
+                │                    │       │       │
+                │                    │       │       ├─→ YES → UPDATE (preserve local data)
+                │                    │       │       │
+                │                    │       │       └─→ NO → INSERT new learner
+                │                    │       │
+                │                    │       └─→ NEVER DELETE
+                │                    │
+                │                    └─→ Refresh UI with updated data
+                │
+                └─→ [OFFLINE/BLOCKED] → Continue with local data
+                                              │
+                                              └─→ ✓ CLOCKING STILL WORKS
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           SYNC LOGIC COMPARISON                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+OLD SYNC (DELETE+INSERT):                  NEW SYNC (UPSERT):
+┌──────────────────────┐                  ┌──────────────────────┐
+│ Server has 100       │                  │ Server has 100       │
+│ learners             │                  │ learners             │
+└──────────┬───────────┘                  └──────────┬───────────┘
+           │                                         │
+           ├─→ DELETE all local learners            ├─→ Keep all local learners
+           │   (even if server fails)               │
+           │                                         │
+           ├─→ INSERT 100 from server               ├─→ For each server learner:
+           │                                         │   │
+           │                                         │   ├─→ Exists? → UPDATE
+           │                                         │   │
+           │                                         │   └─→ New? → INSERT
+           │                                         │
+           └─→ Result:                               └─→ Result:
+               • Server fails = 0 learners               • Server fails = Keep existing
+               • Data loss risk                          • No data loss
+               • Offline clocking fails                  • Offline clocking works
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        CLOCKING FLOW (OFFLINE-FIRST)                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+User Opens Clock-In Page
+        │
+        ├─→ Load Learners from Local DB
+        │       │
+        │       └─→ Display learners ✓
+        │
+        ├─→ User Selects Learner
+        │       │
+        │       └─→ Verify Fingerprint
+        │               │
+        │               └─→ Match ✓
+        │
+        ├─→ Clock In
+        │       │
+        │       ├─→ Save to Local DB (synced=0)
+        │       │
+        │       └─→ Check Internet
+        │               │
+        │               ├─→ [ONLINE] → Sync to Server
+        │               │                    │
+        │               │                    ├─→ Success → Mark synced=1
+        │               │                    │
+        │               │                    └─→ Fail → Keep synced=0
+        │               │                              (will retry later)
+        │               │
+        │               └─→ [OFFLINE] → Keep synced=0
+        │                                (will sync when online)
+        │
+        └─→ Show Success Message ✓
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      AUTOMATIC SYNC ON CONNECTIVITY                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Connectivity Listener
+        │
+        ├─→ Detects Internet Connection
+        │       │
+        │       └─→ Trigger Background Sync
+        │               │
+        │               ├─→ Sync Learners (UPSERT)
+        │               │       │
+        │               │       └─→ Update local database
+        │               │
+        │               ├─→ Sync Offline Clocking Records
+        │               │       │
+        │               │       ├─→ Upload synced=0 records
+        │               │       │
+        │               │       └─→ Mark as synced=1
+        │               │
+        │               └─→ Show Sync Status ✓
+        │
+        └─→ Periodic Sync (every 30 minutes)
+                │
+                └─→ Keep data fresh
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           DATA PERSISTENCE RULES                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ RULE 1: Never Delete Learner Data                                           │
+│ ────────────────────────────────────────────────────────────────────────────│
+│ • Local learner records are permanent                                       │
+│ • Only update or insert, never delete                                       │
+│ • Ensures offline clocking always works                                     │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ RULE 2: Preserve Local Fingerprint Templates                                │
+│ ────────────────────────────────────────────────────────────────────────────│
+│ • If server has template → Use server's                                     │
+│ • If server empty but local has template → Keep local's                     │
+│ • Never lose fingerprint data                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ RULE 3: Sync Offline Records When Online                                    │
+│ ────────────────────────────────────────────────────────────────────────────│
+│ • Keep offline records (synced=0) until uploaded                            │
+│ • Automatic retry when connectivity restored                                │
+│ • Delete only after successful sync (synced=1)                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ RULE 4: UI Always Shows Local Data First                                    │
+│ ────────────────────────────────────────────────────────────────────────────│
+│ • Load from local DB immediately                                            │
+│ • Sync in background without blocking UI                                    │
+│ • Show sync status indicator                                                │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              KEY BENEFITS                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+✓ Works Offline Forever        → No dependency on server availability
+✓ No Data Loss                 → Learner data never deleted
+✓ Automatic Recovery           → Syncs when connectivity restored
+✓ Better Performance           → Loads from local DB instantly
+✓ User Control                 → Manual sync button available
+✓ Clear Status                 → Shows online/offline/syncing state
+✓ Graceful Degradation         → Works with stale data if needed
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         IMPLEMENTATION SUMMARY                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+1. Change Sync Logic:
+   • Remove: await db.delete('learnerdetails', ...)
+   • Add: UPSERT logic (update if exists, insert if new)
+
+2. Add Background Sync Service:
+   • Auto-sync on connectivity restore
+   • Periodic sync every 30 minutes
+   • Retry failed syncs
+
+3. Add Sync Status UI:
+   • Show online/offline indicator
+   • Display last sync time
+   • Manual sync button
+
+4. Update Clock-In Page:
+   • Load from local DB first
+   • Sync in background
+   • Show sync status
+
+Result: Clocking works ALWAYS, even if server is permanently blocked!

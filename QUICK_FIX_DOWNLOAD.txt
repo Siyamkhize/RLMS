@@ -1,0 +1,109 @@
+═══════════════════════════════════════════════════════════════════════════════
+  QUICK FIX: ERR_INVALID_RESPONSE on ZIP Download
+═══════════════════════════════════════════════════════════════════════════════
+
+PROBLEM:
+  ZIP file generates successfully but download fails with ERR_INVALID_RESPONSE
+
+SOLUTION:
+  Created dedicated download handler to avoid interference from main page
+
+═══════════════════════════════════════════════════════════════════════════════
+  UPLOAD THESE FILES (4 files)
+═══════════════════════════════════════════════════════════════════════════════
+
+NEW FILES (Upload these):
+  ✓ download_zip.php          - Dedicated ZIP download handler
+  ✓ check_zip_file.php        - Debug/verification script
+
+UPDATED FILES (Re-upload these):
+  ✓ bulk_download_chunked.js  - Updated to use new download handler
+  ✓ bulk_down_register.php    - Enhanced file serving
+
+═══════════════════════════════════════════════════════════════════════════════
+  DEPLOYMENT (2 MINUTES)
+═══════════════════════════════════════════════════════════════════════════════
+
+STEP 1: Upload Files
+  □ Upload download_zip.php
+  □ Upload check_zip_file.php
+  □ Upload bulk_download_chunked.js (updated)
+  □ Upload bulk_down_register.php (updated)
+
+STEP 2: Set Permissions
+  chmod 755 download_zip.php
+  chmod 755 check_zip_file.php
+
+STEP 3: Test
+  □ Run bulk export with 10 learners
+  □ Wait for completion
+  □ ZIP should download automatically
+  □ Verify ZIP opens correctly
+
+═══════════════════════════════════════════════════════════════════════════════
+  VERIFICATION
+═══════════════════════════════════════════════════════════════════════════════
+
+Test if ZIP was created:
+  https://yoursite.com/check_zip_file.php?file=bulk_reports_20251101_105411.zip
+
+Should show:
+  {
+    "exists": true,
+    "valid_zip": true,
+    "size_formatted": "11.77 MB",
+    "num_files": 150
+  }
+
+Test direct download:
+  https://yoursite.com/download_zip.php?file=bulk_reports_20251101_105411.zip
+
+Should download immediately.
+
+═══════════════════════════════════════════════════════════════════════════════
+  WHAT CHANGED
+═══════════════════════════════════════════════════════════════════════════════
+
+BEFORE (Broken):
+  bulk_down_register.php?temp_file=xxx.zip
+  → Page loads with HTML
+  → Headers already sent
+  → Cannot send ZIP headers
+  → ERR_INVALID_RESPONSE ❌
+
+AFTER (Fixed):
+  download_zip.php?file=xxx.zip
+  → Clean output buffers
+  → Set proper ZIP headers
+  → Stream file in chunks
+  → Download succeeds ✅
+
+═══════════════════════════════════════════════════════════════════════════════
+  TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════════
+
+ISSUE: "File not found"
+  FIX: chmod 777 temp_reports
+
+ISSUE: ZIP is 0 bytes
+  FIX: Check PHP error logs, increase memory limit
+
+ISSUE: Download fails midway
+  FIX: Increase PHP execution time (set_time_limit)
+
+═══════════════════════════════════════════════════════════════════════════════
+  SUCCESS INDICATORS
+═══════════════════════════════════════════════════════════════════════════════
+
+  ✅ Progress completes to 100%
+  ✅ Browser automatically starts download
+  ✅ ZIP file downloads completely
+  ✅ ZIP opens without errors
+  ✅ ZIP contains all expected files
+  ✅ No ERR_INVALID_RESPONSE errors
+
+═══════════════════════════════════════════════════════════════════════════════
+
+For detailed information, see: FIX_DOWNLOAD_ERROR.md
+
+═══════════════════════════════════════════════════════════════════════════════

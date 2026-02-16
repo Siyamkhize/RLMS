@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logistics Management - Sites, Classes & Learners</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #64748b;
+            --secondary-color: #87ceeb;
+            --accent-color: #e2e8f0;
+            --text-dark: #1e293b;
+            --text-light: #64748b;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .main-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+            margin: 20px auto;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .breadcrumb-section {
+            background: linear-gradient(90deg, #f8fafc 0%, #e2e8f0 100%);
+            padding: 15px 25px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .breadcrumb {
+            background: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .breadcrumb-item a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .breadcrumb-item.active {
+            color: var(--text-dark);
+            font-weight: 600;
+        }
+
+        .content-section {
+            padding: 25px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--accent-color);
+        }
+
+        .section-title {
+            color: var(--text-dark);
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 3px 15px rgba(0,0,0,0.05);
+            border-left: 4px solid var(--primary-color);
+            transition: transform 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin: 0;
+        }
+
+        .stat-label {
+            color: var(--text-light);
+            font-size: 0.9rem;
+            margin: 5px 0 0 0;
+        }
+
+        .data-grid {
+            display: grid;
+            gap: 20px;
+        }
+
+        .data-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 3px 15px rgba(0,0,0,0.05);
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .data-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+            border-color: var(--primary-color);
+        }
+
+        .data-card-header {
+            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            padding: 15px 20px;
+            font-weight: 600;
+        }
+
+        .data-card-body {
+            padding: 20px;
+        }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .data-row:last-child {
+            border-bottom: none;
+        }
+
+        .data-label {
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+
+        .data-value {
+            color: var(--text-dark);
+            font-weight: 500;
+        }
+
+        .btn-custom {
+            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-custom:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            color: white;
+        }
+
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+
+        .error-message {
+            background: #fee2e2;
+            color: #dc2626;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-light);
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                margin: 10px;
+                border-radius: 10px;
+            }
+            
+            .content-section {
+                padding: 15px;
+            }
+            
+            .stats-cards {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand text-white fw-bold" href="#">
+                <i class="fas fa-boxes me-2"></i>
+                Logistics Management System
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link text-white" href="#" onclick="loadSites()">
+                    <i class="fas fa-home me-1"></i>
+                    Dashboard
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="container">
+        <div class="main-container">
+            <!-- Breadcrumb -->
+            <div class="breadcrumb-section">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb" id="breadcrumb">
+                        <li class="breadcrumb-item active">Sites</li>
+                    </ol>
+                </nav>
+            </div>
+
+            <!-- Content -->
+            <div class="content-section">
+                <!-- Statistics Cards -->
+                <div class="stats-cards" id="statsCards">
+                    <!-- Stats will be loaded here -->
+                </div>
+
+                <!-- Section Header -->
+                <div class="section-header">
+                    <h2 class="section-title" id="sectionTitle">
+                        <i class="fas fa-map-marker-alt"></i>
+                        Training Sites
+                    </h2>
+                </div>
+
+                <!-- Loading State -->
+                <div class="loading-spinner" id="loadingSpinner">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+
+                <!-- Error State -->
+                <div class="error-message d-none" id="errorMessage">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <span id="errorText"></span>
+                </div>
+
+                <!-- Data Grid -->
+                <div class="data-grid" id="dataGrid">
+                    <!-- Data cards will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Configuration
+        const API_BASE_URL = './'; // Adjust this to your API base URL
+        
+        // State management
+        let currentView = 'sites';
+        let currentSiteId = null;
+        let currentClassId = null;
+        let currentSiteName = '';
+        let currentClassName = '';
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSites();
+        });
+
+        // Load sites data
+        async function loadSites() {
+            currentView = 'sites';
+            currentSiteId = null;
+            currentClassId = null;
+            
+            updateBreadcrumb([{text: 'Sites', active: true}]);
+            updateSectionTitle('<i class="fas fa-map-marker-alt"></i> Training Sites');
+            
+            showLoading();
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}get_logistics_sites.php`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displaySites(data.sites, data.province_summary);
+                } else {
+                    showError(data.error || 'Failed to load sites');
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            }
+        }
+
+        // Load classes for a specific site
+        async function loadClasses(siteId, siteName) {
+            currentView = 'classes';
+            currentSiteId = siteId;
+            currentSiteName = siteName;
+            currentClassId = null;
+            
+            updateBreadcrumb([
+                {text: 'Sites', active: false, onclick: 'loadSites()'},
+                {text: siteName, active: true}
+            ]);
+            updateSectionTitle(`<i class="fas fa-users"></i> Classes at ${siteName}`);
+            
+            showLoading();
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}get_logistics_classes.php?siteID=${siteId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayClasses(data.classes, data.site_info);
+                } else {
+                    showError(data.error || 'Failed to load classes');
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            }
+        }
+
+        // Load learners for a specific class
+        async function loadLearners(classId, className) {
+            currentView = 'learners';
+            currentClassId = classId;
+            currentClassName = className;
+            
+            updateBreadcrumb([
+                {text: 'Sites', active: false, onclick: 'loadSites()'},
+                {text: currentSiteName, active: false, onclick: `loadClasses('${currentSiteId}', '${currentSiteName}')`},
+                {text: className, active: true}
+            ]);
+            updateSectionTitle(`<i class="fas fa-user-graduate"></i> Learners in ${className}`);
+            
+            showLoading();
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}get_logistics_learners.php?classID=${classId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayLearners(data.learners, data.class_info, data.statistics);
+                } else {
+                    showError(data.error || 'Failed to load learners');
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            }
+        }
+
+        // Display sites
+        function displaySites(sites, provinceSummary) {
+            hideLoading();
+            
+            // Display province statistics
+            const statsHtml = provinceSummary.map(province => `
+                <div class="stat-card">
+                    <h3 class="stat-number">${province.active_sites}</h3>
+                    <p class="stat-label">${province.province} Sites</p>
+                    <small class="text-muted">${province.total_learners} learners</small>
+                </div>
+            `).join('');
+            
+            document.getElementById('statsCards').innerHTML = statsHtml;
+            
+            // Display sites
+            if (sites.length === 0) {
+                showEmptyState('No sites found', 'fas fa-map-marker-alt');
+                return;
+            }
+            
+            const sitesHtml = sites.map(site => `
+                <div class="data-card" onclick="loadClasses('${site.siteID}', '${site.siteName}')">
+                    <div class="data-card-header">
+                        <i class="fas fa-map-marker-alt me-2"></i>
+                        ${site.siteName}
+                    </div>
+                    <div class="data-card-body">
+                        <div class="data-row">
+                            <span class="data-label">Province:</span>
+                            <span class="data-value">${site.province}</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">Learning Pathway:</span>
+                            <span class="data-value">${site.learningPathway}</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">Category:</span>
+                            <span class="data-value">${site.category}</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">Classes:</span>
+                            <span class="data-value">${site.total_classes}</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">Learners:</span>
+                            <span class="data-value">${site.total_learners}</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">Beneficiaries:</span>
+                            <span class="data-value">${site.beneficiaries}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            document.getElementById('dataGrid').innerHTML = sitesHtml;
+        }
+
+        // Display classes
+        function displayClasses(classes, siteInfo) {
+            hideLoading();
+            
+            // Display class statistics
+            const totalLearners = classes.reduce((sum, cls) => sum + cls.total_learners, 0);
+            const activeLearners = classes.reduce((sum, cls) => sum + cls.active_learners, 0);
+            const avgEnrollment = classes.length > 0 ? 
+                Math.round(classes.reduce((sum, cls) => sum + cls.enrollment_percentage, 0) / classes.length) : 0;
+            
+            const statsHtml = `
+                <div class="stat-card">
+                    <h3 class="stat-number">${classes.length}</h3>
+                    <p class="stat-label">Total Classes</p>
+                </div>
+                <div class="stat-card">
+                    <h3 class="stat-number">${totalLearners}</h3>
+                    <p class="stat-label">Total Learners</p>
+                </div>
+                <div class="stat-card">
+                    <h3 class="stat-number">${activeLearners}</h3>
+                    <p class="stat-label">Active Learners</p>
+                </div>
+                <div class="stat-card">
+                    <h3 class="stat-number">${avgEnrollment}%</h3>
+                    <p class="stat-label">Avg Enrollment</p>
+                </div>
+            `;
+            
+            document.getElementById('statsCards').innerHTML = statsHtml;
+            
+            // Display classes
+            if (classes.length === 0) {
+                showEmptyState('No classes found for this site', 'fas fa-users');
+                return;
+            }
+            
+            const classesHtml = classes.map(cls => `
+                <div class="data-card" onclick="loadLearners('${cls.classID}', '${cls.className}')">
+                    <div class="data-card-header">
+                        <i class="fas fa-users me-2"></i>
+                        ${cls.className}
+                    </div>
+                    <div class="data-card-body">
+                        <div class="data-row">
+                            <span class="data-label">Facilitator:</span>
+                            <span class="data-value">${cls.facilitator_name}</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">Total Learners:</span>
+                            <span class="data-value">${cls.total_learners} / ${cls.max_learners}</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">Active Learners:</span>
+                            <span class="data-value">${cls.active_learners}</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">Enrollment:</span>
+                            <span class="data-value">${cls.enrollment_percentage}%</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">Status:</span>
+                            <span class="data-value">
+                                <span class="badge ${cls.status === 'Active' ? 'bg-success' : 'bg-secondary'}">${cls.status}</span>
+                            </span>
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">Duration:</span>
+                            <span class="data-value">${cls.startDate} - ${cls.endDate}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            document.getElementById('dataGrid').innerHTML = classesHtml;
+        }
+
+        // Display learners
+        function displayLearners(learners, classInfo, statistics) {
+            hideLoading();
+            
+            // Display learner statistics
+            const statsHtml = `
+                <div class="stat-card">
+                    <h3 class="stat-number">${statistics.total_learners}</h3>
+                    <p class="stat-label">Total Learners</p>
+                </div>
+                <div class="stat-card">
+                    <h3 class="stat-number">${statistics.active_learners}</h3>
+                    <p class="stat-label">Active Learners</p>
+                </div>
+                <div class="stat-card">
+                    <h3 class="stat-number">${statistics.completed_learners}</h3>
+                    <p class="stat-label">Completed</p>
+                </div>
+                <div class="stat-card">
+                    <h3 class="stat-number">${statistics.average_attendance}%</h3>
+                    <p class="stat-label">Avg Attendance</p>
+                </div>
+            `;
+            
+            document.getElementById('statsCards').innerHTML = statsHtml;
+            
+            // Display learners
+            if (learners.length === 0) {
+                showEmptyState('No learners found for this class', 'fas fa-user-graduate');
+                return;
+            }
+            
+            const learnersHtml = learners.map(learner => `
+                <div class="data-card">
+                    <div class="data-card-header">
+                        <i class="fas fa-user-graduate me-2"></i>
+                        ${learner.FullName}
+                    </div>
+                    <div class="data-card-body">
+                        <div class="data-row">
+                            <span class="data-label">Learner ID:</span>
+                            <span class="data-value">${learner.LearnerID}</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">ID Number:</span>
+                            <span class="data-value">${learner.IDNumber}</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">Email:</span>
+                            <span class="data-value">${learner.Email}</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">Phone:</span>
+                            <span class="data-value">${learner.Phone}</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">Status:</span>
+                            <span class="data-value">
+                                <span class="badge ${learner.status === 'Active' ? 'bg-success' : 'bg-secondary'}">${learner.status}</span>
+                            </span>
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">Attendance:</span>
+                            <span class="data-value">
+                                ${learner.attendance_percentage}% 
+                                <span class="badge ${learner.attendance_status === 'Good' ? 'bg-success' : 
+                                    learner.attendance_status === 'Fair' ? 'bg-warning' : 'bg-danger'}">${learner.attendance_status}</span>
+                            </span>
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">Enrollment Date:</span>
+                            <span class="data-value">${learner.enrollment_date}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            document.getElementById('dataGrid').innerHTML = learnersHtml;
+        }
+
+        // Utility functions
+        function updateBreadcrumb(items) {
+            const breadcrumbHtml = items.map(item => {
+                if (item.active) {
+                    return `<li class="breadcrumb-item active">${item.text}</li>`;
+                } else {
+                    return `<li class="breadcrumb-item"><a href="#" onclick="${item.onclick}">${item.text}</a></li>`;
+                }
+            }).join('');
+            
+            document.getElementById('breadcrumb').innerHTML = breadcrumbHtml;
+        }
+
+        function updateSectionTitle(title) {
+            document.getElementById('sectionTitle').innerHTML = title;
+        }
+
+        function showLoading() {
+            document.getElementById('loadingSpinner').classList.remove('d-none');
+            document.getElementById('errorMessage').classList.add('d-none');
+            document.getElementById('dataGrid').innerHTML = '';
+            document.getElementById('statsCards').innerHTML = '';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingSpinner').classList.add('d-none');
+        }
+
+        function showError(message) {
+            hideLoading();
+            document.getElementById('errorText').textContent = message;
+            document.getElementById('errorMessage').classList.remove('d-none');
+        }
+
+        function showEmptyState(message, icon) {
+            document.getElementById('dataGrid').innerHTML = `
+                <div class="empty-state">
+                    <i class="${icon}"></i>
+                    <h4>${message}</h4>
+                    <p>There are no items to display at this time.</p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Database credentials
+connection.php
+
+# Debug and test files
+debug_*.php
+test_*.php
+check_*.php
+fix_*.php
+diagnose_*.php
+
+# Logs
+*.log
+error.log
+debug.log
+
+# Temporary files
+*.tmp
+*.temp
+/temp/
+/tmp/
+
+# Uploads (should be outside web root)
+/uploads/
+/mobile/uploads/
+
+# Vendor
+/vendor/
+
+# Python virtual environment
+venv/
+/venv/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.apk
+*.aab
+build/
+.dart_tool/
+
+# Sensitive documentation
+*_AUDIT*.md
+*_SECURITY*.md
+
+# Git backup
+.git_backup_corrupted/
+
+# Large files
+*.hprof
+*.sql
+android/*.hprof

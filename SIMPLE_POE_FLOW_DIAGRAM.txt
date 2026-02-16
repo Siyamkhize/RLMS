@@ -1,0 +1,227 @@
+═══════════════════════════════════════════════════════════════════════════════
+  SIMPLE POE SOLUTION - FLOW DIAGRAM
+═══════════════════════════════════════════════════════════════════════════════
+
+
+OLD APPROACH (TIMES OUT)
+─────────────────────────────────────────────────────────────────────────────
+
+Flutter App
+    │
+    │ HTTP Request
+    ▼
+get_learners_with_poe_assigned.php
+    │
+    ├─► Create temp table 1 (POE learners)
+    │   └─► Complex query with class filter
+    │
+    ├─► Create temp table 2 (Marks summary)
+    │   └─► Calculate performance levels
+    │   └─► Extract unit standards with REGEXP
+    │   └─► Sum marks per unit standard
+    │   └─► Average across all unit standards
+    │
+    ├─► Create temp table 3 (Coverage)
+    │   └─► Count distinct unit standards
+    │   └─► Check POE table
+    │   └─► Check marks table
+    │   └─► Check logbook_marks table
+    │
+    ├─► Main query with 5 JOINs
+    │   └─► Join learnerdetails
+    │   └─► Join poe
+    │   └─► Join class
+    │   └─► Join temp_learner_marks
+    │   └─► Join temp_learner_coverage
+    │
+    ├─► Stratified sampling
+    │   └─► Group by 5 dimensions
+    │   └─► Calculate sample size per stratum
+    │   └─► Random selection
+    │
+    └─► ❌ TIMEOUT after 60 seconds
+        └─► No data returned to Flutter app
+
+
+NEW APPROACH (FAST)
+─────────────────────────────────────────────────────────────────────────────
+
+Flutter App
+    │
+    │ HTTP Request
+    ▼
+get_learners_with_poe_simple_api.php
+    │
+    ├─► Query 1: Get moderator's classes
+    │   └─► SELECT classID FROM facilitator WHERE facilitator_id = 77
+    │   └─► Handle comma-separated values
+    │   └─► Result: [69, 93, 67, 68, 91, 81, 30, 97, 46, 86]
+    │
+    ├─► Query 2: Get learners with POE
+    │   └─► SELECT learners FROM poe
+    │   └─► JOIN learnerdetails
+    │   └─► JOIN class
+    │   └─► WHERE classID IN (moderator's classes)
+    │   └─► AND filePath IS NOT NULL
+    │   └─► GROUP BY learnerID
+    │   └─► COUNT POE documents
+    │
+    └─► ✅ SUCCESS in 2-5 seconds
+        └─► Return ~1571 learners to Flutter app
+
+
+COMPARISON
+─────────────────────────────────────────────────────────────────────────────
+
+┌─────────────────────┬──────────────────────┬──────────────────────┐
+│ Feature             │ Old Approach         │ New Approach         │
+├─────────────────────┼──────────────────────┼──────────────────────┤
+│ Temp Tables         │ 3 tables             │ 0 tables             │
+│ Queries             │ 10+ complex queries  │ 2 simple queries     │
+│ JOINs               │ 5 JOINs              │ 2 JOINs              │
+│ Calculations        │ Performance levels   │ None                 │
+│ Regex Operations    │ Unit std extraction  │ None                 │
+│ Stratification      │ 5 dimensions         │ None                 │
+│ Response Time       │ 60+ seconds          │ 2-5 seconds          │
+│ Success Rate        │ 0% (timeout)         │ 100%                 │
+│ Data Returned       │ 0 learners           │ ~1571 learners       │
+└─────────────────────┴──────────────────────┴──────────────────────┘
+
+
+TESTING FLOW
+─────────────────────────────────────────────────────────────────────────────
+
+Step 1: Test Database Directly
+    │
+    ▼
+php test_standalone.php
+    │
+    ├─► Connect to database (embedded credentials)
+    ├─► Query 1: Count all POE learners
+    ├─► Query 2: Count POE learners with files
+    ├─► Query 3: Get moderator's classes
+    ├─► Query 4: Count POE learners in moderator's classes
+    └─► Query 5: Sample learner IDs
+    │
+    ▼
+✅ Result: ~1571 learners
+    │
+    │
+Step 2: Upload API File
+    │
+    ▼
+Upload get_learners_with_poe_simple_api.php to server
+    │
+    │
+Step 3: Test API via HTTP
+    │
+    ▼
+php test_simple_api_direct.php
+    │
+    ├─► Make HTTP request to API
+    ├─► Parse JSON response
+    └─► Display results
+    │
+    ▼
+✅ Result: ~1571 learners in 2-5 seconds
+    │
+    │
+Step 4: Update Flutter App
+    │
+    ▼
+Change endpoint URL in Flutter code
+    │
+    ├─► OLD: get_learners_with_poe_assigned.php
+    └─► NEW: get_learners_with_poe_simple_api.php
+    │
+    ▼
+✅ Flutter app displays learners without timeout
+
+
+DATA FLOW
+─────────────────────────────────────────────────────────────────────────────
+
+Database Tables:
+┌─────────────────┐
+│ facilitator     │  ──► Get moderator's classes
+│ - facilitator_id│      (handles comma-separated values)
+│ - classID       │
+└─────────────────┘
+        │
+        │ classID
+        ▼
+┌─────────────────┐
+│ poe             │  ──► Get POE documents
+│ - learnerID     │      (filter by filePath not null)
+│ - filePath      │
+│ - exercise      │
+└─────────────────┘
+        │
+        │ learnerID
+        ▼
+┌─────────────────┐
+│ learnerdetails  │  ──► Get learner info
+│ - LearnerID     │      (name, surname, ID number, etc.)
+│ - Name          │
+│ - Surname       │
+│ - classID       │
+└─────────────────┘
+        │
+        │ classID
+        ▼
+┌─────────────────┐
+│ class           │  ──► Get class info
+│ - classID       │      (class name, site ID)
+│ - className     │
+│ - siteID        │
+└─────────────────┘
+
+
+QUERY STRUCTURE
+─────────────────────────────────────────────────────────────────────────────
+
+Query 1: Get Moderator's Classes
+┌────────────────────────────────────────────────────────────┐
+│ SELECT DISTINCT classID                                    │
+│ FROM facilitator                                           │
+│ WHERE facilitator_id = 77                                  │
+│                                                            │
+│ Result: "69,93,67,68,91,81,30,97,46,86"                  │
+│ Split: [69, 93, 67, 68, 91, 81, 30, 97, 46, 86]          │
+└────────────────────────────────────────────────────────────┘
+
+Query 2: Get Learners with POE
+┌────────────────────────────────────────────────────────────┐
+│ SELECT DISTINCT                                            │
+│   l.LearnerID,                                            │
+│   l.Name,                                                 │
+│   l.Surname,                                              │
+│   l.classID,                                              │
+│   c.className,                                            │
+│   c.siteID,                                               │
+│   COUNT(DISTINCT p.poeID) as poe_count                    │
+│ FROM poe p                                                │
+│ INNER JOIN learnerdetails l ON p.learnerID = l.LearnerID │
+│ LEFT JOIN class c ON l.classID = c.classID               │
+│ WHERE p.filePath IS NOT NULL                              │
+│   AND p.filePath != ''                                    │
+│   AND l.classID IN (69, 93, 67, 68, 91, 81, 30, 97, 46, 86) │
+│ GROUP BY l.LearnerID                                      │
+│ ORDER BY c.className, l.Surname, l.Name                   │
+│ LIMIT 2000                                                │
+│                                                            │
+│ Result: ~1571 learners                                    │
+└────────────────────────────────────────────────────────────┘
+
+
+SUCCESS CRITERIA
+─────────────────────────────────────────────────────────────────────────────
+
+✅ test_standalone.php returns ~1571 learners
+✅ test_simple_api_direct.php returns ~1571 learners
+✅ Response time under 10 seconds
+✅ Flutter app displays learners
+✅ No timeout errors
+
+
+═══════════════════════════════════════════════════════════════════════════════

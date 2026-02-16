@@ -1,0 +1,284 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    MODERATOR POTHOLE CHECKLIST WORKFLOW                      ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           ASSESSOR PHASE (Existing)                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    Assessor logs in
+         │
+         ├──> Selects Class
+         │
+         ├──> Selects Learner
+         │
+         ├──> Fills Pothole Checklist
+         │
+         ├──> Assigns Marks (0-100)
+         │
+         ├──> Adds Comments (optional)
+         │
+         └──> Saves to Database
+                    │
+                    ▼
+         ┌─────────────────────────┐
+         │ pothole_checklist_marks │
+         ├─────────────────────────┤
+         │ learner_id: 12345       │
+         │ assessor_id: 67890      │
+         │ marks: 85               │
+         │ comments: "Good work"   │
+         │ approval_status: NULL   │◄─── NEW COLUMN
+         │ comment: NULL           │◄─── NEW COLUMN
+         └─────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         MODERATOR PHASE (New Feature)                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    Moderator logs in
+         │
+         ├──> Opens Drawer Menu
+         │
+         ├──> Clicks "Pothole Checklist"
+         │
+         ▼
+    ┌─────────────────────────┐
+    │   Class List Page       │
+    │                         │
+    │  ┌─────────────────┐   │
+    │  │ Class A [Select]│   │
+    │  │ Class B [Select]│   │
+    │  │ Class C [Select]│   │
+    │  └─────────────────┘   │
+    └─────────────────────────┘
+         │
+         ├──> Clicks "Select" on Class
+         │
+         ▼
+    ┌─────────────────────────────────────────────────┐
+    │          Learner List Page                      │
+    │                                                  │
+    │  Learner ID | Name      | Action                │
+    │  ──────────────────────────────────────────     │
+    │  12345      | John Doe  | [No Marks]     ◄──── Grey (No marks yet)
+    │  12346      | Jane Doe  | [Moderate]     ◄──── Orange (Needs moderation)
+    │  12347      | Bob Smith | [View (Approved)] ◄─ Green (Already approved)
+    │  12348      | Sue Jones | [View (Disapproved)] Red (Already disapproved)
+    └─────────────────────────────────────────────────┘
+         │
+         ├──> Clicks "Moderate" button
+         │
+         ▼
+    ┌─────────────────────────────────────────────────┐
+    │        Moderation Page                          │
+    │                                                  │
+    │  ┌─────────────────────────────────────────┐   │
+    │  │ Learner Information                     │   │
+    │  │ Name: John Doe                          │   │
+    │  │ ID: 12345                               │   │
+    │  └─────────────────────────────────────────┘   │
+    │                                                  │
+    │  ┌─────────────────────────────────────────┐   │
+    │  │ Assessor Marks (READ-ONLY)              │   │
+    │  │ Marks: 85                               │   │
+    │  │ Comments: "Good work"                   │   │
+    │  └─────────────────────────────────────────┘   │
+    │                                                  │
+    │  ┌─────────────────────────────────────────┐   │
+    │  │ Moderation                              │   │
+    │  │                                         │   │
+    │  │ Approval Status: [Dropdown]             │   │
+    │  │   ├─ Approved                           │   │
+    │  │   └─ Disapproved                        │   │
+    │  │                                         │   │
+    │  │ Moderator Comment: [Text Field]         │   │
+    │  │ (Required for Disapproval)              │   │
+    │  │                                         │   │
+    │  │ [Save Moderation]                       │   │
+    │  └─────────────────────────────────────────┘   │
+    └─────────────────────────────────────────────────┘
+         │
+         ├──> Moderator selects status
+         │
+         ├──> Moderator enters comment (if disapproving)
+         │
+         ├──> Clicks "Save Moderation"
+         │
+         ▼
+    ┌─────────────────────────────────────────────────┐
+    │  Validation                                      │
+    │  ├─ Status selected? ✓                          │
+    │  ├─ Comment required? (if Disapproved) ✓        │
+    │  └─ Comment length < 256? ✓                     │
+    └─────────────────────────────────────────────────┘
+         │
+         ├──> POST to save_pothole_moderation.php
+         │
+         ▼
+    ┌─────────────────────────────────────────────────┐
+    │  Database Update (NON-DESTRUCTIVE)               │
+    │                                                  │
+    │  UPDATE pothole_checklist_marks                 │
+    │  SET approval_status = 'Approved',              │
+    │      comment = 'Marks are appropriate',         │
+    │      updated_at = NOW()                         │
+    │  WHERE learner_id = '12345'                     │
+    │    AND assessment_date = '2026-01-19'           │
+    │                                                  │
+    │  ✓ Original marks preserved                     │
+    │  ✓ Assessor comments preserved                  │
+    │  ✓ Only status and comment updated              │
+    └─────────────────────────────────────────────────┘
+         │
+         ├──> Success message shown
+         │
+         └──> Return to Learner List
+                    │
+                    ▼
+              Button now shows:
+              [View (Approved)] or [View (Disapproved)]
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            DATABASE STRUCTURE                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Table: pothole_checklist_marks
+┌──────────────────┬──────────────────────────┬─────────────────────────────┐
+│ Column           │ Type                     │ Description                 │
+├──────────────────┼──────────────────────────┼─────────────────────────────┤
+│ id               │ INT(11) AUTO_INCREMENT   │ Primary key                 │
+│ learner_id       │ VARCHAR(50)              │ Learner identifier          │
+│ assessor_id      │ VARCHAR(50)              │ Assessor identifier         │
+│ assessment_date  │ DATE                     │ Date of assessment          │
+│ marks            │ INT(3)                   │ Score (0-100)               │
+│ comments         │ TEXT                     │ Assessor comments           │
+│ approval_status  │ ENUM('Approved',         │ Moderator decision (NEW)    │
+│                  │      'Disapproved')      │                             │
+│ comment          │ VARCHAR(256)             │ Moderator comment (NEW)     │
+│ created_at       │ TIMESTAMP                │ Record creation time        │
+│ updated_at       │ TIMESTAMP                │ Last update time            │
+└──────────────────┴──────────────────────────┴─────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          APPROVAL WORKFLOW                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+SCENARIO 1: Approval
+─────────────────────
+Moderator Action:
+  ├─ Selects "Approved"
+  ├─ Adds comment (optional): "Marks are appropriate"
+  └─ Clicks Save
+
+Database Update:
+  ├─ approval_status = 'Approved'
+  ├─ comment = 'Marks are appropriate'
+  └─ updated_at = NOW()
+
+Result:
+  ├─ Marks remain: 85
+  ├─ Assessor comments remain: "Good work"
+  └─ Status visible to all: APPROVED ✓
+
+
+SCENARIO 2: Disapproval
+────────────────────────
+Moderator Action:
+  ├─ Selects "Disapproved"
+  ├─ Adds comment (REQUIRED): "Needs more detail in section 3"
+  └─ Clicks Save
+
+Database Update:
+  ├─ approval_status = 'Disapproved'
+  ├─ comment = 'Needs more detail in section 3'
+  └─ updated_at = NOW()
+
+Result:
+  ├─ Marks remain: 85 (NOT DELETED)
+  ├─ Assessor comments remain: "Good work" (NOT DELETED)
+  └─ Status visible to all: DISAPPROVED ✗
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          API ENDPOINTS                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+1. GET /mobile/get_pothole_checklist_marks.php
+   ├─ Parameters: learner_id, assessor_id, assessment_date
+   ├─ Returns: marks, comments, approval_status, comment
+   └─ Used by: Moderator to view marks
+
+2. POST /mobile/save_pothole_moderation.php
+   ├─ Body: learner_id, assessment_date, approval_status, comment
+   ├─ Updates: approval_status and comment columns
+   └─ Used by: Moderator to save decision
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          BUTTON STATE LOGIC                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+IF marks exist:
+  │
+  ├─ IF approval_status IS NULL:
+  │    └─> Show: [Moderate] (Orange) ◄─── Needs moderation
+  │
+  ├─ IF approval_status = 'Approved':
+  │    └─> Show: [View (Approved)] (Green) ◄─── Already approved
+  │
+  └─ IF approval_status = 'Disapproved':
+       └─> Show: [View (Disapproved)] (Red) ◄─── Already disapproved
+
+ELSE (no marks):
+  └─> Show: [No Marks] (Grey) ◄─── Assessor hasn't marked yet
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          KEY FEATURES                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+✓ Non-Destructive Updates
+  └─ Original marks and comments are NEVER deleted
+
+✓ Read-Only Marks Display
+  └─ Moderators can VIEW but not EDIT marks
+
+✓ Required Comments for Disapproval
+  └─ Ensures feedback is provided when rejecting
+
+✓ Visual Status Indicators
+  └─ Color-coded buttons show moderation state
+
+✓ Complete Audit Trail
+  └─ updated_at timestamp tracks when moderation occurred
+
+✓ Data Integrity
+  └─ Validation ensures only valid statuses are saved
+
+✓ User-Friendly Interface
+  └─ Clear workflow with intuitive navigation
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          DEPLOYMENT SUMMARY                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+1. Database Migration
+   └─ Run: add_moderation_columns_to_pothole_marks.sql
+
+2. PHP Files
+   ├─ Upload: save_pothole_moderation.php (NEW)
+   └─ Replace: get_pothole_checklist_marks.php (UPDATED)
+
+3. Flutter App
+   └─ Rebuild with updated ModeratorPage.dart
+
+4. Testing
+   └─ Follow checklist in DEPLOY_MODERATOR_POTHOLE_CHECKLIST.md
+
+═══════════════════════════════════════════════════════════════════════════════
+                              END OF DIAGRAM
+═══════════════════════════════════════════════════════════════════════════════

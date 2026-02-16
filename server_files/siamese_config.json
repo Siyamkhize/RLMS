@@ -1,0 +1,12 @@
+{
+  "model_path": "C:/xampp/htdocs/mobile/models/siamese_model_checkpoint.h5",
+  "threshold": 0.5,
+  "image_size": [
+    96,
+    96
+  ],
+  "api_endpoints": {
+    "verification": "http://192.168.0.53/mobile/siamese_inference.php",
+    "extraction": "http://192.168.0.53/mobile/extract_features.php"
+  }
+}

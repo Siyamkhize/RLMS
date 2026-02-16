@@ -1,0 +1,160 @@
+================================================================================
+                  🔍 QUICK DIAGNOSTIC: STRATIFICATION DATA ISSUE
+================================================================================
+
+PROBLEM:
+--------
+✅ Class filtering is working (moderators see only their classes)
+❌ Unit standards count is incorrect
+❌ Performance level is incorrect  
+❌ Marking status is incorrect
+
+================================================================================
+                            RUN THESE TESTS
+================================================================================
+
+TEST 1: Check Temp Tables
+--------------------------
+Open in browser:
+https://rlms.rlms.co.za/test_temp_tables_issue.php?moderator_id=77
+
+This will show:
+- How many learners in temp_poe_learners
+- How many learners in temp_learner_marks
+- How many learners in temp_learner_coverage
+- Sample data from each table
+- Main query results
+
+WHAT TO LOOK FOR:
+✅ All temp tables should have data
+✅ POE count should be > 0
+✅ Marking status should be correct
+✅ Performance level should be correct
+
+TEST 2: Check Individual Learner
+---------------------------------
+Open in browser:
+https://rlms.rlms.co.za/test_stratification_data.php?moderator_id=77
+
+This will show:
+- Unit standards from POE table
+- Unit standards from marks table
+- Unit standards from logbook_marks table
+- Total unique unit standards
+- Marking status calculation
+- Performance level calculation
+
+WHAT TO LOOK FOR:
+✅ Unit standards should be extracted correctly
+✅ Total count should match sum of unique IDs
+✅ Marking status should match summative marks
+✅ Performance should match average marks
+
+TEST 3: Check API Response
+---------------------------
+Open in browser:
+https://rlms.rlms.co.za/get_learners_with_poe_assigned.php?moderator_id=77
+
+Compare with diagnostic results:
+- poe_count (unit standards count)
+- marking_status (Marked/Not Marked)
+- performance_level (High/Medium/Low/Not Assessed)
+- poe_completeness (Complete/Partial/Incomplete)
+
+================================================================================
+                          COMMON ISSUES & FIXES
+================================================================================
+
+ISSUE 1: Temp Tables Are Empty
+-------------------------------
+SYMPTOM: test_temp_tables_issue.php shows 0 learners in temp tables
+CAUSE: Class filtering is too restrictive
+FIX: Verify moderator has classes with learners who have POE
+
+ISSUE 2: Unit Standards Count is 0
+-----------------------------------
+SYMPTOM: poe_count shows 0 for all learners
+CAUSE: Unit standard extraction from exercise column is failing
+FIX: Check exercise column format in database
+
+ISSUE 3: Marking Status Always "Not Marked"
+--------------------------------------------
+SYMPTOM: All learners show "Not Marked" even if they have marks
+CAUSE: No SUMMATIVE marks found, or marks query is wrong
+FIX: Verify learners have marks with type = 'Summative'
+
+ISSUE 4: Performance Always "Not Assessed"
+-------------------------------------------
+SYMPTOM: All learners show "Not Assessed"
+CAUSE: avg_marks is NULL (no summative marks)
+FIX: Verify learners have summative marks with marks_scored values
+
+================================================================================
+                            EXPECTED VALUES
+================================================================================
+
+For a learner with complete data:
+
+Unit Standards Count:
+- Range: 0-10 (10 total unit standards)
+- Counts DISTINCT unit standards across poe, marks, logbook_marks
+
+POE Completeness:
+- Complete: 10/10 unit standards
+- Partial: 1-9 unit standards
+- Incomplete: 0 unit standards
+
+Marking Status:
+- Marked: Has at least one SUMMATIVE mark
+- Not Marked: No SUMMATIVE marks
+
+Performance Level:
+- High: Average >= 70%
+- Medium: Average >= 50% and < 70%
+- Low: Average >= 0% and < 50%
+- Not Assessed: No SUMMATIVE marks
+
+================================================================================
+                              QUICK STEPS
+================================================================================
+
+1. Run test_temp_tables_issue.php
+   → Check if temp tables have data
+
+2. Run test_stratification_data.php
+   → Check individual learner calculations
+
+3. Compare with API response
+   → Identify discrepancies
+
+4. Based on results:
+   - If temp tables empty → Check class filtering
+   - If unit standards 0 → Check exercise column format
+   - If marking wrong → Check summative marks exist
+   - If performance wrong → Check marks_scored values
+
+5. Apply fix to get_learners_with_poe_assigned.php
+
+6. Upload to server
+
+7. Test again
+
+================================================================================
+                            DOCUMENTATION
+================================================================================
+
+Detailed Guide:
+- STRATIFICATION_DATA_ISSUE_DIAGNOSIS.md
+
+Test Files:
+- test_temp_tables_issue.php (temp tables diagnostic)
+- test_stratification_data.php (individual learner diagnostic)
+
+API File:
+- get_learners_with_poe_assigned.php (main file to fix)
+
+================================================================================
+
+RUN THE DIAGNOSTICS FIRST, THEN WE CAN FIX THE ISSUE! 🔍
+
+================================================================================

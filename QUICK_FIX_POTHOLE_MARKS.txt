@@ -1,0 +1,89 @@
+═══════════════════════════════════════════════════════════════
+  POTHOLE MARKS MODERATOR FIX - QUICK REFERENCE
+═══════════════════════════════════════════════════════════════
+
+PROBLEM:
+  Pothole marks not showing in moderator page
+
+CAUSE:
+  Marks stored in logbook_marks table, system looking elsewhere
+
+SOLUTION:
+  Update backend to fetch from logbook_marks table
+
+═══════════════════════════════════════════════════════════════
+  DEPLOYMENT (3 STEPS)
+═══════════════════════════════════════════════════════════════
+
+1. ADD DATABASE COLUMNS:
+   mysql -u user -p db < add_moderation_columns_to_logbook_marks.sql
+
+2. UPLOAD PHP FILES:
+   - php/view_pothole_checklists.php
+   - save_moderation.php
+   - test_pothole_marks_moderator.php
+
+3. TEST:
+   https://your-domain.com/test_pothole_marks_moderator.php?learner_id=LEARNER_ID
+
+═══════════════════════════════════════════════════════════════
+  VERIFICATION
+═══════════════════════════════════════════════════════════════
+
+✓ Check database:
+  SELECT * FROM logbook_marks 
+  WHERE unit_standard_id LIKE '%pothole%' LIMIT 5;
+
+✓ Test endpoint:
+  curl "https://your-domain.com/php/view_pothole_checklists.php?learner_id=LEARNER_ID"
+
+✓ Test in app:
+  Login as moderator → View learner → Check pothole section
+
+═══════════════════════════════════════════════════════════════
+  KEY INFORMATION
+═══════════════════════════════════════════════════════════════
+
+Table:        logbook_marks
+Identifier:   unit_standard_id LIKE '%pothole%'
+Columns:      moderator_status, moderator_comment, moderator_id,
+              moderation_date, assessor_comment
+
+Flutter App:  NO CHANGES NEEDED (already correct)
+
+═══════════════════════════════════════════════════════════════
+  TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════
+
+No marks showing?
+  → Check: SELECT * FROM logbook_marks WHERE learner_id='ID' 
+           AND unit_standard_id LIKE '%pothole%';
+
+Moderation not saving?
+  → Check: SHOW COLUMNS FROM logbook_marks LIKE 'moderator%';
+
+Wrong marks displayed?
+  → System shows most recent (ORDER BY assessment_date DESC)
+
+═══════════════════════════════════════════════════════════════
+  FILES CHANGED
+═══════════════════════════════════════════════════════════════
+
+Backend:
+  ✓ php/view_pothole_checklists.php  (fetch marks)
+  ✓ save_moderation.php              (save moderation)
+
+Database:
+  ✓ add_moderation_columns_to_logbook_marks.sql
+
+Testing:
+  ✓ test_pothole_marks_moderator.php
+
+Documentation:
+  ✓ POTHOLE_MARKS_MODERATOR_FIX.md
+  ✓ DEPLOY_POTHOLE_MARKS_FIX.md
+  ✓ POTHOLE_MARKS_FIX_SUMMARY.md
+
+═══════════════════════════════════════════════════════════════
+  STATUS: ✅ READY TO DEPLOY
+═══════════════════════════════════════════════════════════════

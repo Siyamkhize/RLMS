@@ -1,0 +1,56 @@
+═══════════════════════════════════════════════════════════════
+  SUMMATIVE DETECTION FIX - QUICK SUMMARY
+═══════════════════════════════════════════════════════════════
+
+PROBLEM:
+--------
+• type column = "Formative" for ALL marks (WRONG!)
+• exercise column = "All Summative Questions - 9964 - ..." (CORRECT!)
+• Result: No summative marks detected → temp_learner_marks EMPTY
+
+SOLUTION:
+---------
+Changed WHERE clause to check BOTH type AND exercise columns:
+
+  AND (m.type = 'Summative' OR m.exercise LIKE '%Summative%' OR m.exercise LIKE '%summative%')
+
+This catches summative marks even if type column is wrong.
+
+FILES UPDATED:
+--------------
+✅ get_learners_with_poe_assigned.php (lines 312 & 356)
+✅ test_temp_tables_logic.php (lines 99 & 143)
+
+UPLOAD & TEST:
+--------------
+1. Upload both files to server
+2. Test: http://your-server/test_temp_tables_logic.php?moderator_id=77
+3. Check Step 3 has data (not empty)
+4. Test API: http://your-server/get_learners_with_poe_assigned.php?moderator_id=77
+5. Verify marking_status = "Marked" and performance_level = High/Medium/Low
+
+EXPECTED RESULTS:
+-----------------
+Before Fix:
+  ❌ temp_learner_marks: 0 rows
+  ❌ Marking Status: Not Marked
+  ❌ Performance Level: Not Assessed
+  ❌ US Count: NULL
+  ❌ Avg Marks: NULL
+
+After Fix:
+  ✅ temp_learner_marks: Has rows
+  ✅ Marking Status: Marked
+  ✅ Performance Level: High/Medium/Low
+  ✅ US Count: > 0
+  ✅ Avg Marks: > 0
+
+RESET ASSIGNMENTS (if needed):
+-------------------------------
+DELETE FROM moderator_assignments WHERE moderator_id = '77';
+
+Then call API again for fresh sampling.
+
+═══════════════════════════════════════════════════════════════
+STATUS: READY FOR DEPLOYMENT ✅
+═══════════════════════════════════════════════════════════════

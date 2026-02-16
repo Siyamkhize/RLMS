@@ -1,0 +1,50 @@
+========================================
+   PHP ENDPOINT UPDATE REQUIRED
+========================================
+
+To complete the fix for "sync only current day to offline":
+
+STEP 1: Locate the PHP file
+----------------------------
+Path: C:\xampp\htdocs\assessorReport2\mobile\sync_learner_clocking.php
+
+
+STEP 2: Backup the old file
+----------------------------
+Rename it to: sync_learner_clocking_OLD.php
+
+
+STEP 3: Copy the new file
+----------------------------
+Copy: sync_learner_clocking_UPDATED.php
+To:   C:\xampp\htdocs\assessorReport2\mobile\sync_learner_clocking.php
+
+
+STEP 4: Test the endpoint
+----------------------------
+Open in browser:
+http://localhost/assessorReport2/mobile/sync_learner_clocking.php?clock_date=2025-10-11
+
+Should return only today's records (not all 211 records)
+
+
+WHAT IT DOES:
+----------------------------
+Before: Returns ALL learner_clocking records (211+ records)
+After:  Returns ONLY current day when ?clock_date parameter is provided
+
+The Flutter app now sends: sync_learner_clocking.php?clock_date=2025-10-11
+This prevents accumulating old records in local database
+
+
+ALTERNATIVE: Manual SQL Query
+----------------------------
+If you don't want to update PHP file, the Flutter fixes will still work,
+but background sync will fetch all records. The cleanup will delete them,
+so it's just more data transfer than needed.
+
+
+========================================
+   Status: PHP update needed to complete
+========================================
+

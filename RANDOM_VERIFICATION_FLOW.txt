@@ -1,0 +1,117 @@
+📱 RANDOM BIOMETRIC VERIFICATION FLOW
+=====================================
+
+1. ADMINISTRATOR CREATES RANDOM PROMPTS
+   ┌─────────────────────────────────────┐
+   │ curl POST /create_random_prompts_   │
+   │ batch.php                           │
+   │ - class_id=ABC123                   │
+   │ - num_prompts=3                     │
+   │ - countdown_duration=180            │
+   └─────────────────────────────────────┘
+                    │
+                    ▼
+   ┌─────────────────────────────────────┐
+   │ Server randomly selects 3 learners │
+   │ from class ABC123 who are clocked   │
+   │ in and creates prompts for them     │
+   └─────────────────────────────────────┘
+
+2. LEARNER'S APP MONITORS (Every 30 seconds)
+   ┌─────────────────────────────────────┐
+   │ App checks:                         │
+   │ POST /check_monitoring_prompts.php  │
+   │ - learner_id=123                    │
+   └─────────────────────────────────────┘
+                    │
+                    ▼
+   ┌─────────────────────────────────────┐
+   │ Server responds:                    │
+   │ {                                   │
+   │   "has_prompt": true,               │
+   │   "time_remaining": 165             │
+   │ }                                   │
+   └─────────────────────────────────────┘
+
+3. PHONE ALERTS USER (If app is minimized)
+   ┌─────────────────────────────────────┐
+   │ 📳 Phone vibrates (pattern)         │
+   │ 🔔 Notification appears:            │
+   │ "⚠️ Biometric Verification Required │
+   │  Please verify within 2m 45s"      │
+   └─────────────────────────────────────┘
+
+4. USER OPENS APP
+   ┌─────────────────────────────────────┐
+   │ 🚨 FULL-SCREEN PROMPT               │
+   │ ┌─────────────────────────────────┐ │
+   │ │ ⚠️ Biometric Verification       │ │
+   │ │ Required                        │ │
+   │ │                                 │ │
+   │ │     ⏰ 02:45                    │ │
+   │ │                                 │ │
+   │ │ Place your finger on the        │ │
+   │ │ scanner to verify...            │ │
+   │ │                                 │ │
+   │ │    [🔍 Verify Now]              │ │
+   │ │                                 │ │
+   │ │ Cannot dismiss until verified   │ │
+   │ └─────────────────────────────────┘ │
+   └─────────────────────────────────────┘
+
+5. FINGERPRINT VERIFICATION
+   ┌─────────────────────────────────────┐
+   │ User places finger on scanner       │
+   │                                     │
+   │ ✅ MATCH: "Verification successful!"│
+   │ ❌ NO MATCH: "Try again"            │
+   │ ⏰ TIMEOUT: "Time expired!"         │
+   └─────────────────────────────────────┘
+                    │
+                    ▼
+   ┌─────────────────────────────────────┐
+   │ Update status on server:            │
+   │ POST /update_monitoring_status.php  │
+   │ - monitoring_id=101                 │
+   │ - status=completed                  │
+   │ - response_time=45                  │
+   └─────────────────────────────────────┘
+
+6. COMPLIANCE TRACKING
+   ┌─────────────────────────────────────┐
+   │ 📊 Generate Reports:                │
+   │ - 85% completed on time             │
+   │ - 10% failed verification           │
+   │ - 5% timeout                        │
+   │                                     │
+   │ 📈 Response times:                  │
+   │ - Average: 45 seconds               │
+   │ - Fastest: 12 seconds               │
+   │ - Slowest: 2m 30s                   │
+   └─────────────────────────────────────┘
+
+KEY FEATURES:
+=============
+✅ Random selection prevents gaming
+✅ Works when app is minimized
+✅ Phone vibration + notifications
+✅ Cannot dismiss until verified
+✅ Countdown timer with color coding
+✅ Detailed compliance tracking
+✅ User-friendly error messages
+✅ Offline support with local storage
+
+TIMING:
+=======
+• Check frequency: Every 30 seconds
+• Default countdown: 3 minutes (180s)
+• Vibration pattern: 500ms-1000ms-500ms-1000ms
+• Notification: Persistent (cannot dismiss)
+
+SECURITY:
+=========
+• Only prompts clocked-in learners
+• Random timing prevents prediction
+• Detailed audit trail
+• Response time tracking
+• Failed attempt logging

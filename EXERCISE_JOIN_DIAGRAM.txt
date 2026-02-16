@@ -1,0 +1,66 @@
+========================================
+EXERCISE COLUMN JOIN - VISUAL DIAGRAM
+========================================
+
+PROBLEM: marks.type column is wrong
+┌─────────────────────────────────────┐
+│ marks table                         │
+├─────────────────────────────────────┤
+│ learnerID | exercise              | type      | marks_scored │
+│ 1234      | Define a safe site    | Formative | 75           │ ❌ Wrong!
+│ 1234      | Safety hazards        | Formative | 80           │ ❌ Wrong!
+│ 1235      | Common sources        | Formative | 65           │ ❌ Wrong!
+└─────────────────────────────────────┘
+All marked as "Formative" even though they're actually Summative!
+
+SOLUTION: Join with assessments table using exercise column
+┌─────────────────────────────────────┐
+│ marks table                         │
+├─────────────────────────────────────┤
+│ learnerID | exercise              | marks_scored │
+│ 1234      | Define a safe site    | 75           │
+│ 1234      | Safety hazards        | 80           │
+│ 1235      | Common sources        | 65           │
+└─────────────────────────────────────┘
+                    │
+                    │ JOIN ON exercise column (text match)
+                    ↓
+┌─────────────────────────────────────┐
+│ assessments table                   │
+├─────────────────────────────────────┤
+│ exercise              | assessment_type | unit_standard_id │
+│ Define a safe site    | Summative       | 9964             │ ✅ Correct!
+│ Safety hazards        | Summative       | 9964             │ ✅ Correct!
+│ Common sources        | Summative       | 14555            │ ✅ Correct!
+└─────────────────────────────────────┘
+
+RESULT: Accurate summative marks
+┌─────────────────────────────────────┐
+│ temp_learner_marks                  │
+├─────────────────────────────────────┤
+│ learnerID | unit_standard_count | avg_marks │
+│ 1234      | 5                   | 75.50     │ ✅ Has data!
+│ 1235      | 3                   | 62.00     │ ✅ Has data!
+└─────────────────────────────────────┘
+
+FINAL OUTPUT: Correct stratification
+┌─────────────────────────────────────┐
+│ Learner 1234                        │
+├─────────────────────────────────────┤
+│ Marking Status: Marked              │ ✅ Correct!
+│ Performance Level: High (75.50)     │ ✅ Correct!
+│ Unit Standards Count: 5             │ ✅ Correct!
+└─────────────────────────────────────┘
+
+SQL QUERY:
+FROM marks m
+INNER JOIN assessments a ON m.exercise = a.exercise  ← KEY LINE
+WHERE a.assessment_type = 'Summative'                ← Authoritative source
+
+BEFORE FIX:
+WHERE m.type = 'Summative'  ❌ Returns 0 rows (all marked as Formative)
+
+AFTER FIX:
+WHERE a.assessment_type = 'Summative'  ✅ Returns correct summative marks
+
+========================================

@@ -1,0 +1,38 @@
+============================================
+   RLMSS APP - QUICK FIX GUIDE
+============================================
+
+PROBLEM: Out of Memory during build
+
+QUICK FIX:
+1. Double-click: fix_build.bat
+2. Wait for it to complete
+3. Run: build_app.bat
+
+OR manually run:
+   flutter clean
+   flutter pub get
+   flutter build apk
+
+============================================
+CHANGES MADE:
+============================================
+
+✓ Reduced Gradle memory from 4GB to 2GB
+✓ Disabled parallel builds (saves memory)
+✓ Enabled MultiDex support
+✓ Added multidex dependency
+✓ Created automated fix script
+
+============================================
+IF STILL FAILING:
+============================================
+
+1. Close all other programs
+2. Restart your computer
+3. Run fix_build.bat again
+4. Try building with:
+   flutter build apk --release
+
+============================================
+

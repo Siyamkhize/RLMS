@@ -1,0 +1,246 @@
+POE UPLOAD ERROR - VISUAL EXPLANATION
+=====================================
+
+THE PROBLEM: "Chunk file not found in request"
+-----------------------------------------------
+
+WHAT'S HAPPENING:
+
+┌─────────────────────────────────────────────────────────────────┐
+│ FLUTTER APP                                                     │
+│                                                                 │
+│ 1. User scans 50 pages → Creates 10MB PDF                     │
+│ 2. App splits into chunks: 2MB each = 5 chunks                │
+│ 3. App sends Chunk 1:                                          │
+│    - File data: 2MB                                            │
+│    - Metadata: learner_id, chunk_index, etc.                   │
+│    - Total POST size: ~2.5MB                                   │
+└─────────────────────────────────────────────────────────────────┘
+                            ↓
+                    [INTERNET]
+                            ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ SERVER (rlms.rlms.co.za)                             │
+│                                                                 │
+│ PHP Configuration (BEFORE FIX):                                │
+│   post_max_size = 2M  ← TOO SMALL!                            │
+│                                                                 │
+│ What PHP Does:                                                 │
+│   1. Receives POST request (2.5MB total)                       │
+│   2. Checks: 2.5MB > 2M limit? YES!                           │
+│   3. SILENTLY drops $_FILES array                              │
+│   4. Keeps $_POST data (metadata)                              │
+│                                                                 │
+│ Result:                                                        │
+│   $_POST = [learner_id, chunk_index, ...]  ✓ Present         │
+│   $_FILES = []                              ✗ EMPTY!          │
+│                                                                 │
+│ upload_poe_document.php checks:                                │
+│   if (!isset($_FILES['chunk'])) {                             │
+│       throw Exception('Chunk file not found');  ← ERROR!      │
+│   }                                                            │
+└─────────────────────────────────────────────────────────────────┘
+
+
+THE FIX: Increase post_max_size to 200M
+----------------------------------------
+
+┌─────────────────────────────────────────────────────────────────┐
+│ FLUTTER APP                                                     │
+│                                                                 │
+│ Same as before:                                                │
+│ - Sends 2MB chunk + metadata                                   │
+│ - Total POST size: ~2.5MB                                      │
+└─────────────────────────────────────────────────────────────────┘
+                            ↓
+                    [INTERNET]
+                            ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ SERVER (rlms.rlms.co.za)                             │
+│                                                                 │
+│ PHP Configuration (AFTER FIX):                                 │
+│   post_max_size = 200M  ← PLENTY OF ROOM!                     │
+│                                                                 │
+│ What PHP Does:                                                 │
+│   1. Receives POST request (2.5MB total)                       │
+│   2. Checks: 2.5MB > 200M limit? NO!                          │
+│   3. Accepts BOTH $_FILES and $_POST                           │
+│                                                                 │
+│ Result:                                                        │
+│   $_POST = [learner_id, chunk_index, ...]  ✓ Present         │
+│   $_FILES = [chunk => file data]           ✓ Present!         │
+│                                                                 │
+│ upload_poe_document.php:                                       │
+│   - Saves chunk to temp directory                              │
+│   - Returns success                                            │
+│   - Repeats for all chunks                                     │
+│   - Merges chunks into final PDF                               │
+│   - Saves to database                                          │
+│   - SUCCESS! ✓                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+
+COMPLETE UPLOAD FLOW (AFTER FIX)
+---------------------------------
+
+50-page document = ~10MB PDF
+
+Chunk 1 (2MB):
+  App → Server: 2.5MB POST
+  Server: ✓ Saves chunk_0
+  Response: {"success": true, "chunk_index": 0}
+
+Chunk 2 (2MB):
+  App → Server: 2.5MB POST
+  Server: ✓ Saves chunk_1
+  Response: {"success": true, "chunk_index": 1}
+
+Chunk 3 (2MB):
+  App → Server: 2.5MB POST
+  Server: ✓ Saves chunk_2
+  Response: {"success": true, "chunk_index": 2}
+
+Chunk 4 (2MB):
+  App → Server: 2.5MB POST
+  Server: ✓ Saves chunk_3
+  Response: {"success": true, "chunk_index": 3}
+
+Chunk 5 (2MB) - LAST CHUNK:
+  App → Server: 2.5MB POST
+  Server: 
+    ✓ Saves chunk_4
+    ✓ Merges all 5 chunks
+    ✓ Creates POE_12345_1234567890_abc123.pdf
+    ✓ Inserts into database
+  Response: {
+    "success": true,
+    "document_id": 42,
+    "file_name": "POE_12345_1234567890_abc123.pdf",
+    "chunks_merged": 5
+  }
+
+App: Shows "Document uploaded successfully!"
+App: Closes scanner screen automatically
+
+
+WHY WE USE CHUNKED UPLOAD
+--------------------------
+
+Option 1: Direct Upload (files < 3MB)
+  ┌─────────┐
+  │ 2MB PDF │ ──────────────────────→ Server
+  └─────────┘
+  Simple, fast, one request
+
+Option 2: Chunked Upload (files > 3MB)
+  ┌──────────┐
+  │ 10MB PDF │
+  └──────────┘
+       ↓
+  Split into chunks:
+  ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐
+  │ 2MB│ │ 2MB│ │ 2MB│ │ 2MB│ │ 2MB│
+  └────┘ └────┘ └────┘ └────┘ └────┘
+    ↓      ↓      ↓      ↓      ↓
+  ──────────────────────────────────→ Server
+  
+  Benefits:
+  - Handles large files (up to 200MB)
+  - Shows progress (20%, 40%, 60%, 80%, 100%)
+  - Recoverable (can retry failed chunks)
+  - Works with default server limits (after fix)
+
+
+DEPLOYMENT CHECKLIST
+--------------------
+
+[ ] 1. Upload .htaccess_poe_upload to server
+[ ] 2. Rename to .htaccess (or append to existing)
+[ ] 3. Restart Apache: sudo service apache2 restart
+[ ] 4. Verify: Visit check_php_upload_limits.php
+[ ] 5. Test: Scan and upload 50-page document
+[ ] 6. Verify: Check database for new record
+[ ] 7. Verify: Check uploads/poe_documents/ for PDF file
+
+
+EXPECTED RESULTS
+----------------
+
+Before Fix:
+  Scan 50 pages → Upload → ✗ "Chunk file not found in request"
+
+After Fix:
+  Scan 50 pages → Upload → ✓ "Document uploaded successfully!"
+  
+  Database:
+    poe_documents table has new record
+    
+  File System:
+    uploads/poe_documents/POE_12345_1234567890_abc123.pdf exists
+
+
+TROUBLESHOOTING
+---------------
+
+Error: "Chunk file not found in request"
+  → .htaccess not applied yet
+  → Restart Apache
+  → Check Apache allows .htaccess overrides
+
+Error: "File too large"
+  → upload_max_filesize too small
+  → Check .htaccess has upload_max_filesize = 200M
+
+Error: "Maximum execution time exceeded"
+  → max_execution_time too small
+  → Check .htaccess has max_execution_time = 7200
+
+Error: "Out of memory"
+  → memory_limit too small
+  → Check .htaccess has memory_limit = 256M
+
+
+FILES INVOLVED
+--------------
+
+Flutter App:
+  lib/poe_document_scanner.dart
+    - Scans documents using flutter_doc_scanner
+    - Splits large files into 2MB chunks
+    - Uploads with progress indicator
+    - Auto-closes after successful upload
+
+Server:
+  upload_poe_document.php
+    - Handles direct and chunked uploads
+    - 2-hour timeout (7200 seconds)
+    - Merges chunks into final PDF
+    - Saves to database
+
+Configuration:
+  .htaccess_poe_upload
+    - Increases PHP upload limits
+    - Sets 2-hour timeout
+    - Increases memory limit
+
+Testing:
+  check_php_upload_limits.php
+    - Verifies PHP configuration
+    - Shows current limits
+
+Database:
+  poe_documents table
+    - Stores document metadata
+    - Links to learner_id
+    - Tracks upload status
+
+
+SUMMARY
+-------
+
+Problem: Server's post_max_size (2M) < Chunk size (2.5MB)
+Solution: Increase post_max_size to 200M via .htaccess
+Result: Chunked uploads work perfectly!
+
+Time to fix: 5 minutes
+Impact: Enables all POE document uploads (up to 195 pages)

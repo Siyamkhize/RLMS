@@ -1,0 +1,75 @@
+═══════════════════════════════════════════════════════════════
+  ASSESSMENTS JOIN - QUICK TEST GUIDE
+═══════════════════════════════════════════════════════════════
+
+STATUS: CODE IS READY ✅
+Both files already use assessments table join!
+
+FILES TO UPLOAD:
+----------------
+1. get_learners_with_poe_assigned.php (already has join)
+2. test_temp_tables_logic.php (already has join)
+3. test_assessments_join.php (NEW - diagnostic script)
+
+TESTING SEQUENCE:
+-----------------
+Step 1: Run diagnostic script
+  URL: http://your-server/test_assessments_join.php?learner_id=1231
+  
+  Check:
+  ✅ Test 1: marks table has assessment_id column
+  ✅ Test 2: marks have assessment_id values
+  ✅ Test 3: assessments table has summative records
+  ✅ Test 4: join works correctly
+  ✅ Test 5: summative marks count > 0
+  ✅ Test 6: unit standards extracted
+
+Step 2: Test temp tables logic
+  URL: http://your-server/test_temp_tables_logic.php?moderator_id=77
+  
+  Expected:
+  ✅ Step 3 has rows (not empty)
+  ✅ Unit Standard Count > 0
+  ✅ Avg Marks > 0
+  ✅ Performance Level = High/Medium/Low
+
+Step 3: Test API endpoint
+  URL: http://your-server/get_learners_with_poe_assigned.php?moderator_id=77
+  
+  Expected JSON:
+  {
+    "marking_status": "Marked",
+    "performance_level": "High",
+    "unit_standards_count": > 0
+  }
+
+IF STILL SHOWING 0:
+-------------------
+The problem is in the DATABASE, not the code!
+
+Run this SQL query:
+  SELECT COUNT(*) 
+  FROM marks m
+  INNER JOIN assessments a ON m.assessment_id = a.assessment_id
+  WHERE m.learnerID = 1231
+  AND a.assessment_type = 'Summative';
+
+If returns 0, check:
+  □ Does marks table have assessment_id column?
+  □ Are assessment_id values populated (not NULL)?
+  □ Does assessments table have summative records?
+  □ Is the relationship correct?
+
+IMPLEMENTATION DETAILS:
+-----------------------
+Current code uses:
+  FROM marks m
+  INNER JOIN assessments a ON m.assessment_id = a.assessment_id
+  WHERE a.assessment_type = 'Summative'
+
+This is the CORRECT approach!
+The assessments.assessment_type is the authoritative source.
+
+═══════════════════════════════════════════════════════════════
+NEXT ACTION: Upload 3 files and run diagnostic script!
+═══════════════════════════════════════════════════════════════

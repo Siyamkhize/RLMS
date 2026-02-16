@@ -1,0 +1,192 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    MODERATOR CLASS FILTERING - BUG FIX                       ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ BEFORE (BUGGY) - Class Filter Was Ignored                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  1. Get Moderator Classes
+     ┌──────────────────┐
+     │ Moderator 77     │
+     │ Classes: [74]    │ ✅ Correct
+     └──────────────────┘
+            │
+            ▼
+  2. Create Filtered Temp Table
+     ┌──────────────────────────────────┐
+     │ temp_poe_learners                │
+     │ - Learner 1 (Class 74) ✅        │
+     │ - Learner 2 (Class 74) ✅        │
+     │ - Learner 3 (Class 74) ✅        │ ✅ Filtered correctly!
+     └──────────────────────────────────┘
+            │
+            ▼
+  3. Main Query (THE BUG!)
+     ┌──────────────────────────────────┐
+     │ SELECT ... FROM learnerdetails   │ ❌ WRONG!
+     │                                  │
+     │ Returns ALL learners:            │
+     │ - Learner 1 (Class 74)           │
+     │ - Learner 4 (Class 75) ❌        │
+     │ - Learner 5 (Class 76) ❌        │
+     │ - Learner 6 (Class 77) ❌        │
+     │ ... (entire database)            │
+     └──────────────────────────────────┘
+            │
+            ▼
+  4. Result: Moderator sees ALL learners ❌
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ AFTER (FIXED) - Class Filter Works Correctly                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  1. Get Moderator Classes
+     ┌──────────────────┐
+     │ Moderator 77     │
+     │ Classes: [74]    │ ✅ Correct
+     └──────────────────┘
+            │
+            ▼
+  2. Create Filtered Temp Table
+     ┌──────────────────────────────────┐
+     │ temp_poe_learners                │
+     │ - Learner 1 (Class 74) ✅        │
+     │ - Learner 2 (Class 74) ✅        │
+     │ - Learner 3 (Class 74) ✅        │ ✅ Filtered correctly!
+     └──────────────────────────────────┘
+            │
+            ▼
+  3. Main Query (FIXED!)
+     ┌──────────────────────────────────┐
+     │ SELECT ... FROM temp_poe_learners│ ✅ CORRECT!
+     │                                  │
+     │ Returns ONLY filtered learners:  │
+     │ - Learner 1 (Class 74) ✅        │
+     │ - Learner 2 (Class 74) ✅        │
+     │ - Learner 3 (Class 74) ✅        │
+     └──────────────────────────────────┘
+            │
+            ▼
+  4. Stratified Sampling (25%)
+     ┌──────────────────────────────────┐
+     │ Selected: ~1 learner             │
+     │ - Learner 1 (Class 74) ✅        │
+     └──────────────────────────────────┘
+            │
+            ▼
+  5. Result: Moderator sees ONLY Class 74 learners ✅
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                              THE KEY CHANGE                                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+  BEFORE:                              AFTER:
+  ┌─────────────────────────┐         ┌─────────────────────────┐
+  │ FROM learnerdetails l   │   →     │ FROM temp_poe_learners  │
+  │ INNER JOIN poe p ...    │         │ INNER JOIN learnerdetails│
+  └─────────────────────────┘         └─────────────────────────┘
+           ❌ Wrong                              ✅ Correct
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                            DATA FLOW DIAGRAM                                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+  Database Tables                    Temp Tables                  Final Result
+  ┌──────────────┐                  ┌──────────────┐            ┌──────────────┐
+  │ facilitator  │                  │temp_poe_     │            │ Moderator    │
+  │ - mod 77     │──────────────────│learners      │────────────│ Assignment   │
+  │   class 74   │  Filter by       │ (filtered)   │  Sample    │ (25%)        │
+  └──────────────┘  classes         └──────────────┘  25%       └──────────────┘
+         │                                  │
+         │                                  │
+         ▼                                  ▼
+  ┌──────────────┐                  ┌──────────────┐
+  │learnerdetails│                  │temp_learner_ │
+  │ - All        │──────────────────│marks         │
+  │   learners   │  Join with       │ (filtered)   │
+  └──────────────┘  temp table      └──────────────┘
+         │                                  │
+         │                                  │
+         ▼                                  ▼
+  ┌──────────────┐                  ┌──────────────┐
+  │ poe          │                  │temp_learner_ │
+  │ - POE docs   │──────────────────│coverage      │
+  └──────────────┘  Join with       │ (filtered)   │
+                    temp table      └──────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                          EXAMPLE: MODERATOR 77                               ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+  Input:
+  ┌────────────────────────────────────────────────────────────────┐
+  │ Moderator ID: 77                                               │
+  │ Allocated Classes: Class A (ID: 74)                            │
+  │ Learners with POE in Class A: 3                                │
+  └────────────────────────────────────────────────────────────────┘
+
+  Processing:
+  ┌────────────────────────────────────────────────────────────────┐
+  │ 1. Query facilitator table → Get class 74                     │
+  │ 2. Create temp_poe_learners → Filter by class 74              │
+  │ 3. Main query → Start FROM temp_poe_learners ✅                │
+  │ 4. Stratified sampling → Select 25% (1 learner)               │
+  └────────────────────────────────────────────────────────────────┘
+
+  Output:
+  ┌────────────────────────────────────────────────────────────────┐
+  │ Selected Learners: 1                                           │
+  │ - Learner X (Class A, ID: 74) ✅                               │
+  │                                                                │
+  │ All learners are from Class A ✅                               │
+  │ No learners from other classes ✅                              │
+  └────────────────────────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                              VERIFICATION                                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+  Test Query:
+  ┌────────────────────────────────────────────────────────────────┐
+  │ GET /get_learners_with_poe_assigned.php?moderator_id=77        │
+  └────────────────────────────────────────────────────────────────┘
+
+  Expected Response:
+  ┌────────────────────────────────────────────────────────────────┐
+  │ {                                                              │
+  │   "data": {                                                    │
+  │     "selected_count": 1,                                       │
+  │     "learners": [                                              │
+  │       {                                                        │
+  │         "classID": "74",        ✅ Correct class!              │
+  │         "className": "Class A",                                │
+  │         ...                                                    │
+  │       }                                                        │
+  │     ]                                                          │
+  │   }                                                            │
+  │ }                                                              │
+  └────────────────────────────────────────────────────────────────┘
+
+  Validation:
+  ┌────────────────────────────────────────────────────────────────┐
+  │ ✅ All learners have classID = 74                              │
+  │ ✅ No learners from other classes                              │
+  │ ✅ Sampling rate ~25%                                          │
+  │ ✅ Stratification still works                                  │
+  └────────────────────────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                 SUMMARY                                      ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+  Problem:  Main query didn't use filtered temp table
+  Solution: Changed FROM clause to start from temp_poe_learners
+  Result:   Moderators now see only their allocated class learners
+  Status:   ✅ FIXED - Ready for deployment

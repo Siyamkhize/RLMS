@@ -1,0 +1,60 @@
+═══════════════════════════════════════════════════════════════
+  ASSESSMENTS TABLE JOIN FIX - QUICK REFERENCE
+═══════════════════════════════════════════════════════════════
+
+PROBLEM:
+--------
+• marks.type column = "Formative" (WRONG!)
+• marks.exercise column = unreliable
+• Result: No summative marks detected
+
+SOLUTION:
+---------
+Join with assessments table to get authoritative assessment type:
+
+  INNER JOIN assessments a ON m.assessment_id = a.assessment_id
+  WHERE a.assessment_type = 'Summative'
+
+The assessments.assessment_type column is the AUTHORITATIVE SOURCE!
+
+FILES UPDATED:
+--------------
+✅ get_learners_with_poe_assigned.php
+✅ test_temp_tables_logic.php
+
+Both MySQL 8.0+ and MySQL 5.7/MariaDB sections updated.
+
+KEY CHANGE:
+-----------
+OLD:
+  FROM marks m
+  WHERE m.type = 'Summative'  ❌ Wrong!
+
+NEW:
+  FROM marks m
+  INNER JOIN assessments a ON m.assessment_id = a.assessment_id
+  WHERE a.assessment_type = 'Summative'  ✅ Correct!
+
+UPLOAD & TEST:
+--------------
+1. Upload both files to server
+2. Test: http://your-server/test_temp_tables_logic.php?moderator_id=77
+3. Check Step 3 (temp_learner_marks) - should have rows!
+4. Test API: http://your-server/get_learners_with_poe_assigned.php?moderator_id=77
+5. Verify marking_status = "Marked" and performance_level shows data
+
+EXPECTED RESULTS:
+-----------------
+✅ temp_learner_marks: Has rows (not empty)
+✅ Marking Status: Marked
+✅ Performance Level: High/Medium/Low
+✅ US Count: > 0
+✅ Avg Marks: > 0
+
+RESET ASSIGNMENTS (if needed):
+-------------------------------
+DELETE FROM moderator_assignments WHERE moderator_id = '77';
+
+═══════════════════════════════════════════════════════════════
+STATUS: READY FOR DEPLOYMENT ✅
+═══════════════════════════════════════════════════════════════

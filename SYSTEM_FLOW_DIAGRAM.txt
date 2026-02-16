@@ -1,0 +1,293 @@
+  ═══════════════════════════════════════════════════════════════════════════════
+  CHUNKED BULK EXPORT SYSTEM - FLOW DIAGRAM
+  How the System Processes 2000+ Learners Without Timeout
+═══════════════════════════════════════════════════════════════════════════════
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│                          USER INTERFACE                                     │
+│                     (bulk_down_register.php)                                │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  Filters: District, Site, Date Range, Attendance                     │   │
+│  │  Results: 2000 learners displayed                                    │   │
+│  │                                                                       │   │
+│  │  [📄 Bulk Download (2000+ Learners Supported)]  ← User clicks       │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+                                       │ Extract learner IDs from table
+                                       │ Get date range from filters
+                                       ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│                    JAVASCRIPT CONTROLLER                                    │
+│                 (bulk_download_chunked.js)                                  │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  ChunkedBulkDownloader Class                                         │   │
+│  │                                                                       │   │
+│  │  Input: [1, 2, 3, ..., 2000] learner IDs                            │   │
+│  │  Chunk Size: 10 learners per chunk                                   │   │
+│  │  Total Chunks: 200 chunks                                            │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+                                       │ STEP 1: Initialize Session
+                                       ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│                      BACKEND PROCESSOR                                      │
+│                   (bulk_export_chunked.php)                                 │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  ACTION: start                                                       │   │
+│  │                                                                       │   │
+│  │  • Create session ID: session_1699123456_7890                        │   │
+│  │  • Split 2000 learners into 200 chunks of 10                         │   │
+│  │  • Create session directory: temp_reports/session_xxx/               │   │
+│  │  • Save session data to session.json                                 │   │
+│  │                                                                       │   │
+│  │  Response: { success: true, session_id: "...", total_chunks: 200 }  │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+                                       │ Session created
+                                       ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│                    PROGRESS DISPLAY                                         │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  🔄 Processing Bulk Export                                           │   │
+│  │                                                                       │   │
+│  │  Generating reports with sick notes and manual registers...          │   │
+│  │                                                                       │   │
+│  │  ████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  45%      │   │
+│  │                                                                       │   │
+│  │  Processing chunk 90 of 200...                                       │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+                                       │ STEP 2: Process Chunks (Loop)
+                                       ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│                  CHUNK PROCESSING LOOP                                      │
+│                                                                             │
+│  For each chunk (1 to 200):                                                │
+│                                                                             │
+│  ┌─────────────────────────────────── ──────────────────────────────────┐   │
+│  │  ACTION: process_chunk                                               │   │
+│  │  Chunk Index: 0 (learners 1-10)                                      │   │
+│  │                                                                       │   │
+│  │  For each learner in chunk:                                          │   │
+│  │    1. Fetch learner data from database                               │   │
+│  │    2. Get sick notes (date filtered)                                 │   │
+│  │    3. Get manual registers (date filtered)                           │   │
+│  │    4. Generate HTML report                                           │   │
+│  │    5. Convert HTML to PDF using mPDF                                 │   │
+│  │    6. Copy sick notes to temp folder                                 │   │
+│  │    7. Copy manual registers to temp folder                           │   │
+│  │                                                                       │   │
+│  │  Time: 10-20 seconds (well under timeout limit)                      │   │
+│  │                                                                       │   │
+│  │  Response: {                                                         │   │
+│  │    success: true,                                                    │   │
+│  │    chunk_index: 0,                                                   │   │
+│  │    processed: 10,                                                    │   │
+│  │    failed: 0,                                                        │   │
+│  │    progress_percent: 0.5                                             │   │
+│  │  }                                                                   │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ↓ Repeat for chunk 1 (learners 11-20)                                     │
+│  ↓ Repeat for chunk 2 (learners 21-30)                                     │
+│  ↓ ...                                                                      │
+│  ↓ Repeat for chunk 199 (learners 1991-2000)                               │
+│                                                                             │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+                                       │ All chunks processed
+                                       │ STEP 3: Finalize
+                                       ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│                      FINALIZATION                                           │
+│                   (bulk_export_chunked.php)                                 │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  ACTION: finalize                                                    │   │
+│  │                                                                       │   │
+│  │  1. Create ZIP file: bulk_reports_20241101_143022.zip                │   │
+│  │                                                                       │   │
+│  │  2. Add all files from session directory:                            │   │
+│  │     • reports/report_1.pdf                                           │   │
+│  │     • reports/report_2.pdf                                           │   │
+│  │     • ... (2000 reports)                                             │   │
+│  │     • sick_notes/1_sicknote_doc1.pdf                                 │   │
+│  │     • sick_notes/2_sicknote_doc1.pdf                                 │   │
+│  │     • ... (all sick notes)                                           │   │
+│  │     • manual_registers/1_manual_reg.pdf                              │   │
+│  │     • manual_registers/2_manual_reg.pdf                              │   │
+│  │     • ... (all manual registers)                                     │   │
+│  │                                                                       │   │
+│  │  3. Add SUMMARY.txt with statistics                                  │   │
+│  │                                                                       │   │
+│  │  4. Close ZIP file                                                   │   │
+│  │                                                                       │   │
+│  │  5. Clean up session directory                                       │   │
+│  │                                                                       │   │
+│  │  Response: {                                                         │   │
+│  │    success: true,                                                    │   │
+│  │    zip_file: "bulk_reports_20241101_143022.zip",                    │   │
+│  │    download_url: "bulk_down_register.php?temp_file=..."             │   │
+│  │  }                                                                   │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+                                       │ ZIP ready
+                                       ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│                      DOWNLOAD                                               │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  ✅ Export completed successfully!                                   │   │
+│  │                                                                       │   │
+│  │  Total learners: 2000                                                │   │
+│  │  Successfully processed: 1998                                        │   │
+│  │  Failed: 2                                                           │   │
+│  │  Sick notes included: 450                                            │   │
+│  │  Manual registers included: 120                                      │   │
+│  │                                                                       │   │
+│  │  Downloading ZIP file...                                             │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Browser automatically downloads:                                           │
+│  bulk_reports_20241101_143022.zip (245 MB)                                  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+  KEY ADVANTAGES
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ NO TIMEOUT ISSUES
+   • Each chunk completes in 10-20 seconds
+   • Well under gateway timeout limits (60-120 seconds)
+   • Can process unlimited learners
+
+✅ REAL-TIME PROGRESS
+   • User sees progress bar updating
+   • Status text shows current chunk
+   • Estimated time remaining
+
+✅ FAULT TOLERANT
+   • Individual chunk failures don't stop entire process
+   • Can retry failed chunks
+   • Detailed error logging
+
+✅ SCALABLE
+   • Linear scaling: 2x learners = 2x time
+   • No exponential slowdown
+   • Can handle 5000+ learners if needed
+
+✅ ORGANIZED OUTPUT
+   • Structured ZIP file
+   • Separate folders for different document types
+   • Summary file with statistics
+
+
+═══════════════════════════════════════════════════════════════════════════════
+  TIMING BREAKDOWN (Example: 2000 Learners)
+═══════════════════════════════════════════════════════════════════════════════
+
+Phase                    | Time        | Details
+-------------------------|-------------|----------------------------------------
+Initialize Session       | 1-2 sec     | Create session, split into chunks
+Process Chunk 1          | 15 sec      | 10 learners, generate PDFs, copy docs
+Process Chunk 2          | 15 sec      | 10 learners, generate PDFs, copy docs
+...                      | ...         | ...
+Process Chunk 200        | 15 sec      | 10 learners, generate PDFs, copy docs
+Create ZIP               | 2-3 min     | Compress all files
+Download                 | 1-2 min     | Transfer to browser
+-------------------------|-------------|----------------------------------------
+TOTAL                    | 50-60 min   | Predictable and reliable
+
+
+═══════════════════════════════════════════════════════════════════════════════
+  COMPARISON: OLD vs NEW SYSTEM
+═══════════════════════════════════════════════════════════════════════════════
+
+OLD SYSTEM (Single Request):
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  User clicks → Process ALL 2000 learners → Timeout after 120 seconds ❌     │
+│                                                                             │
+│  Problems:                                                                  │
+│  • Single long-running request                                             │
+│  • Gateway timeout kills process                                           │
+│  • No progress indication                                                  │
+│  • All-or-nothing (complete failure)                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+NEW SYSTEM (Chunked Requests):
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  User clicks → Initialize (2 sec) → Chunk 1 (15 sec) → Chunk 2 (15 sec) →  │
+│  ... → Chunk 200 (15 sec) → Finalize (3 min) → Download ✅                  │
+│                                                                             │
+│  Advantages:                                                                │
+│  • Multiple short requests                                                 │
+│  • Each request completes quickly                                          │
+│  • Real-time progress updates                                              │
+│  • Fault tolerant (can recover from failures)                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+  FILE STRUCTURE
+═══════════════════════════════════════════════════════════════════════════════
+
+During Processing:
+temp_reports/
+└── session_1699123456_7890/
+    ├── session.json                    (session metadata)
+    ├── reports/
+    │   ├── report_1.pdf
+    │   ├── report_2.pdf
+    │   └── ... (2000 PDFs)
+    ├── sick_notes/
+    │   ├── 1_sicknote_doc1.pdf
+    │   ├── 2_sicknote_doc1.pdf
+    │   └── ... (all sick notes)
+    └── manual_registers/
+        ├── 1_manual_reg.pdf
+        ├── 2_manual_reg.pdf
+        └── ... (all manual registers)
+
+Final Output:
+temp_reports/
+└── bulk_reports_20241101_143022.zip
+    ├── reports/
+    │   ├── report_1.pdf
+    │   ├── report_2.pdf
+    │   └── ... (2000 PDFs)
+    ├── sick_notes/
+    │   ├── 1_sicknote_doc1.pdf
+    │   └── ... (all sick notes)
+    ├── manual_registers/
+    │   ├── 1_manual_reg.pdf
+    │   └── ... (all manual registers)
+    └── SUMMARY.txt
+
+
+═══════════════════════════════════════════════════════════════════════════════
+  READY TO DEPLOY! 🚀
+═══════════════════════════════════════════════════════════════════════════════

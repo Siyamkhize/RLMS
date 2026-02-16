@@ -1,0 +1,26 @@
+# POE Document Upload Configuration
+# This file increases PHP limits to support large document uploads (up to 195 pages)
+# 
+# DEPLOYMENT INSTRUCTIONS:
+# 1. Upload this file to your server at: tesing.mtltechnical.co.za/mobile/
+# 2. Rename it from ".htaccess_poe_upload" to ".htaccess"
+# 3. If you already have a .htaccess file, ADD these lines to it (don't replace)
+# 4. Restart Apache: sudo service apache2 restart
+# 5. Test with: check_php_upload_limits.php
+
+# Increase upload limits for large POE documents
+php_value upload_max_filesize 200M
+php_value post_max_size 200M
+php_value max_execution_time 7200
+php_value max_input_time 7200
+php_value memory_limit 256M
+
+# Enable error logging (helpful for debugging)
+php_flag display_errors Off
+php_flag log_errors On
+
+# Set maximum POST data size (must be >= upload_max_filesize)
+php_value max_input_vars 5000
+
+# Increase timeout for long-running uploads
+php_value default_socket_timeout 7200

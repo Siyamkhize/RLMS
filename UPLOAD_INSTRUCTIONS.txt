@@ -1,0 +1,65 @@
+================================================================================
+UPLOAD THESE FILES TO YOUR SERVER NOW
+================================================================================
+
+The bulk download is failing because these files are not on your server yet.
+
+REQUIRED FILES TO UPLOAD (Upload to same directory as bulk_down_register.php):
+================================================================================
+
+1. bulk_export_api.php
+2. bulk_export_with_documents.php  
+3. get_learner_documents.php
+4. bulk_down_register.php (REPLACE existing file)
+
+OPTIONAL FILES (For testing):
+================================================================================
+
+5. test_bulk_documents.php
+6. DEPLOY_BULK_DOCUMENTS.md
+
+HOW TO UPLOAD:
+================================================================================
+
+Option 1: Using FTP/SFTP Client (FileZilla, WinSCP, etc.)
+   - Connect to your server
+   - Navigate to /public_html/ directory
+   - Upload the 4 required files above
+   - Overwrite bulk_down_register.php when prompted
+
+Option 2: Using cPanel File Manager
+   - Login to cPanel
+   - Open File Manager
+   - Navigate to public_html
+   - Click Upload
+   - Select the 4 required files
+   - Upload and overwrite when prompted
+
+Option 3: Using Command Line (SSH)
+   - SSH into your server
+   - Navigate to /public_html/
+   - Upload files using scp or rsync
+
+AFTER UPLOADING:
+================================================================================
+
+1. Test the API:
+   Visit: https://rlms.rlms.co.za/bulk_export_api.php
+   Should see: {"success":true,"message":"Bulk Export API is running"...}
+
+2. Test the bulk download:
+   - Go to bulk download page
+   - Filter to 5-10 learners
+   - Click "Bulk Download"
+   - Should download ZIP file with reports and documents
+
+CURRENT ERROR:
+================================================================================
+
+Error: POST https://rlms.rlms.co.za/bulk_export_api.php 404 (Not Found)
+
+This means bulk_export_api.php is NOT on the server yet.
+
+SOLUTION: Upload the files listed above!
+
+================================================================================

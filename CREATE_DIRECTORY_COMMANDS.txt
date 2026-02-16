@@ -1,0 +1,67 @@
+=== COMMANDS TO CREATE UPLOAD DIRECTORY ===
+
+Option 1: Via SSH
+-----------------
+1. SSH into your server
+2. Run these commands:
+
+cd /home/username/public_html/mobile
+mkdir -p uploads/pothole_evidence
+chmod 755 uploads/pothole_evidence
+ls -la uploads/
+
+You should see:
+drwxr-xr-x  2 username username 4096 Nov 10 14:49 pothole_evidence
+
+
+Option 2: Via cPanel File Manager
+----------------------------------
+1. Login to cPanel
+2. Go to File Manager
+3. Navigate to: public_html/mobile/
+4. Create folder: uploads (if it doesn't exist)
+5. Inside uploads, create folder: pothole_evidence
+6. Right-click pothole_evidence > Change Permissions
+7. Set to: 755 (rwxr-xr-x)
+8. Click Save
+
+
+Option 3: Via FTP
+-----------------
+1. Connect to your server via FTP
+2. Navigate to: /public_html/mobile/
+3. Create folder: uploads (if it doesn't exist)
+4. Inside uploads, create folder: pothole_evidence
+5. Set permissions to 755
+
+
+Verification
+------------
+After creating the directory, visit:
+https://rlms.rlms.co.za/mobile/check_upload_status.php
+
+Should show:
+{
+  "upload_directory": {
+    "exists": true,
+    "writable": true
+  },
+  "overall": "OK"
+}
+
+
+Then Try Uploading
+------------------
+1. Open the app
+2. Go to Pothole Checklist
+3. Click camera icon for a learner
+4. Select an image
+5. It should now upload successfully!
+
+
+If You Can't Access Server
+---------------------------
+Upload the create_upload_directory.php file to your server's mobile folder, then visit:
+https://rlms.rlms.co.za/mobile/create_upload_directory.php
+
+This will attempt to create the directory automatically.

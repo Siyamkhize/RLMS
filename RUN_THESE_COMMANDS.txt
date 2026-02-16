@@ -1,0 +1,140 @@
+═══════════════════════════════════════════════════════════════
+  SIMPLE POE SOLUTION - QUICK COMMANDS
+═══════════════════════════════════════════════════════════════
+
+STEP 1: Test Database Directly (No HTTP)
+─────────────────────────────────────────────────────────────
+Command:
+  php test_standalone.php
+
+Expected Result:
+  ✅ Database connected successfully
+  ✅ Result: 1571 distinct learners
+  ✅ SUCCESS! Got 1571 learners (expected ~1571)
+
+If this works: Database is fine, proceed to Step 2
+If this fails: Database connection issue
+
+
+STEP 2: Upload API File to Server
+─────────────────────────────────────────────────────────────
+File to Upload:
+  get_learners_with_poe_simple_api.php
+
+Upload Location:
+  https://rlms.rlms.co.za/mobile/get_learners_with_poe_simple_api.php
+
+Upload Method:
+  - FTP/SFTP
+  - cPanel File Manager
+  - Any file upload method you normally use
+
+
+STEP 3: Test API via HTTP
+─────────────────────────────────────────────────────────────
+Command:
+  php test_simple_api_direct.php
+
+Expected Result:
+  ✅ SUCCESS!
+  ✅ Total Learners: 1571
+  ✅ Response Time: 3-5 seconds
+  🎉 PERFECT! Got 1571 learners (expected ~1571)
+
+If this works: API is ready for Flutter app
+If this fails: Check server upload
+
+
+STEP 4: Update Flutter App
+─────────────────────────────────────────────────────────────
+Change this URL in your Flutter code:
+
+OLD (times out):
+  get_learners_with_poe_assigned.php
+
+NEW (fast):
+  get_learners_with_poe_simple_api.php
+
+
+═══════════════════════════════════════════════════════════════
+  FILES CREATED
+═══════════════════════════════════════════════════════════════
+
+1. test_standalone.php
+   → Test database directly (no HTTP)
+   → Run: php test_standalone.php
+
+2. get_learners_with_poe_simple_api.php
+   → Simple API endpoint for Flutter
+   → Upload to server
+
+3. test_simple_api_direct.php
+   → Test API via HTTP
+   → Run: php test_simple_api_direct.php
+
+4. SIMPLE_POE_SOLUTION_COMPLETE.md
+   → Complete documentation
+
+5. RUN_THESE_COMMANDS.txt
+   → This file (quick reference)
+
+
+═══════════════════════════════════════════════════════════════
+  IMPORTANT NOTES
+═══════════════════════════════════════════════════════════════
+
+✅ test_standalone.php has ALL credentials embedded
+   → No external files needed
+   → No HTTP requests
+   → Just direct database queries
+
+✅ New API is SIMPLE and FAST
+   → No complex stratification
+   → No performance calculations
+   → Just learners with POE files
+   → Response time: 2-5 seconds (not 60+ seconds)
+
+✅ Filters by moderator's classes
+   → Handles comma-separated class IDs
+   → Only returns learners in moderator's allocated classes
+
+✅ Returns ~1571 learners
+   → All learners with POE files
+   → In moderator 77's classes
+
+
+═══════════════════════════════════════════════════════════════
+  TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════
+
+If test_standalone.php fails:
+  → Check database credentials
+  → Verify database server is running
+  → Check if POE table exists
+
+If test_simple_api_direct.php fails:
+  → Verify file uploaded to server
+  → Check file permissions (644)
+  → Try URL in browser
+
+If Flutter app still times out:
+  → Verify using NEW endpoint URL
+  → Check network connectivity
+  → Check server logs
+
+
+═══════════════════════════════════════════════════════════════
+  START HERE
+═══════════════════════════════════════════════════════════════
+
+Run this command NOW:
+
+  php test_standalone.php
+
+This will test the database directly and show you if the
+simple query approach works.
+
+If it shows ~1571 learners, you're good to proceed!
+
+
+═══════════════════════════════════════════════════════════════

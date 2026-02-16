@@ -1,0 +1,199 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    STRATIFICATION CALCULATION FIX                            ║
+║                         Visual Flow Diagram                                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           BEFORE FIX (BROKEN)                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Step 1: Create temp_poe_learners
+┌──────────────────────────┐
+│  temp_poe_learners       │
+│  ─────────────────       │
+│  learnerID: 1231         │  ← Has POE from Class A
+│  learnerID: 1233         │  ← Has POE from Class A
+│  learnerID: 1568         │  ← Has POE from Class A
+└──────────────────────────┘
+
+Step 2: Create temp_learner_coverage
+┌──────────────────────────┐
+│  temp_learner_coverage   │
+│  ─────────────────────   │
+│  1231 → 3 unit standards │  ← Counted from 3 tables
+│  1233 → 2 unit standards │  ← Counted from 3 tables
+└──────────────────────────┘
+
+Step 3: Main Query (WRONG!)
+┌──────────────────────────────────────────────────────────────┐
+│  SELECT ...                                                  │
+│  FROM learnerdetails l  ← STARTS FROM ALL LEARNERS!         │
+│  LEFT JOIN temp_learner_coverage tc ON l.LearnerID = ...    │
+└──────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Result: ALL learners included, but temp tables only have    │
+│  data for learners 1231, 1233, 1568                          │
+│                                                               │
+│  Learner 1000 → LEFT JOIN → NULL → COALESCE → 0             │
+│  Learner 1001 → LEFT JOIN → NULL → COALESCE → 0             │
+│  Learner 1231 → LEFT JOIN → 3    → COALESCE → 3  ✓          │
+│  Learner 1233 → LEFT JOIN → 2    → COALESCE → 2  ✓          │
+│                                                               │
+│  Problem: Most learners show 0 because they're not in temp! │
+└──────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            AFTER FIX (WORKING)                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Step 1: Create temp_poe_learners (SAME)
+┌──────────────────────────┐
+│  temp_poe_learners       │
+│  ─────────────────       │
+│  learnerID: 1231         │  ← Has POE from Class A
+│  learnerID: 1233         │  ← Has POE from Class A
+│  learnerID: 1568         │  ← Has POE from Class A
+└──────────────────────────┘
+
+Step 2: Create temp_learner_coverage (SAME)
+┌──────────────────────────┐
+│  temp_learner_coverage   │
+│  ─────────────────────   │
+│  1231 → 3 unit standards │  ← Counted from 3 tables
+│  1233 → 2 unit standards │  ← Counted from 3 tables
+└──────────────────────────┘
+
+Step 3: Main Query (FIXED!)
+┌──────────────────────────────────────────────────────────────┐
+│  SELECT ...                                                  │
+│  FROM temp_poe_learners tpl  ← STARTS FROM TEMP TABLE!      │
+│  INNER JOIN learnerdetails l ON tpl.learnerID = l.LearnerID │
+│  LEFT JOIN temp_learner_coverage tc ON l.LearnerID = ...    │
+└──────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Result: ONLY learners from temp_poe_learners included!     │
+│                                                               │
+│  Learner 1231 → LEFT JOIN → 3 → COALESCE → 3  ✓             │
+│  Learner 1233 → LEFT JOIN → 2 → COALESCE → 2  ✓             │
+│  Learner 1568 → LEFT JOIN → NULL → COALESCE → 0  ✓          │
+│                                                               │
+│  Success: All learners show correct counts!                  │
+└──────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         KEY DIFFERENCES                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+BEFORE:
+  FROM learnerdetails l                    ← Includes ALL learners
+  LEFT JOIN temp_learner_coverage tc       ← Most get NULL
+
+AFTER:
+  FROM temp_poe_learners tpl               ← Only POE learners
+  INNER JOIN learnerdetails l              ← Match with details
+  LEFT JOIN temp_learner_coverage tc       ← All have data
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         NULL HANDLING FIX                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+BEFORE:
+  CASE 
+    WHEN tm.unit_standard_count > 0        ← NULL > 0 = FALSE
+    THEN 'Marked' 
+    ELSE 'Not Marked' 
+  END
+
+AFTER:
+  CASE 
+    WHEN COALESCE(tm.unit_standard_count, 0) > 0  ← NULL → 0, then 0 > 0 = FALSE
+    THEN 'Marked' 
+    ELSE 'Not Marked' 
+  END
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         COMPLETE DATA FLOW                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+1. Moderator 77 requests learners
+   │
+   ▼
+2. Get moderator's classes from facilitator table
+   │  Result: Class A (ID: 74)
+   ▼
+3. Create temp_poe_learners (filtered by Class A)
+   │  Result: 6 learners with POE from Class A
+   ▼
+4. Create temp_learner_marks (summative marks only)
+   │  Result: 0 learners (no summative marks yet)
+   ▼
+5. Create temp_learner_coverage (count from 3 tables)
+   │  Result: Learner 1231 → 3, Learner 1233 → 2
+   ▼
+6. Main query (start from temp_poe_learners)
+   │  Result: 6 learners with correct counts
+   ▼
+7. Calculate stratification metadata
+   │  - POE Count: 3, 2, 0, 0, 0, 0
+   │  - Completeness: Partial, Partial, Incomplete, ...
+   │  - Marking: Not Marked (all - no summative marks)
+   │  - Performance: Not Assessed (all - no marks)
+   ▼
+8. Perform stratified sampling (25% from each stratum)
+   │  Result: 2 learners selected
+   ▼
+9. Store in moderator_assignments table
+   │  Result: Persistent assignment
+   ▼
+10. Return to mobile app
+    Result: Moderator sees 2 learners with correct metadata
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         EXAMPLE OUTPUT                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Learner: Boitumelo Minah Michelle Shai (ID: 1231)
+┌────────────────────────────────────────────────────────────┐
+│  POE Count: 3                                              │
+│  Completeness: Partial (1-9 unit standards)               │
+│  Marking Status: Not Marked (no summative marks)          │
+│  Performance: Not Assessed (no marks)                     │
+│  Class: Class A (ID: 74)                                  │
+│  Stratum: 74|Unknown|Partial|Not Marked|Not Assessed     │
+└────────────────────────────────────────────────────────────┘
+
+Learner: Puleng susan Sekabate (ID: 1233)
+┌────────────────────────────────────────────────────────────┐
+│  POE Count: 2                                              │
+│  Completeness: Partial (1-9 unit standards)               │
+│  Marking Status: Not Marked (no summative marks)          │
+│  Performance: Not Assessed (no marks)                     │
+│  Class: Class A (ID: 74)                                  │
+│  Stratum: 74|Unknown|Partial|Not Marked|Not Assessed     │
+└────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         SUMMARY                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+✅ Start query from temp_poe_learners (not learnerdetails)
+✅ Use COALESCE for NULL handling
+✅ Filter by moderator's allocated classes
+✅ Count unit standards from 3 tables (poe, marks, logbook_marks)
+✅ Calculate performance from summative marks only
+✅ Store stratification metadata for fast retrieval
+✅ Perform stratified sampling across 5 dimensions
+
+Result: Accurate stratification calculations for moderation sampling!
+
+═══════════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,161 @@
+═══════════════════════════════════════════════════════════════
+  QUICK FIX: OFFLINE CLOCKING SOLUTION
+═══════════════════════════════════════════════════════════════
+
+PROBLEM:
+  ❌ IP blocked → Can't access server
+  ❌ No local data → Can't clock in offline
+  ❌ System unusable when offline
+
+SOLUTION:
+  ✅ Keep learner data in local database permanently
+  ✅ Use UPSERT instead of clear-and-insert
+  ✅ Enable offline clocking operations
+
+═══════════════════════════════════════════════════════════════
+  FILES CREATED
+═══════════════════════════════════════════════════════════════
+
+1. lib/persistent_sync_service.dart
+   → New sync service that never clears local data
+
+2. lib/database_helper.dart (UPDATED)
+   → Added upsertLearner() method
+   → Added hasLocalLearnerData() check
+   → Added getLocalLearnerCount() method
+
+3. OFFLINE_CLOCKING_COMPLETE_SOLUTION.md
+   → Complete documentation
+
+4. IMPLEMENT_OFFLINE_CLOCKING_NOW.md
+   → Step-by-step implementation guide
+
+═══════════════════════════════════════════════════════════════
+  3-STEP IMPLEMENTATION
+═══════════════════════════════════════════════════════════════
+
+STEP 1: Update main.dart
+────────────────────────────────────────────────────────────────
+import 'persistent_sync_service.dart';
+
+// Replace:
+await syncService.syncLearnerDetails();
+
+// With:
+final persistentSync = PersistentSyncService();
+await persistentSync.syncLearnerDetailsPersistent();
+
+STEP 2: Update clock_in_page.dart
+────────────────────────────────────────────────────────────────
+@override
+void initState() {
+  super.initState();
+  _checkLocalDataAvailability(); // ADD THIS LINE
+  _initializeData();
+  // ... rest of init
+}
+
+// ADD THIS METHOD:
+Future<void> _checkLocalDataAvailability() async {
+  final hasData = await DatabaseHelper().hasLocalLearnerData(widget.classID);
+  if (!hasData) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('No local data. Please sync when online.')),
+    );
+  }
+}
+
+STEP 3: Update sync_service.dart
+────────────────────────────────────────────────────────────────
+In _syncLearnerDetails() method:
+
+// REMOVE THIS LINE:
+// await _dbHelper.clearTable('learnerdetails');
+
+// REPLACE INSERT WITH UPSERT:
+for (var learner in learners) {
+  await _dbHelper.upsertLearner(learner); // Use upsert
+}
+
+═══════════════════════════════════════════════════════════════
+  TESTING
+═══════════════════════════════════════════════════════════════
+
+TEST 1: Initial Sync
+  1. Connect to internet
+  2. Open app and login
+  3. Verify learners sync to local database
+  4. Check console for "Upserted learner" messages
+
+TEST 2: Offline Clocking
+  1. Turn on airplane mode
+  2. Open clock-in page
+  3. Verify learners still visible ✅
+  4. Clock in a learner ✅
+  5. Verify "Saved locally" message ✅
+
+TEST 3: IP Block Scenario
+  1. Block IP on server
+  2. Try online features (should fail)
+  3. Open clock-in page (should work) ✅
+  4. Clock in learner (should work) ✅
+
+TEST 4: Auto-Sync
+  1. Clock in while offline
+  2. Reconnect to internet
+  3. Wait for auto-sync
+  4. Verify record uploaded to server ✅
+
+═══════════════════════════════════════════════════════════════
+  KEY BENEFITS
+═══════════════════════════════════════════════════════════════
+
+✅ Works offline - No internet required for clocking
+✅ IP block resistant - System works even when blocked
+✅ Data persistence - Learners stay in local database
+✅ Auto-sync - Records upload when connection available
+✅ Faster - No full reload each time
+✅ User-friendly - Clear messages and manual sync
+
+═══════════════════════════════════════════════════════════════
+  IMPORTANT NOTES
+═══════════════════════════════════════════════════════════════
+
+⚠️ Must sync online at least ONCE to populate local database
+⚠️ Local data may be stale if not synced regularly
+⚠️ More data stored locally (monitor device storage)
+⚠️ Server data always wins in conflicts
+
+═══════════════════════════════════════════════════════════════
+  TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════
+
+PROBLEM: "No local learner data"
+SOLUTION: Connect to internet and trigger sync
+
+PROBLEM: Learners disappear after restart
+SOLUTION: Check if old sync code is still clearing data
+
+PROBLEM: Offline records not syncing
+SOLUTION: Check connectivity listener in clock_in_page.dart
+
+═══════════════════════════════════════════════════════════════
+  NEXT STEPS
+═══════════════════════════════════════════════════════════════
+
+1. ✅ Files created
+2. ⏳ Implement 3 steps above
+3. ⏳ Test offline clocking
+4. ⏳ Deploy to production
+
+Time Required: 30-60 minutes
+Risk Level: Low
+Impact: High
+
+═══════════════════════════════════════════════════════════════
+
+For detailed instructions, see:
+→ IMPLEMENT_OFFLINE_CLOCKING_NOW.md
+→ OFFLINE_CLOCKING_COMPLETE_SOLUTION.md
+
+═══════════════════════════════════════════════════════════════
