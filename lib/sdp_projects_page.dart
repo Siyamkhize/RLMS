@@ -1,29 +1,27 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'database_helper.dart';
-import 'sdp_learning_pathways_page.dart';
 import 'config.dart';
+import 'sdp_learning_pathways_page.dart';
 
 class SdpProjectsPage extends StatefulWidget {
-  final String sdpIdentifier;
-  final String? sdpDisplayName;
+  final String sdpId;
+  final String sdpName;
 
   const SdpProjectsPage({
-    super.key,
-    required this.sdpIdentifier,
-    this.sdpDisplayName,
-  });
+    Key? key,
+    required this.sdpId,
+    required this.sdpName,
+  }) : super(key: key);
 
   @override
-  State<SdpProjectsPage> createState() => _SdpProjectsPageState();
+  _SdpProjectsPageState createState() => _SdpProjectsPageState();
 }
 
 class _SdpProjectsPageState extends State<SdpProjectsPage> {
-  List<Map<String, dynamic>> _projects = [];
-  bool _isLoading = true;
-  bool _isOnline = true;
+  List<Map<String, dynamic>> projects = [];
+  bool isLoading = true;
+  String errorMessage = '';
 
   @override
   void initState() {
@@ -31,110 +29,42 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
     _loadProjects();
   }
 
-  Future<bool> _checkConnectivity() async {
-    try {
-      final result = await InternetAddress.lookup('google.com');
-      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
-    } on SocketException catch (_) {
-      return false;
-    }
-  }
-
   Future<void> _loadProjects() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      isLoading = true;
+      errorMessage = '';
+    });
 
-    final isConnected = await _checkConnectivity();
-    setState(() => _isOnline = isConnected);
-
-    if (_isOnline) {
-      await _fetchProjectsOnline();
-    } else {
-      await _fetchProjectsOffline();
-    }
-  }
-
-  Future<void> _fetchProjectsOnline() async {
     try {
-      final url = AppConfig.buildUrl(
-        'get_sdp_projects.php',
-        queryParams: {'sdp_identifier': widget.sdpIdentifier},
-      );
-
-      debugPrint('[SDP_PROJECTS] Fetching online: $url');
-
-      final response = await http.get(Uri.parse(url)).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          throw Exception('Request timed out');
-        },
+      final response = await http.post(
+        Uri.parse('${Config.apiBaseUrl}/get_sdp_projects.php'),
+        body: {'sdp_id': widget.sdpId},
       );
 
       if (response.statusCode == 200) {
-        final jsonData = json.decode(response.body);
-        if (jsonData['success'] == true && jsonData['projects'] != null) {
-          final projects =
-              List<Map<String, dynamic>>.from(jsonData['projects']);
-
-          if (mounted) {
-            setState(() {
-              _projects = projects;
-              _isLoading = false;
-            });
-          }
-          return;
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          setState(() {
+            projects = List<Map<String, dynamic>>.from(data['projects']);
+            isLoading = false;
+          });
+        } else {
+          setState(() {
+            errorMessage = data['message'] ?? 'Failed to load projects';
+            isLoading = false;
+          });
         }
-      }
-
-      // Fallback to offline if online fails
-      debugPrint('[SDP_PROJECTS] Online fetch failed, falling back to offline');
-      await _fetchProjectsOffline();
-    } catch (e) {
-      debugPrint('[SDP_PROJECTS] Error fetching online: $e');
-      await _fetchProjectsOffline();
-    }
-  }
-
-  Future<void> _fetchProjectsOffline() async {
-    try {
-      final dbHelper = DatabaseHelper();
-      final db = await dbHelper.database;
-
-      // Query projects for this SDP
-      final projects = await db.rawQuery('''
-        SELECT DISTINCT
-          p.project_id,
-          p.Project_name,
-          p.sdp_name,
-          p.client_name,
-          p.Financial_year,
-          p.Start_date,
-          p.End_date,
-          p.Province,
-          p.n_beneficiaries,
-          p.Project_pathway
-        FROM project p
-        WHERE p.sdp_name = ? OR p.project_id IN (
-          SELECT DISTINCT s.project_id 
-          FROM sites s 
-          WHERE s.sdp_id = ?
-        )
-        ORDER BY p.Project_name
-      ''', [widget.sdpIdentifier, int.tryParse(widget.sdpIdentifier) ?? 0]);
-
-      if (mounted) {
+      } else {
         setState(() {
-          _projects = projects;
-          _isLoading = false;
+          errorMessage = 'Server error: ${response.statusCode}';
+          isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint('[SDP_PROJECTS] Error loading offline projects: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading projects: $e')),
-        );
-      }
+      setState(() {
+        errorMessage = 'Error loading projects: $e';
+        isLoading = false;
+      });
     }
   }
 
@@ -142,71 +72,134 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.sdpDisplayName ?? 'Projects'),
-        actions: [
-          IconButton(
-            icon: Icon(_isOnline ? Icons.cloud_done : Icons.cloud_off),
-            onPressed: null,
-            tooltip: _isOnline ? 'Online' : 'Offline',
-          ),
-        ],
+        title: Text('Projects - ${widget.sdpName}'),
+        backgroundColor: Colors.blue,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _projects.isEmpty
-              ? const Center(
-                  child: Text(
-                    'No projects found',
-                    style: TextStyle(fontSize: 16),
+      body: isLoading
+          ? Center(child: CircularProgressIndicator())
+          : errorMessage.isNotEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline, size: 60, color: Colors.red),
+                      SizedBox(height: 16),
+                      Text(errorMessage, style: TextStyle(color: Colors.red)),
+                      SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadProjects,
+                        child: Text('Retry'),
+                      ),
+                    ],
                   ),
                 )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _projects.length,
-                  itemBuilder: (context, index) {
-                    final project = _projects[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.all(16),
-                        title: Text(
-                          project['Project_name'] ?? 'Unknown Project',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 8),
-                            Text('Client: ${project['client_name'] ?? 'N/A'}'),
-                            Text('Province: ${project['Province'] ?? 'N/A'}'),
-                            Text(
-                                'Beneficiaries: ${project['n_beneficiaries'] ?? 'N/A'}'),
-                            Text('Year: ${project['Financial_year'] ?? 'N/A'}'),
-                          ],
-                        ),
-                        trailing: const Icon(Icons.arrow_forward_ios),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => SdpLearningPathwaysPage(
-                                sdpIdentifier: widget.sdpIdentifier,
-                                projectId: project['project_id'].toString(),
-                                projectName:
-                                    project['Project_name'] ?? 'Project',
-                                projectPathwayJson:
-                                    project['Project_pathway'] ?? '[]',
-                              ),
-                            ),
-                          );
+              : projects.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.folder_open, size: 60, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text('No projects found'),
+                        ],
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadProjects,
+                      child: ListView.builder(
+                        padding: EdgeInsets.all(16),
+                        itemCount: projects.length,
+                        itemBuilder: (context, index) {
+                          final project = projects[index];
+                          return _buildProjectCard(project);
                         },
                       ),
-                    );
-                  },
+                    ),
+    );
+  }
+
+  Widget _buildProjectCard(Map<String, dynamic> project) {
+    final projectId = project['project_id']?.toString() ?? '';
+    final projectName =
+        project['project_name']?.toString() ?? 'Unknown Project';
+    final projectCode = project['project_code']?.toString() ?? '';
+    final pathwayCount = project['pathway_count']?.toString() ?? '0';
+
+    return Card(
+      elevation: 4,
+      margin: EdgeInsets.only(bottom: 16),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SdpLearningPathwaysPage(
+                sdpId: widget.sdpId,
+                projectId: projectId,
+                projectName: projectName,
+              ),
+            ),
+          );
+        },
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade100,
+                  borderRadius: BorderRadius.circular(8),
                 ),
+                child: Icon(
+                  Icons.folder,
+                  size: 32,
+                  color: Colors.blue,
+                ),
+              ),
+              SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      projectName,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (projectCode.isNotEmpty)
+                      Text(
+                        projectCode,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.route, size: 16, color: Colors.grey),
+                        SizedBox(width: 4),
+                        Text(
+                          '$pathwayCount Learning Pathways',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: Colors.grey),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

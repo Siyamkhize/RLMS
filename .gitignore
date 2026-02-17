@@ -50,6 +50,12 @@ Thumbs.db
 build/
 .dart_tool/
 
+# Local config files (not used)
+lib/config_local.dart
+lib/config_localhost.dart
+config_local.dart
+config_localhost.dart
+
 # Sensitive documentation
 *_AUDIT*.md
 *_SECURITY*.md
