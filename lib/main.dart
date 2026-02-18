@@ -17,6 +17,7 @@ import 'ModeratorPage.dart';
 import 'facilitator_fingerprint_page.dart';
 import 'finance_dashboard.dart';
 import 'logistics_dashboard.dart';
+import 'sdp_projects_page.dart';
 // MONITORING SYSTEM TEMPORARILY DISABLED - BUILD ISSUE
 // import 'services/random_prompt_service.dart';
 // import 'monitoring_prompt_page.dart';
@@ -596,12 +597,18 @@ class _LoginPageState extends State<LoginPage> {
     debugPrint('[NAVIGATION] Role: "$normalizedRole", classID: "$classID", facilitator_id: "$facilitator_id"');
     
     if (normalizedRole == 'sdp') {
+      // SDP users start at projects, then pathways, then admin/sites
+      final sdpId = data['sdp_id']?.toString() ?? sdp;
+      final sdpName = data['sdp_name']?.toString() ??
+          data['sdpName']?.toString() ??
+          sdp;
+
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => AdminPage(
-            sdp: sdp,
-            data: classData,
+          builder: (context) => SdpProjectsPage(
+            sdpId: sdpId,
+            sdpName: sdpName,
           ),
         ),
       );

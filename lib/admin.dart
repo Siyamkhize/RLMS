@@ -106,23 +106,62 @@ class _AdminPageState extends State<AdminPage> {
   }
 
   Future<void> _fetchOnlineData() async {
-    // Add your logic here to fetch data from the online source (API)
-    // Once data is fetched, update the _siteData and set _isLoading to false
     try {
-      // Simulate API call and data population
-      await Future.delayed(const Duration(seconds: 2)); // Simulate delay
+      final sdpId = widget.sdp.trim().isEmpty ? _resolveSdpIdentifier() : widget.sdp.trim();
+      if (sdpId == null || sdpId.isEmpty) {
+        setState(() {
+          _siteData = List<Map<String, dynamic>>.from(widget.data);
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final queryParams = <String, String>{'sdpId': sdpId};
+      if (widget.projectId != null && widget.projectId!.isNotEmpty) {
+        queryParams['project_id'] = widget.projectId!;
+      }
+      if (widget.pathwayId != null && widget.pathwayId!.isNotEmpty) {
+        queryParams['pathway_id'] = widget.pathwayId!;
+      }
+
+      final url = AppConfig.buildUrl('get_sdp_sites.php', queryParams: queryParams);
+      final response = await http.get(Uri.parse(url)).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw Exception('Request timed out'),
+      );
+
+      if (response.statusCode == 200) {
+        String cleaned = response.body.replaceAll(RegExp(r'<[^>]+>'), '').trim();
+        final start = cleaned.indexOf('{');
+        final end = cleaned.lastIndexOf('}');
+        if (start != -1 && end != -1 && end >= start) {
+          cleaned = cleaned.substring(start, end + 1);
+        }
+        final jsonData = json.decode(cleaned);
+        if (jsonData['success'] == true && jsonData['data'] != null) {
+          setState(() {
+            _siteData = List<Map<String, dynamic>>.from(jsonData['data']);
+            _isLoading = false;
+          });
+          return;
+        }
+      }
+
+      // Fallback to widget.data if API fails or returns no data
       setState(() {
         _siteData = List<Map<String, dynamic>>.from(widget.data);
-        // Assume widget.data contains the online data
         _isLoading = false;
       });
     } catch (e) {
       setState(() {
+        _siteData = List<Map<String, dynamic>>.from(widget.data);
         _isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading online data: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading sites: $e')),
+        );
+      }
     }
   }
 
@@ -259,12 +298,12 @@ class _AdminPageState extends State<AdminPage> {
         throw Exception('SDP identifier not available');
       }
 
-      // Build URL
+      // Build URL - use unified "sdpId" key for the SDP identifier
       final url = AppConfig.buildUrl(
         'search_learner_by_id_sdp.php',
         queryParams: {
           'id_number': idNumber,
-          'sdp_id': sdpIdentifier,
+          'sdpId': sdpIdentifier,
         },
       );
 
@@ -392,10 +431,19 @@ class _AdminPageState extends State<AdminPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (_siteData.isNotEmpty && _siteData.first['project_name'] != null)
+                Text(
+                  'Project: ${_siteData.first['project_name']}',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.blue),
+                ),
+              if (_siteData.isNotEmpty && _siteData.first['sdp_name'] != null)
+                Text(
+                  'SDP: ${_siteData.first['sdp_name']}',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.grey),
+                ),
               Text(
-                'Class Information for ${widget.sdp}',
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                'Sites & Classes (${_siteData.length} sites)',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               // Search bar for learner by ID number
@@ -456,19 +504,49 @@ class _AdminPageState extends State<AdminPage> {
                       child: DataTable(
                         columns: const [
                           DataColumn(label: Text('Site Name')),
+                          DataColumn(label: Text('Project')),
+                          DataColumn(label: Text('SDP')),
+                          DataColumn(label: Text('Pathway')),
+                          DataColumn(label: Text('Qualification')),
                           DataColumn(label: Text('Beneficiaries')),
                           DataColumn(label: Text('Classes')),
-                          DataColumn(label: Text('Learning Pathway')),
                           DataColumn(label: Text('Coordinates')),
                           DataColumn(label: Text('Province')),
                           DataColumn(label: Text('Action')),
                         ],
                         rows: _siteData.map<DataRow>((item) {
+                          // Get pathway and qualification info
+                          final pathways = item['pathways'] is List 
+                              ? (item['pathways'] as List).join(', ')
+                              : (item['learningPathway'] ?? item['project_pathway'] ?? 'N/A').toString();
+                          final qualifications = item['qualifications'] is List
+                              ? (item['qualifications'] as List).join(', ')
+                              : 'N/A';
+                          
                           return DataRow(cells: [
                             DataCell(Text(item['siteName'] ?? 'N/A')),
+                            DataCell(Text(item['project_name'] ?? item['project_id'] ?? 'N/A')),
+                            DataCell(Text(item['sdp_name'] ?? item['sdp_client_name'] ?? item['sdp_id'] ?? 'N/A')),
+                            DataCell(
+                              Tooltip(
+                                message: pathways,
+                                child: Text(
+                                  pathways.length > 30 ? '${pathways.substring(0, 30)}...' : pathways,
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            ),
+                            DataCell(
+                              Tooltip(
+                                message: qualifications,
+                                child: Text(
+                                  qualifications.length > 30 ? '${qualifications.substring(0, 30)}...' : qualifications,
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            ),
                             DataCell(Text(item['beneficiaries'] ?? 'N/A')),
                             DataCell(Text(item['classes'] ?? 'N/A')),
-                            DataCell(Text(item['project_pathway'] ?? 'N/A')),
                             DataCell(Text(item['coordinates'] ?? 'N/A')),
                             DataCell(Text(item['province'] ?? 'N/A')),
                             DataCell(
