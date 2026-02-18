@@ -1,15 +1,3 @@
--- Add moderation columns to pothole_checklist_marks table
--- These columns will store the moderator's approval status and comments
-
--- Add approval_status column (enum with Approved/Disapproved)
-ALTER TABLE pothole_checklist_marks 
-ADD COLUMN approval_status ENUM('Approved', 'Disapproved') NULL DEFAULT NULL
-AFTER comments;
-
--- Add comment column for moderator comments
-ALTER TABLE pothole_checklist_marks 
-ADD COLUMN comment VARCHAR(256) NULL DEFAULT NULL
-AFTER approval_status;
-
--- Verify the changes
-DESCRIBE pothole_checklist_marks;
+version https://git-lfs.github.com/spec/v1
+oid sha256:5ea7a5927c64bfe43b4629f2473022f04ac4a46bd7ebe352290911a6c7a165ea
+size 554

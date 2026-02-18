@@ -1,10 +1,3 @@
--- Add stratum_type column to moderator_assignments table
--- This column stores the type of stratification used for the assignment
-
--- Simple version: Just add the column at the end
-ALTER TABLE moderator_assignments 
-ADD COLUMN stratum_type VARCHAR(50) NULL 
-COMMENT 'Type of stratification used';
-
--- Verify the column was added
-DESCRIBE moderator_assignments;
+version https://git-lfs.github.com/spec/v1
+oid sha256:2d9f5c6f21356acf7d855717f3ad60d6385a913b2b63e46b60d0b61077c9f1b3
+size 372

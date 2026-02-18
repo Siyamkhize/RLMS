@@ -1,24 +1,3 @@
--- Manual cleanup script for old synced records
--- Run this on your local SQLite database
-
--- Delete all learner_clocking records from before today
-DELETE FROM learner_clocking 
-WHERE clock_date < DATE('now');
-
--- Delete all induction_clocking records from before today  
-DELETE FROM induction_clocking
-WHERE clock_date < DATE('now');
-
--- Check remaining records
-SELECT 'Learner Clocking - Remaining Records:' as info;
-SELECT COUNT(*) as count, clock_date 
-FROM learner_clocking 
-GROUP BY clock_date 
-ORDER BY clock_date;
-
-SELECT 'Induction Clocking - Remaining Records:' as info;
-SELECT COUNT(*) as count, clock_date 
-FROM induction_clocking 
-GROUP BY clock_date 
-ORDER BY clock_date;
-
+version https://git-lfs.github.com/spec/v1
+oid sha256:54f10e79cb1eda907c7a8b8b0e255c3b25b30f162253ff4ae1558a6b50205f56
+size 687

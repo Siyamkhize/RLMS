@@ -1,17 +1,16 @@
 <?php
+ob_start(); // Start output buffering to catch any stray output
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header('Content-Type: application/json');
 
-// Suppress imagick warnings
-error_reporting(E_ALL & ~E_WARNING);
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+// Suppress all output except JSON
+error_reporting(0);
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
 
-// Optional: Use Memcached for sessions if available
-ini_set('session.save_handler', 'memcached');
-ini_set('session.save_path', 'localhost:11211'); // Adjust to your Memcached server
+// Use default file-based sessions
 session_start();
 
 include('connection.php');
@@ -563,6 +562,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
             $stmt_projects->close();
 
+            ob_end_clean(); // Clear any buffered output
             echo json_encode([
                 'success' => true,
                 'role' => 'sdp',
@@ -571,8 +571,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 'projects' => $projects,
                 'project_count' => count($projects)
             ]);
+            exit;
         } else {
+            ob_end_clean();
             echo json_encode(['success' => false, 'message' => 'Invalid password for SDP.']);
+            exit;
         }
     } else {
         // Check for client credentials

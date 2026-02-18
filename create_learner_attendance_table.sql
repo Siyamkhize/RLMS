@@ -1,17 +1,3 @@
-CREATE TABLE IF NOT EXISTS learner_attendance (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    learner_id VARCHAR(50) NOT NULL,
-    class_id VARCHAR(50) NOT NULL,
-    finance_id VARCHAR(50),
-    attendance_date DATE NOT NULL,
-    attendance_month INT NOT NULL,
-    attendance_year INT NOT NULL,
-    marked_by VARCHAR(50),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_learner (learner_id),
-    INDEX idx_class (class_id),
-    INDEX idx_date (attendance_date),
-    INDEX idx_month_year (attendance_month, attendance_year),
-    UNIQUE KEY unique_attendance (learner_id, attendance_date)
-);
+version https://git-lfs.github.com/spec/v1
+oid sha256:3ef82a506bb1e0038ce28ff132cb7c34b018f51240395b79a66eb9516778f8c0
+size 701

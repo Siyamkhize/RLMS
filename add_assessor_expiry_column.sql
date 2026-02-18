@@ -1,10 +1,3 @@
--- Add assessorExpiryDate column to facilitator table
--- Run this on your server database to add the new column
-
-ALTER TABLE facilitator ADD COLUMN assessorExpiryDate VARCHAR(10) DEFAULT NULL;
-
--- Optional: Add a comment to document the column
-ALTER TABLE facilitator MODIFY COLUMN assessorExpiryDate VARCHAR(10) DEFAULT NULL COMMENT 'Assessor certificate expiry date in DD/MM/YYYY format';
-
--- Verify the column was added
-DESCRIBE facilitator;
+version https://git-lfs.github.com/spec/v1
+oid sha256:243df459fdaa5977e406693bfdc13455c5beacca45063d1e23c9c2790fd07e5f
+size 453
