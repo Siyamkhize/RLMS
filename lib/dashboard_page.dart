@@ -457,10 +457,12 @@ class _DashboardPageState extends State<DashboardPage> {
           }
 
           // PRIORITY 3: Template size (better quality)
-          if (futronicLeft != null && futronicLeft.toString().length > 200)
+          if (futronicLeft != null && futronicLeft.toString().length > 200) {
             priority += 5;
-          if (futronicRight != null && futronicRight.toString().length > 200)
+          }
+          if (futronicRight != null && futronicRight.toString().length > 200) {
             priority += 5;
+          }
 
           candidateLearners.add({
             'learnerId': learnerId,
@@ -490,14 +492,18 @@ class _DashboardPageState extends State<DashboardPage> {
         // Secondary sort: Template count
         int scoreA = 0;
         int scoreB = 0;
-        if (a['leftTemplate'] != null && a['leftTemplate'].isNotEmpty)
+        if (a['leftTemplate'] != null && a['leftTemplate'].isNotEmpty) {
           scoreA += 1;
-        if (a['rightTemplate'] != null && a['rightTemplate'].isNotEmpty)
+        }
+        if (a['rightTemplate'] != null && a['rightTemplate'].isNotEmpty) {
           scoreA += 1;
-        if (b['leftTemplate'] != null && b['leftTemplate'].isNotEmpty)
+        }
+        if (b['leftTemplate'] != null && b['leftTemplate'].isNotEmpty) {
           scoreB += 1;
-        if (b['rightTemplate'] != null && b['rightTemplate'].isNotEmpty)
+        }
+        if (b['rightTemplate'] != null && b['rightTemplate'].isNotEmpty) {
           scoreB += 1;
+        }
 
         return scoreB.compareTo(scoreA); // Higher scores first
       });
@@ -714,10 +720,12 @@ class _DashboardPageState extends State<DashboardPage> {
           }
 
           // PRIORITY 3: Template size (better quality)
-          if (zktecoLeft != null && zktecoLeft.toString().length > 200)
+          if (zktecoLeft != null && zktecoLeft.toString().length > 200) {
             priority += 5;
-          if (zktecoRight != null && zktecoRight.toString().length > 200)
+          }
+          if (zktecoRight != null && zktecoRight.toString().length > 200) {
             priority += 5;
+          }
 
           candidateLearners.add({
             'learnerId': learnerId,
@@ -749,16 +757,24 @@ class _DashboardPageState extends State<DashboardPage> {
         int templateScoreB = 0;
         if (a['leftTemplate'] != null &&
             a['leftTemplate'].isNotEmpty &&
-            a['leftTemplate'].length > 100) templateScoreA += 1;
+            a['leftTemplate'].length > 100) {
+          templateScoreA += 1;
+        }
         if (a['rightTemplate'] != null &&
             a['rightTemplate'].isNotEmpty &&
-            a['rightTemplate'].length > 100) templateScoreA += 1;
+            a['rightTemplate'].length > 100) {
+          templateScoreA += 1;
+        }
         if (b['leftTemplate'] != null &&
             b['leftTemplate'].isNotEmpty &&
-            b['leftTemplate'].length > 100) templateScoreB += 1;
+            b['leftTemplate'].length > 100) {
+          templateScoreB += 1;
+        }
         if (b['rightTemplate'] != null &&
             b['rightTemplate'].isNotEmpty &&
-            b['rightTemplate'].length > 100) templateScoreB += 1;
+            b['rightTemplate'].length > 100) {
+          templateScoreB += 1;
+        }
 
         return templateScoreB.compareTo(templateScoreA);
       });
