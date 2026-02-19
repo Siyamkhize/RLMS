@@ -33,11 +33,14 @@ class _SdpLearningPathwaysPageState extends State<SdpLearningPathwaysPage> {
         _pathways = widget.pathways!;
         _isLoading = false;
       });
+      debugPrint(
+          '[SDP_PATHWAYS] Loaded ${_pathways.length} pathways from widget');
     } else {
       setState(() {
         _pathways = [];
         _isLoading = false;
       });
+      debugPrint('[SDP_PATHWAYS] No pathways provided');
     }
   }
 
@@ -85,6 +88,13 @@ class _SdpLearningPathwaysPageState extends State<SdpLearningPathwaysPage> {
                     final pathway = _pathways[index];
                     final qualTypes = pathway['qual_types'] as List? ?? [];
 
+                    // Extract pathway name from 'name' field
+                    final pathwayName = pathway['name']?.toString() ??
+                        pathway['pathway_name']?.toString() ??
+                        'Unknown Pathway';
+                    final isInternship = pathway['isInternship'] == true ||
+                        pathway['is_internship'] == true;
+
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
                       elevation: 3,
@@ -92,14 +102,12 @@ class _SdpLearningPathwaysPageState extends State<SdpLearningPathwaysPage> {
                         leading: CircleAvatar(
                           backgroundColor: Colors.green,
                           child: Icon(
-                            pathway['is_internship'] == true
-                                ? Icons.work
-                                : Icons.school,
+                            isInternship ? Icons.work : Icons.school,
                             color: Colors.white,
                           ),
                         ),
                         title: Text(
-                          pathway['pathway_name'] ?? 'Unknown Pathway',
+                          pathwayName,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -109,14 +117,14 @@ class _SdpLearningPathwaysPageState extends State<SdpLearningPathwaysPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              pathway['is_internship'] == true
+                              isInternship
                                   ? 'Internship Programme'
                                   : 'Training Programme',
                               style: TextStyle(fontSize: 13),
                             ),
                             SizedBox(height: 4),
                             Text(
-                              'Sites: ${pathway['site_count'] ?? 0}',
+                              'Qualifications: ${qualTypes.length}',
                               style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.blue,
@@ -179,24 +187,42 @@ class _SdpLearningPathwaysPageState extends State<SdpLearningPathwaysPage> {
                             padding: const EdgeInsets.all(16),
                             child: ElevatedButton.icon(
                               onPressed: () {
-                                // Navigate to AdminPage with sites data
+                                // Get first qualification ID if available
+                                String? qualificationId;
+                                if (qualTypes.isNotEmpty) {
+                                  final firstQual =
+                                      qualTypes[0]['qualification'] as Map?;
+                                  qualificationId =
+                                      firstQual?['id']?.toString();
+                                }
+
+                                debugPrint(
+                                    '[SDP_PATHWAYS] Navigating to AdminPage:');
+                                debugPrint(
+                                    '  - sdpIdentifier: ${widget.sdpIdentifier}');
+                                debugPrint(
+                                    '  - projectId: ${widget.projectId}');
+                                debugPrint('  - pathwayName: $pathwayName');
+                                debugPrint(
+                                    '  - qualificationId: $qualificationId');
+
+                                // Navigate to AdminPage - it will fetch sites from API
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) => AdminPage(
                                       sdp: widget.sdpIdentifier,
-                                      data: List<Map<String, dynamic>>.from(
-                                          pathway['sites'] ?? []),
+                                      data: const [], // Empty - let admin fetch from API
                                       projectId: widget.projectId,
                                       pathwayId:
-                                          pathway['pathway_id']?.toString(),
+                                          pathwayName, // Pass pathway NAME
+                                      qualificationId: qualificationId,
                                     ),
                                   ),
                                 );
                               },
                               icon: Icon(Icons.location_on),
-                              label: Text(
-                                  'View ${pathway['site_count'] ?? 0} Sites'),
+                              label: Text('View Sites'),
                               style: ElevatedButton.styleFrom(
                                 minimumSize: Size(double.infinity, 45),
                                 backgroundColor: Colors.blue,

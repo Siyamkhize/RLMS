@@ -153,6 +153,28 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
                               ),
                               trailing: Icon(Icons.arrow_forward_ios, size: 16),
                               onTap: () {
+                                // Parse pathways from Project_pathway JSON string
+                                List<Map<String, dynamic>> parsedPathways = [];
+                                try {
+                                  final pathwayJson =
+                                      project['Project_pathway'] ??
+                                          project['Project_pathway_raw'] ??
+                                          '[]';
+                                  if (pathwayJson is String &&
+                                      pathwayJson.isNotEmpty &&
+                                      pathwayJson != '[]') {
+                                    final decoded = json.decode(pathwayJson);
+                                    if (decoded is List) {
+                                      parsedPathways =
+                                          List<Map<String, dynamic>>.from(
+                                              decoded);
+                                    }
+                                  }
+                                } catch (e) {
+                                  debugPrint(
+                                      '[SDP_PROJECTS] Error parsing pathways: $e');
+                                }
+
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -164,8 +186,7 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
                                               '',
                                       projectName:
                                           project['Project_name'] ?? 'Unknown',
-                                      pathways: List<Map<String, dynamic>>.from(
-                                          project['pathways'] ?? []),
+                                      pathways: parsedPathways,
                                     ),
                                   ),
                                 );
