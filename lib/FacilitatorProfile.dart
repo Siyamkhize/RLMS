@@ -102,8 +102,9 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
       return 'ID number is required';
     }
     if (value.length != 13) return 'SA ID must be exactly 13 digits';
-    if (!RegExp(r'^\d{13}$').hasMatch(value))
+    if (!RegExp(r'^\d{13}$').hasMatch(value)) {
       return 'ID number must contain only digits';
+    }
     int year = int.parse(value.substring(0, 2));
     int month = int.parse(value.substring(2, 4));
     int day = int.parse(value.substring(4, 6));
@@ -130,8 +131,9 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
       sum += int.parse(evenSumStr[i]);
     }
     int checkDigit = (10 - (sum % 10)) % 10;
-    if (checkDigit != int.parse(value[12]))
+    if (checkDigit != int.parse(value[12])) {
       return 'Invalid SA ID number checksum';
+    }
     return null;
   }
 
@@ -163,8 +165,9 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
       // Basic date validation
       if (day < 1 || day > 31) return 'Invalid day';
       if (month < 1 || month > 12) return 'Invalid month';
-      if (year < 2020 || year > 2050)
+      if (year < 2020 || year > 2050) {
         return 'Year must be between 2020 and 2050';
+      }
 
       // Create date and validate it's a real date
       final date = DateTime(year, month, day);
@@ -338,8 +341,9 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
     if (image != null) {
       final directory = await getApplicationDocumentsDirectory();
       final imageDirectory = Directory('${directory.path}/profile_images');
-      if (!await imageDirectory.exists())
+      if (!await imageDirectory.exists()) {
         await imageDirectory.create(recursive: true);
+      }
       final imagePath =
           '${imageDirectory.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
       await image.saveTo(imagePath);
@@ -451,8 +455,9 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
       if (data != null) {
         final directory = await getApplicationDocumentsDirectory();
         final signatureDirectory = Directory('${directory.path}/signatures');
-        if (!await signatureDirectory.exists())
+        if (!await signatureDirectory.exists()) {
           await signatureDirectory.create(recursive: true);
+        }
         final signaturePath =
             '${signatureDirectory.path}/${DateTime.now().millisecondsSinceEpoch}.png';
         final file = File(signaturePath);

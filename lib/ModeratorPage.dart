@@ -1347,8 +1347,9 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                                       fit: BoxFit.contain,
                                       loadingBuilder:
                                           (context, child, loadingProgress) {
-                                        if (loadingProgress == null)
+                                        if (loadingProgress == null) {
                                           return child;
+                                        }
                                         return const Center(
                                           child: CircularProgressIndicator(
                                               color: Colors.white),

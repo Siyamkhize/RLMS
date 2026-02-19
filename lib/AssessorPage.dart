@@ -6853,9 +6853,10 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                                                     outcome['outcome_text']
                                                             ?.toString() ??
                                                         '';
-                                                if (outcomeText.isEmpty)
+                                                if (outcomeText.isEmpty) {
                                                   return const SizedBox
                                                       .shrink();
+                                                }
 
                                                 return Padding(
                                                   padding:
@@ -7061,7 +7062,9 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                                                           child,
                                                           loadingProgress) {
                                                         if (loadingProgress ==
-                                                            null) return child;
+                                                            null) {
+                                                          return child;
+                                                        }
                                                         return const Center(
                                                           child:
                                                               CircularProgressIndicator(
@@ -7138,8 +7141,9 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                                             },
                                             loadingBuilder: (context, child,
                                                 loadingProgress) {
-                                              if (loadingProgress == null)
+                                              if (loadingProgress == null) {
                                                 return child;
+                                              }
                                               return const Center(
                                                   child:
                                                       CircularProgressIndicator());
@@ -7731,7 +7735,9 @@ class _PotholeChecklistScannedViewPageState
                                                           child,
                                                           loadingProgress) {
                                                         if (loadingProgress ==
-                                                            null) return child;
+                                                            null) {
+                                                          return child;
+                                                        }
                                                         return const Center(
                                                           child:
                                                               CircularProgressIndicator(
@@ -7808,8 +7814,9 @@ class _PotholeChecklistScannedViewPageState
                                             },
                                             loadingBuilder: (context, child,
                                                 loadingProgress) {
-                                              if (loadingProgress == null)
+                                              if (loadingProgress == null) {
                                                 return child;
+                                              }
                                               return const Center(
                                                   child:
                                                       CircularProgressIndicator());
@@ -7919,9 +7926,10 @@ class _PotholeChecklistScannedViewPageState
                                                     outcome['outcome_text']
                                                             ?.toString() ??
                                                         '';
-                                                if (outcomeText.isEmpty)
+                                                if (outcomeText.isEmpty) {
                                                   return const SizedBox
                                                       .shrink();
+                                                }
 
                                                 return Padding(
                                                   padding:

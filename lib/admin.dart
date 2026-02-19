@@ -308,38 +308,60 @@ class _AdminPageState extends State<AdminPage> {
 
       debugPrint('[ADMIN] Response status: ${response.statusCode}');
       debugPrint(
-          '[ADMIN] Response body: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
+          '[ADMIN] Response body (first 500 chars): ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
 
       if (response.statusCode == 200) {
-        String cleaned =
-            response.body.replaceAll(RegExp(r'<[^>]+>'), '').trim();
-        final start = cleaned.indexOf('{');
-        final end = cleaned.lastIndexOf('}');
-        if (start != -1 && end != -1 && end >= start) {
-          cleaned = cleaned.substring(start, end + 1);
-        }
-        final jsonData = json.decode(cleaned);
-        debugPrint(
-            '[ADMIN] Parsed JSON success: ${jsonData['success']}, data count: ${jsonData['data']?.length ?? 0}');
+        try {
+          // Clean the response body - remove any HTML tags and whitespace
+          String cleaned = response.body.trim();
 
-        if (jsonData['success'] == true && jsonData['data'] != null) {
-          final sites = List<Map<String, dynamic>>.from(jsonData['data']);
-          debugPrint('[ADMIN] Loaded ${sites.length} sites from API');
-          try {
-            await DatabaseHelper().saveSdpSitesForOffline(sdpId, sites);
-          } catch (e) {
-            debugPrint('[ADMIN] Failed to cache sites for offline: $e');
+          // Remove any HTML/PHP output before JSON
+          cleaned = cleaned.replaceAll(RegExp(r'<[^>]+>'), '').trim();
+
+          // Find JSON boundaries
+          final start = cleaned.indexOf('{');
+          final end = cleaned.lastIndexOf('}');
+
+          if (start == -1 || end == -1 || end < start) {
+            throw Exception('No valid JSON found in response');
           }
-          if (mounted) {
-            setState(() {
-              _siteData = sites;
-              _isLoading = false;
-            });
-          }
-          return;
-        } else {
+
+          cleaned = cleaned.substring(start, end + 1);
+
           debugPrint(
-              '[ADMIN] API returned success=false or no data: ${jsonData['message'] ?? 'Unknown error'}');
+              '[ADMIN] Cleaned JSON (first 200 chars): ${cleaned.substring(0, cleaned.length > 200 ? 200 : cleaned.length)}');
+
+          final jsonData = json.decode(cleaned);
+          debugPrint(
+              '[ADMIN] Parsed JSON - success: ${jsonData['success']}, data count: ${jsonData['data']?.length ?? 0}');
+
+          if (jsonData['success'] == true && jsonData['data'] != null) {
+            final sites = List<Map<String, dynamic>>.from(jsonData['data']);
+            debugPrint(
+                '[ADMIN] Successfully loaded ${sites.length} sites from API');
+
+            // Cache for offline use
+            try {
+              await DatabaseHelper().saveSdpSitesForOffline(sdpId, sites);
+              debugPrint('[ADMIN] Sites cached for offline use');
+            } catch (e) {
+              debugPrint('[ADMIN] Failed to cache sites for offline: $e');
+            }
+
+            if (mounted) {
+              setState(() {
+                _siteData = sites;
+                _isLoading = false;
+              });
+            }
+            return;
+          } else {
+            debugPrint(
+                '[ADMIN] API returned success=false or no data: ${jsonData['message'] ?? 'Unknown error'}');
+          }
+        } catch (e) {
+          debugPrint('[ADMIN] Error parsing JSON response: $e');
+          debugPrint('[ADMIN] Raw response: ${response.body}');
         }
       }
 
@@ -414,12 +436,15 @@ class _AdminPageState extends State<AdminPage> {
       // Normalize keys for table (API uses lowercase; DB may use Province, Project_pathway)
       final normalized = offlineSites.map((s) {
         final m = Map<String, dynamic>.from(s);
-        if (m['province'] == null && m['Province'] != null)
+        if (m['province'] == null && m['Province'] != null) {
           m['province'] = m['Province'];
-        if (m['project_pathway'] == null && m['Project_pathway'] != null)
+        }
+        if (m['project_pathway'] == null && m['Project_pathway'] != null) {
           m['project_pathway'] = m['Project_pathway'];
-        if (m['learningPathway'] == null && m['Project_pathway'] != null)
+        }
+        if (m['learningPathway'] == null && m['Project_pathway'] != null) {
           m['learningPathway'] = m['Project_pathway'];
+        }
         m['pathways'] = m['pathways'] ??
             (m['Project_pathway'] != null
                 ? [m['Project_pathway']]

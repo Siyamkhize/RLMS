@@ -1906,6 +1906,33 @@ updated_at TIMESTAMP
     return sites;
   }
 
+  // Save SDP sites for offline use
+  Future<void> saveSdpSitesForOffline(
+      String sdpId, List<Map<String, dynamic>> sites) async {
+    final db = await database;
+
+    // Parse sdpId to int if needed
+    final sdpIdInt = int.tryParse(sdpId);
+
+    // Use a batch operation for better performance
+    final batch = db.batch();
+
+    for (var site in sites) {
+      // Ensure sdp_id is set
+      if (sdpIdInt != null) {
+        site['sdp_id'] = sdpIdInt;
+      }
+
+      batch.insert(
+        'sites',
+        site,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+
+    await batch.commit(noResult: true);
+  }
+
   // Fetch class data by siteID from SQLite
   Future<List<Map<String, dynamic>>> fetchClassDataBySiteID(
       String siteID) async {

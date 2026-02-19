@@ -8,9 +8,11 @@ import 'package:permission_handler/permission_handler.dart';
 import 'database_helper.dart';
 import 'LearnerDetailsPage.dart';
 import 'AddLearnerPage.dart';
+import 'finance_register_history.dart';
 import 'package:intl/intl.dart';
 
 import 'config.dart';
+
 class Learner {
   final String? classID;
   final String? learnerID; // Changed to String? to match database usage
@@ -102,14 +104,21 @@ class Learner {
     // Handle DateOfBirth properly
     String? validDateOfBirth;
     String? rawDateOfBirth = json['DateOfBirth']?.toString();
-    
-    if (rawDateOfBirth != null && rawDateOfBirth.isNotEmpty && rawDateOfBirth != 'N/A') {
+
+    if (rawDateOfBirth != null &&
+        rawDateOfBirth.isNotEmpty &&
+        rawDateOfBirth != 'N/A') {
       // Try to parse the date to ensure it's valid
       try {
         // Try different date formats
-        List<String> dateFormats = ['yyyy-MM-dd', 'dd/MM/yyyy', 'MM/dd/yyyy', 'yyyy/MM/dd'];
+        List<String> dateFormats = [
+          'yyyy-MM-dd',
+          'dd/MM/yyyy',
+          'MM/dd/yyyy',
+          'yyyy/MM/dd'
+        ];
         DateTime? parsedDate;
-        
+
         for (String format in dateFormats) {
           try {
             parsedDate = DateFormat(format).parse(rawDateOfBirth);
@@ -118,7 +127,7 @@ class Learner {
             continue;
           }
         }
-        
+
         if (parsedDate != null) {
           validDateOfBirth = DateFormat('yyyy-MM-dd').format(parsedDate);
         } else {
@@ -165,7 +174,9 @@ class Learner {
       bankCode: json['BankCode']?.toString(),
       profileImage: json['profile_image']?.toString(),
       signature: json['signature']?.toString(),
-      synced: json['synced'] != null ? int.tryParse(json['synced'].toString()) ?? 0 : 0,
+      synced: json['synced'] != null
+          ? int.tryParse(json['synced'].toString()) ?? 0
+          : 0,
       zktecoLeftTemplate: json['zkteco_left_template']?.toString(),
       zktecoRightTemplate: json['zkteco_right_template']?.toString(),
       futronicLeftTemplate: json['futronic_left_template']?.toString(),
@@ -182,10 +193,7 @@ class Learner {
 class LearnerListPage extends StatefulWidget {
   final String classID;
 
-  const LearnerListPage({
-    super.key,
-    required this.classID,
-  });
+  const LearnerListPage({super.key, required this.classID});
 
   @override
   _LearnerListPageState createState() => _LearnerListPageState();
@@ -215,16 +223,16 @@ class _LearnerListPageState extends State<LearnerListPage> {
   // Helper function to clean file paths - extract only filename
   String _cleanFilePath(String? filePath) {
     if (filePath == null || filePath.isEmpty) return '';
-    
+
     // If it's already just a filename (no path separators), return as is
     if (!filePath.contains('/') && !filePath.contains('\\')) {
       return filePath;
     }
-    
+
     // Extract filename from path
     final pathParts = filePath.split('/');
     if (pathParts.isEmpty) return '';
-    
+
     final filename = pathParts.last;
     return filename;
   }
@@ -261,15 +269,17 @@ class _LearnerListPageState extends State<LearnerListPage> {
   Future<void> _checkForUnsyncedData() async {
     try {
       final dbHelper = DatabaseHelper();
-      final unsyncedLearners = await dbHelper.fetchUnsyncedLearners(widget.classID);
-      
+      final unsyncedLearners =
+          await dbHelper.fetchUnsyncedLearners(widget.classID);
+
       if (unsyncedLearners.isNotEmpty) {
         // Show a notification after a short delay to let the UI load
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('You have ${unsyncedLearners.length} unsynced learners. Tap the sync button to upload them.'),
+                content: Text(
+                    'You have ${unsyncedLearners.length} unsynced learners. Tap the sync button to upload them.'),
                 duration: const Duration(seconds: 5),
                 action: SnackBarAction(
                   label: 'Sync Now',
@@ -301,7 +311,8 @@ class _LearnerListPageState extends State<LearnerListPage> {
     try {
       print('Fetching learners from server for classID: ${widget.classID}');
       final response = await http.get(
-        Uri.parse(AppConfig.buildUrl('get_learners.php', queryParams: {'classID': widget.classID.toString()})),
+        Uri.parse(AppConfig.buildUrl('get_learners.php',
+            queryParams: {'classID': widget.classID.toString()})),
       );
 
       print('Server response status: ${response.statusCode}');
@@ -310,11 +321,14 @@ class _LearnerListPageState extends State<LearnerListPage> {
       if (response.statusCode == 200) {
         final List<dynamic> learnersJson = jsonDecode(response.body);
         print('Parsed server response: $learnersJson'); // Debug log
-        print('Number of learners received from server: ${learnersJson.length}'); // Debug log
-        
+        print(
+            'Number of learners received from server: ${learnersJson.length}'); // Debug log
+
         if (learnersJson.isNotEmpty) {
-          print('First learner data from server: ${learnersJson.first}'); // Debug log
-          print('Available fields in first learner: ${learnersJson.first.keys.toList()}'); // Debug log
+          print(
+              'First learner data from server: ${learnersJson.first}'); // Debug log
+          print(
+              'Available fields in first learner: ${learnersJson.first.keys.toList()}'); // Debug log
           print('Sample field values:');
           learnersJson.first.forEach((key, value) {
             print('  $key: $value');
@@ -322,14 +336,16 @@ class _LearnerListPageState extends State<LearnerListPage> {
         } else {
           print('No learners found on server for classID: ${widget.classID}');
         }
-        
+
         // No need to filter since the server now returns only learners for the specific classID
-        final learners = learnersJson.map((json) => Learner.fromJson(json)).toList();
+        final learners =
+            learnersJson.map((json) => Learner.fromJson(json)).toList();
         print('Converted ${learners.length} learners from JSON');
         return learners;
       } else {
         print('Server returned status code: ${response.statusCode}');
-        throw Exception('Failed to load learners from server: ${response.statusCode}');
+        throw Exception(
+            'Failed to load learners from server: ${response.statusCode}');
       }
     } catch (e) {
       print('Error fetching server data: $e');
@@ -343,11 +359,13 @@ class _LearnerListPageState extends State<LearnerListPage> {
   Future<void> saveLearnersToLocalDatabase(List<Learner> serverLearners) async {
     try {
       final dbHelper = DatabaseHelper();
-      print('Saving ${serverLearners.length} server learners to local database');
+      print(
+          'Saving ${serverLearners.length} server learners to local database');
 
       for (var learner in serverLearners) {
         final learnerIdStr = learner.learnerID ?? 'N/A';
-        print('Processing learner: ${learner.name} ${learner.surname} with ID: $learnerIdStr');
+        print(
+            'Processing learner: ${learner.name} ${learner.surname} with ID: $learnerIdStr');
         print('=== LEARNER DATA ANALYSIS ===');
         print('Title: ${learner.title}');
         print('DateOfBirth: ${learner.dateOfBirth}');
@@ -380,7 +398,8 @@ class _LearnerListPageState extends State<LearnerListPage> {
             final learnerId = int.tryParse(learnerIdStr);
             if (learnerId != null) {
               existingTemplates = await dbHelper.getAllTemplates(learnerId);
-              print('[SYNC] Preserving templates for learner $learnerId: ${existingTemplates.keys.where((k) => existingTemplates[k]?.isNotEmpty == true).toList()}');
+              print(
+                  '[SYNC] Preserving templates for learner $learnerId: ${existingTemplates.keys.where((k) => existingTemplates[k]?.isNotEmpty == true).toList()}');
             }
           }
         } catch (e) {
@@ -395,12 +414,14 @@ class _LearnerListPageState extends State<LearnerListPage> {
           'Title': learner.title ?? 'N/A',
           'Name': learner.name ?? 'N/A',
           'Surname': learner.surname ?? 'N/A',
-          'IDNumber': learner.idNumber?.isEmpty ?? true ? 'N/A' : learner.idNumber,
+          'IDNumber':
+              learner.idNumber?.isEmpty ?? true ? 'N/A' : learner.idNumber,
           'DateOfBirth': learner.dateOfBirth ?? 'N/A',
           'PhoneNumber': learner.phoneNumber ?? 'N/A',
           'Email': learner.email ?? 'N/A',
           'Age': int.tryParse(learner.age ?? '0') ?? 0,
-          'Gender': learner.gender?.isEmpty ?? true ? 'Unknown' : learner.gender,
+          'Gender':
+              learner.gender?.isEmpty ?? true ? 'Unknown' : learner.gender,
           'Race': learner.race ?? '',
           'Language': learner.language ?? '',
           'Disability': learner.disability ?? '',
@@ -419,18 +440,22 @@ class _LearnerListPageState extends State<LearnerListPage> {
           'signature': _cleanFilePath(learner.signature),
           'synced': 1, // Mark server learners as synced
           // Preserve existing fingerprint templates, only use server data if we don't have local templates
-          'zkteco_left_template': existingTemplates['zkteco_left_template']?.isNotEmpty == true
-              ? existingTemplates['zkteco_left_template']!
-              : (learner.zktecoLeftTemplate ?? ''),
-          'zkteco_right_template': existingTemplates['zkteco_right_template']?.isNotEmpty == true
-              ? existingTemplates['zkteco_right_template']!
-              : (learner.zktecoRightTemplate ?? ''),
-          'futronic_left_template': existingTemplates['futronic_left_template']?.isNotEmpty == true
-              ? existingTemplates['futronic_left_template']!
-              : (learner.futronicLeftTemplate ?? ''),
-          'futronic_right_template': existingTemplates['futronic_right_template']?.isNotEmpty == true
-              ? existingTemplates['futronic_right_template']!
-              : (learner.futronicRightTemplate ?? ''),
+          'zkteco_left_template':
+              existingTemplates['zkteco_left_template']?.isNotEmpty == true
+                  ? existingTemplates['zkteco_left_template']!
+                  : (learner.zktecoLeftTemplate ?? ''),
+          'zkteco_right_template':
+              existingTemplates['zkteco_right_template']?.isNotEmpty == true
+                  ? existingTemplates['zkteco_right_template']!
+                  : (learner.zktecoRightTemplate ?? ''),
+          'futronic_left_template':
+              existingTemplates['futronic_left_template']?.isNotEmpty == true
+                  ? existingTemplates['futronic_left_template']!
+                  : (learner.futronicLeftTemplate ?? ''),
+          'futronic_right_template':
+              existingTemplates['futronic_right_template']?.isNotEmpty == true
+                  ? existingTemplates['futronic_right_template']!
+                  : (learner.futronicRightTemplate ?? ''),
           'imagePath': _cleanFilePath(learner.imagePath),
           'activity_statu': learner.activityStatus ?? '',
           'witness_initials': learner.witnessInitials ?? '',
@@ -458,34 +483,52 @@ class _LearnerListPageState extends State<LearnerListPage> {
           print('No bank data to save for this learner');
         }
 
-        print('Saving learner data: ${learnerData['Name']} ${learnerData['Surname']} with LearnerID: ${learnerData['LearnerID']}');
+        print(
+            'Saving learner data: ${learnerData['Name']} ${learnerData['Surname']} with LearnerID: ${learnerData['LearnerID']}');
 
         try {
           // Use insertOrUpdate instead of insert to handle existing learners
-          final result = await dbHelper.insertOrUpdateLearner(learnerData, bankData);
+          final result =
+              await dbHelper.insertOrUpdateLearner(learnerData, bankData);
           print('Insert/Update result for ${learnerData['Name']}: $result');
 
           // Verify the insertion by checking if learner exists in the class
           final classLearners = await dbHelper.fetchLearners(widget.classID);
-          final savedLearner = classLearners.where((l) =>
-          l['LearnerID']?.toString() == learnerData['LearnerID'] ||
-              l['IDNumber']?.toString() == learnerData['IDNumber']).firstOrNull;
+          final savedLearner = classLearners
+              .where((l) =>
+                  l['LearnerID']?.toString() == learnerData['LearnerID'] ||
+                  l['IDNumber']?.toString() == learnerData['IDNumber'])
+              .firstOrNull;
 
           if (savedLearner != null) {
             print('Verification successful - learner found in database');
             print('Stored fields: ${savedLearner.keys.toList()}');
 
             // Check specific fields that were problematic
-            final fieldsToCheck = ['Title', 'Race', 'Language', 'Disability', 'AddressLine1',
-              'AddressLine2', 'AddressLine3', 'PostalCode', 'KinName',
-              'KinRelation', 'KinContact', 'SchoolName', 'SchoolCompletion',
-              'SchoolLocation', 'SchoolGrade'];
+            final fieldsToCheck = [
+              'Title',
+              'Race',
+              'Language',
+              'Disability',
+              'AddressLine1',
+              'AddressLine2',
+              'AddressLine3',
+              'PostalCode',
+              'KinName',
+              'KinRelation',
+              'KinContact',
+              'SchoolName',
+              'SchoolCompletion',
+              'SchoolLocation',
+              'SchoolGrade'
+            ];
 
             for (String field in fieldsToCheck) {
               final storedValue = savedLearner[field];
               final originalValue = learnerData[field];
               if (storedValue != originalValue) {
-                print('FIELD MISMATCH - $field: stored="$storedValue", original="$originalValue"');
+                print(
+                    'FIELD MISMATCH - $field: stored="$storedValue", original="$originalValue"');
               } else {
                 print('Field OK - $field: "$storedValue"');
               }
@@ -494,7 +537,8 @@ class _LearnerListPageState extends State<LearnerListPage> {
             // Check bank details if they were supposed to be saved
             if (bankData != null && savedLearner['LearnerID'] != null) {
               try {
-                final savedBankDetails = await dbHelper.fetchLearnerBankDetails(savedLearner['LearnerID']);
+                final savedBankDetails = await dbHelper
+                    .fetchLearnerBankDetails(savedLearner['LearnerID']);
                 if (savedBankDetails != null) {
                   print('Bank details verified: $savedBankDetails');
                 } else {
@@ -505,30 +549,39 @@ class _LearnerListPageState extends State<LearnerListPage> {
               }
             }
           } else {
-            print('ERROR: Learner not found after insertion - this indicates a database problem');
-            print('Looking for LearnerID: ${learnerData['LearnerID']} or IDNumber: ${learnerData['IDNumber']}');
-            print('Available learners in class: ${classLearners.map((l) => '${l['LearnerID']}-${l['IDNumber']}').toList()}');
+            print(
+                'ERROR: Learner not found after insertion - this indicates a database problem');
+            print(
+                'Looking for LearnerID: ${learnerData['LearnerID']} or IDNumber: ${learnerData['IDNumber']}');
+            print(
+                'Available learners in class: ${classLearners.map((l) => '${l['LearnerID']}-${l['IDNumber']}').toList()}');
           }
         } catch (insertError) {
-          print('Error inserting/updating learner ${learnerData['Name']}: $insertError');
+          print(
+              'Error inserting/updating learner ${learnerData['Name']}: $insertError');
           // Continue with next learner instead of failing completely
           continue;
         }
       }
 
-      print('Successfully processed ${serverLearners.length} learners to local database');
+      print(
+          'Successfully processed ${serverLearners.length} learners to local database');
 
       // Summary of sync results
       print('=== SYNC SUMMARY ===');
       print('Total learners processed: ${serverLearners.length}');
-      print('Using sync_onlinedetails.php endpoint which returns all learner fields');
+      print(
+          'Using sync_onlinedetails.php endpoint which returns all learner fields');
       print('All fields should now be populated correctly from server data');
       print('Bank details are stored in separate bankdetails table');
-      print('Fingerprint templates are preserved from local database if they exist');
+      print(
+          'Fingerprint templates are preserved from local database if they exist');
       print('=== END SYNC SUMMARY ===');
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Loaded ${serverLearners.length} learners from server with complete data')),
+        SnackBar(
+            content: Text(
+                'Loaded ${serverLearners.length} learners from server with complete data')),
       );
     } catch (e) {
       print('Error saving learners to local database: $e');
@@ -543,7 +596,9 @@ class _LearnerListPageState extends State<LearnerListPage> {
     try {
       final dbHelper = DatabaseHelper();
       final localLearners = await dbHelper.fetchLearners(widget.classID);
-      final learnersList = localLearners.map((learnerMap) => Learner.fromJson(learnerMap)).toList();
+      final learnersList = localLearners
+          .map((learnerMap) => Learner.fromJson(learnerMap))
+          .toList();
       setState(() {
         learners = learnersList;
       });
@@ -566,7 +621,7 @@ class _LearnerListPageState extends State<LearnerListPage> {
       if (isConnected) {
         // First, sync any local unsynced learners to server
         await _syncLocalLearnersToServer();
-        
+
         // Then fetch from server and merge with local data
         final serverLearners = await fetchLearnersFromServer();
         if (serverLearners.isNotEmpty) {
@@ -600,29 +655,34 @@ class _LearnerListPageState extends State<LearnerListPage> {
   Future<void> _syncLocalLearnersToServer() async {
     try {
       final dbHelper = DatabaseHelper();
-      final unsyncedLearners = await dbHelper.fetchUnsyncedLearners(widget.classID);
-      
+      final unsyncedLearners =
+          await dbHelper.fetchUnsyncedLearners(widget.classID);
+
       if (unsyncedLearners.isNotEmpty) {
         print('Found ${unsyncedLearners.length} unsynced learners to sync');
-        
+
         for (var learner in unsyncedLearners) {
           try {
             final success = await _syncLearnerToServer(learner);
             if (success) {
               // The LearnerID might have been updated by the server response
               // So we need to get the current LearnerID after sync
-              final currentLearner = await dbHelper.fetchLearnerByIDNumber(learner['IDNumber']);
+              final currentLearner =
+                  await dbHelper.fetchLearnerByIDNumber(learner['IDNumber']);
               if (currentLearner != null) {
                 await dbHelper.markLearnerAsSynced(currentLearner['LearnerID']);
-                print('Successfully synced learner ${learner['Name']} ${learner['Surname']}');
+                print(
+                    'Successfully synced learner ${learner['Name']} ${learner['Surname']}');
               } else {
                 print('Could not find learner after sync to mark as synced');
               }
             } else {
-              print('Failed to sync learner ${learner['Name']} ${learner['Surname']}');
+              print(
+                  'Failed to sync learner ${learner['Name']} ${learner['Surname']}');
             }
           } catch (e) {
-            print('Error syncing learner ${learner['Name']} ${learner['Surname']}: $e');
+            print(
+                'Error syncing learner ${learner['Name']} ${learner['Surname']}: $e');
           }
         }
       }
@@ -636,20 +696,22 @@ class _LearnerListPageState extends State<LearnerListPage> {
     try {
       // Create a copy of learnerData without the local LearnerID
       Map<String, dynamic> syncData = Map.from(learnerData);
-      
+
       // Remove the local LearnerID to let server assign the correct one
       syncData.remove('LearnerID');
-      
+
       // Also remove synced field as it's not needed for server
       syncData.remove('synced');
-      
+
       // Clean file paths to save only filenames
       syncData['profile_image'] = _cleanFilePath(syncData['profile_image']);
       syncData['signature'] = _cleanFilePath(syncData['signature']);
-      syncData['witness_signature'] = _cleanFilePath(syncData['witness_signature']);
-      
-      print('Preparing sync data without local LearnerID: ${syncData.keys.toList()}');
-      
+      syncData['witness_signature'] =
+          _cleanFilePath(syncData['witness_signature']);
+
+      print(
+          'Preparing sync data without local LearnerID: ${syncData.keys.toList()}');
+
       final response = await http
           .post(
             Uri.parse(url),
@@ -671,14 +733,16 @@ class _LearnerListPageState extends State<LearnerListPage> {
               final serverLearnerID = responseData['LearnerID'];
               final localLearnerID = learnerData['LearnerID'];
               final dbHelper = DatabaseHelper();
-              
+
               // Update the local LearnerID with the server's LearnerID
               await dbHelper.updateLearnerID(localLearnerID, serverLearnerID);
-              print('Updated local LearnerID $localLearnerID to server LearnerID $serverLearnerID');
+              print(
+                  'Updated local LearnerID $localLearnerID to server LearnerID $serverLearnerID');
             }
             return true;
           } else {
-            print('Server returned success: false - ${responseData['message']}');
+            print(
+                'Server returned success: false - ${responseData['message']}');
             return false;
           }
         } catch (e) {
@@ -698,13 +762,13 @@ class _LearnerListPageState extends State<LearnerListPage> {
   Future<void> _mergeServerAndLocalData(List<Learner> serverLearners) async {
     try {
       final dbHelper = DatabaseHelper();
-      
+
       // First, save server learners to local database
       await saveLearnersToLocalDatabase(serverLearners);
-      
+
       // Get local learners after saving server data
       final localLearners = await dbHelper.fetchLearners(widget.classID);
-      
+
       // Create a map of server learners by IDNumber for easy lookup
       final serverLearnersMap = <String, Learner>{};
       for (var learner in serverLearners) {
@@ -712,46 +776,48 @@ class _LearnerListPageState extends State<LearnerListPage> {
           serverLearnersMap[learner.idNumber!] = learner;
         }
       }
-      
+
       // Create a map of local learners by IDNumber
       final localLearnersMap = <String, Map<String, dynamic>>{};
       for (var learner in localLearners) {
-        if (learner['IDNumber'] != null && learner['IDNumber'].toString().isNotEmpty) {
+        if (learner['IDNumber'] != null &&
+            learner['IDNumber'].toString().isNotEmpty) {
           localLearnersMap[learner['IDNumber'].toString()] = learner;
         }
       }
-      
+
       // Merge data: prefer server data but keep local unsynced data
       List<Learner> mergedLearners = [];
-      
+
       // Add all server learners
       mergedLearners.addAll(serverLearners);
-      
+
       // Add local learners that are not on server (unsynced)
       for (var localLearner in localLearners) {
         final idNumber = localLearner['IDNumber']?.toString();
         if (idNumber != null && idNumber.isNotEmpty) {
           final isSynced = localLearner['synced'] == 1;
           final notOnServer = !serverLearnersMap.containsKey(idNumber);
-          
+
           if (!isSynced || notOnServer) {
             // Convert local learner to Learner object and add to merged list
             final learner = Learner.fromJson(localLearner);
             mergedLearners.add(learner);
-            print('Added local learner to merged data: ${learner.name} ${learner.surname}');
+            print(
+                'Added local learner to merged data: ${learner.name} ${learner.surname}');
           }
         }
       }
-      
+
       // Update the UI with merged data
       setState(() {
         learners = mergedLearners;
       });
       // Apply current search filter after updating learners
       _filterLearners();
-      
-      print('Merged ${serverLearners.length} server learners with ${localLearners.length} local learners = ${mergedLearners.length} total');
-      
+
+      print(
+          'Merged ${serverLearners.length} server learners with ${localLearners.length} local learners = ${mergedLearners.length} total');
     } catch (e) {
       print('Error merging server and local data: $e');
       // Fallback to server data only
@@ -768,7 +834,8 @@ class _LearnerListPageState extends State<LearnerListPage> {
 
       // Check local database
       final localDocs = await dbHelper.fetchLearnerDocuments(learnerId);
-      existingDocs = localDocs.map((doc) => doc['documentName'] as String).toList();
+      existingDocs =
+          localDocs.map((doc) => doc['documentName'] as String).toList();
 
       // Check server if online
       if (await _checkConnectivity()) {
@@ -820,7 +887,8 @@ class _LearnerListPageState extends State<LearnerListPage> {
 
       // Check local database
       final localDocs = await dbHelper.fetchLearnerDocuments(learnerId);
-      existingDocs = localDocs.map((doc) => doc['documentName'] as String).toList();
+      existingDocs =
+          localDocs.map((doc) => doc['documentName'] as String).toList();
       print('Local documents for $learnerId: $existingDocs');
 
       // Check server if online
@@ -860,18 +928,19 @@ class _LearnerListPageState extends State<LearnerListPage> {
       print('Testing server connectivity for learner: $learnerId');
       final isConnected = await _checkConnectivity();
       print('Internet connectivity: $isConnected');
-      
+
       if (isConnected) {
         final serverDocs = await _fetchServerDocuments(learnerId);
         print('Test completed. Server documents found: $serverDocs');
-        
+
         // Test with a known learner ID if available
         if (learners.isNotEmpty) {
           final testLearnerId = learners.first.learnerID ?? 'N/A';
           if (testLearnerId != learnerId) {
             print('Testing with first learner ID: $testLearnerId');
             final testDocs = await _fetchServerDocuments(testLearnerId);
-            print('Test with first learner completed. Documents found: $testDocs');
+            print(
+                'Test with first learner completed. Documents found: $testDocs');
           }
         }
       } else {
@@ -891,13 +960,15 @@ class _LearnerListPageState extends State<LearnerListPage> {
         return;
       }
 
-      for (var learner in learners.take(3)) { // Test first 3 learners
+      for (var learner in learners.take(3)) {
+        // Test first 3 learners
         final learnerId = learner.learnerID ?? 'N/A';
-        print('Testing learner: $learnerId (${learner.name} ${learner.surname})');
-        
+        print(
+            'Testing learner: $learnerId (${learner.name} ${learner.surname})');
+
         final existingDocs = await getExistingDocuments(learnerId);
         final canUpload = await canUploadDocuments(learnerId);
-        
+
         print('  - Existing documents: $existingDocs');
         print('  - Can upload documents: $canUpload');
         print('  - Required documents: $requiredDocuments');
@@ -909,44 +980,77 @@ class _LearnerListPageState extends State<LearnerListPage> {
 
   Future<void> testBankDataInsertion() async {
     try {
-      class LearnerListPage extends StatefulWidget {
-        final String classID;
-        final String? initialLearnerID; // Optional: auto-navigate to this learner
+      print('Testing bank data insertion...');
+      final dbHelper = DatabaseHelper();
 
-        const LearnerListPage({
-          super.key,
-          required this.classID,
-          this.initialLearnerID,
-        });
+      // Test data
+      final testLearnerData = {
+        'classID': widget.classID,
+        'Title': 'Mr.',
+        'Name': 'Test',
+        'Surname': 'BankUser',
+        'IDNumber': '1234567890123',
+        'DateOfBirth': '1990-01-01',
+        'PhoneNumber': '1234567890',
+        'Email': 'test@example.com',
+        'Age': '33',
+        'Gender': 'Male',
+        'Race': 'African',
+        'Language': 'English',
+        'Disability': 'None',
+        'AddressLine1': 'Test Address',
+        'AddressLine2': '',
+        'AddressLine3': '',
+        'PostalCode': '1234',
+        'KinName': 'Test Kin',
+        'KinRelation': 'Parent',
+        'KinContact': '0987654321',
+        'SchoolName': 'Test School',
+        'SchoolCompletion': '2010',
+        'SchoolLocation': 'Test Location',
+        'SchoolGrade': '12',
+        'profile_image': '',
+        'signature': '',
+        'synced': 0,
+        'zkteco_left_template': '',
+        'zkteco_right_template': '',
+        'futronic_left_template': '',
+        'futronic_right_template': '',
+        'imagePath': '',
+        'activity_statu': '',
+        'witness_initials': '',
+        'learner_initials': '',
+        'witness_signature': '',
+      };
 
-        @override
-        _LearnerListPageState createState() => _LearnerListPageState();
-      },
+      final testBankData = {
+        'BankName': 'ABSA',
         'bankType': 'Savings',
         'BankAccount': '1234567890',
         'BankCode': '632005',
       };
-      
+
       print('Test learner data: $testLearnerData');
       print('Test bank data: $testBankData');
-      
-              final learnerId = await dbHelper.insertOrUpdateLearner(testLearnerData, testBankData);
+
+      final learnerId =
+          await dbHelper.insertOrUpdateLearner(testLearnerData, testBankData);
       print('Test learner inserted with ID: $learnerId');
-      
+
       // Verify the insertion
       final insertedLearner = await dbHelper.fetchLearners(widget.classID);
       final lastLearner = insertedLearner.last;
       print('Last inserted learner: $lastLearner');
-      
+
       if (lastLearner['LearnerID'] != null) {
-        final bankDetails = await dbHelper.fetchLearnerBankDetails(lastLearner['LearnerID']);
+        final bankDetails =
+            await dbHelper.fetchLearnerBankDetails(lastLearner['LearnerID']);
         print('Bank details for test learner: $bankDetails');
       }
-      
+
       // Show all bank details
       final allBankDetails = await dbHelper.fetchAllBankDetails();
       print('All bank details in database: $allBankDetails');
-      
     } catch (e) {
       print('Error testing bank data insertion: $e');
     }
@@ -957,7 +1061,7 @@ class _LearnerListPageState extends State<LearnerListPage> {
       print('Fetching server documents for learner: $learnerId');
       print('Request URL: $_checkDocsUrl');
       print('Request body: {"learner_id": "$learnerId"}');
-      
+
       final response = await http.post(
         Uri.parse(_checkDocsUrl),
         body: {'learner_id': learnerId},
@@ -971,7 +1075,7 @@ class _LearnerListPageState extends State<LearnerListPage> {
         try {
           final jsonResponse = jsonDecode(response.body);
           print('Parsed JSON response: $jsonResponse');
-          
+
           if (jsonResponse['success'] == true) {
             final documents = List<String>.from(jsonResponse['documents']);
             print('Successfully fetched server documents: $documents');
@@ -1029,10 +1133,13 @@ class _LearnerListPageState extends State<LearnerListPage> {
           final jsonResponse = jsonDecode(responseBody);
           if (jsonResponse['success'] == true) {
             final dbHelper = DatabaseHelper();
-            await dbHelper.updateLearnerDocumentSynced(document['document_id'], 1);
-            print('Document synced: ${document['documentName']} for learner ${document['learner_id']}');
+            await dbHelper.updateLearnerDocumentSynced(
+                document['document_id'], 1);
+            print(
+                'Document synced: ${document['documentName']} for learner ${document['learner_id']}');
           } else {
-            throw Exception(jsonResponse['message'] ?? 'Failed to sync document');
+            throw Exception(
+                jsonResponse['message'] ?? 'Failed to sync document');
           }
         } catch (e) {
           throw Exception('Invalid JSON response: $responseBody');
@@ -1042,7 +1149,7 @@ class _LearnerListPageState extends State<LearnerListPage> {
       }
     } catch (e) {
       print('Error syncing document: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -1065,7 +1172,9 @@ class _LearnerListPageState extends State<LearnerListPage> {
 
       if (unsyncedDocs.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Synced ${unsyncedDocs.length} documents to server')),
+          SnackBar(
+              content:
+                  Text('Synced ${unsyncedDocs.length} documents to server')),
         );
       }
 
@@ -1077,7 +1186,8 @@ class _LearnerListPageState extends State<LearnerListPage> {
     }
   }
 
-  Future<void> uploadDocument(String learnerId, String documentName, String filePath) async {
+  Future<void> uploadDocument(
+      String learnerId, String documentName, String filePath) async {
     try {
       final dbHelper = DatabaseHelper();
       final document = {
@@ -1125,7 +1235,9 @@ class _LearnerListPageState extends State<LearnerListPage> {
                 }
 
                 final existingDocs = snapshot.data ?? [];
-                final availableDocs = requiredDocuments.where((doc) => !existingDocs.contains(doc)).toList();
+                final availableDocs = requiredDocuments
+                    .where((doc) => !existingDocs.contains(doc))
+                    .toList();
 
                 if (availableDocs.isEmpty) {
                   return AlertDialog(
@@ -1134,11 +1246,13 @@ class _LearnerListPageState extends State<LearnerListPage> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('All required documents have already been uploaded for this learner.'),
+                        const Text(
+                            'All required documents have already been uploaded for this learner.'),
                         const SizedBox(height: 8),
                         Text('Existing documents: ${existingDocs.join(', ')}'),
                         const SizedBox(height: 8),
-                        Text('Required documents: ${requiredDocuments.join(', ')}'),
+                        Text(
+                            'Required documents: ${requiredDocuments.join(', ')}'),
                       ],
                     ),
                     actions: [
@@ -1156,7 +1270,8 @@ class _LearnerListPageState extends State<LearnerListPage> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Available documents to upload: ${availableDocs.length}/${requiredDocuments.length}'),
+                      Text(
+                          'Available documents to upload: ${availableDocs.length}/${requiredDocuments.length}'),
                       const SizedBox(height: 8),
                       if (existingDocs.isNotEmpty)
                         Text('Already uploaded: ${existingDocs.join(', ')}'),
@@ -1188,60 +1303,67 @@ class _LearnerListPageState extends State<LearnerListPage> {
                       onPressed: selectedDocument == null || _isScanning
                           ? null
                           : () async {
-                        setState(() => _isScanning = true);
-                        try {
-                          final status = await Permission.camera.request();
-                          if (!status.isGranted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Camera permission denied. Please enable it in settings.',
-                                ),
-                              ),
-                            );
-                            await openAppSettings();
-                            return;
-                          }
+                              setState(() => _isScanning = true);
+                              try {
+                                final status =
+                                    await Permission.camera.request();
+                                if (!status.isGranted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Camera permission denied. Please enable it in settings.',
+                                      ),
+                                    ),
+                                  );
+                                  await openAppSettings();
+                                  return;
+                                }
 
-                          final scanner = FlutterDocScanner();
-                          // Allow unlimited pages (999) for CV and learner agreements
-                          final scanResult = await scanner.getScanDocuments(
-                            page: 999, // Unlimited pages
-                          );
-                          if (scanResult is! Map ||
-                              !scanResult.containsKey('pdfUri') ||
-                              scanResult['pdfUri'] == null) {
-                            throw 'Invalid scan result';
-                          }
+                                final scanner = FlutterDocScanner();
+                                // Allow unlimited pages (999) for CV and learner agreements
+                                final scanResult =
+                                    await scanner.getScanDocuments(
+                                  page: 999, // Unlimited pages
+                                );
+                                if (scanResult is! Map ||
+                                    !scanResult.containsKey('pdfUri') ||
+                                    scanResult['pdfUri'] == null) {
+                                  throw 'Invalid scan result';
+                                }
 
-                          final pdfPath = (scanResult['pdfUri'] as String).replaceFirst('file:///', '');
-                          final file = File(pdfPath);
+                                final pdfPath = (scanResult['pdfUri'] as String)
+                                    .replaceFirst('file:///', '');
+                                final file = File(pdfPath);
 
-                          if (!await file.exists() || !pdfPath.endsWith('.pdf')) {
-                            throw 'Invalid or missing PDF file';
-                          }
+                                if (!await file.exists() ||
+                                    !pdfPath.endsWith('.pdf')) {
+                                  throw 'Invalid or missing PDF file';
+                                }
 
-                          final fileSize = await file.length();
-                          if (fileSize > _maxFileSize) {
-                            throw 'File size exceeds 5MB limit';
-                          }
-                          if (fileSize < _minFileSize) {
-                            throw 'The scanned page may not be clear. Ensure text is sharp and entire page is captured.';
-                          }
+                                final fileSize = await file.length();
+                                if (fileSize > _maxFileSize) {
+                                  throw 'File size exceeds 5MB limit';
+                                }
+                                if (fileSize < _minFileSize) {
+                                  throw 'The scanned page may not be clear. Ensure text is sharp and entire page is captured.';
+                                }
 
-                          await uploadDocument(learnerId, selectedDocument!, pdfPath);
-                          // Avoid full refresh, just close the dialog
-                          Navigator.pop(context);
-                          // Refresh document status
-                          refreshDocumentStatus();
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error scanning document: $e')),
-                          );
-                        } finally {
-                          setState(() => _isScanning = false);
-                        }
-                      },
+                                await uploadDocument(
+                                    learnerId, selectedDocument!, pdfPath);
+                                // Avoid full refresh, just close the dialog
+                                Navigator.pop(context);
+                                // Refresh document status
+                                refreshDocumentStatus();
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                      content:
+                                          Text('Error scanning document: $e')),
+                                );
+                              } finally {
+                                setState(() => _isScanning = false);
+                              }
+                            },
                       child: const Text('Scan and Upload'),
                     ),
                   ],
@@ -1282,7 +1404,8 @@ class _LearnerListPageState extends State<LearnerListPage> {
               if (learners.isNotEmpty) {
                 testServerConnectivity(learners.first.learnerID ?? 'N/A');
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Check console for server test results')),
+                  const SnackBar(
+                      content: Text('Check console for server test results')),
                 );
               }
             },
@@ -1293,7 +1416,9 @@ class _LearnerListPageState extends State<LearnerListPage> {
             onPressed: () {
               testAllLearnerDocuments();
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Check console for all learners test results')),
+                const SnackBar(
+                    content:
+                        Text('Check console for all learners test results')),
               );
             },
             tooltip: 'Test All Learners',
@@ -1304,7 +1429,9 @@ class _LearnerListPageState extends State<LearnerListPage> {
               final dbHelper = DatabaseHelper();
               await dbHelper.debugDatabaseStructure();
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Check console for database structure debug info')),
+                const SnackBar(
+                    content: Text(
+                        'Check console for database structure debug info')),
               );
             },
             tooltip: 'Debug Database',
@@ -1314,7 +1441,9 @@ class _LearnerListPageState extends State<LearnerListPage> {
             onPressed: () async {
               await testBankDataInsertion();
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Check console for bank data insertion test results')),
+                const SnackBar(
+                    content: Text(
+                        'Check console for bank data insertion test results')),
               );
             },
             tooltip: 'Test Bank Insertion',
@@ -1335,7 +1464,8 @@ class _LearnerListPageState extends State<LearnerListPage> {
           ),
           // Search bar for ID number
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Card(
               elevation: 2,
               child: Padding(
@@ -1350,7 +1480,8 @@ class _LearnerListPageState extends State<LearnerListPage> {
                         decoration: const InputDecoration(
                           hintText: 'Search learner by ID number...',
                           border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          contentPadding:
+                              EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                         ),
                         onChanged: (_) => _filterLearners(),
                       ),
@@ -1373,96 +1504,137 @@ class _LearnerListPageState extends State<LearnerListPage> {
             child: learners.isEmpty
                 ? const Center(child: CircularProgressIndicator())
                 : RefreshIndicator(
-                                      onRefresh: () async {
+                    onRefresh: () async {
                       await _syncLocalLearnersToServer();
                       await fetchLearnersData();
                       refreshDocumentStatus();
                     },
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.vertical,
                     child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        columns: const [
-                          DataColumn(label: Text('Learner ID')),
-                          DataColumn(label: Text('Name')),
-                          DataColumn(label: Text('Surname')),
-                          DataColumn(label: Text('ID Number')),
-                          DataColumn(label: Text('Age')),
-                          DataColumn(label: Text('Gender')),
-                          DataColumn(label: Text('Action')),
-                        ],
-                        rows: (_searchController.text.isNotEmpty 
-                            ? _filteredLearners 
-                            : learners).map((learner) {
-                          return DataRow(cells: [
-                            DataCell(Text(learner.learnerID ?? 'N/A')),
-                            DataCell(Text(learner.name ?? '')),
-                            DataCell(Text(learner.surname ?? '')),
-                            DataCell(Text(learner.idNumber ?? '')),
-                            DataCell(Text(learner.age ?? '')),
-                            DataCell(Text(learner.gender ?? '')),
-                            DataCell(
-                              Row(
-                                children: [
-                                  FutureBuilder<bool>(
-                                    future: hasAnyDocuments(learner.learnerID ?? 'N/A'),
-                                    builder: (context, snapshot) {
-                                      if (snapshot.connectionState == ConnectionState.waiting) {
-                                        return const CircularProgressIndicator();
-                                      }
-                                      bool hasDocuments = snapshot.data ?? false;
-                                      return ElevatedButton(
-                                        onPressed: hasDocuments
-                                            ? () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => LearnerDetailsPage(
-                                                learnerID: learner.learnerID ?? 'N/A',
-                                              ),
-                                            ),
-                                          );
+                      scrollDirection: Axis.vertical,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: DataTable(
+                          columns: const [
+                            DataColumn(label: Text('Learner ID')),
+                            DataColumn(label: Text('Name')),
+                            DataColumn(label: Text('Surname')),
+                            DataColumn(label: Text('ID Number')),
+                            DataColumn(label: Text('Age')),
+                            DataColumn(label: Text('Gender')),
+                            DataColumn(label: Text('Action')),
+                          ],
+                          rows: (_searchController.text.isNotEmpty
+                                  ? _filteredLearners
+                                  : learners)
+                              .map((learner) {
+                            return DataRow(cells: [
+                              DataCell(Text(learner.learnerID ?? 'N/A')),
+                              DataCell(Text(learner.name ?? '')),
+                              DataCell(Text(learner.surname ?? '')),
+                              DataCell(Text(learner.idNumber ?? '')),
+                              DataCell(Text(learner.age ?? '')),
+                              DataCell(Text(learner.gender ?? '')),
+                              DataCell(
+                                Row(
+                                  children: [
+                                    FutureBuilder<bool>(
+                                      future: hasAnyDocuments(
+                                          learner.learnerID ?? 'N/A'),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.connectionState ==
+                                            ConnectionState.waiting) {
+                                          return const CircularProgressIndicator();
                                         }
-                                            : null,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: hasDocuments ? Colors.blue : Colors.grey,
-                                        ),
-                                        child: const Text('View'),
-                                      );
-                                    },
-                                  ),
-                                  const SizedBox(width: 8),
-                                  FutureBuilder<bool>(
-                                    future: canUploadDocuments(learner.learnerID ?? 'N/A'),
-                                    builder: (context, snapshot) {
-                                      if (snapshot.connectionState == ConnectionState.waiting) {
-                                        return const CircularProgressIndicator();
-                                      }
-                                      bool canUpload = snapshot.data ?? false;
-                                      return ElevatedButton(
-                                        onPressed: !canUpload || _isScanning
-                                            ? null
-                                            : () => showDocumentUploadModal(
+                                        bool hasDocuments =
+                                            snapshot.data ?? false;
+                                        return ElevatedButton(
+                                          onPressed: hasDocuments
+                                              ? () {
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (context) =>
+                                                          LearnerDetailsPage(
+                                                        learnerID:
+                                                            learner.learnerID ??
+                                                                'N/A',
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
+                                              : null,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: hasDocuments
+                                                ? Colors.blue
+                                                : Colors.grey,
+                                          ),
+                                          child: const Text('View'),
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(width: 8),
+                                    FutureBuilder<bool>(
+                                      future: canUploadDocuments(
+                                          learner.learnerID ?? 'N/A'),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.connectionState ==
+                                            ConnectionState.waiting) {
+                                          return const CircularProgressIndicator();
+                                        }
+                                        bool canUpload = snapshot.data ?? false;
+                                        return ElevatedButton(
+                                          onPressed: !canUpload || _isScanning
+                                              ? null
+                                              : () => showDocumentUploadModal(
+                                                    context,
+                                                    learner.learnerID ?? 'N/A',
+                                                  ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: canUpload
+                                                ? Colors.green
+                                                : Colors.grey,
+                                          ),
+                                          child: const Text('Documents'),
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        final learnerName =
+                                            '${learner.surname ?? ''} ${learner.name ?? ''}'
+                                                .trim();
+                                        Navigator.push(
                                           context,
-                                          learner.learnerID ?? 'N/A',
-                                        ),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: canUpload ? Colors.green : Colors.grey,
-                                        ),
-                                        child: const Text('Documents'),
-                                      );
-                                    },
-                                  ),
-                                ],
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                FinanceRegisterHistory(
+                                              learnerId:
+                                                  learner.learnerID ?? 'N/A',
+                                              learnerName: learnerName,
+                                              classId: widget.classID,
+                                              className:
+                                                  'Class ${widget.classID}',
+                                              financeId: widget
+                                                  .classID, // Use classID as financeId
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.orange,
+                                      ),
+                                      child: const Text('Attendance'),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ]);
-                        }).toList(),
+                            ]);
+                          }).toList(),
+                        ),
                       ),
                     ),
                   ),
-                ),
           ),
         ],
       ),
@@ -1477,8 +1649,8 @@ class _LearnerListPageState extends State<LearnerListPage> {
             ),
           ).then((_) => fetchLearnersData());
         },
-        child: const Icon(Icons.add),
         backgroundColor: Colors.blue,
+        child: const Icon(Icons.add),
       ),
     );
   }
@@ -1532,16 +1704,16 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
   // Helper function to clean file paths - extract only filename
   String _cleanFilePath(String? filePath) {
     if (filePath == null || filePath.isEmpty) return '';
-    
+
     // If it's already just a filename (no path separators), return as is
     if (!filePath.contains('/') && !filePath.contains('\\')) {
       return filePath;
     }
-    
+
     // Extract filename from path
     final pathParts = filePath.split('/');
     if (pathParts.isEmpty) return '';
-    
+
     final filename = pathParts.last;
     return filename;
   }
@@ -1627,8 +1799,9 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
                     labelText: "Enter learner's name",
                     border: OutlineInputBorder(),
                   ),
-                  validator: (value) =>
-                  value == null || value.isEmpty ? 'Please enter name' : null,
+                  validator: (value) => value == null || value.isEmpty
+                      ? 'Please enter name'
+                      : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -1639,8 +1812,9 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
                     labelText: "Enter learner's surname",
                     border: OutlineInputBorder(),
                   ),
-                  validator: (value) =>
-                  value == null || value.isEmpty ? 'Please enter surname' : null,
+                  validator: (value) => value == null || value.isEmpty
+                      ? 'Please enter surname'
+                      : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -1663,7 +1837,7 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
                     });
                   },
                   validator: (value) =>
-                  value == null ? 'Please select a title' : null,
+                      value == null ? 'Please select a title' : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -1693,9 +1867,10 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
                     helperText: _isValidSAId
                         ? 'Enter 13-digit South African ID number'
                         : null,
-                    errorText: !_isValidSAId && _idNumberController.text.isNotEmpty
-                        ? 'Not a valid SA ID number'
-                        : null,
+                    errorText:
+                        !_isValidSAId && _idNumberController.text.isNotEmpty
+                            ? 'Not a valid SA ID number'
+                            : null,
                     errorStyle: const TextStyle(color: Colors.red),
                   ),
                   keyboardType: TextInputType.number,
@@ -1726,8 +1901,9 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
                     ),
                   ),
                   onTap: _isValidSAId ? () => _selectDate(context) : null,
-                  validator: (value) =>
-                  value == null || value.isEmpty ? 'Please select date of birth' : null,
+                  validator: (value) => value == null || value.isEmpty
+                      ? 'Please select date of birth'
+                      : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -1739,8 +1915,9 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
                     border: OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.phone,
-                  validator: (value) =>
-                  value == null || value.isEmpty ? 'Please enter contact number' : null,
+                  validator: (value) => value == null || value.isEmpty
+                      ? 'Please enter contact number'
+                      : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -1802,7 +1979,7 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
                     });
                   },
                   validator: (value) =>
-                  value == null ? 'Please select a gender' : null,
+                      value == null ? 'Please select a gender' : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -1816,7 +1993,8 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
                   items: const [
                     DropdownMenuItem(value: 'African', child: Text('African')),
                     DropdownMenuItem(value: 'Indian', child: Text('Indian')),
-                    DropdownMenuItem(value: 'Coloured', child: Text('Coloured')),
+                    DropdownMenuItem(
+                        value: 'Coloured', child: Text('Coloured')),
                     DropdownMenuItem(value: 'White', child: Text('White')),
                   ],
                   onChanged: (value) {
@@ -1836,16 +2014,22 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
                   ),
                   items: const [
                     DropdownMenuItem(value: 'IsiZulu', child: Text('IsiZulu')),
-                    DropdownMenuItem(value: 'IsiXhosa', child: Text('IsiXhosa')),
-                    DropdownMenuItem(value: 'Afrikaans', child: Text('Afrikaans')),
+                    DropdownMenuItem(
+                        value: 'IsiXhosa', child: Text('IsiXhosa')),
+                    DropdownMenuItem(
+                        value: 'Afrikaans', child: Text('Afrikaans')),
                     DropdownMenuItem(value: 'English', child: Text('English')),
-                    DropdownMenuItem(value: 'IsiNdebele', child: Text('IsiNdebele')),
+                    DropdownMenuItem(
+                        value: 'IsiNdebele', child: Text('IsiNdebele')),
                     DropdownMenuItem(value: 'Sepedi', child: Text('Sepedi')),
                     DropdownMenuItem(value: 'Sesotho', child: Text('Sesotho')),
-                    DropdownMenuItem(value: 'Setswana', child: Text('Setswana')),
+                    DropdownMenuItem(
+                        value: 'Setswana', child: Text('Setswana')),
                     DropdownMenuItem(value: 'SiSwati', child: Text('SiSwati')),
-                    DropdownMenuItem(value: 'Tshivenda', child: Text('Tshivenda')),
-                    DropdownMenuItem(value: 'Xitsonga', child: Text('Xitsonga')),
+                    DropdownMenuItem(
+                        value: 'Tshivenda', child: Text('Tshivenda')),
+                    DropdownMenuItem(
+                        value: 'Xitsonga', child: Text('Xitsonga')),
                   ],
                   onChanged: (value) {
                     setState(() {
@@ -1905,7 +2089,8 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
                   ),
                   items: const [
                     DropdownMenuItem(value: 'None', child: Text('None')),
-                    DropdownMenuItem(value: 'Physical', child: Text('Physical')),
+                    DropdownMenuItem(
+                        value: 'Physical', child: Text('Physical')),
                     DropdownMenuItem(value: 'Visual', child: Text('Visual')),
                     DropdownMenuItem(value: 'Hearing', child: Text('Hearing')),
                     DropdownMenuItem(value: 'Other', child: Text('Other')),
@@ -2022,15 +2207,21 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
                     DropdownMenuItem(value: 'ABSA', child: Text('ABSA')),
                     DropdownMenuItem(value: 'FNB', child: Text('FNB')),
                     DropdownMenuItem(value: 'Nedbank', child: Text('Nedbank')),
-                    DropdownMenuItem(value: 'Standard Bank', child: Text('Standard Bank')),
+                    DropdownMenuItem(
+                        value: 'Standard Bank', child: Text('Standard Bank')),
                     DropdownMenuItem(value: 'Capitec', child: Text('Capitec')),
-                    DropdownMenuItem(value: 'TymeBank', child: Text('Tyme Bank')),
+                    DropdownMenuItem(
+                        value: 'TymeBank', child: Text('Tyme Bank')),
                     DropdownMenuItem(value: 'Ithala', child: Text('Ithala')),
                     DropdownMenuItem(value: 'Bidvest', child: Text('Bidvest')),
-                    DropdownMenuItem(value: 'OldMutual', child: Text('Old Mutual')),
-                    DropdownMenuItem(value: 'AfricanBank', child: Text('African Bank')),
-                    DropdownMenuItem(value: 'Discovery', child: Text('Discovery')),
-                    DropdownMenuItem(value: 'PostBank', child: Text('Post Bank')),
+                    DropdownMenuItem(
+                        value: 'OldMutual', child: Text('Old Mutual')),
+                    DropdownMenuItem(
+                        value: 'AfricanBank', child: Text('African Bank')),
+                    DropdownMenuItem(
+                        value: 'Discovery', child: Text('Discovery')),
+                    DropdownMenuItem(
+                        value: 'PostBank', child: Text('Post Bank')),
                   ],
                   onChanged: (value) {
                     setState(() {
@@ -2075,112 +2266,112 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
                 // Submit Button
                 ElevatedButton(
                   onPressed: () async {
-                                          if (_formKey.currentState!.validate()) {
-                        // Validate classID
-                        if (widget.classID.isEmpty ||
-                            int.tryParse(widget.classID) == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Invalid Class ID')),
-                          );
-                          return;
-                        }
-
-                        final learnerData = {
-                          'classID':
-                              widget.classID, // Use string as per Learner class
-                          'Title': _selectedTitle ?? 'N/A',
-                          'Name': _nameController.text,
-                          'Surname': _surnameController.text,
-                          'IDNumber': _idNumberController.text,
-                          'DateOfBirth': _dobController.text.isEmpty
-                              ? 'N/A'
-                              : _dobController.text,
-                          'PhoneNumber': _contactNumberController.text.isEmpty
-                              ? 'N/A'
-                              : _contactNumberController.text,
-                          'Email': _emailController.text.isEmpty
-                              ? 'N/A'
-                              : _emailController.text,
-                          'Age': _ageController.text.isEmpty
-                              ? '0'
-                              : int.tryParse(_ageController.text)?.toString() ??
-                                  '0',
-                          'Gender': _selectedGender ?? 'Unknown',
-                          'Race': _selectedRace ?? '',
-                          'Language': _selectedLanguage ?? '',
-                          'Disability': _selectedDisability ?? '',
-                          'AddressLine1': _addressStreetController.text.isEmpty
-                              ? ''
-                              : _addressStreetController.text,
-                          'AddressLine2': _addressSuburbController.text.isEmpty
-                              ? ''
-                              : _addressSuburbController.text,
-                          'AddressLine3': _addressCityController.text.isEmpty
-                              ? ''
-                              : _addressCityController.text,
-                          'PostalCode': _postalCodeController.text.isEmpty
-                              ? ''
-                              : _postalCodeController.text,
-                          'KinName': _kinNameController.text.isEmpty
-                              ? ''
-                              : _kinNameController.text,
-                          'KinRelation': _kinRelationController.text.isEmpty
-                              ? ''
-                              : _kinRelationController.text,
-                          'KinContact': _kinContactController.text.isEmpty
-                              ? ''
-                              : _kinContactController.text,
-                          'SchoolName': _schoolNameController.text.isEmpty
-                              ? ''
-                              : _schoolNameController.text,
-                          'SchoolCompletion':
-                              _schoolCompletionController.text.isEmpty
-                                  ? ''
-                                  : _schoolCompletionController.text,
-                          'SchoolLocation': _schoolLocationController.text.isEmpty
-                              ? ''
-                              : _schoolLocationController.text,
-                          'SchoolGrade': _schoolGradeController.text.isEmpty
-                              ? ''
-                              : _schoolGradeController.text,
-                          'BankName': _selectedBank ?? '',
-                          'bankType': _bankAccountTypeController.text.isEmpty
-                              ? ''
-                              : _bankAccountTypeController.text,
-                          'BankAccount': _bankAccountNumberController.text.isEmpty
-                              ? ''
-                              : _bankAccountNumberController.text,
-                          'BankCode': _bankBranchCodeController.text.isEmpty
-                              ? ''
-                              : _bankBranchCodeController.text,
-                          'profile_image': '',
-                          'signature': '',
-                          'synced': 0,
-                          'zkteco_right_template': '',
-                          'imagePath': '',
-                          'zkteco_left_template': '',
-                          'activity_statu': '',
-                          'witness_initials': '',
-                          'learner_initials': '',
-                          'witness_signature': '',
-                        };
-
-                        // Remove bank details if BankName is empty
-                        if (learnerData['BankName'] == '') {
-                          learnerData
-                            ..remove('bankType')
-                            ..remove('BankAccount')
-                            ..remove('BankCode');
-                        }
-
-                        print('Request body: ${json.encode(learnerData)}');
-
-                        final success =
-                            await _submitLearnerData(context, learnerData);
-                        if (success) {
-                          Navigator.pop(context, true);
-                        }
+                    if (_formKey.currentState!.validate()) {
+                      // Validate classID
+                      if (widget.classID.isEmpty ||
+                          int.tryParse(widget.classID) == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Invalid Class ID')),
+                        );
+                        return;
                       }
+
+                      final learnerData = {
+                        'classID':
+                            widget.classID, // Use string as per Learner class
+                        'Title': _selectedTitle ?? 'N/A',
+                        'Name': _nameController.text,
+                        'Surname': _surnameController.text,
+                        'IDNumber': _idNumberController.text,
+                        'DateOfBirth': _dobController.text.isEmpty
+                            ? 'N/A'
+                            : _dobController.text,
+                        'PhoneNumber': _contactNumberController.text.isEmpty
+                            ? 'N/A'
+                            : _contactNumberController.text,
+                        'Email': _emailController.text.isEmpty
+                            ? 'N/A'
+                            : _emailController.text,
+                        'Age': _ageController.text.isEmpty
+                            ? '0'
+                            : int.tryParse(_ageController.text)?.toString() ??
+                                '0',
+                        'Gender': _selectedGender ?? 'Unknown',
+                        'Race': _selectedRace ?? '',
+                        'Language': _selectedLanguage ?? '',
+                        'Disability': _selectedDisability ?? '',
+                        'AddressLine1': _addressStreetController.text.isEmpty
+                            ? ''
+                            : _addressStreetController.text,
+                        'AddressLine2': _addressSuburbController.text.isEmpty
+                            ? ''
+                            : _addressSuburbController.text,
+                        'AddressLine3': _addressCityController.text.isEmpty
+                            ? ''
+                            : _addressCityController.text,
+                        'PostalCode': _postalCodeController.text.isEmpty
+                            ? ''
+                            : _postalCodeController.text,
+                        'KinName': _kinNameController.text.isEmpty
+                            ? ''
+                            : _kinNameController.text,
+                        'KinRelation': _kinRelationController.text.isEmpty
+                            ? ''
+                            : _kinRelationController.text,
+                        'KinContact': _kinContactController.text.isEmpty
+                            ? ''
+                            : _kinContactController.text,
+                        'SchoolName': _schoolNameController.text.isEmpty
+                            ? ''
+                            : _schoolNameController.text,
+                        'SchoolCompletion':
+                            _schoolCompletionController.text.isEmpty
+                                ? ''
+                                : _schoolCompletionController.text,
+                        'SchoolLocation': _schoolLocationController.text.isEmpty
+                            ? ''
+                            : _schoolLocationController.text,
+                        'SchoolGrade': _schoolGradeController.text.isEmpty
+                            ? ''
+                            : _schoolGradeController.text,
+                        'BankName': _selectedBank ?? '',
+                        'bankType': _bankAccountTypeController.text.isEmpty
+                            ? ''
+                            : _bankAccountTypeController.text,
+                        'BankAccount': _bankAccountNumberController.text.isEmpty
+                            ? ''
+                            : _bankAccountNumberController.text,
+                        'BankCode': _bankBranchCodeController.text.isEmpty
+                            ? ''
+                            : _bankBranchCodeController.text,
+                        'profile_image': '',
+                        'signature': '',
+                        'synced': 0,
+                        'zkteco_right_template': '',
+                        'imagePath': '',
+                        'zkteco_left_template': '',
+                        'activity_statu': '',
+                        'witness_initials': '',
+                        'learner_initials': '',
+                        'witness_signature': '',
+                      };
+
+                      // Remove bank details if BankName is empty
+                      if (learnerData['BankName'] == '') {
+                        learnerData
+                          ..remove('bankType')
+                          ..remove('BankAccount')
+                          ..remove('BankCode');
+                      }
+
+                      print('Request body: ${json.encode(learnerData)}');
+
+                      final success =
+                          await _submitLearnerData(context, learnerData);
+                      if (success) {
+                        Navigator.pop(context, true);
+                      }
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -2202,7 +2393,9 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
   String? _validateIdNumber(String? value) {
     if (value == null || value.isEmpty) return 'ID number is required';
     if (value.length != 13) return 'SA ID must be exactly 13 digits';
-    if (!RegExp(r'^\d{13}$').hasMatch(value)) return 'ID number must contain only digits';
+    if (!RegExp(r'^\d{13}$').hasMatch(value)) {
+      return 'ID number must contain only digits';
+    }
 
     int year = int.parse(value.substring(0, 2));
     int month = int.parse(value.substring(2, 4));
@@ -2213,7 +2406,8 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
     if (day < 1 || day > 31) return 'Invalid day in ID number';
 
     List<int> daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    if (month == 2 && (fullYear % 4 == 0 && fullYear % 100 != 0 || fullYear % 400 == 0)) {
+    if (month == 2 &&
+        (fullYear % 4 == 0 && fullYear % 100 != 0 || fullYear % 400 == 0)) {
       daysInMonth[1] = 29;
     }
     if (day > daysInMonth[month - 1]) return 'Invalid date in ID number';
@@ -2236,7 +2430,9 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
     }
 
     int checkDigit = (10 - (sum % 10)) % 10;
-    if (checkDigit != int.parse(value[12])) return 'Invalid SA ID number checksum';
+    if (checkDigit != int.parse(value[12])) {
+      return 'Invalid SA ID number checksum';
+    }
 
     return null;
   }
@@ -2279,7 +2475,8 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
           }
 
           setState(() {
-            _dobController.text = '${fullYear.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
+            _dobController.text =
+                '${fullYear.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
             _ageController.text = age.toString();
           });
         } catch (e) {
@@ -2308,21 +2505,26 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
       // Separate learner data from bank data
       Map<String, dynamic> learnerOnlyData = Map.from(learnerData);
       Map<String, dynamic>? bankData;
-      
+
       // Clean file paths to save only filenames
-      learnerOnlyData['profile_image'] = _cleanFilePath(learnerOnlyData['profile_image']);
-      learnerOnlyData['signature'] = _cleanFilePath(learnerOnlyData['signature']);
-      learnerOnlyData['witness_signature'] = _cleanFilePath(learnerOnlyData['witness_signature']);
-      
+      learnerOnlyData['profile_image'] =
+          _cleanFilePath(learnerOnlyData['profile_image']);
+      learnerOnlyData['signature'] =
+          _cleanFilePath(learnerOnlyData['signature']);
+      learnerOnlyData['witness_signature'] =
+          _cleanFilePath(learnerOnlyData['witness_signature']);
+
       // Extract bank data if present
-      if (learnerOnlyData.containsKey('BankName') && learnerOnlyData['BankName'] != null && learnerOnlyData['BankName'].toString().isNotEmpty) {
+      if (learnerOnlyData.containsKey('BankName') &&
+          learnerOnlyData['BankName'] != null &&
+          learnerOnlyData['BankName'].toString().isNotEmpty) {
         bankData = {
           'BankName': learnerOnlyData['BankName'],
           'bankType': learnerOnlyData['bankType'] ?? '',
           'BankAccount': learnerOnlyData['BankAccount'] ?? '',
           'BankCode': learnerOnlyData['BankCode'] ?? '',
         };
-        
+
         // Remove bank fields from learner data
         learnerOnlyData.remove('BankName');
         learnerOnlyData.remove('bankType');
@@ -2332,14 +2534,14 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
 
       if (!isConnected) {
         // Offline: Save locally only with temporary ID
-        final id = await dbHelper.insertOrUpdateLearner(learnerOnlyData, bankData);
+        final id =
+            await dbHelper.insertOrUpdateLearner(learnerOnlyData, bankData);
         if (id > 0) {
           await dbHelper.syncBankDetails();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Learner saved to local database successfully!' +
-                    (bankData != null ? ' Bank details also saved. Will sync when online.' : ' Will sync when online.'),
+                'Learner saved to local database successfully!${bankData != null ? ' Bank details also saved. Will sync when online.' : ' Will sync when online.'}',
               ),
             ),
           );
@@ -2352,18 +2554,21 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
         }
       } else {
         // Online: Save to server first to get the server LearnerID
-        final serverResponse = await _sendToBackendAndGetLearnerID(context, learnerData);
-        
+        final serverResponse =
+            await _sendToBackendAndGetLearnerID(context, learnerData);
+
         if (serverResponse['success']) {
           // Save locally with the server's LearnerID
           final serverLearnerID = serverResponse['learnerID'];
           learnerOnlyData['LearnerID'] = serverLearnerID;
           learnerOnlyData['synced'] = 1; // Mark as synced since it's on server
-          
+
           try {
-            final localId = await dbHelper.insertOrUpdateLearner(learnerOnlyData, bankData);
-            print('Saved locally with server LearnerID: $serverLearnerID, local ID: $localId');
-            
+            final localId =
+                await dbHelper.insertOrUpdateLearner(learnerOnlyData, bankData);
+            print(
+                'Saved locally with server LearnerID: $serverLearnerID, local ID: $localId');
+
             if (bankData != null) {
               await dbHelper.syncBankDetails();
             }
@@ -2371,21 +2576,22 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
             print('Error saving locally: $localError');
             // Don't fail the whole operation if local save fails, since server succeeded
           }
-          
+
           return true;
         } else {
           // Server failed, save locally with temporary ID for later sync
           try {
-            final localId = await dbHelper.insertOrUpdateLearner(learnerOnlyData, bankData);
+            final localId =
+                await dbHelper.insertOrUpdateLearner(learnerOnlyData, bankData);
             print('Server failed, saved locally with temporary ID: $localId');
-            
+
             if (bankData != null) {
               await dbHelper.syncBankDetails();
             }
           } catch (localError) {
             print('Error saving locally after server failure: $localError');
           }
-          
+
           return false;
         }
       }
@@ -2469,16 +2675,19 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(responseData['message'] ?? 'Success')),
             );
-            
+
             // Return success status and server LearnerID
             return {
               'success': true,
-              'learnerID': responseData['LearnerID'] ?? responseData['learnerID'],
+              'learnerID':
+                  responseData['LearnerID'] ?? responseData['learnerID'],
               'message': responseData['message'] ?? 'Success'
             };
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(responseData['message'] ?? 'Failed to add learner')),
+              SnackBar(
+                  content:
+                      Text(responseData['message'] ?? 'Failed to add learner')),
             );
             return {
               'success': false,
@@ -2491,10 +2700,7 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
             SnackBar(
                 content: Text('Invalid server response: ${response.body}')),
           );
-          return {
-            'success': false,
-            'message': 'Invalid server response'
-          };
+          return {'success': false, 'message': 'Invalid server response'};
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2512,10 +2718,7 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Network error: $e')),
       );
-      return {
-        'success': false,
-        'message': 'Network error: $e'
-      };
+      return {'success': false, 'message': 'Network error: $e'};
     }
   }
 }
