@@ -10,10 +10,10 @@ class FinanceDashboard extends StatefulWidget {
   final String financeName;
 
   const FinanceDashboard({
-    Key? key,
+    super.key,
     required this.financeId,
     required this.financeName,
-  }) : super(key: key);
+  });
 
   @override
   _FinanceDashboardState createState() => _FinanceDashboardState();
@@ -55,7 +55,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data is List) {
           // Group classes by site
           Map<String, List<dynamic>> grouped = {};
@@ -66,7 +66,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
             }
             grouped[siteName]!.add(classData);
           }
-          
+
           setState(() {
             classes = data;
             classesBySite = grouped;
@@ -106,12 +106,13 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
     });
 
     try {
-      final url = AppConfig.buildUrl('search_learner_by_id.php?id_number=${Uri.encodeComponent(idNumber)}');
+      final url = AppConfig.buildUrl(
+          'search_learner_by_id.php?id_number=${Uri.encodeComponent(idNumber)}');
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         setState(() {
           isSearching = false;
           if (data['success'] == true && data['learners'] != null) {
@@ -135,9 +136,10 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
         searchResults = [];
         showSearchResults = true;
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Search error: $e'), backgroundColor: Colors.red),
+        SnackBar(
+            content: Text('Search error: $e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -201,9 +203,11 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.error_outline, size: 60, color: Colors.red),
+                            Icon(Icons.error_outline,
+                                size: 60, color: Colors.red),
                             SizedBox(height: 16),
-                            Text(errorMessage, style: TextStyle(color: Colors.red)),
+                            Text(errorMessage,
+                                style: TextStyle(color: Colors.red)),
                             SizedBox(height: 16),
                             ElevatedButton(
                               onPressed: fetchClasses,
@@ -219,7 +223,8 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.class_, size: 60, color: Colors.grey),
+                                    Icon(Icons.class_,
+                                        size: 60, color: Colors.grey),
                                     SizedBox(height: 16),
                                     Text('No classes found'),
                                   ],
@@ -231,9 +236,12 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                                   padding: EdgeInsets.all(16),
                                   itemCount: classesBySite.keys.length,
                                   itemBuilder: (context, index) {
-                                    final siteName = classesBySite.keys.elementAt(index);
-                                    final siteClasses = classesBySite[siteName]!;
-                                    return _buildSiteSection(siteName, siteClasses);
+                                    final siteName =
+                                        classesBySite.keys.elementAt(index);
+                                    final siteClasses =
+                                        classesBySite[siteName]!;
+                                    return _buildSiteSection(
+                                        siteName, siteClasses);
                                   },
                                 ),
                               ),
@@ -286,7 +294,8 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
               Expanded(
                 child: Text(
                   'Found ${searchResults.length} learner(s)',
-                  style: TextStyle(color: Colors.green[900], fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      color: Colors.green[900], fontWeight: FontWeight.bold),
                 ),
               ),
               TextButton(
@@ -316,7 +325,8 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
   }
 
   Widget _buildLearnerSearchCard(Map<String, dynamic> learner) {
-    final learnerName = '${learner['name'] ?? ''} ${learner['surname'] ?? ''}'.trim();
+    final learnerName =
+        '${learner['name'] ?? ''} ${learner['surname'] ?? ''}'.trim();
     final learnerId = learner['learner_id']?.toString() ?? '';
     final idNumber = learner['id_number']?.toString() ?? 'N/A';
     final className = learner['class_name']?.toString() ?? 'Unknown Class';
@@ -351,8 +361,12 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                   CircleAvatar(
                     backgroundColor: Colors.green[100],
                     child: Text(
-                      learnerName.isNotEmpty ? learnerName[0].toUpperCase() : 'L',
-                      style: TextStyle(color: Colors.green[700], fontWeight: FontWeight.bold),
+                      learnerName.isNotEmpty
+                          ? learnerName[0].toUpperCase()
+                          : 'L',
+                      style: TextStyle(
+                          color: Colors.green[700],
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
                   SizedBox(width: 12),
@@ -361,7 +375,9 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          learnerName.isNotEmpty ? learnerName : 'Unknown Learner',
+                          learnerName.isNotEmpty
+                              ? learnerName
+                              : 'Unknown Learner',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -461,7 +477,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
             ],
           ),
         ),
-        ...siteClasses.map((classData) => _buildClassCard(classData)).toList(),
+        ...siteClasses.map((classData) => _buildClassCard(classData)),
         SizedBox(height: 16),
       ],
     );

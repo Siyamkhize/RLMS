@@ -38,21 +38,23 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
   final TextEditingController _assessorNameController = TextEditingController();
   final TextEditingController _venueController = TextEditingController();
   DateTime _date = DateTime.now();
-  
+
   final DatabaseHelper _dbHelper = DatabaseHelper();
   bool _isLoading = false;
   String? _checklistType; // 'system', 'scanned', or null
   String? _scannedDocumentPath;
   bool _checklistExists = false;
   bool _hasCheckedStatus = false;
-  bool _isViewMode = false; // true when viewing existing form, false when editing
-  
+  bool _isViewMode =
+      false; // true when viewing existing form, false when editing
+
   // LogBook Unit Standards
   List<Map<String, dynamic>> _logbookUnitStandards = [];
-  Map<String, TextEditingController> _logbookMarksControllers = {};
+  final Map<String, TextEditingController> _logbookMarksControllers = {};
   bool _isLoadingLogbook = false;
   bool _isLogbookExpanded = false; // Main logbook section expansion
-  Map<String, bool> _unitStandardExpanded = {}; // Individual unit standard expansion
+  final Map<String, bool> _unitStandardExpanded =
+      {}; // Individual unit standard expansion
 
   // Signature controllers
   final SignatureController _learnerSignatureController = SignatureController(
@@ -72,7 +74,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
   @override
   void initState() {
     super.initState();
-    
+
     // Initialize items first
     _items = [
       {
@@ -86,13 +88,13 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
         'entries': [
           {
             'label':
-            'Cleans the pothole of all loose material, debris and water',
+                'Cleans the pothole of all loose material, debris and water',
             'value': true,
             'notes': ''
           },
           {
             'label':
-            'Setting out done correctly (marking, straightness, corners)',
+                'Setting out done correctly (marking, straightness, corners)',
             'value': true,
             'notes': ''
           },
@@ -136,7 +138,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
           },
           {
             'label':
-            'Final compacted surface is flush with surrounding road surfaces',
+                'Final compacted surface is flush with surrounding road surfaces',
             'value': true,
             'notes': ''
           },
@@ -149,7 +151,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
         ],
       },
     ];
-    
+
     // Now initialize other data
     final learnerFullName = [widget.learnerFirstName, widget.learnerLastName]
         .where((e) => (e ?? '').trim().isNotEmpty)
@@ -166,7 +168,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
 
     // Load existing checklist data if available
     _loadExistingChecklist();
-    
+
     // Load logbook unit standards
     _loadLogbookUnitStandards();
   }
@@ -203,23 +205,25 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
 
   Future<void> _loadExistingChecklist() async {
     if (widget.learnerId.isEmpty || widget.facilitatorId == null) {
-      print('DEBUG: Cannot load checklist - missing learner_id or facilitator_id');
+      print(
+          'DEBUG: Cannot load checklist - missing learner_id or facilitator_id');
       return;
     }
 
     try {
-      final url = '${AppConfig.baseUrl}/view_pothole_checklists.php?learner_id=${widget.learnerId}&assessor_id=${widget.facilitatorId}&assessment_date=${_date.toIso8601String().split('T').first}';
+      final url =
+          '${AppConfig.baseUrl}/view_pothole_checklists.php?learner_id=${widget.learnerId}&assessor_id=${widget.facilitatorId}&assessment_date=${_date.toIso8601String().split('T').first}';
       print('DEBUG: Loading checklist from: $url');
-      
+
       final response = await http.get(Uri.parse(url));
-      
+
       print('DEBUG: Response status: ${response.statusCode}');
       print('DEBUG: Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         print('DEBUG: Parsed data status: ${data['status']}');
-        
+
         if (data['status'] == 'success' && data['data'] != null) {
           final checklistData = data['data'];
           print('DEBUG: Checklist found! Loading data...');
@@ -230,7 +234,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
             _idNumberController.text = checklistData['learner_id_number'] ?? '';
             _assessorNameController.text = checklistData['assessor_name'] ?? '';
             _venueController.text = checklistData['venue'] ?? '';
-            
+
             // Mark that checklist exists
             _checklistExists = true;
             _checklistType = 'system';
@@ -243,29 +247,33 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
             // Load checklist items
             final itemsData = checklistData['checklist_items'] ?? {};
             print('DEBUG: Loading ${itemsData.length} sections');
-            
+
             for (var section in _items) {
               final sectionName = section['section'] as String;
               if (itemsData.containsKey(sectionName)) {
                 final sectionItems = itemsData[sectionName] as List;
                 for (int i = 0;
-                i < (section['entries'] as List).length &&
-                    i < sectionItems.length;
-                i++) {
+                    i < (section['entries'] as List).length &&
+                        i < sectionItems.length;
+                    i++) {
                   final item = sectionItems[i];
                   (section['entries'] as List)[i]['value'] =
-                  (item['value'] == 1 || item['value'] == true) ? true :
-                  ((item['value'] == 0 || item['value'] == false) ? false : true);
+                      (item['value'] == 1 || item['value'] == true)
+                          ? true
+                          : ((item['value'] == 0 || item['value'] == false)
+                              ? false
+                              : true);
                   (section['entries'] as List)[i]['notes'] =
                       item['notes'] ?? '';
                 }
               }
             }
           });
-          
+
           print('DEBUG: Checklist loaded successfully in view mode');
         } else {
-          print('DEBUG: No checklist found - ${data['message'] ?? 'Unknown error'}');
+          print(
+              'DEBUG: No checklist found - ${data['message'] ?? 'Unknown error'}');
         }
       } else {
         print('DEBUG: HTTP error - status code: ${response.statusCode}');
@@ -278,17 +286,17 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
   /// Check if checklist exists (system or scanned)
   Future<Map<String, dynamic>> _checkChecklistStatus() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final assessmentDate = _date.toIso8601String().split('T').first;
-      
+
       // Check local database for scanned document
       final scannedDoc = await _dbHelper.getScannedPotholeChecklist(
         learnerId: widget.learnerId,
         assessorId: widget.facilitatorId ?? '',
         assessmentDate: assessmentDate,
       );
-      
+
       if (scannedDoc != null) {
         setState(() => _isLoading = false);
         return {
@@ -297,13 +305,14 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
           'data': scannedDoc,
         };
       }
-      
+
       // Check server for system-generated checklist
       try {
-        final response = await http.get(Uri.parse(
-          '${AppConfig.baseUrl}/view_pothole_checklists.php?learner_id=${widget.learnerId}&assessor_id=${widget.facilitatorId}&assessment_date=$assessmentDate'
-        )).timeout(const Duration(seconds: 10));
-        
+        final response = await http
+            .get(Uri.parse(
+                '${AppConfig.baseUrl}/view_pothole_checklists.php?learner_id=${widget.learnerId}&assessor_id=${widget.facilitatorId}&assessment_date=$assessmentDate'))
+            .timeout(const Duration(seconds: 10));
+
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           if (data['status'] == 'success' && data['data'] != null) {
@@ -318,7 +327,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
       } catch (e) {
         print('Server check failed (offline?): $e');
       }
-      
+
       setState(() => _isLoading = false);
       return {
         'exists': false,
@@ -341,20 +350,21 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
     try {
       final docScanner = FlutterDocScanner();
       final scannedDoc = await docScanner.getScanDocuments();
-      
+
       if (scannedDoc != null && scannedDoc.isNotEmpty) {
         // Get the first scanned document
         final scannedPath = scannedDoc.first;
-        
+
         // Save to permanent location
         final appDir = await getApplicationDocumentsDirectory();
-        final fileName = 'pothole_checklist_${widget.learnerId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+        final fileName =
+            'pothole_checklist_${widget.learnerId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
         final permanentPath = '${appDir.path}/$fileName';
-        
+
         // Copy file to permanent location
         final file = File(scannedPath);
         await file.copy(permanentPath);
-        
+
         // Save to database
         final assessmentDate = _date.toIso8601String().split('T').first;
         await _dbHelper.saveScannedPotholeChecklist(
@@ -363,22 +373,23 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
           documentPath: permanentPath,
           assessmentDate: assessmentDate,
         );
-        
+
         setState(() {
           _checklistType = 'scanned';
           _scannedDocumentPath = permanentPath;
           _checklistExists = true;
           _hasCheckedStatus = true;
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Document scanned and saved successfully! Click "View Scanned Document" to open it.'),
+            content: Text(
+                'Document scanned and saved successfully! Click "View Scanned Document" to open it.'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 3),
           ),
         );
-        
+
         // Sync to server if online
         _syncScannedDocument(permanentPath, assessmentDate);
       }
@@ -388,34 +399,36 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
   }
 
   /// Sync scanned document to server
-  Future<void> _syncScannedDocument(String documentPath, String assessmentDate) async {
+  Future<void> _syncScannedDocument(
+      String documentPath, String assessmentDate) async {
     try {
       final file = File(documentPath);
       if (!await file.exists()) {
         print('File does not exist: $documentPath');
         return;
       }
-      
+
       final request = http.MultipartRequest(
         'POST',
         Uri.parse('${AppConfig.baseUrl}/upload_scanned_pothole_checklist.php'),
       );
-      
+
       request.fields['learner_id'] = widget.learnerId;
       request.fields['assessor_id'] = widget.facilitatorId ?? '';
       request.fields['assessment_date'] = assessmentDate;
-      
+
       request.files.add(await http.MultipartFile.fromPath(
         'document',
         documentPath,
       ));
-      
-      final response = await request.send().timeout(const Duration(seconds: 30));
-      
+
+      final response =
+          await request.send().timeout(const Duration(seconds: 30));
+
       if (response.statusCode == 200) {
         final responseData = await response.stream.bytesToString();
         final data = jsonDecode(responseData);
-        
+
         if (data['status'] == 'success') {
           print('Scanned document synced successfully');
           // Mark as synced in local database
@@ -425,7 +438,8 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
             assessmentDate: assessmentDate,
           );
           if (scannedDoc != null) {
-            await _dbHelper.markScannedChecklistAsSynced(scannedDoc['id'] as int);
+            await _dbHelper
+                .markScannedChecklistAsSynced(scannedDoc['id'] as int);
           }
         }
       }
@@ -454,7 +468,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
     if (!_hasCheckedStatus) {
       return 'Open Checklist';
     }
-    
+
     if (_checklistExists) {
       if (_checklistType == 'scanned') {
         return 'View Scanned Document';
@@ -462,7 +476,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
         return 'View Checklist';
       }
     }
-    
+
     return 'Create Checklist';
   }
 
@@ -471,7 +485,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
     if (!_hasCheckedStatus) {
       return Icons.folder_open;
     }
-    
+
     if (_checklistExists) {
       if (_checklistType == 'scanned') {
         return Icons.picture_as_pdf;
@@ -479,7 +493,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
         return Icons.visibility;
       }
     }
-    
+
     return Icons.add_circle_outline;
   }
 
@@ -488,11 +502,11 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
     if (!_hasCheckedStatus) {
       return Colors.orange;
     }
-    
+
     if (_checklistExists) {
       return Colors.blue;
     }
-    
+
     return Colors.green;
   }
 
@@ -503,7 +517,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
       await _checkAndUpdateStatus();
       return;
     }
-    
+
     // If checklist exists - view it
     if (_checklistExists) {
       if (_checklistType == 'scanned') {
@@ -519,7 +533,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
       }
       return;
     }
-    
+
     // No checklist exists - show creation options
     _showCreationOptionsDialog();
   }
@@ -527,9 +541,9 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
   /// Check checklist status and update button state
   Future<void> _checkAndUpdateStatus() async {
     final status = await _checkChecklistStatus();
-    
+
     if (!mounted) return;
-    
+
     setState(() {
       _hasCheckedStatus = true;
       _checklistExists = status['exists'] == true;
@@ -538,7 +552,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
         _scannedDocumentPath = status['data']['document_path'] as String?;
       }
     });
-    
+
     // Show feedback
     if (_checklistExists) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -557,7 +571,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
         const SnackBar(
           content: Text('No checklist found. Click again to create one.'),
           backgroundColor: Colors.orange,
-          duration: const Duration(seconds: 2),
+          duration: Duration(seconds: 2),
         ),
       );
     }
@@ -612,9 +626,9 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
   /// Show checklist options dialog
   Future<void> _showChecklistOptionsDialog() async {
     final status = await _checkChecklistStatus();
-    
+
     if (!mounted) return;
-    
+
     if (status['exists'] == true) {
       // Checklist exists - show view option
       final type = status['type'];
@@ -739,9 +753,9 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
       // Get signature data - using simple approach for now
       // Note: Full signature support can be implemented with proper package methods
       final learnerSignatureData =
-      _learnerSignatureController.isEmpty ? null : 'signature_present';
+          _learnerSignatureController.isEmpty ? null : 'signature_present';
       final assessorSignatureData =
-      _assessorSignatureController.isEmpty ? null : 'signature_present';
+          _assessorSignatureController.isEmpty ? null : 'signature_present';
 
       final payload = {
         'learner_id': widget.learnerId,
@@ -771,10 +785,10 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
             _checklistExists = true;
             _hasCheckedStatus = true;
           });
-          
+
           // Also save logbook marks
           await _saveLogbookMarks();
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(data['message']),
@@ -785,7 +799,8 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
           throw Exception(data['message']);
         }
       } else {
-        throw Exception('Server error: ${response.statusCode} - ${response.body}');
+        throw Exception(
+            'Server error: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       _showError('Error saving checklist: $e');
@@ -795,26 +810,27 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
   /// Load LogBook Unit Standards for this learner
   Future<void> _loadLogbookUnitStandards() async {
     if (widget.learnerId.isEmpty) return;
-    
+
     setState(() => _isLoadingLogbook = true);
-    
+
     try {
       final response = await http.get(Uri.parse(
-        '${AppConfig.baseUrl}/get_logbook_unit_standards.php?learner_id=${widget.learnerId}'
-      ));
-      
+          '${AppConfig.baseUrl}/get_logbook_unit_standards.php?learner_id=${widget.learnerId}'));
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == 'success') {
           setState(() {
-            _logbookUnitStandards = List<Map<String, dynamic>>.from(data['data'] ?? []);
-            
+            _logbookUnitStandards =
+                List<Map<String, dynamic>>.from(data['data'] ?? []);
+
             // Create controllers for each unit standard
             for (var us in _logbookUnitStandards) {
-              _logbookMarksControllers[us['unit_standard_id'].toString()] = TextEditingController();
+              _logbookMarksControllers[us['unit_standard_id'].toString()] =
+                  TextEditingController();
             }
           });
-          
+
           // Load existing marks if checklist exists
           if (_checklistExists) {
             await _loadLogbookMarks();
@@ -831,24 +847,24 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
   /// Load existing LogBook marks
   Future<void> _loadLogbookMarks() async {
     if (widget.learnerId.isEmpty || widget.facilitatorId == null) return;
-    
+
     try {
       final assessmentDate = _date.toIso8601String().split('T').first;
       final assessorId = widget.facilitatorId ?? '';
-      
+
       final response = await http.get(Uri.parse(
-        '${AppConfig.baseUrl}/get_logbook_marks.php?learner_id=${widget.learnerId}&assessor_id=$assessorId&assessment_date=$assessmentDate'
-      ));
-      
+          '${AppConfig.baseUrl}/get_logbook_marks.php?learner_id=${widget.learnerId}&assessor_id=$assessorId&assessment_date=$assessmentDate'));
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == 'success') {
           final marks = data['data'] as Map<String, dynamic>;
-          
+
           setState(() {
             marks.forEach((unitStandardId, mark) {
               if (_logbookMarksControllers.containsKey(unitStandardId)) {
-                _logbookMarksControllers[unitStandardId]!.text = mark.toString();
+                _logbookMarksControllers[unitStandardId]!.text =
+                    mark.toString();
               }
             });
           });
@@ -862,33 +878,33 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
   /// Save LogBook marks
   Future<void> _saveLogbookMarks() async {
     if (_logbookUnitStandards.isEmpty) return;
-    
+
     // Validate and collect marks
     List<Map<String, dynamic>> unitStandardsMarks = [];
-    
+
     for (var us in _logbookUnitStandards) {
-      final controller = _logbookMarksControllers[us['unit_standard_id'].toString()];
+      final controller =
+          _logbookMarksControllers[us['unit_standard_id'].toString()];
       if (controller != null && controller.text.isNotEmpty) {
         final marks = int.tryParse(controller.text);
         if (marks == null || marks < 0 || marks > 50) {
-          _showError('Marks for ${us['unit_standard_name']} must be between 0 and 50');
+          _showError(
+              'Marks for ${us['unit_standard_name']} must be between 0 and 50');
           return;
         }
-        unitStandardsMarks.add({
-          'unit_standard_id': us['unit_standard_id'],
-          'marks': marks
-        });
+        unitStandardsMarks
+            .add({'unit_standard_id': us['unit_standard_id'], 'marks': marks});
       }
     }
-    
+
     if (unitStandardsMarks.isEmpty) {
       return; // No marks to save
     }
-    
+
     try {
       final assessmentDate = _date.toIso8601String().split('T').first;
       final assessorId = widget.facilitatorId ?? '';
-      
+
       final response = await http.post(
         Uri.parse('${AppConfig.baseUrl}/save_logbook_marks.php'),
         headers: {'Content-Type': 'application/json'},
@@ -899,7 +915,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
           'unit_standards_marks': unitStandardsMarks
         }),
       );
-      
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == 'success') {
@@ -937,7 +953,8 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bool hasFacilitator = widget.facilitatorId != null && widget.facilitatorId!.isNotEmpty;
+    final bool hasFacilitator =
+        widget.facilitatorId != null && widget.facilitatorId!.isNotEmpty;
     final bool hasClass = widget.classId != null && widget.classId!.isNotEmpty;
 
     return Scaffold(
@@ -978,7 +995,8 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.visibility, color: Colors.blue.shade700, size: 20),
+                            Icon(Icons.visibility,
+                                color: Colors.blue.shade700, size: 20),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -1038,8 +1056,9 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
                                     firstDate: DateTime(2020),
                                     lastDate: DateTime(2035),
                                   );
-                                  if (picked != null)
+                                  if (picked != null) {
                                     setState(() => _date = picked);
+                                  }
                                 },
                                 child: InputDecorator(
                                   decoration: const InputDecoration(
@@ -1061,7 +1080,8 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
                                   border: OutlineInputBorder(),
                                   prefixIcon: Icon(Icons.location_on),
                                 ),
-                                readOnly: hasClass,  // Editable if no class provided
+                                readOnly:
+                                    hasClass, // Editable if no class provided
                               ),
                             ),
                           ],
@@ -1135,7 +1155,8 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
                               border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.person),
                             ),
-                            readOnly: hasFacilitator,  // Editable if no facilitator provided
+                            readOnly:
+                                hasFacilitator, // Editable if no facilitator provided
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -1162,7 +1183,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
                               prefixIcon: Icon(Icons.calendar_today),
                             ),
                             child:
-                            Text(_date.toIso8601String().split('T').first),
+                                Text(_date.toIso8601String().split('T').first),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -1290,7 +1311,8 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
             absorbing: _isViewMode,
             child: Signature(
               controller: controller,
-              backgroundColor: _isViewMode ? Colors.grey.shade100 : Colors.white,
+              backgroundColor:
+                  _isViewMode ? Colors.grey.shade100 : Colors.white,
             ),
           ),
         ),
@@ -1307,7 +1329,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
                   foregroundColor: Colors.red,
                 ),
               ),
-            if (!controller.isEmpty)
+            if (controller.isNotEmpty)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -1362,7 +1384,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children:
-              List<Widget>.from((section['entries'] as List).map((entry) {
+                  List<Widget>.from((section['entries'] as List).map((entry) {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 16),
                   padding: const EdgeInsets.all(12),
@@ -1387,7 +1409,8 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
                           Expanded(
                             child: RadioListTile<bool?>(
                               dense: false,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 8.0),
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 8.0),
                               title: const Text(
                                 'YES',
                                 style: TextStyle(fontWeight: FontWeight.w500),
@@ -1395,15 +1418,17 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
                               controlAffinity: ListTileControlAffinity.leading,
                               value: true,
                               groupValue: entry['value'] as bool?,
-                              onChanged: _isViewMode ? null : (v) =>
-                                  setState(() => entry['value'] = v),
+                              onChanged: _isViewMode
+                                  ? null
+                                  : (v) => setState(() => entry['value'] = v),
                               activeColor: Colors.green,
                             ),
                           ),
                           Expanded(
                             child: RadioListTile<bool?>(
                               dense: false,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 8.0),
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 8.0),
                               title: const Text(
                                 'NO',
                                 style: TextStyle(fontWeight: FontWeight.w500),
@@ -1411,8 +1436,9 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
                               controlAffinity: ListTileControlAffinity.leading,
                               value: false,
                               groupValue: entry['value'] as bool?,
-                              onChanged: _isViewMode ? null : (v) =>
-                                  setState(() => entry['value'] = v),
+                              onChanged: _isViewMode
+                                  ? null
+                                  : (v) => setState(() => entry['value'] = v),
                               activeColor: Colors.red,
                             ),
                           ),
@@ -1421,7 +1447,8 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
                       const SizedBox(height: 12),
                       TextFormField(
                         initialValue: entry['notes '] as String? ?? '',
-                        onChanged: _isViewMode ? null : (t) => entry['notes'] = t,
+                        onChanged:
+                            _isViewMode ? null : (t) => entry['notes'] = t,
                         readOnly: _isViewMode,
                         decoration: const InputDecoration(
                           labelText: 'Notes & observations by assessor',
@@ -1447,7 +1474,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
     if (_logbookUnitStandards.isEmpty) {
       return const SizedBox.shrink();
     }
-    
+
     return Card(
       elevation: 2,
       color: Colors.orange.shade50,
@@ -1477,7 +1504,9 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
                     ),
                   ),
                   Icon(
-                    _isLogbookExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    _isLogbookExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
                     color: Colors.orange.shade700,
                     size: 28,
                   ),
@@ -1485,7 +1514,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
               ),
             ),
           ),
-          
+
           // Expandable Content
           if (_isLogbookExpanded) ...[
             const Divider(height: 1),
@@ -1498,7 +1527,9 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
               Padding(
                 padding: const EdgeInsets.all(8),
                 child: Column(
-                  children: _logbookUnitStandards.map((us) => _buildUnitStandardCard(us)).toList(),
+                  children: _logbookUnitStandards
+                      .map((us) => _buildUnitStandardCard(us))
+                      .toList(),
                 ),
               ),
           ],
@@ -1512,22 +1543,24 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
     final unitStandardId = unitStandard['unit_standard_id'].toString();
     final controller = _logbookMarksControllers[unitStandardId];
     final isExpanded = _unitStandardExpanded[unitStandardId] ?? false;
-    
+
     // Parse specific outcomes - handle both List and null
     List<dynamic> specificOutcomes = [];
-    if (unitStandard.containsKey('specific_outcomes') && unitStandard['specific_outcomes'] != null) {
+    if (unitStandard.containsKey('specific_outcomes') &&
+        unitStandard['specific_outcomes'] != null) {
       final outcomes = unitStandard['specific_outcomes'];
       if (outcomes is List) {
         specificOutcomes = outcomes;
       }
     }
-    
+
     // Debug print
-    print('Unit Standard: $unitStandardId, Outcomes count: ${specificOutcomes.length}');
+    print(
+        'Unit Standard: $unitStandardId, Outcomes count: ${specificOutcomes.length}');
     if (specificOutcomes.isNotEmpty) {
       print('First outcome: ${specificOutcomes[0]}');
     }
-    
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       elevation: 1,
@@ -1556,7 +1589,9 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
                     ),
                   ),
                   Icon(
-                    isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    isExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
                     color: Colors.grey.shade600,
                     size: 24,
                   ),
@@ -1564,7 +1599,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
               ),
             ),
           ),
-          
+
           // Expandable Content
           if (isExpanded) ...[
             const Divider(height: 1),
@@ -1579,7 +1614,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
                     style: const TextStyle(color: Colors.red, fontSize: 12),
                   ),
                   const SizedBox(height: 8),
-                  
+
                   // Specific Outcomes (if any)
                   if (specificOutcomes.isNotEmpty) ...[
                     Container(
@@ -1602,30 +1637,35 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
                           ),
                           const SizedBox(height: 8),
                           ...specificOutcomes.map((outcome) {
-                            final outcomeText = outcome['outcome_text']?.toString() ?? '';
+                            final outcomeText =
+                                outcome['outcome_text']?.toString() ?? '';
                             print('Rendering outcome: $outcomeText');
-                            
+
                             if (outcomeText.isEmpty) {
                               print('Empty outcome text, skipping');
                               return const SizedBox.shrink();
                             }
-                            
+
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 8),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('• ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                  const Text('• ',
+                                      style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold)),
                                   Expanded(
                                     child: Text(
                                       outcomeText,
-                                      style: const TextStyle(fontSize: 14, height: 1.4),
+                                      style: const TextStyle(
+                                          fontSize: 14, height: 1.4),
                                     ),
                                   ),
                                 ],
                               ),
                             );
-                          }).toList(),
+                          }),
                         ],
                       ),
                     ),
@@ -1637,7 +1677,7 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
                     ),
                     const SizedBox(height: 8),
                   ],
-                  
+
                   // Marks Input
                   Row(
                     children: [
@@ -1650,7 +1690,8 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
                             labelText: 'Mark (0-50)',
                             border: OutlineInputBorder(),
                             hintText: 'Enter mark out of 50',
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 16),
                           ),
                           keyboardType: TextInputType.number,
                           readOnly: _isViewMode,

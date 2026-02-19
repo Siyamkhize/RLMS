@@ -4,17 +4,14 @@ import 'dart:convert';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
-import 'DetailsPage.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'dart:math';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config.dart';
 
 class ModeratorPage extends StatefulWidget {
   final String facilitator_id;
 
-  const ModeratorPage({Key? key, required this.facilitator_id}) : super(key: key);
+  const ModeratorPage({super.key, required this.facilitator_id});
 
   @override
   _ModeratorPageState createState() => _ModeratorPageState();
@@ -30,10 +27,11 @@ class _ModeratorPageState extends State<ModeratorPage> {
     _classes = fetchClasses(widget.facilitator_id);
   }
 
-  Future<List<dynamic>> fetchClasses(String facilitator_id) async {
+  Future<List<dynamic>> fetchClasses(String facilitatorId) async {
     try {
       final response = await http.get(
-        Uri.parse(AppConfig.buildUrl('get_classes.php?facilitator_id=$facilitator_id')),
+        Uri.parse(AppConfig.buildUrl(
+            'get_classes.php?facilitator_id=$facilitatorId')),
       );
 
       print('Response Body (get_classes): ${response.body}');
@@ -41,7 +39,8 @@ class _ModeratorPageState extends State<ModeratorPage> {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception('Failed to load classes. Server error: ${response.statusCode}');
+        throw Exception(
+            'Failed to load classes. Server error: ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to load classes. Error: $e');
@@ -63,7 +62,8 @@ class _ModeratorPageState extends State<ModeratorPage> {
       case 2:
         return ModerationReportPage(facilitatorId: widget.facilitator_id);
       case 3:
-        return ModeratorPotholeChecklistPage(facilitatorId: widget.facilitator_id);
+        return ModeratorPotholeChecklistPage(
+            facilitatorId: widget.facilitator_id);
       case 4:
         return ModerationSamplingPage(facilitatorId: widget.facilitator_id);
       default:
@@ -112,7 +112,8 @@ class _ModeratorPageState extends State<ModeratorPage> {
                         String projectId = classData['project_id'].toString();
                         String classId = classData['classID'].toString();
                         String className = classData['className'] ?? 'Unknown';
-                        String numberOfLearners = classData['numberOfLearners'].toString();
+                        String numberOfLearners =
+                            classData['numberOfLearners'].toString();
                         String siteId = classData['siteID'].toString();
 
                         return DataRow(cells: [
@@ -127,7 +128,9 @@ class _ModeratorPageState extends State<ModeratorPage> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => ClassDetailsPage(classId: classId, moderatorId: widget.facilitator_id),
+                                    builder: (context) => ClassDetailsPage(
+                                        classId: classId,
+                                        moderatorId: widget.facilitator_id),
                                   ),
                                 );
                               },
@@ -223,7 +226,8 @@ class ClassDetailsPage extends StatefulWidget {
   final String classId;
   final String moderatorId;
 
-  const ClassDetailsPage({required this.classId, required this.moderatorId, Key? key}) : super(key: key);
+  const ClassDetailsPage(
+      {required this.classId, required this.moderatorId, super.key});
 
   @override
   _ClassDetailsPageState createState() => _ClassDetailsPageState();
@@ -249,7 +253,8 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception('Failed to load learners. Server error: ${response.statusCode}');
+        throw Exception(
+            'Failed to load learners. Server error: ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to load learners. Error: $e');
@@ -335,13 +340,13 @@ class ModeratorMarkingPage extends StatelessWidget {
   final String moderatorId;
 
   const ModeratorMarkingPage({
-    Key? key,
+    super.key,
     required this.learnerId,
     this.learnerFirstName,
     this.learnerLastName,
     this.learnerIdNumber,
     required this.moderatorId,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -375,7 +380,7 @@ class ModeratorMarkingPage extends StatelessWidget {
 class LearnerInformationTab extends StatelessWidget {
   final String learnerId;
 
-  const LearnerInformationTab({Key? key, required this.learnerId}) : super(key: key);
+  const LearnerInformationTab({super.key, required this.learnerId});
 
   @override
   Widget build(BuildContext context) {
@@ -393,7 +398,8 @@ class ModeratorPOETab extends StatefulWidget {
   final String learnerId;
   final String moderatorId;
 
-  const ModeratorPOETab({Key? key, required this.learnerId, required this.moderatorId}) : super(key: key);
+  const ModeratorPOETab(
+      {super.key, required this.learnerId, required this.moderatorId});
 
   @override
   _ModeratorPOETabState createState() => _ModeratorPOETabState();
@@ -401,8 +407,9 @@ class ModeratorPOETab extends StatefulWidget {
 
 class _ModeratorPOETabState extends State<ModeratorPOETab> {
   late Future<Map<String, dynamic>> _poeData;
-  final TextEditingController _potholeCommentController = TextEditingController();
-  
+  final TextEditingController _potholeCommentController =
+      TextEditingController();
+
   // Pothole evidence images
   List<Map<String, dynamic>> _potholeImages = [];
   bool _isLoadingImages = false;
@@ -413,24 +420,26 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
     _poeData = fetchPOE(widget.learnerId);
     _loadPotholeImages();
   }
-  
+
   Future<void> _loadPotholeImages() async {
     setState(() => _isLoadingImages = true);
-    
+
     try {
-      final url = '${AppConfig.baseUrl}/get_pothole_images.php?learner_id=${widget.learnerId}';
+      final url =
+          '${AppConfig.baseUrl}/get_pothole_images.php?learner_id=${widget.learnerId}';
       print('DEBUG Images: Loading from $url');
-      
+
       final response = await http.get(Uri.parse(url));
-      
+
       print('DEBUG Images: Response status ${response.statusCode}');
       print('DEBUG Images: Response body ${response.body}');
-      
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == 'success') {
           setState(() {
-            _potholeImages = List<Map<String, dynamic>>.from(data['data'] ?? []);
+            _potholeImages =
+                List<Map<String, dynamic>>.from(data['data'] ?? []);
           });
           print('DEBUG Images: Loaded ${_potholeImages.length} images');
         } else {
@@ -455,7 +464,7 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
       final url = AppConfig.buildUrl('get_poe.php', queryParams: {
         'learnerId': learnerId,
       });
-      
+
       print('[ModeratorPOETab] Fetching POE from: $url');
       final response = await http.get(Uri.parse(url));
 
@@ -465,7 +474,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception('Failed to load POE data. Server error: ${response.statusCode}');
+        throw Exception(
+            'Failed to load POE data. Server error: ${response.statusCode}');
       }
     } catch (e) {
       print('[ModeratorPOETab] Error fetching POE: $e');
@@ -500,7 +510,7 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               ),
             ),
-            
+
             // Build pathway/qualification/unit standard structure
             ...pathways.entries.map((entry) {
               return Card(
@@ -512,14 +522,14 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                   children: _buildQualificationTiles(entry.value),
                 ),
               );
-            }).toList(),
-            
+            }),
+
             // LogBook Section
             _buildLogBookSection(poeData),
-            
+
             // Pothole Checklist Section
             _buildPotholeChecklistSection(),
-            
+
             // Pothole Evidence Images Section
             _buildPotholeImagesSection(),
           ],
@@ -540,7 +550,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
   }
 
   List<Widget> _buildUnitStandardTiles(Map<String, dynamic> qualificationData) {
-    Map<String, dynamic> unitStandards = qualificationData['unitstandards'] ?? {};
+    Map<String, dynamic> unitStandards =
+        qualificationData['unitstandards'] ?? {};
 
     return unitStandards.entries.map((usEntry) {
       return ExpansionTile(
@@ -550,7 +561,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
     }).toList();
   }
 
-  List<Widget> _buildAssessmentTypeTiles(Map<String, dynamic> unitStandardData) {
+  List<Widget> _buildAssessmentTypeTiles(
+      Map<String, dynamic> unitStandardData) {
     List<dynamic> summative = unitStandardData['summative'] ?? [];
     List<dynamic> formative = unitStandardData['formative'] ?? [];
 
@@ -558,11 +570,13 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
 
     // Formative Assessments
     if (formative.isNotEmpty) {
-      TextEditingController moderatorCommentController = TextEditingController();
-      String existingModeratorComment = formative.first['moderator_comment'] ?? '';
+      TextEditingController moderatorCommentController =
+          TextEditingController();
+      String existingModeratorComment =
+          formative.first['moderator_comment'] ?? '';
       String existingAssessorComment = formative.first['a_comment'] ?? '';
       moderatorCommentController.text = existingModeratorComment;
-      
+
       assessmentTiles.add(
         ExpansionTile(
           title: const Text('Formative'),
@@ -607,7 +621,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
               child: Divider(),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -630,9 +645,10 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                     decoration: InputDecoration(
                       labelText: 'Comment',
                       border: const OutlineInputBorder(),
-                      hintText: 'Enter your moderation comments for all formative questions',
-                      helperText: existingModeratorComment.isNotEmpty 
-                          ? 'Editing existing comment' 
+                      hintText:
+                          'Enter your moderation comments for all formative questions',
+                      helperText: existingModeratorComment.isNotEmpty
+                          ? 'Editing existing comment'
                           : null,
                     ),
                     maxLines: 4,
@@ -649,7 +665,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                         );
                       },
                       icon: const Icon(Icons.save),
-                      label: const Text('Update Comment for All Formative Questions'),
+                      label: const Text(
+                          'Update Comment for All Formative Questions'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
                         foregroundColor: Colors.white,
@@ -667,11 +684,13 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
 
     // Summative Assessments
     if (summative.isNotEmpty) {
-      TextEditingController moderatorCommentController = TextEditingController();
-      String existingModeratorComment = summative.first['moderator_comment'] ?? '';
+      TextEditingController moderatorCommentController =
+          TextEditingController();
+      String existingModeratorComment =
+          summative.first['moderator_comment'] ?? '';
       String existingAssessorComment = summative.first['a_comment'] ?? '';
       moderatorCommentController.text = existingModeratorComment;
-      
+
       assessmentTiles.add(
         ExpansionTile(
           title: const Text('Summative'),
@@ -716,7 +735,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
               child: Divider(),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -739,9 +759,10 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                     decoration: InputDecoration(
                       labelText: 'Comment',
                       border: const OutlineInputBorder(),
-                      hintText: 'Enter your moderation comments for all summative questions',
-                      helperText: existingModeratorComment.isNotEmpty 
-                          ? 'Editing existing comment' 
+                      hintText:
+                          'Enter your moderation comments for all summative questions',
+                      helperText: existingModeratorComment.isNotEmpty
+                          ? 'Editing existing comment'
                           : null,
                     ),
                     maxLines: 4,
@@ -758,7 +779,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                         );
                       },
                       icon: const Icon(Icons.save),
-                      label: const Text('Update Comment for All Summative Questions'),
+                      label: const Text(
+                          'Update Comment for All Summative Questions'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
                         foregroundColor: Colors.white,
@@ -798,16 +820,18 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
         });
       });
     });
-    
+
     // Also add logbook marks from the logbook_marks array (includes pothole checklist)
     List<dynamic> logbookMarks = poeData['logbook_marks'] ?? [];
     for (var mark in logbookMarks) {
       String unitStandardId = mark['unit_standard_id'] ?? '';
-      String unitStandardName = mark['unit_standard_name'] ?? 'Unit Standard $unitStandardId';
-      
+      String unitStandardName =
+          mark['unit_standard_name'] ?? 'Unit Standard $unitStandardId';
+
       // Check if this is pothole checklist (unit standards 13958 or 14555)
-      bool isPotholeChecklist = unitStandardId == '13958' || unitStandardId == '14555';
-      
+      bool isPotholeChecklist =
+          unitStandardId == '13958' || unitStandardId == '14555';
+
       allLogbookItems.add({
         'unitStandardName': unitStandardName,
         'unitStandardId': unitStandardId,
@@ -815,7 +839,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
         'logbookItems': [
           {
             'id': unitStandardId,
-            'exercise_name': isPotholeChecklist ? 'Pothole Checklist' : unitStandardName,
+            'exercise_name':
+                isPotholeChecklist ? 'Pothole Checklist' : unitStandardName,
             'marks_scored': mark['marks'],
             'total_marks': isPotholeChecklist ? 50 : 100,
             'moderator_status': mark['moderator_status'] ?? '',
@@ -842,15 +867,16 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
         leading: const Icon(Icons.book, color: Colors.blue),
         children: allLogbookItems.map((item) {
           List<dynamic> logbookItems = item['logbookItems'];
-          TextEditingController moderatorCommentController = TextEditingController();
-          String existingModeratorComment = logbookItems.isNotEmpty 
-              ? (logbookItems.first['moderator_comment'] ?? '') 
+          TextEditingController moderatorCommentController =
+              TextEditingController();
+          String existingModeratorComment = logbookItems.isNotEmpty
+              ? (logbookItems.first['moderator_comment'] ?? '')
               : '';
-          String existingAssessorComment = logbookItems.isNotEmpty 
-              ? (logbookItems.first['a_comment'] ?? '') 
+          String existingAssessorComment = logbookItems.isNotEmpty
+              ? (logbookItems.first['a_comment'] ?? '')
               : '';
           moderatorCommentController.text = existingModeratorComment;
-          
+
           return ExpansionTile(
             title: Text(item['unitStandardName']),
             children: [
@@ -894,7 +920,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                 child: Divider(),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -912,8 +939,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                         labelText: 'Comment',
                         border: const OutlineInputBorder(),
                         hintText: 'Enter your moderation comments for logbook',
-                        helperText: existingModeratorComment.isNotEmpty 
-                            ? 'Editing existing comment' 
+                        helperText: existingModeratorComment.isNotEmpty
+                            ? 'Editing existing comment'
                             : null,
                       ),
                       maxLines: 3,
@@ -927,12 +954,16 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                               labelText: 'Moderation Decision',
                               border: OutlineInputBorder(),
                             ),
-                            value: existingModeratorComment.isNotEmpty && logbookItems.first['moderator_status'] != null 
-                                ? logbookItems.first['moderator_status'] 
+                            value: existingModeratorComment.isNotEmpty &&
+                                    logbookItems.first['moderator_status'] !=
+                                        null
+                                ? logbookItems.first['moderator_status']
                                 : null,
                             items: const [
-                              DropdownMenuItem(value: 'upheld', child: Text('Uphold')),
-                              DropdownMenuItem(value: 'withdrawn', child: Text('Withdraw')),
+                              DropdownMenuItem(
+                                  value: 'upheld', child: Text('Uphold')),
+                              DropdownMenuItem(
+                                  value: 'withdrawn', child: Text('Withdraw')),
                             ],
                             onChanged: (value) {
                               if (value != null) {
@@ -1013,7 +1044,7 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
 
         // Get unit standards array (new format)
         List<dynamic> unitStandards = data?['unit_standards'] ?? [];
-        
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -1029,13 +1060,13 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                     ? 'Scanned Document'
                     : 'System Generated Form',
               ),
-              subtitle: unitStandards.isNotEmpty 
+              subtitle: unitStandards.isNotEmpty
                   ? Text('${unitStandards.length} Unit Standard(s) marked')
                   : const Text('Tap to view'),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () => _viewPotholeChecklist(checklistType!, data),
             ),
-            
+
             // Display each unit standard separately with individual moderation
             if (unitStandards.isNotEmpty)
               ...unitStandards.map((us) {
@@ -1045,9 +1076,10 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                 String moderatorComment = us['moderator_comment'] ?? '';
                 String assessorComment = us['assessor_comment'] ?? '';
                 String recordId = us['id']?.toString() ?? '';
-                
+
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0, vertical: 8.0),
                   child: Card(
                     elevation: 2,
                     child: Padding(
@@ -1058,7 +1090,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                           // Unit Standard Header
                           Row(
                             children: [
-                              const Icon(Icons.assignment, color: Colors.blue, size: 20),
+                              const Icon(Icons.assignment,
+                                  color: Colors.blue, size: 20),
                               const SizedBox(width: 8),
                               Text(
                                 'Unit Standard: $unitId',
@@ -1070,13 +1103,13 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          
+
                           // Marks
                           Text(
                             'Marks: $marks / 50',
                             style: const TextStyle(fontSize: 14),
                           ),
-                          
+
                           // Assessor Comment
                           if (assessorComment.isNotEmpty) ...[
                             const SizedBox(height: 8),
@@ -1092,7 +1125,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                                 children: [
                                   const Row(
                                     children: [
-                                      Icon(Icons.comment, color: Colors.blue, size: 16),
+                                      Icon(Icons.comment,
+                                          color: Colors.blue, size: 16),
                                       SizedBox(width: 4),
                                       Text(
                                         'Assessor Comment:',
@@ -1104,12 +1138,13 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                                     ],
                                   ),
                                   const SizedBox(height: 4),
-                                  Text(assessorComment, style: const TextStyle(fontSize: 12)),
+                                  Text(assessorComment,
+                                      style: const TextStyle(fontSize: 12)),
                                 ],
                               ),
                             ),
                           ],
-                          
+
                           // Individual Moderation Decision for this Unit Standard
                           const SizedBox(height: 12),
                           const Text(
@@ -1128,11 +1163,15 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                               decoration: const InputDecoration(
                                 labelText: 'Moderation Decision',
                                 border: OutlineInputBorder(),
-                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
                               ),
                               items: const [
-                                DropdownMenuItem(value: 'upheld', child: Text('Uphold')),
-                                DropdownMenuItem(value: 'withdrawn', child: Text('Withdraw')),
+                                DropdownMenuItem(
+                                    value: 'upheld', child: Text('Uphold')),
+                                DropdownMenuItem(
+                                    value: 'withdrawn',
+                                    child: Text('Withdraw')),
                               ],
                               onChanged: (value) {
                                 if (value != null) {
@@ -1150,24 +1189,26 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                             Container(
                               padding: const EdgeInsets.all(12.0),
                               decoration: BoxDecoration(
-                                color: moderatorStatus.toLowerCase() == 'upheld' 
-                                    ? Colors.green.shade50 
+                                color: moderatorStatus.toLowerCase() == 'upheld'
+                                    ? Colors.green.shade50
                                     : Colors.red.shade50,
                                 border: Border.all(
-                                  color: moderatorStatus.toLowerCase() == 'upheld' 
-                                      ? Colors.green 
-                                      : Colors.red,
+                                  color:
+                                      moderatorStatus.toLowerCase() == 'upheld'
+                                          ? Colors.green
+                                          : Colors.red,
                                 ),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Row(
                                 children: [
                                   Icon(
-                                    moderatorStatus.toLowerCase() == 'upheld' 
-                                        ? Icons.check_circle 
+                                    moderatorStatus.toLowerCase() == 'upheld'
+                                        ? Icons.check_circle
                                         : Icons.cancel,
-                                    color: moderatorStatus.toLowerCase() == 'upheld' 
-                                        ? Colors.green 
+                                    color: moderatorStatus.toLowerCase() ==
+                                            'upheld'
+                                        ? Colors.green
                                         : Colors.red,
                                     size: 20,
                                   ),
@@ -1178,8 +1219,9 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 14,
-                                        color: moderatorStatus.toLowerCase() == 'upheld' 
-                                            ? Colors.green 
+                                        color: moderatorStatus.toLowerCase() ==
+                                                'upheld'
+                                            ? Colors.green
                                             : Colors.red,
                                       ),
                                     ),
@@ -1192,8 +1234,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                     ),
                   ),
                 );
-              }).toList(),
-            
+              }),
+
             // Shared Moderator Comment Field (after all unit standards)
             if (unitStandards.isNotEmpty)
               _buildSharedPotholeCommentField(unitStandards),
@@ -1215,11 +1257,11 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
         ),
       );
     }
-    
+
     if (_potholeImages.isEmpty) {
       return const SizedBox.shrink(); // Don't show anything if no images
     }
-    
+
     return Card(
       margin: const EdgeInsets.all(8.0),
       elevation: 4,
@@ -1234,7 +1276,10 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                 const SizedBox(width: 12),
                 const Text(
                   'Pothole Evidence Images',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.purple),
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.purple),
                 ),
               ],
             ),
@@ -1252,8 +1297,9 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
               itemBuilder: (context, index) {
                 final image = _potholeImages[index];
                 // Use correct domain for images
-                final imageUrl = 'https://rlms.rlms.co.za/mobile/${image['file_path']}';
-                
+                final imageUrl =
+                    'https://rlms.rlms.co.za/mobile/${image['file_path']}';
+
                 return GestureDetector(
                   onTap: () {
                     // Show full image with zoom capability
@@ -1261,7 +1307,7 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                       context: context,
                       builder: (context) => Dialog(
                         backgroundColor: Colors.black,
-                        child: Container(
+                        child: SizedBox(
                           width: MediaQuery.of(context).size.width * 0.9,
                           height: MediaQuery.of(context).size.height * 0.8,
                           child: Column(
@@ -1270,15 +1316,20 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                               Container(
                                 padding: const EdgeInsets.all(8.0),
                                 child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
                                       'Image ${index + 1}',
-                                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold),
                                     ),
                                     IconButton(
                                       onPressed: () => Navigator.pop(context),
-                                      icon: const Icon(Icons.close, color: Colors.white),
+                                      icon: const Icon(Icons.close,
+                                          color: Colors.white),
                                     ),
                                   ],
                                 ),
@@ -1292,17 +1343,22 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                                   maxScale: 4.0,
                                   child: Center(
                                     child: Image.network(
-                                      imageUrl, 
+                                      imageUrl,
                                       fit: BoxFit.contain,
-                                      loadingBuilder: (context, child, loadingProgress) {
-                                        if (loadingProgress == null) return child;
+                                      loadingBuilder:
+                                          (context, child, loadingProgress) {
+                                        if (loadingProgress == null)
+                                          return child;
                                         return const Center(
-                                          child: CircularProgressIndicator(color: Colors.white),
+                                          child: CircularProgressIndicator(
+                                              color: Colors.white),
                                         );
                                       },
-                                      errorBuilder: (context, error, stackTrace) {
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
                                         return const Center(
-                                          child: Icon(Icons.broken_image, size: 50, color: Colors.white),
+                                          child: Icon(Icons.broken_image,
+                                              size: 50, color: Colors.white),
                                         );
                                       },
                                     ),
@@ -1310,13 +1366,15 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                                 ),
                               ),
                               // Description if available
-                              if (image['description'] != null && image['description'].toString().isNotEmpty)
+                              if (image['description'] != null &&
+                                  image['description'].toString().isNotEmpty)
                                 Container(
                                   padding: const EdgeInsets.all(12.0),
                                   color: Colors.black87,
                                   child: Text(
                                     image['description'],
-                                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                                    style: const TextStyle(
+                                        color: Colors.white, fontSize: 14),
                                     textAlign: TextAlign.center,
                                   ),
                                 ),
@@ -1343,7 +1401,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                           },
                           errorBuilder: (context, error, stackTrace) {
                             return const Center(
-                              child: Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                              child: Icon(Icons.broken_image,
+                                  size: 40, color: Colors.grey),
                             );
                           },
                         ),
@@ -1384,11 +1443,13 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
 
       // Check server using unified endpoint
       try {
-        final url = '${AppConfig.baseUrl}/view_pothole_checklists.php?learner_id=${widget.learnerId}';
+        final url =
+            '${AppConfig.baseUrl}/view_pothole_checklists.php?learner_id=${widget.learnerId}';
         print('DEBUG Pothole: Checking server at $url');
-        
-        final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
-        
+
+        final response =
+            await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+
         print('DEBUG Pothole: Response status ${response.statusCode}');
         print('DEBUG Pothole: Response body ${response.body}');
 
@@ -1426,15 +1487,15 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
 
   void _viewPotholeChecklist(String type, Map<String, dynamic>? data) {
     print('DEBUG: _viewPotholeChecklist called with type=$type');
-    
+
     if (type == 'scanned' && data?['document_path'] != null) {
       print('DEBUG: Opening scanned PDF');
-      
+
       String documentPath = data!['document_path'];
-      
+
       // Convert relative server path to full URL
       String fullUrl = documentPath;
-      
+
       // If path starts with ../, convert to full URL
       if (documentPath.startsWith('../')) {
         // Remove ../ and construct full URL
@@ -1446,9 +1507,9 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
         // If it's a relative path without ../, add base URL
         fullUrl = '${AppConfig.baseUrl}/$documentPath';
       }
-      
+
       print('DEBUG: Full PDF URL: $fullUrl');
-      
+
       // Navigate to PDF viewer page
       Navigator.push(
         context,
@@ -1463,7 +1524,7 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
       );
     } else if (type == 'system' && data != null) {
       print('DEBUG: Opening system checklist');
-      
+
       // Show dialog with checklist data
       showDialog(
         context: context,
@@ -1488,7 +1549,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
       return const Text('No data available');
     }
 
-    final items = checklistData['checklist_items'] as Map<String, dynamic>? ?? {};
+    final items =
+        checklistData['checklist_items'] as Map<String, dynamic>? ?? {};
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1516,9 +1578,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                         item['value'] == true
                             ? Icons.check_circle
                             : Icons.cancel,
-                        color: item['value'] == true
-                            ? Colors.green
-                            : Colors.red,
+                        color:
+                            item['value'] == true ? Colors.green : Colors.red,
                         size: 20,
                       ),
                       const SizedBox(width: 8),
@@ -1526,21 +1587,22 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                     ],
                   ),
                 );
-              }).toList(),
+              }),
               const Divider(),
             ],
           );
-        }).toList(),
+        }),
       ],
     );
   }
 
   // Build moderation action buttons with comment section
-  Widget _buildModerationActions(String assessmentType, String unitStandardName, List<dynamic> items) {
+  Widget _buildModerationActions(
+      String assessmentType, String unitStandardName, List<dynamic> items) {
     TextEditingController commentController = TextEditingController();
     String currentStatus = items.first['moderator_status'] ?? '';
     String currentComment = items.first['moderator_comment'] ?? '';
-    
+
     commentController.text = currentComment;
     String selectedStatus = currentStatus.isEmpty ? 'none' : currentStatus;
 
@@ -1563,10 +1625,10 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
             decoration: InputDecoration(
               labelText: 'Moderator Comments',
               border: const OutlineInputBorder(),
-              hintText: 'Enter your moderation comments for this ${assessmentType.toLowerCase()}',
-              helperText: currentComment.isNotEmpty 
-                  ? 'Editing existing comment' 
-                  : null,
+              hintText:
+                  'Enter your moderation comments for this ${assessmentType.toLowerCase()}',
+              helperText:
+                  currentComment.isNotEmpty ? 'Editing existing comment' : null,
             ),
             maxLines: 3,
           ),
@@ -1590,9 +1652,11 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                       border: OutlineInputBorder(),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'none', child: Text('-- Select Decision --')),
+                      DropdownMenuItem(
+                          value: 'none', child: Text('-- Select Decision --')),
                       DropdownMenuItem(value: 'upheld', child: Text('Uphold')),
-                      DropdownMenuItem(value: 'withdrawn', child: Text('Withdraw')),
+                      DropdownMenuItem(
+                          value: 'withdrawn', child: Text('Withdraw')),
                     ],
                     onChanged: (value) {
                       setState(() {
@@ -1602,20 +1666,24 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton.icon(
-                    onPressed: selectedStatus == 'none' ? null : () {
-                      _submitModeration(
-                        assessmentType,
-                        unitStandardName,
-                        selectedStatus,
-                        commentController.text,
-                        items,
-                      );
-                    },
-                    icon: Icon(selectedStatus == 'upheld' ? Icons.check_circle : Icons.save),
+                    onPressed: selectedStatus == 'none'
+                        ? null
+                        : () {
+                            _submitModeration(
+                              assessmentType,
+                              unitStandardName,
+                              selectedStatus,
+                              commentController.text,
+                              items,
+                            );
+                          },
+                    icon: Icon(selectedStatus == 'upheld'
+                        ? Icons.check_circle
+                        : Icons.save),
                     label: const Text('Submit Moderation'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: selectedStatus == 'upheld' 
-                          ? Colors.green 
+                      backgroundColor: selectedStatus == 'upheld'
+                          ? Colors.green
                           : selectedStatus == 'withdrawn'
                               ? Colors.red
                               : Colors.grey,
@@ -1642,11 +1710,11 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
   ) async {
     try {
       final url = '${AppConfig.baseUrl}/save_moderation.php';
-      
+
       print('[Moderation] Submitting moderation');
       print('[Moderation] URL: $url');
       print('[Moderation] Type: $assessmentType, Status: $status');
-      
+
       final response = await http.post(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
@@ -1665,15 +1733,16 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
 
       if (response.statusCode == 200) {
         var responseData = jsonDecode(response.body);
-        
+
         if (responseData['status'] == 'success') {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Moderation ${status == 'upheld' ? 'upheld' : 'withdrawn'} successfully!'),
+              content: Text(
+                  'Moderation ${status == 'upheld' ? 'upheld' : 'withdrawn'} successfully!'),
               backgroundColor: status == 'upheld' ? Colors.green : Colors.red,
             ),
           );
-          
+
           // Refresh the POE data
           setState(() {
             _poeData = fetchPOE(widget.learnerId);
@@ -1681,7 +1750,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error: ${responseData['message'] ?? 'Unknown error'}'),
+              content:
+                  Text('Error: ${responseData['message'] ?? 'Unknown error'}'),
               backgroundColor: Colors.red,
             ),
           );
@@ -1709,11 +1779,13 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
   ) async {
     try {
       final url = '${AppConfig.baseUrl}/moderate_marks.php';
-      
-      print('[Pothole Moderation] Submitting moderation for unit standard $unitStandardId');
+
+      print(
+          '[Pothole Moderation] Submitting moderation for unit standard $unitStandardId');
       print('[Pothole Moderation] URL: $url');
-      print('[Pothole Moderation] Record ID: $recordId, Status: $status, Comment: $comment');
-      
+      print(
+          '[Pothole Moderation] Record ID: $recordId, Status: $status, Comment: $comment');
+
       final response = await http.post(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
@@ -1732,22 +1804,24 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
 
       if (response.statusCode == 200) {
         var responseData = jsonDecode(response.body);
-        
+
         if (responseData['status'] == 'success') {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Unit Standard $unitStandardId ${status == 'upheld' ? 'upheld' : 'withdrawn'} successfully!'),
+              content: Text(
+                  'Unit Standard $unitStandardId ${status == 'upheld' ? 'upheld' : 'withdrawn'} successfully!'),
               backgroundColor: status == 'upheld' ? Colors.green : Colors.red,
               duration: const Duration(seconds: 2),
             ),
           );
-          
+
           // DON'T refresh the entire POE data - this causes navigation issues
           // The UI will update when the user navigates away and comes back
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error: ${responseData['message'] ?? 'Unknown error'}'),
+              content:
+                  Text('Error: ${responseData['message'] ?? 'Unknown error'}'),
               backgroundColor: Colors.red,
             ),
           );
@@ -1766,24 +1840,26 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
     }
   }
 
-  List<Widget> _buildExerciseTiles(List<dynamic> exercises, {String assessmentType = 'general'}) {
+  List<Widget> _buildExerciseTiles(List<dynamic> exercises,
+      {String assessmentType = 'general'}) {
     return exercises.map((exercise) {
       String moderatorStatus = exercise['moderator_status'] ?? '';
       // Normalize status for display (capitalize first letter)
-      String displayStatus = moderatorStatus.isNotEmpty 
-          ? moderatorStatus[0].toUpperCase() + moderatorStatus.substring(1).toLowerCase()
+      String displayStatus = moderatorStatus.isNotEmpty
+          ? moderatorStatus[0].toUpperCase() +
+              moderatorStatus.substring(1).toLowerCase()
           : '';
-      
+
       String marksScored = exercise['marks_scored']?.toString() ?? 'Not marked';
       String totalMarks = exercise['total_marks']?.toString() ?? '';
       String fileUrl = exercise['fileUrl'] ?? exercise['file_url'] ?? '';
-      
+
       return Card(
         margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
         child: ExpansionTile(
           leading: Icon(
-            displayStatus == 'Upheld' 
-                ? Icons.check_circle 
+            displayStatus == 'Upheld'
+                ? Icons.check_circle
                 : displayStatus == 'Withdrawn'
                     ? Icons.cancel
                     : Icons.assignment,
@@ -1793,7 +1869,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                     ? Colors.red
                     : Colors.blue,
           ),
-          title: Text(exercise['exercise_name'] ?? exercise['exercise'] ?? 'Exercise'),
+          title: Text(
+              exercise['exercise_name'] ?? exercise['exercise'] ?? 'Exercise'),
           subtitle: Text(
             'Marks: $marksScored${totalMarks.isNotEmpty ? "/$totalMarks" : ""}'
             '${displayStatus.isNotEmpty ? " • Status: $displayStatus" : ""}',
@@ -1816,9 +1893,10 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  
+
                   // View Answer button
-                  if (exercise['fileUrl'] != null && exercise['fileUrl'].toString().isNotEmpty) ...[
+                  if (exercise['fileUrl'] != null &&
+                      exercise['fileUrl'].toString().isNotEmpty) ...[
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -1828,7 +1906,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => ModeratorPdfViewerScreen(pdfUrl: fileUrl),
+                                builder: (context) =>
+                                    ModeratorPdfViewerScreen(pdfUrl: fileUrl),
                               ),
                             );
                           }
@@ -1843,7 +1922,7 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                     ),
                     const SizedBox(height: 16),
                   ],
-                  
+
                   // Per-exercise moderation decision (without comment)
                   const Divider(),
                   const SizedBox(height: 8),
@@ -1855,7 +1934,7 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  
+
                   // Always show dropdown - allows updating moderation status
                   // If already moderated, show current status as selected value
                   Column(
@@ -1866,30 +1945,36 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                           labelText: 'Decision for this question',
                           border: const OutlineInputBorder(),
                           // Show current status in helper text if already moderated
-                          helperText: moderatorStatus.isNotEmpty 
-                              ? 'Current: ${displayStatus} (you can change it)' 
+                          helperText: moderatorStatus.isNotEmpty
+                              ? 'Current: $displayStatus (you can change it)'
                               : null,
                           helperStyle: TextStyle(
-                            color: displayStatus == 'Upheld' ? Colors.green : Colors.red,
+                            color: displayStatus == 'Upheld'
+                                ? Colors.green
+                                : Colors.red,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        value: moderatorStatus.isNotEmpty ? moderatorStatus.toLowerCase() : null,
+                        value: moderatorStatus.isNotEmpty
+                            ? moderatorStatus.toLowerCase()
+                            : null,
                         items: const [
-                          DropdownMenuItem(value: 'upheld', child: Text('Uphold')),
-                          DropdownMenuItem(value: 'withdrawn', child: Text('Withdraw')),
+                          DropdownMenuItem(
+                              value: 'upheld', child: Text('Uphold')),
+                          DropdownMenuItem(
+                              value: 'withdrawn', child: Text('Withdraw')),
                         ],
                         onChanged: (value) {
                           if (value != null) {
                             // Show confirmation if changing existing status
-                            if (moderatorStatus.isNotEmpty && value != moderatorStatus.toLowerCase()) {
+                            if (moderatorStatus.isNotEmpty &&
+                                value != moderatorStatus.toLowerCase()) {
                               showDialog(
                                 context: context,
                                 builder: (context) => AlertDialog(
                                   title: const Text('Confirm Change'),
                                   content: Text(
-                                    'Change moderation status from ${displayStatus} to ${value == 'upheld' ? 'Uphold' : 'Withdraw'}?'
-                                  ),
+                                      'Change moderation status from $displayStatus to ${value == 'upheld' ? 'Uphold' : 'Withdraw'}?'),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.pop(context),
@@ -1906,7 +1991,9 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                                         );
                                       },
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: value == 'upheld' ? Colors.green : Colors.red,
+                                        backgroundColor: value == 'upheld'
+                                            ? Colors.green
+                                            : Colors.red,
                                       ),
                                       child: const Text('Confirm'),
                                     ),
@@ -1931,12 +2018,12 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                         Container(
                           padding: const EdgeInsets.all(8.0),
                           decoration: BoxDecoration(
-                            color: displayStatus == 'Upheld' 
-                                ? Colors.green.shade50 
+                            color: displayStatus == 'Upheld'
+                                ? Colors.green.shade50
                                 : Colors.red.shade50,
                             border: Border.all(
-                              color: displayStatus == 'Upheld' 
-                                  ? Colors.green 
+                              color: displayStatus == 'Upheld'
+                                  ? Colors.green
                                   : Colors.red,
                             ),
                             borderRadius: BorderRadius.circular(4),
@@ -1945,11 +2032,11 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                displayStatus == 'Upheld' 
-                                    ? Icons.check_circle 
+                                displayStatus == 'Upheld'
+                                    ? Icons.check_circle
                                     : Icons.cancel,
-                                color: displayStatus == 'Upheld' 
-                                    ? Colors.green 
+                                color: displayStatus == 'Upheld'
+                                    ? Colors.green
                                     : Colors.red,
                                 size: 16,
                               ),
@@ -1959,8 +2046,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 12,
-                                  color: displayStatus == 'Upheld' 
-                                      ? Colors.green 
+                                  color: displayStatus == 'Upheld'
+                                      ? Colors.green
                                       : Colors.red,
                                 ),
                               ),
@@ -1978,7 +2065,7 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
       );
     }).toList();
   }
-  
+
   // Submit per-exercise moderation
   Future<void> _submitExerciseModeration(
     Map<String, dynamic> exercise,
@@ -1990,18 +2077,19 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
       // Use different endpoints based on assessment type
       // Formative/Summative use save_moderation_status.php (marks table)
       // Logbook uses moderate_marks.php (logbook_marks table)
-      final String endpoint = (assessmentType == 'formative' || assessmentType == 'summative') 
-          ? 'save_moderation_status.php'  // For formative/summative
-          : 'moderate_marks.php';          // For logbook/pothole
-      
+      final String endpoint =
+          (assessmentType == 'formative' || assessmentType == 'summative')
+              ? 'save_moderation_status.php' // For formative/summative
+              : 'moderate_marks.php'; // For logbook/pothole
+
       final url = AppConfig.buildUrl(endpoint);
-      
+
       // Build request body based on endpoint
       Map<String, dynamic> requestBody;
       if (endpoint == 'save_moderation_status.php') {
         // Formative/Summative endpoint - match PHP expectations exactly
         // PHP expects: learnerId, exerciseId (the exercise question text), moderation_status, assessment_type
-        
+
         // Debug: Print ALL exercise data to understand structure
         print('[DEBUG] ========== EXERCISE DATA DUMP ==========');
         print('[DEBUG] Full exercise map: $exercise');
@@ -2010,81 +2098,93 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
           print('[DEBUG]   $key: $value (${value.runtimeType})');
         });
         print('[DEBUG] ==========================================');
-        
+
         // Try multiple field names to extract exercise name
         // IMPORTANT: The database and API use 'exercise' as the field name
-        String exerciseName = exercise['exercise']?.toString() ??  // PRIMARY: This is the actual field name from get_poe.php
-                             exercise['exercise_name']?.toString() ?? 
-                             exercise['question']?.toString() ?? 
-                             exercise['title']?.toString() ?? 
-                             exercise['name']?.toString() ?? 
-                             exercise['exercise_text']?.toString() ?? 
-                             exercise['question_text']?.toString() ?? 
-                             '';
-        
-        print('[DEBUG] Exercise name extracted (before cleanup): "$exerciseName"');
-        
+        String exerciseName = exercise['exercise']
+                ?.toString() ?? // PRIMARY: This is the actual field name from get_poe.php
+            exercise['exercise_name']?.toString() ??
+            exercise['question']?.toString() ??
+            exercise['title']?.toString() ??
+            exercise['name']?.toString() ??
+            exercise['exercise_text']?.toString() ??
+            exercise['question_text']?.toString() ??
+            '';
+
+        print(
+            '[DEBUG] Exercise name extracted (before cleanup): "$exerciseName"');
+
         // Remove "Exercise " prefix if it exists to get the actual question text
         if (exerciseName.startsWith('Exercise ')) {
           exerciseName = exerciseName.substring(9); // Remove "Exercise " prefix
         }
-        
+
         print('[DEBUG] Exercise name after cleanup: "$exerciseName"');
-        
+
         // If exerciseName is STILL empty, this is a critical error
         if (exerciseName.isEmpty) {
           print('[DEBUG] ERROR: Exercise name is empty after all attempts!');
-          print('[DEBUG] This will cause "missing required fields" error on backend');
-          
+          print(
+              '[DEBUG] This will cause "missing required fields" error on backend');
+
           // Last resort: use ID if available
           if (exercise['id'] != null) {
             exerciseName = 'Exercise ${exercise['id']}';
             print('[DEBUG] Using last resort exercise name: "$exerciseName"');
           } else {
             print('[DEBUG] CRITICAL: No ID available either!');
-            throw Exception('Cannot determine exercise name from exercise data');
+            throw Exception(
+                'Cannot determine exercise name from exercise data');
           }
         }
-        
+
         // Determine the database type value (capitalize first letter)
-        String dbAssessmentType = assessmentType == 'formative' 
-            ? 'Formative' 
-            : assessmentType == 'summative' 
-                ? 'Summative' 
+        String dbAssessmentType = assessmentType == 'formative'
+            ? 'Formative'
+            : assessmentType == 'summative'
+                ? 'Summative'
                 : '';
-        
+
         requestBody = {
           'learnerId': widget.learnerId,
-          'exercise': exerciseName,  // Use 'exercise' to match database column name
-          'moderation_status': action,  // 'Upheld' or 'Withdrawn'
-          'moderator_comment': comment,  // Moderator's comment (snake_case to match PHP)
-          'moderator_id': widget.moderatorId,  // Moderator ID (snake_case to match PHP)
-          'assessment_type': dbAssessmentType,  // CRITICAL: Include assessment type to prevent cross-contamination
+          'exercise':
+              exerciseName, // Use 'exercise' to match database column name
+          'moderation_status': action, // 'Upheld' or 'Withdrawn'
+          'moderator_comment':
+              comment, // Moderator's comment (snake_case to match PHP)
+          'moderator_id':
+              widget.moderatorId, // Moderator ID (snake_case to match PHP)
+          'assessment_type':
+              dbAssessmentType, // CRITICAL: Include assessment type to prevent cross-contamination
         };
-        
+
         // Debug: Print request body
         print('[DEBUG] Request body: $requestBody');
       } else {
         // Logbook/Pothole endpoint
         requestBody = {
           'assessmentType': assessmentType,
-          'exerciseId': exercise['id']?.toString() ?? exercise['exercise_id']?.toString() ?? '',
+          'exerciseId': exercise['id']?.toString() ??
+              exercise['exercise_id']?.toString() ??
+              '',
           'learnerId': widget.learnerId,
           'moderatorStatus': action,
           'moderatorComment': comment,
           'moderatorId': widget.moderatorId,
         };
       }
-      
+
       print('[DEBUG] Sending POST request to: $url');
       print('[DEBUG] Request headers: Content-Type: application/json');
       print('[DEBUG] Request body: ${jsonEncode(requestBody)}');
-      
-      final response = await http.post(
+
+      final response = await http
+          .post(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(requestBody),
-      ).timeout(
+      )
+          .timeout(
         const Duration(seconds: 30),
         onTimeout: () {
           print('[DEBUG] Request timed out after 30 seconds');
@@ -2098,24 +2198,28 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
       if (response.statusCode == 200) {
         var responseData = jsonDecode(response.body);
         print('[DEBUG] Parsed response data: $responseData');
-        
+
         // Handle both 'success' and 'warning' as successful operations
-        if (responseData['status'] == 'success' || responseData['status'] == 'warning') {
+        if (responseData['status'] == 'success' ||
+            responseData['status'] == 'warning') {
           // Update the local exercise data without refreshing the entire page
           setState(() {
-            exercise['moderator_status'] = action.toLowerCase(); // Store as lowercase to match PHP
-            exercise['approval_status'] = action == 'upheld' ? 'Approved' : 'Disapproved';
+            exercise['moderator_status'] =
+                action.toLowerCase(); // Store as lowercase to match PHP
+            exercise['approval_status'] =
+                action == 'upheld' ? 'Approved' : 'Disapproved';
           });
-          
+
           // Show appropriate message based on status
-          String message = responseData['status'] == 'warning' 
+          String message = responseData['status'] == 'warning'
               ? 'Status already set to ${action == 'upheld' ? 'upheld' : 'withdrawn'}'
               : 'Exercise ${action == 'upheld' ? 'upheld' : 'withdrawn'} successfully!';
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(message),
-              backgroundColor: action == 'upheld' ? Colors.green : Colors.orange,
+              backgroundColor:
+                  action == 'upheld' ? Colors.green : Colors.orange,
               duration: const Duration(seconds: 2),
             ),
           );
@@ -2143,15 +2247,15 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
   // Build shared comment field for pothole checklist
   Widget _buildSharedPotholeCommentField(List<dynamic> unitStandards) {
     // Get existing comment from first unit standard (they should all have the same comment)
-    String existingComment = unitStandards.isNotEmpty 
-        ? (unitStandards.first['moderator_comment'] ?? '') 
+    String existingComment = unitStandards.isNotEmpty
+        ? (unitStandards.first['moderator_comment'] ?? '')
         : '';
-    
+
     // Initialize controller with existing comment if not already set
     if (_potholeCommentController.text.isEmpty && existingComment.isNotEmpty) {
       _potholeCommentController.text = existingComment;
     }
-    
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -2187,9 +2291,10 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
             decoration: InputDecoration(
               labelText: 'Moderator Comment',
               border: const OutlineInputBorder(),
-              hintText: 'Enter your moderation comments for the pothole checklist',
-              helperText: existingComment.isNotEmpty 
-                  ? 'Editing existing comment' 
+              hintText:
+                  'Enter your moderation comments for the pothole checklist',
+              helperText: existingComment.isNotEmpty
+                  ? 'Editing existing comment'
                   : null,
             ),
             maxLines: 4,
@@ -2218,7 +2323,7 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
   // Update comment for all pothole unit standards
   Future<void> _updatePotholeCommentForAll(List<dynamic> unitStandards) async {
     String comment = _potholeCommentController.text;
-    
+
     if (comment.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -2228,19 +2333,19 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
       );
       return;
     }
-    
+
     try {
       int successCount = 0;
       int failCount = 0;
-      
+
       for (var us in unitStandards) {
         String recordId = us['id']?.toString() ?? '';
         String unitStandardId = us['unit_standard_id'] ?? '';
-        
+
         if (recordId.isEmpty) continue;
-        
+
         final url = AppConfig.buildUrl('moderate_marks.php');
-        
+
         final response = await http.post(
           Uri.parse(url),
           headers: {'Content-Type': 'application/json'},
@@ -2248,7 +2353,8 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
             'assessmentType': 'logbook',
             'exerciseId': recordId,
             'learnerId': widget.learnerId,
-            'moderatorStatus': us['moderator_status'] ?? 'upheld',  // Keep existing status or default to upheld
+            'moderatorStatus': us['moderator_status'] ??
+                'upheld', // Keep existing status or default to upheld
             'moderatorComment': comment,
             'moderatorId': widget.moderatorId,
           }),
@@ -2265,7 +2371,7 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
           failCount++;
         }
       }
-      
+
       if (successCount > 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -2273,13 +2379,13 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
             backgroundColor: Colors.green,
           ),
         );
-        
+
         // Refresh the POE data
         setState(() {
           _poeData = fetchPOE(widget.learnerId);
         });
       }
-      
+
       if (failCount > 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -2314,31 +2420,32 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
       );
       return;
     }
-    
+
     try {
       int successCount = 0;
       int failCount = 0;
-      
+
       for (var exercise in exercises) {
-        String exerciseName = exercise['exercise_name']?.toString() ?? 
-                             exercise['exercise']?.toString() ?? 
-                             '';
+        String exerciseName = exercise['exercise_name']?.toString() ??
+            exercise['exercise']?.toString() ??
+            '';
         // Remove "Exercise " prefix if it exists
         if (exerciseName.startsWith('Exercise ')) {
           exerciseName = exerciseName.substring(9);
         }
-        
+
         if (exerciseName.isEmpty) continue;
-        
+
         final url = AppConfig.buildUrl('save_moderation_status.php');
-        
+
         final response = await http.post(
           Uri.parse(url),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'learnerId': widget.learnerId,
             'exerciseId': exerciseName,
-            'moderation_status': exercise['moderator_status'] ?? 'upheld',  // Keep existing status or default to upheld
+            'moderation_status': exercise['moderator_status'] ??
+                'upheld', // Keep existing status or default to upheld
             'moderator_comment': comment,
             'moderator_id': widget.moderatorId,
           }),
@@ -2355,25 +2462,27 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
           failCount++;
         }
       }
-      
+
       if (successCount > 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Comment updated for $successCount ${assessmentType} question(s)'),
+            content: Text(
+                'Comment updated for $successCount $assessmentType question(s)'),
             backgroundColor: Colors.green,
           ),
         );
-        
+
         // Refresh the POE data
         setState(() {
           _poeData = fetchPOE(widget.learnerId);
         });
       }
-      
+
       if (failCount > 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to update $failCount ${assessmentType} question(s)'),
+            content:
+                Text('Failed to update $failCount $assessmentType question(s)'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -2394,7 +2503,7 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
 class ModerationFeedbackPage extends StatefulWidget {
   final String facilitatorId;
 
-  const ModerationFeedbackPage({Key? key, required this.facilitatorId}) : super(key: key);
+  const ModerationFeedbackPage({super.key, required this.facilitatorId});
 
   @override
   _ModerationFeedbackPageState createState() => _ModerationFeedbackPageState();
@@ -2412,7 +2521,8 @@ class _ModerationFeedbackPageState extends State<ModerationFeedbackPage> {
   Future<List<dynamic>> fetchClassList(String facilitatorId) async {
     try {
       final response = await http.get(
-        Uri.parse(AppConfig.buildUrl('get_classes_by_facilitator.php?facilitator_id=$facilitatorId')),
+        Uri.parse(AppConfig.buildUrl(
+            'get_classes_by_facilitator.php?facilitator_id=$facilitatorId')),
       );
 
       if (response.statusCode == 200) {
@@ -2440,14 +2550,19 @@ class _ModerationFeedbackPageState extends State<ModerationFeedbackPage> {
       }
 
       final response = await http.get(
-        Uri.parse(AppConfig.buildUrl('generate_moderation_report.php', queryParams: {'class_id': classId.toString()})),
+        Uri.parse(AppConfig.buildUrl('generate_moderation_report.php',
+            queryParams: {'class_id': classId.toString()})),
       );
 
-      print('Request URL: ${AppConfig.buildUrl("generate_moderation_report.php", queryParams: {"class_id": classId.toString()})}');
+      print(
+          'Request URL: ${AppConfig.buildUrl("generate_moderation_report.php", queryParams: {
+            "class_id": classId.toString()
+          })}');
       print('Response Status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        if (response.headers['content-type']?.contains('application/pdf') == true) {
+        if (response.headers['content-type']?.contains('application/pdf') ==
+            true) {
           final dir = await getTemporaryDirectory();
           final file = File('${dir.path}/Class_${classId}_Feedback_Report.pdf');
           await file.writeAsBytes(response.bodyBytes);
@@ -2531,7 +2646,8 @@ class _ModerationFeedbackPageState extends State<ModerationFeedbackPage> {
                         return Center(
                           child: Text(
                             'Error: ${snapshot.error}',
-                            style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                color: Colors.red, fontWeight: FontWeight.bold),
                           ),
                         );
                       } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -2553,16 +2669,22 @@ class _ModerationFeedbackPageState extends State<ModerationFeedbackPage> {
                                 leading: CircleAvatar(
                                   backgroundColor: Colors.blue,
                                   foregroundColor: Colors.white,
-                                  child: Text(classData['classID']?.toString() ?? 'N/A'),
+                                  child: Text(
+                                      classData['classID']?.toString() ??
+                                          'N/A'),
                                 ),
                                 title: Text(
                                   classData['className'] ?? 'Unknown Class',
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
                                 ),
-                                subtitle: Text(classData['classDescription'] ?? 'No description'),
-                                trailing: const Icon(Icons.picture_as_pdf, color: Colors.red),
+                                subtitle: Text(classData['classDescription'] ??
+                                    'No description'),
+                                trailing: const Icon(Icons.picture_as_pdf,
+                                    color: Colors.red),
                                 onTap: () {
-                                  _generateAndDownloadReport(classData['classID']?.toString() ?? '');
+                                  _generateAndDownloadReport(
+                                      classData['classID']?.toString() ?? '');
                                 },
                               ),
                             );
@@ -2584,7 +2706,7 @@ class _ModerationFeedbackPageState extends State<ModerationFeedbackPage> {
 class ModerationReportPage extends StatefulWidget {
   final String facilitatorId;
 
-  const ModerationReportPage({Key? key, required this.facilitatorId}) : super(key: key);
+  const ModerationReportPage({super.key, required this.facilitatorId});
 
   @override
   _ModerationReportPageState createState() => _ModerationReportPageState();
@@ -2597,7 +2719,8 @@ class _ModerationReportPageState extends State<ModerationReportPage> {
 
   Future<List<dynamic>> fetchModerationReport() async {
     final response = await http.get(
-      Uri.parse(AppConfig.buildUrl('get_classes.php?facilitator_id=${widget.facilitatorId}')),
+      Uri.parse(AppConfig.buildUrl(
+          'get_classes.php?facilitator_id=${widget.facilitatorId}')),
     );
 
     if (response.statusCode == 200) {
@@ -2620,7 +2743,8 @@ class _ModerationReportPageState extends State<ModerationReportPage> {
   }
 
   Future<void> _generateAndViewReport(String learnerId) async {
-    final url = Uri.parse(AppConfig.buildUrl('moderationReport.php?learner_id=$learnerId'));
+    final url = Uri.parse(
+        AppConfig.buildUrl('moderationReport.php?learner_id=$learnerId'));
 
     try {
       print('Attempting to launch URL: $url');
@@ -2719,11 +2843,20 @@ class _ModerationReportPageState extends State<ModerationReportPage> {
                                   DataColumn(label: Text('Action')),
                                 ],
                                 rows: classes.map<DataRow>((classData) {
-                                  String projectId = classData['project_id']?.toString() ?? 'N/A';
-                                  String classId = classData['classID']?.toString() ?? 'N/A';
-                                  String className = classData['className']?.toString() ?? 'Unknown';
-                                  String numberOfLearners = classData['numberOfLearners']?.toString() ?? 'N/A';
-                                  String siteId = classData['siteID']?.toString() ?? 'N/A';
+                                  String projectId =
+                                      classData['project_id']?.toString() ??
+                                          'N/A';
+                                  String classId =
+                                      classData['classID']?.toString() ?? 'N/A';
+                                  String className =
+                                      classData['className']?.toString() ??
+                                          'Unknown';
+                                  String numberOfLearners =
+                                      classData['numberOfLearners']
+                                              ?.toString() ??
+                                          'N/A';
+                                  String siteId =
+                                      classData['siteID']?.toString() ?? 'N/A';
 
                                   return DataRow(
                                     cells: [
@@ -2734,7 +2867,8 @@ class _ModerationReportPageState extends State<ModerationReportPage> {
                                       DataCell(Text(siteId)),
                                       DataCell(
                                         ElevatedButton(
-                                          onPressed: () => _onActionPressed(classId),
+                                          onPressed: () =>
+                                              _onActionPressed(classId),
                                           child: const Text('View Learners'),
                                         ),
                                       ),
@@ -2750,7 +2884,8 @@ class _ModerationReportPageState extends State<ModerationReportPage> {
                         const SizedBox(height: 16),
                         const Text(
                           'Learners - Click to generate report',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 8),
                         Expanded(
@@ -2769,10 +2904,18 @@ class _ModerationReportPageState extends State<ModerationReportPage> {
                                     DataColumn(label: Text('Action')),
                                   ],
                                   rows: learners.map<DataRow>((learnerData) {
-                                    String learnerId = learnerData['LearnerID']?.toString() ?? 'N/A';
-                                    String firstName = learnerData['Name']?.toString() ?? 'Unknown';
-                                    String lastName = learnerData['Surname']?.toString() ?? 'Unknown';
-                                    String idNumber = learnerData['IDNumber']?.toString() ?? 'Unknown';
+                                    String learnerId =
+                                        learnerData['LearnerID']?.toString() ??
+                                            'N/A';
+                                    String firstName =
+                                        learnerData['Name']?.toString() ??
+                                            'Unknown';
+                                    String lastName =
+                                        learnerData['Surname']?.toString() ??
+                                            'Unknown';
+                                    String idNumber =
+                                        learnerData['IDNumber']?.toString() ??
+                                            'Unknown';
 
                                     return DataRow(
                                       cells: [
@@ -2782,8 +2925,12 @@ class _ModerationReportPageState extends State<ModerationReportPage> {
                                         DataCell(Text(idNumber)),
                                         DataCell(
                                           ElevatedButton.icon(
-                                            onPressed: () => _generateAndViewReport(learnerId),
-                                            icon: const Icon(Icons.picture_as_pdf, size: 16),
+                                            onPressed: () =>
+                                                _generateAndViewReport(
+                                                    learnerId),
+                                            icon: const Icon(
+                                                Icons.picture_as_pdf,
+                                                size: 16),
                                             label: const Text('Generate'),
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.red,
@@ -2815,7 +2962,7 @@ class _ModerationReportPageState extends State<ModerationReportPage> {
 class ModeratorPotholeChecklistPage extends StatelessWidget {
   final String facilitatorId;
 
-  const ModeratorPotholeChecklistPage({Key? key, required this.facilitatorId}) : super(key: key);
+  const ModeratorPotholeChecklistPage({super.key, required this.facilitatorId});
 
   @override
   Widget build(BuildContext context) {
@@ -2827,7 +2974,7 @@ class ModeratorPotholeChecklistPage extends StatelessWidget {
 class ModerationSamplingPage extends StatefulWidget {
   final String facilitatorId;
 
-  const ModerationSamplingPage({Key? key, required this.facilitatorId}) : super(key: key);
+  const ModerationSamplingPage({super.key, required this.facilitatorId});
 
   @override
   _ModerationSamplingPageState createState() => _ModerationSamplingPageState();
@@ -2854,7 +3001,8 @@ class _ModerationSamplingPageState extends State<ModerationSamplingPage> {
       // Add cache-busting timestamp to ensure fresh data
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final response = await http.get(
-        Uri.parse(AppConfig.buildUrl('get_learners_with_poe_assigned.php?moderator_id=${widget.facilitatorId}&_t=$timestamp')),
+        Uri.parse(AppConfig.buildUrl(
+            'get_learners_with_poe_assigned.php?moderator_id=${widget.facilitatorId}&_t=$timestamp')),
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
@@ -2929,7 +3077,8 @@ class _ModerationSamplingPageState extends State<ModerationSamplingPage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      const Icon(Icons.error_outline,
+                          size: 64, color: Colors.red),
                       const SizedBox(height: 16),
                       Text(
                         'Error: $_errorMessage',
@@ -2962,17 +3111,26 @@ class _ModerationSamplingPageState extends State<ModerationSamplingPage> {
                             children: [
                               const Text(
                                 'Sampling Summary',
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                    fontSize: 18, fontWeight: FontWeight.bold),
                               ),
                               const SizedBox(height: 12),
-                              _buildSummaryRow('Sampling Method', _samplingData!['sampling_method'] ?? 'N/A'),
-                              _buildSummaryRow('Total Learners with POE', _samplingData!['total_learners_with_poe'].toString()),
-                              _buildSummaryRow('Selected for Moderation', _samplingData!['selected_count'].toString()),
+                              _buildSummaryRow('Sampling Method',
+                                  _samplingData!['sampling_method'] ?? 'N/A'),
+                              _buildSummaryRow(
+                                  'Total Learners with POE',
+                                  _samplingData!['total_learners_with_poe']
+                                      .toString()),
+                              _buildSummaryRow('Selected for Moderation',
+                                  _samplingData!['selected_count'].toString()),
                               if (_samplingData!['sampling_rate'] != null)
-                                _buildSummaryRow('Sampling Rate', _samplingData!['sampling_rate']),
+                                _buildSummaryRow('Sampling Rate',
+                                    _samplingData!['sampling_rate']),
                               if (_samplingData!['total_strata'] != null)
-                                _buildSummaryRow('Total Strata', _samplingData!['total_strata'].toString()),
-                              if (_samplingData!['is_existing_assignment'] == true)
+                                _buildSummaryRow('Total Strata',
+                                    _samplingData!['total_strata'].toString()),
+                              if (_samplingData!['is_existing_assignment'] ==
+                                  true)
                                 Container(
                                   margin: const EdgeInsets.only(top: 8),
                                   padding: const EdgeInsets.all(8),
@@ -2982,61 +3140,76 @@ class _ModerationSamplingPageState extends State<ModerationSamplingPage> {
                                   ),
                                   child: const Row(
                                     children: [
-                                      Icon(Icons.check_circle, color: Colors.green, size: 20),
+                                      Icon(Icons.check_circle,
+                                          color: Colors.green, size: 20),
                                       SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
                                           'This is your existing assignment',
-                                          style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                                          style: TextStyle(
+                                              color: Colors.green,
+                                              fontWeight: FontWeight.bold),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
                               // Stratification dimensions info
-                              if (_samplingData!['stratification_dimensions'] != null) ...[
+                              if (_samplingData!['stratification_dimensions'] !=
+                                  null) ...[
                                 const SizedBox(height: 12),
                                 const Divider(),
                                 const SizedBox(height: 8),
                                 const Text(
                                   'Stratification Dimensions:',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14),
                                 ),
                                 const SizedBox(height: 8),
-                                ...(_samplingData!['stratification_dimensions'] as List).map((dimension) {
+                                ...(_samplingData!['stratification_dimensions']
+                                        as List)
+                                    .map((dimension) {
                                   return Padding(
-                                    padding: const EdgeInsets.only(left: 16.0, bottom: 4.0),
+                                    padding: const EdgeInsets.only(
+                                        left: 16.0, bottom: 4.0),
                                     child: Row(
                                       children: [
-                                        const Icon(Icons.check, size: 16, color: Colors.blue),
+                                        const Icon(Icons.check,
+                                            size: 16, color: Colors.blue),
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
                                             dimension.toString(),
-                                            style: const TextStyle(fontSize: 13),
+                                            style:
+                                                const TextStyle(fontSize: 13),
                                           ),
                                         ),
                                       ],
                                     ),
                                   );
-                                }).toList(),
+                                }),
                               ],
                             ],
                           ),
                         ),
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Strata Summary (if available)
                       if (_samplingData!['strata_summary'] != null) ...[
                         const Text(
                           'Strata Breakdown',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 8),
                         const Text(
                           'Each row represents a unique combination of stratification dimensions',
-                          style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic),
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                              fontStyle: FontStyle.italic),
                         ),
                         const SizedBox(height: 8),
                         Card(
@@ -3045,68 +3218,108 @@ class _ModerationSamplingPageState extends State<ModerationSamplingPage> {
                             scrollDirection: Axis.horizontal,
                             child: DataTable(
                               columnSpacing: 16,
-                              headingRowColor: MaterialStateProperty.all(Colors.blue.shade100),
+                              headingRowColor:
+                                  WidgetStateProperty.all(Colors.blue.shade100),
                               columns: const [
-                                DataColumn(label: Text('Class', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('Site', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('POE Status', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('Marking', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('Performance', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('Total', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('Selected', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('Rate', style: TextStyle(fontWeight: FontWeight.bold))),
+                                DataColumn(
+                                    label: Text('Class',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold))),
+                                DataColumn(
+                                    label: Text('Site',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold))),
+                                DataColumn(
+                                    label: Text('POE Status',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold))),
+                                DataColumn(
+                                    label: Text('Marking',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold))),
+                                DataColumn(
+                                    label: Text('Performance',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold))),
+                                DataColumn(
+                                    label: Text('Total',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold))),
+                                DataColumn(
+                                    label: Text('Selected',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold))),
+                                DataColumn(
+                                    label: Text('Rate',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold))),
                               ],
-                              rows: (_samplingData!['strata_summary'] as List).map<DataRow>((stratum) {
+                              rows: (_samplingData!['strata_summary'] as List)
+                                  .map<DataRow>((stratum) {
                                 return DataRow(cells: [
                                   DataCell(Text(stratum['class'] ?? 'N/A')),
                                   DataCell(Text(stratum['site'] ?? 'N/A')),
                                   DataCell(
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: _getCompletenessColor(stratum['poe_completeness']),
+                                        color: _getCompletenessColor(
+                                            stratum['poe_completeness']),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
                                         stratum['poe_completeness'] ?? 'N/A',
-                                        style: const TextStyle(color: Colors.white, fontSize: 11),
+                                        style: const TextStyle(
+                                            color: Colors.white, fontSize: 11),
                                       ),
                                     ),
                                   ),
                                   DataCell(
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: _getMarkingColor(stratum['marking_status']),
+                                        color: _getMarkingColor(
+                                            stratum['marking_status']),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
                                         stratum['marking_status'] ?? 'N/A',
-                                        style: const TextStyle(color: Colors.white, fontSize: 11),
+                                        style: const TextStyle(
+                                            color: Colors.white, fontSize: 11),
                                       ),
                                     ),
                                   ),
                                   DataCell(
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: _getPerformanceColor(stratum['performance_level']),
+                                        color: _getPerformanceColor(
+                                            stratum['performance_level']),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
                                         stratum['performance_level'] ?? 'N/A',
-                                        style: const TextStyle(color: Colors.white, fontSize: 11),
+                                        style: const TextStyle(
+                                            color: Colors.white, fontSize: 11),
                                       ),
                                     ),
                                   ),
-                                  DataCell(Text(stratum['total_in_stratum'].toString())),
+                                  DataCell(Text(
+                                      stratum['total_in_stratum'].toString())),
                                   DataCell(
                                     Text(
-                                      stratum['selected_from_stratum'].toString(),
-                                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
+                                      stratum['selected_from_stratum']
+                                          .toString(),
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.blue),
                                     ),
                                   ),
-                                  DataCell(Text(stratum['sampling_rate'] ?? 'N/A')),
+                                  DataCell(
+                                      Text(stratum['sampling_rate'] ?? 'N/A')),
                                 ]);
                               }).toList(),
                             ),
@@ -3114,11 +3327,12 @@ class _ModerationSamplingPageState extends State<ModerationSamplingPage> {
                         ),
                         const SizedBox(height: 16),
                       ],
-                      
+
                       // Learners List
                       const Text(
                         'Selected Learners',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
                       Card(
@@ -3127,71 +3341,121 @@ class _ModerationSamplingPageState extends State<ModerationSamplingPage> {
                           scrollDirection: Axis.horizontal,
                           child: DataTable(
                             columnSpacing: 12,
-                            headingRowColor: MaterialStateProperty.all(Colors.purple.shade50),
+                            headingRowColor:
+                                WidgetStateProperty.all(Colors.purple.shade50),
                             columns: const [
-                              DataColumn(label: Text('Learner ID', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Surname', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Class ID', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Class Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Site', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('POE Status', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Marking', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Performance', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Unit Stds', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(
+                                  label: Text('Learner ID',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold))),
+                              DataColumn(
+                                  label: Text('Name',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold))),
+                              DataColumn(
+                                  label: Text('Surname',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold))),
+                              DataColumn(
+                                  label: Text('Class ID',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold))),
+                              DataColumn(
+                                  label: Text('Class Name',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold))),
+                              DataColumn(
+                                  label: Text('Site',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold))),
+                              DataColumn(
+                                  label: Text('POE Status',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold))),
+                              DataColumn(
+                                  label: Text('Marking',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold))),
+                              DataColumn(
+                                  label: Text('Performance',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold))),
+                              DataColumn(
+                                  label: Text('Unit Stds',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold))),
+                              DataColumn(
+                                  label: Text('Action',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold))),
                             ],
-                            rows: (_samplingData!['learners'] as List).map<DataRow>((learner) {
+                            rows: (_samplingData!['learners'] as List)
+                                .map<DataRow>((learner) {
                               return DataRow(cells: [
                                 DataCell(Text(learner['LearnerID'].toString())),
                                 DataCell(Text(learner['Name'] ?? 'N/A')),
                                 DataCell(Text(learner['Surname'] ?? 'N/A')),
-                                DataCell(Text(learner['classID']?.toString() ?? 'N/A')),
+                                DataCell(Text(
+                                    learner['classID']?.toString() ?? 'N/A')),
                                 DataCell(Text(learner['className'] ?? 'N/A')),
-                                DataCell(Text(learner['siteName'] ?? learner['siteID'] ?? 'N/A')),
+                                DataCell(Text(learner['siteName'] ??
+                                    learner['siteID'] ??
+                                    'N/A')),
                                 DataCell(
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 3),
                                     decoration: BoxDecoration(
-                                      color: _getCompletenessColor(learner['poe_completeness']),
+                                      color: _getCompletenessColor(
+                                          learner['poe_completeness']),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
                                       learner['poe_completeness'] ?? 'Unknown',
-                                      style: const TextStyle(color: Colors.white, fontSize: 10),
+                                      style: const TextStyle(
+                                          color: Colors.white, fontSize: 10),
                                     ),
                                   ),
                                 ),
                                 DataCell(
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 3),
                                     decoration: BoxDecoration(
-                                      color: _getMarkingColor(learner['marking_status']),
+                                      color: _getMarkingColor(
+                                          learner['marking_status']),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
                                       learner['marking_status'] ?? 'Unknown',
-                                      style: const TextStyle(color: Colors.white, fontSize: 10),
+                                      style: const TextStyle(
+                                          color: Colors.white, fontSize: 10),
                                     ),
                                   ),
                                 ),
                                 DataCell(
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 3),
                                     decoration: BoxDecoration(
-                                      color: _getPerformanceColor(learner['performance_level']),
+                                      color: _getPerformanceColor(
+                                          learner['performance_level']),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
                                       learner['performance_level'] ?? 'Unknown',
-                                      style: const TextStyle(color: Colors.white, fontSize: 10),
+                                      style: const TextStyle(
+                                          color: Colors.white, fontSize: 10),
                                     ),
                                   ),
                                 ),
                                 DataCell(
                                   Text(
-                                    learner['unit_standards_count']?.toString() ?? '0',
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                    learner['unit_standards_count']
+                                            ?.toString() ??
+                                        '0',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
                                   ),
                                 ),
                                 DataCell(
@@ -3200,11 +3464,14 @@ class _ModerationSamplingPageState extends State<ModerationSamplingPage> {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => ModeratorMarkingPage(
-                                            learnerId: learner['LearnerID'].toString(),
+                                          builder: (context) =>
+                                              ModeratorMarkingPage(
+                                            learnerId:
+                                                learner['LearnerID'].toString(),
                                             learnerFirstName: learner['Name'],
                                             learnerLastName: learner['Surname'],
-                                            learnerIdNumber: learner['IDNumber'],
+                                            learnerIdNumber:
+                                                learner['IDNumber'],
                                             moderatorId: widget.facilitatorId,
                                           ),
                                         ),
@@ -3213,9 +3480,11 @@ class _ModerationSamplingPageState extends State<ModerationSamplingPage> {
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.purple,
                                       foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 8),
                                     ),
-                                    child: const Text('Moderate', style: TextStyle(fontSize: 12)),
+                                    child: const Text('Moderate',
+                                        style: TextStyle(fontSize: 12)),
                                   ),
                                 ),
                               ]);
@@ -3245,7 +3514,8 @@ class _ModerationSamplingPageState extends State<ModerationSamplingPage> {
           ),
           Text(
             value,
-            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
+            style: const TextStyle(
+                fontWeight: FontWeight.bold, color: Colors.blue),
           ),
         ],
       ),
@@ -3292,7 +3562,6 @@ class _ModerationSamplingPageState extends State<ModerationSamplingPage> {
   }
 }
 
-
 // PDF Viewer for Scanned Pothole Checklist
 class PotholeChecklistPDFViewer extends StatefulWidget {
   final String pdfUrl;
@@ -3301,15 +3570,16 @@ class PotholeChecklistPDFViewer extends StatefulWidget {
   final String assessmentDate;
 
   const PotholeChecklistPDFViewer({
-    Key? key,
+    super.key,
     required this.pdfUrl,
     required this.documentPath,
     required this.learnerId,
     required this.assessmentDate,
-  }) : super(key: key);
+  });
 
   @override
-  _PotholeChecklistPDFViewerState createState() => _PotholeChecklistPDFViewerState();
+  _PotholeChecklistPDFViewerState createState() =>
+      _PotholeChecklistPDFViewerState();
 }
 
 class _PotholeChecklistPDFViewerState extends State<PotholeChecklistPDFViewer> {
@@ -3328,21 +3598,21 @@ class _PotholeChecklistPDFViewerState extends State<PotholeChecklistPDFViewer> {
   Future<void> _downloadAndOpenPDF() async {
     try {
       print('DEBUG PDF: Downloading from ${widget.pdfUrl}');
-      
+
       final response = await http.get(Uri.parse(widget.pdfUrl));
-      
+
       if (response.statusCode == 200) {
         final bytes = response.bodyBytes;
         final dir = await getApplicationDocumentsDirectory();
         final file = File('${dir.path}/temp_pothole_checklist.pdf');
-        
+
         await file.writeAsBytes(bytes);
-        
+
         setState(() {
           localPath = file.path;
           isLoading = false;
         });
-        
+
         print('DEBUG PDF: Downloaded to ${file.path}');
       } else {
         setState(() {
@@ -3412,15 +3682,13 @@ class _PotholeChecklistPDFViewerState extends State<PotholeChecklistPDFViewer> {
                   const SizedBox(height: 8),
                   Text('Learner ID: ${widget.learnerId}'),
                   Text('Assessment Date: ${widget.assessmentDate}'),
-                  if (totalPages != null)
-                    Text('Pages: $totalPages'),
-                  if (currentPage > 0)
-                    Text('Current Page: ${currentPage + 1}'),
+                  if (totalPages != null) Text('Pages: $totalPages'),
+                  if (currentPage > 0) Text('Current Page: ${currentPage + 1}'),
                 ],
               ),
             ),
           ),
-          
+
           // PDF Viewer
           Expanded(
             child: isLoading
@@ -3502,15 +3770,15 @@ class _PotholeChecklistPDFViewerState extends State<PotholeChecklistPDFViewer> {
   }
 }
 
-
 // PDF Viewer for Learner Answers
 class ModeratorPdfViewerScreen extends StatefulWidget {
   final String pdfUrl;
 
-  const ModeratorPdfViewerScreen({Key? key, required this.pdfUrl}) : super(key: key);
+  const ModeratorPdfViewerScreen({super.key, required this.pdfUrl});
 
   @override
-  _ModeratorPdfViewerScreenState createState() => _ModeratorPdfViewerScreenState();
+  _ModeratorPdfViewerScreenState createState() =>
+      _ModeratorPdfViewerScreenState();
 }
 
 class _ModeratorPdfViewerScreenState extends State<ModeratorPdfViewerScreen> {
@@ -3529,20 +3797,20 @@ class _ModeratorPdfViewerScreenState extends State<ModeratorPdfViewerScreen> {
   Future<void> _downloadAndSavePdf() async {
     try {
       print('[PDF Viewer] Downloading from: ${widget.pdfUrl}');
-      
+
       final response = await http.get(Uri.parse(widget.pdfUrl));
-      
+
       if (response.statusCode == 200) {
         final dir = await getTemporaryDirectory();
         final fileName = widget.pdfUrl.split('/').last;
         final file = File('${dir.path}/$fileName');
         await file.writeAsBytes(response.bodyBytes);
-        
+
         setState(() {
           _localPath = file.path;
           _isLoading = false;
         });
-        
+
         print('[PDF Viewer] Downloaded to: ${file.path}');
       } else {
         setState(() {
@@ -3610,15 +3878,14 @@ class _ModeratorPdfViewerScreenState extends State<ModeratorPdfViewerScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  if (_totalPages != null)
-                    Text('Total Pages: $_totalPages'),
+                  if (_totalPages != null) Text('Total Pages: $_totalPages'),
                   if (_currentPage > 0)
                     Text('Current Page: ${_currentPage + 1}'),
                 ],
               ),
             ),
           ),
-          
+
           // PDF Viewer
           Expanded(
             child: _isLoading
@@ -3698,12 +3965,11 @@ class _ModeratorPdfViewerScreenState extends State<ModeratorPdfViewerScreen> {
   }
 }
 
-
 // PDF Viewer Page for Reports
 class PdfViewerPage extends StatefulWidget {
   final String pdfPath;
 
-  const PdfViewerPage({Key? key, required this.pdfPath}) : super(key: key);
+  const PdfViewerPage({super.key, required this.pdfPath});
 
   @override
   _PdfViewerPageState createState() => _PdfViewerPageState();
@@ -3757,4 +4023,3 @@ class _PdfViewerPageState extends State<PdfViewerPage> {
     );
   }
 }
-

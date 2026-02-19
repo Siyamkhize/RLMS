@@ -17,12 +17,12 @@ class PoeBulkScanPage extends StatefulWidget {
   final List<Map<String, dynamic>> questions;
 
   const PoeBulkScanPage({
-    Key? key,
+    super.key,
     required this.learnerID,
     required this.unitStandard,
     required this.assessmentType,
     required this.questions,
-  }) : super(key: key);
+  });
 
   @override
   State<PoeBulkScanPage> createState() => _PoeBulkScanPageState();
@@ -31,8 +31,8 @@ class PoeBulkScanPage extends StatefulWidget {
 class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
   final ImagePicker _picker = ImagePicker();
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  
-  List<File> _scannedImages = [];
+
+  final List<File> _scannedImages = [];
   Set<String> _selectedQuestions = {};
   bool _isUploading = false;
   bool _selectAll = false;
@@ -60,7 +60,7 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
         setState(() {
           _scannedImages.add(File(image.path));
         });
-        
+
         FingerprintErrorHandler.showSuccess(
           context,
           'Document scanned! Total: ${_scannedImages.length}',
@@ -81,7 +81,7 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
         setState(() {
           _scannedImages.addAll(images.map((img) => File(img.path)));
         });
-        
+
         FingerprintErrorHandler.showSuccess(
           context,
           'Added ${images.length} documents! Total: ${_scannedImages.length}',
@@ -145,7 +145,7 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
     try {
       // First save to local database
       await _saveToLocalDatabase(synced: 0);
-      
+
       // Get the saved POE records
       final db = await _dbHelper.database;
       final unsyncedPoeRecords = await db.query(
@@ -153,19 +153,19 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
         where: 'learnerID = ? AND synced = 0',
         whereArgs: [widget.learnerID],
       );
-      
+
       int successCount = 0;
       int failCount = 0;
-      
+
       // Sync each POE record using sync_PoeOnline.php
       for (final poeRecord in unsyncedPoeRecords) {
         final exercise = poeRecord['exercise']?.toString() ?? '';
-        
+
         // Only sync records we just created (matching selected questions)
         if (!_selectedQuestions.contains(exercise)) {
           continue;
         }
-        
+
         final syncSuccess = await _syncSinglePoeRecord(poeRecord);
         if (syncSuccess) {
           successCount++;
@@ -180,9 +180,10 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
           failCount++;
         }
       }
-      
-      debugPrint('[POE_BULK] Sync complete: $successCount synced, $failCount failed');
-      
+
+      debugPrint(
+          '[POE_BULK] Sync complete: $successCount synced, $failCount failed');
+
       if (successCount > 0) {
         FingerprintErrorHandler.showSuccess(
           context,
@@ -194,7 +195,6 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
           'POE saved locally (${_selectedQuestions.length} questions). Will sync when online.',
         );
       }
-      
     } catch (e) {
       debugPrint('[POE_BULK] Upload error: $e');
       // Already saved locally, just show info
@@ -204,27 +204,29 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
       );
     }
   }
-  
+
   Future<bool> _syncSinglePoeRecord(Map<String, dynamic> poeRecord) async {
     try {
       final url = Uri.parse(AppConfig.syncPoeOnlineUrl);
       final request = http.MultipartRequest('POST', url);
-      
+
       // Add fields
       request.fields['learnerID'] = poeRecord['learnerID']?.toString() ?? '';
       request.fields['exercise'] = poeRecord['exercise']?.toString() ?? '';
       request.fields['type'] = poeRecord['type']?.toString() ?? '';
-      request.fields['submitted_at'] = poeRecord['submitted_at']?.toString() ?? DateTime.now().toIso8601String();
-      
+      request.fields['submitted_at'] = poeRecord['submitted_at']?.toString() ??
+          DateTime.now().toIso8601String();
+
       // Get file paths (comma-separated for multiple images)
       final filePaths = poeRecord['filePath']?.toString() ?? '';
       final pathList = filePaths.split(',').where((p) => p.isNotEmpty).toList();
-      
+
       if (pathList.isEmpty || !File(pathList[0]).existsSync()) {
-        debugPrint('[POE_BULK] No valid file for exercise ${poeRecord['exercise']}');
+        debugPrint(
+            '[POE_BULK] No valid file for exercise ${poeRecord['exercise']}');
         return false;
       }
-      
+
       // Use the first image file (sync_PoeOnline.php expects a single file)
       request.files.add(
         await http.MultipartFile.fromPath(
@@ -232,14 +234,15 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
           pathList[0],
         ),
       );
-      
-      debugPrint('[POE_BULK] Syncing exercise ${poeRecord['exercise']} to server...');
-      
+
+      debugPrint(
+          '[POE_BULK] Syncing exercise ${poeRecord['exercise']} to server...');
+
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      
+
       debugPrint('[POE_BULK] Response (${response.statusCode}): $responseBody');
-      
+
       if (response.statusCode == 200) {
         final responseData = json.decode(responseBody);
         if (responseData['success'] == true) {
@@ -247,9 +250,8 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
           return true;
         }
       }
-      
+
       return false;
-      
     } catch (e) {
       debugPrint('[POE_BULK] Error syncing POE record: $e');
       return false;
@@ -258,7 +260,7 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
 
   Future<void> _saveLocally() async {
     await _saveToLocalDatabase(synced: 0);
-    
+
     FingerprintErrorHandler.showInfo(
       context,
       'POE saved locally (${_selectedQuestions.length} questions). Will sync when online.',
@@ -269,7 +271,7 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
     try {
       final db = await _dbHelper.database;
       final timestamp = DateTime.now().toIso8601String();
-      
+
       // Save scanned images to app directory
       final appDir = await getApplicationDocumentsDirectory();
       final poeDir = Directory('${appDir.path}/POE');
@@ -279,7 +281,8 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
 
       List<String> savedPaths = [];
       for (int i = 0; i < _scannedImages.length; i++) {
-        final fileName = 'poe_${widget.learnerID}_${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
+        final fileName =
+            'poe_${widget.learnerID}_${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
         final savedPath = '${poeDir.path}/$fileName';
         await _scannedImages[i].copy(savedPath);
         savedPaths.add(savedPath);
@@ -290,7 +293,7 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
 
       // Insert a record for each selected question with the same document
       final batch = db.batch();
-      
+
       for (final exercise in _selectedQuestions) {
         batch.insert(
           'poe',
@@ -301,15 +304,17 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
             'filePath': documentPath,
             'submitted_at': timestamp,
             'synced': synced,
-            'logbook_text': widget.assessmentType == 'LogBook' ? _logbookText : '',
+            'logbook_text':
+                widget.assessmentType == 'LogBook' ? _logbookText : '',
           },
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
       }
 
       await batch.commit();
-      
-      debugPrint('[POE_BULK] Saved ${_selectedQuestions.length} questions with ${savedPaths.length} images (synced=$synced)');
+
+      debugPrint(
+          '[POE_BULK] Saved ${_selectedQuestions.length} questions with ${savedPaths.length} images (synced=$synced)');
     } catch (e) {
       debugPrint('[POE_BULK] Error saving to local database: $e');
       rethrow;
@@ -358,9 +363,9 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Scanned Documents Section
                   Text(
                     'Scanned Documents (${_scannedImages.length})',
@@ -369,9 +374,9 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  
+
                   const SizedBox(height: 12),
-                  
+
                   // Scan Buttons
                   Row(
                     children: [
@@ -402,9 +407,9 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Scanned Images Grid
                   if (_scannedImages.isNotEmpty)
                     SizedBox(
@@ -454,9 +459,9 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
                         },
                       ),
                     ),
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   // Questions Summary (All Auto-Tagged)
                   Card(
                     color: Colors.green[50],
@@ -464,7 +469,8 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
                       padding: const EdgeInsets.all(16),
                       child: Row(
                         children: [
-                          Icon(Icons.check_circle, color: Colors.green[700], size: 32),
+                          Icon(Icons.check_circle,
+                              color: Colors.green[700], size: 32),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
@@ -493,9 +499,9 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Questions List (Read-only display)
                   Text(
                     'Questions to be tagged:',
@@ -515,13 +521,15 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
                     child: Column(
                       children: widget.questions.map((question) {
                         final exercise = question['exercise']?.toString() ?? '';
-                        final questionType = question['question_type']?.toString() ?? '';
-                        
+                        final questionType =
+                            question['question_type']?.toString() ?? '';
+
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           child: Row(
                             children: [
-                              Icon(Icons.check_circle, color: Colors.green, size: 20),
+                              Icon(Icons.check_circle,
+                                  color: Colors.green, size: 20),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -535,9 +543,9 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
                       }).toList(),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // LogBook Text Field (if LogBook type)
                   if (widget.assessmentType == 'LogBook') ...[
                     const Text(
@@ -562,7 +570,7 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
                     ),
                     const SizedBox(height: 16),
                   ],
-                  
+
                   // Save Button
                   SizedBox(
                     width: double.infinity,
@@ -572,7 +580,8 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
                       icon: const Icon(Icons.cloud_upload),
                       label: const Text(
                         'Save & Sync POE',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orange,
@@ -586,4 +595,3 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
     );
   }
 }
-

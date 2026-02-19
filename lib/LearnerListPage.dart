@@ -6,7 +6,6 @@ import 'package:signature/signature.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 // import 'package:geolocator/geolocator.dart';  // Temporarily commented out
-import 'package:camera/camera.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
@@ -18,6 +17,7 @@ import 'ppe_sizes_page.dart';
 import 'database_helper.dart';
 
 import 'config.dart';
+
 class Learnerlistpage extends StatefulWidget {
   final String classID;
   final List<dynamic> learners;
@@ -179,7 +179,8 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
 
     // Individual server fetches disabled - data is already synced via main sync endpoint
     // This prevents FormatException errors from broken get_clocking_data.php endpoint
-    print('[LEARNER_LIST] Individual server fetches disabled - using main sync endpoint only');
+    print(
+        '[LEARNER_LIST] Individual server fetches disabled - using main sync endpoint only');
   }
 
   Future<void> _syncOfflineClockIns() async {
@@ -212,7 +213,8 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
   Future<void> _refreshDataWithoutClearingState() async {
     try {
       final dbHelper = DatabaseHelper();
-      final learnersWithClockingData = await dbHelper.getLearnersWithClockingData(widget.classID);
+      final learnersWithClockingData =
+          await dbHelper.getLearnersWithClockingData(widget.classID);
 
       setState(() {
         for (var learner in learnersWithClockingData) {
@@ -221,13 +223,19 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
           String clockOutTime = learner['clock_out_time']?.toString() ?? '';
           String contactTime = learner['contact_time']?.toString() ?? '';
 
-          if (clockInTime.isNotEmpty && clockInTime != 'N/A' && clockInTime != 'null') {
+          if (clockInTime.isNotEmpty &&
+              clockInTime != 'N/A' &&
+              clockInTime != 'null') {
             clockInTimes[learnerId] = clockInTime;
           }
-          if (clockOutTime.isNotEmpty && clockOutTime != 'N/A' && clockOutTime != 'null') {
+          if (clockOutTime.isNotEmpty &&
+              clockOutTime != 'N/A' &&
+              clockOutTime != 'null') {
             clockOutTimes[learnerId] = clockOutTime;
           }
-          if (contactTime.isNotEmpty && contactTime != 'N/A' && contactTime != 'null') {
+          if (contactTime.isNotEmpty &&
+              contactTime != 'N/A' &&
+              contactTime != 'null') {
             contactTimes[learnerId] = contactTime;
           }
         }
@@ -252,7 +260,8 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
   Future<void> _loadLearnersFromLocalDatabase() async {
     try {
       final dbHelper = DatabaseHelper();
-      final learnersWithClockingData = await dbHelper.getLearnersWithClockingData(widget.classID);
+      final learnersWithClockingData =
+          await dbHelper.getLearnersWithClockingData(widget.classID);
 
       setState(() {
         widget.learners.clear();
@@ -262,13 +271,19 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
           String clockOutTime = learner['clock_out_time']?.toString() ?? '';
           String contactTime = learner['contact_time']?.toString() ?? '';
 
-          if (clockInTime.isNotEmpty && clockInTime != 'N/A' && clockInTime != 'null') {
+          if (clockInTime.isNotEmpty &&
+              clockInTime != 'N/A' &&
+              clockInTime != 'null') {
             clockInTimes[learnerId] = clockInTime;
           }
-          if (clockOutTime.isNotEmpty && clockOutTime != 'N/A' && clockOutTime != 'null') {
+          if (clockOutTime.isNotEmpty &&
+              clockOutTime != 'N/A' &&
+              clockOutTime != 'null') {
             clockOutTimes[learnerId] = clockOutTime;
           }
-          if (contactTime.isNotEmpty && contactTime != 'N/A' && contactTime != 'null') {
+          if (contactTime.isNotEmpty &&
+              contactTime != 'N/A' &&
+              contactTime != 'null') {
             contactTimes[learnerId] = contactTime;
           }
 
@@ -292,7 +307,8 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
     }
   }
 
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+      double lat1, double lon1, double lat2, double lon2) {
     const double R = 6371e3; // Earth radius in meters
     final double phi1 = lat1 * pi / 180;
     final double phi2 = lat2 * pi / 180;
@@ -306,7 +322,8 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
     return R * c; // Distance in meters
   }
 
-  Future<bool> _isWithinSiteRadius(String classID, double userLat, double userLon, double userAccuracy) async {
+  Future<bool> _isWithinSiteRadius(String classID, double userLat,
+      double userLon, double userAccuracy) async {
     // Note: Accuracy validation removed to match PHP endpoint that accepts any accuracy
     print('Location accuracy: $userAccuracy meters');
 
@@ -318,7 +335,8 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
       final sites = await db.query('sites');
       print('Class table contents: $classes');
       print('Sites table contents: $sites');
-      print('Querying coordinates for classID: $classID (type: ${classID.runtimeType})');
+      print(
+          'Querying coordinates for classID: $classID (type: ${classID.runtimeType})');
 
       final result = await db.rawQuery(
         'SELECT s.latitude, s.longitude FROM class c JOIN sites s ON c.siteID = s.siteID WHERE c.classID = ?',
@@ -329,17 +347,20 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
         if (classes.isEmpty) {
           print('Class table is empty');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No class data available in local database.')),
+            const SnackBar(
+                content: Text('No class data available in local database.')),
           );
         } else if (sites.isEmpty) {
           print('Sites table is empty');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No site data available in local database.')),
+            const SnackBar(
+                content: Text('No site data available in local database.')),
           );
         } else {
           print('No matching class or site found for classID: $classID');
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('No site coordinates found for class $classID.')),
+            SnackBar(
+                content: Text('No site coordinates found for class $classID.')),
           );
         }
         return false;
@@ -349,9 +370,11 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
       final siteLon = double.tryParse(result.first['longitude'].toString());
 
       if (siteLat == null || siteLon == null) {
-        print('Invalid site coordinates for classID: $classID, lat: ${result.first['latitude']}, lon: ${result.first['longitude']}');
+        print(
+            'Invalid site coordinates for classID: $classID, lat: ${result.first['latitude']}, lon: ${result.first['longitude']}');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid site coordinates in database.')),
+          const SnackBar(
+              content: Text('Invalid site coordinates in database.')),
         );
         return false;
       }
@@ -362,7 +385,8 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
       // Note: Geofencing disabled to match PHP endpoint - distance calculated for logging only
       return true;
     } catch (e, stackTrace) {
-      print('Error checking site radius for classID $classID: $e\nStack trace: $stackTrace');
+      print(
+          'Error checking site radius for classID $classID: $e\nStack trace: $stackTrace');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error checking location: $e')),
       );
@@ -446,51 +470,65 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
       }
 
       // Temporarily disabled geolocator functionality
-      print('[LEARNER_LIST] Geolocator temporarily disabled - skipping location validation');
+      print(
+          '[LEARNER_LIST] Geolocator temporarily disabled - skipping location validation');
 
       // Prepare payload - updated to match new PHP script expectations
       final payload = {
         'LearnerID': learnerID,
         'clock_in': '1',
         'signature': base64Encode(signatureImage),
-        'user_latitude': '0.0', // Default coordinates since geolocator is disabled
-        'user_longitude': '0.0', // Default coordinates since geolocator is disabled
-        'user_accuracy': '10.0', // Default accuracy since geolocator is disabled
-        'isSynced': '0', // Changed from 'synced' to 'isSynced' to match PHP script
+        'user_latitude':
+            '0.0', // Default coordinates since geolocator is disabled
+        'user_longitude':
+            '0.0', // Default coordinates since geolocator is disabled
+        'user_accuracy':
+            '10.0', // Default accuracy since geolocator is disabled
+        'isSynced':
+            '0', // Changed from 'synced' to 'isSynced' to match PHP script
         'classID': widget.classID,
       };
 
       print('Sending online clock-in request for learnerID: $learnerID');
       print('Payload keys: ${payload.keys.toList()}');
-      print('Signature length: ${payload['signature']?.toString().length ?? 0} characters');
+      print(
+          'Signature length: ${payload['signature']?.toString().length ?? 0} characters');
 
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: payload,
-      ).timeout(const Duration(seconds: 30)); // Increased timeout for signature upload
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: payload,
+          )
+          .timeout(const Duration(
+              seconds: 30)); // Increased timeout for signature upload
 
-      print('Raw server response (status ${response.statusCode}): "${response.body}"');
+      print(
+          'Raw server response (status ${response.statusCode}): "${response.body}"');
 
       // Handle different response status codes
       if (response.statusCode == 500) {
-        throw Exception('Server internal error (500). Check PHP script logs. Response: "${response.body}"');
+        throw Exception(
+            'Server internal error (500). Check PHP script logs. Response: "${response.body}"');
       }
 
       if (response.statusCode != 200) {
-        throw Exception('HTTP error ${response.statusCode}. Response: "${response.body}"');
+        throw Exception(
+            'HTTP error ${response.statusCode}. Response: "${response.body}"');
       }
 
       // Check if response body is empty
       if (response.body.trim().isEmpty) {
-        throw Exception('Server returned empty response. Check PHP script for fatal errors.');
+        throw Exception(
+            'Server returned empty response. Check PHP script for fatal errors.');
       }
 
       dynamic result;
       try {
         result = jsonDecode(response.body);
       } catch (e) {
-        throw Exception('Failed to parse server response: $e. Raw response: "${response.body}"');
+        throw Exception(
+            'Failed to parse server response: $e. Raw response: "${response.body}"');
       }
 
       if (result is Map<String, dynamic> && result['success'] == true) {
@@ -513,11 +551,14 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
       print('Online clock-in failed for learnerID: $learnerID: $e');
 
       // If server error, suggest falling back to offline mode
-      if (e.toString().contains('500') || e.toString().contains('empty response')) {
-        print('Server appears to be down. Consider falling back to offline mode.');
+      if (e.toString().contains('500') ||
+          e.toString().contains('empty response')) {
+        print(
+            'Server appears to be down. Consider falling back to offline mode.');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Server error detected. Data will be saved locally and synced later.'),
+            content: Text(
+                'Server error detected. Data will be saved locally and synced later.'),
             duration: Duration(seconds: 5),
           ),
         );
@@ -527,7 +568,8 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
     }
   }
 
-  Future<void> _clockOutOnline(String learnerID, String signaturePath, {bool synced = false}) async {
+  Future<void> _clockOutOnline(String learnerID, String signaturePath,
+      {bool synced = false}) async {
     final url = Uri.parse(AppConfig.clockoutUrl);
     final currentDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
     try {
@@ -543,36 +585,45 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
         if (signatureImage != null) {
           signatureBase64 = base64Encode(signatureImage);
         } else {
-          print('Warning: Failed to generate signature image, sending empty signature.');
+          print(
+              'Warning: Failed to generate signature image, sending empty signature.');
         }
       } catch (e) {
-        print('Warning: Signature generation failed: $e, sending empty signature.');
+        print(
+            'Warning: Signature generation failed: $e, sending empty signature.');
       }
 
       // Temporarily disabled geolocator functionality
-      print('[LEARNER_LIST] Geolocator temporarily disabled - skipping location validation');
+      print(
+          '[LEARNER_LIST] Geolocator temporarily disabled - skipping location validation');
 
       // Prepare payload
       final payload = {
         'LearnerID': learnerID,
         'clock_out': '1',
         'signature': signatureBase64,
-        'user_latitude': '0.0', // Default coordinates since geolocator is disabled
-        'user_longitude': '0.0', // Default coordinates since geolocator is disabled
-        'user_accuracy': '10.0', // Default accuracy since geolocator is disabled
+        'user_latitude':
+            '0.0', // Default coordinates since geolocator is disabled
+        'user_longitude':
+            '0.0', // Default coordinates since geolocator is disabled
+        'user_accuracy':
+            '10.0', // Default accuracy since geolocator is disabled
         'synced': synced ? '1' : '0',
         'classID': widget.classID, // Added classID to payload
       };
 
       print('Sending online clock-out request: $payload');
 
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: payload,
-      ).timeout(const Duration(seconds: 30));
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: payload,
+          )
+          .timeout(const Duration(seconds: 30));
 
-      print('Raw server response (status ${response.statusCode}): "${response.body}"');
+      print(
+          'Raw server response (status ${response.statusCode}): "${response.body}"');
 
       dynamic result;
       try {
@@ -582,7 +633,9 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
         throw Exception('Failed to parse server response: ${response.body}');
       }
 
-      if (response.statusCode == 200 && result is Map<String, dynamic> && result['success'] == true) {
+      if (response.statusCode == 200 &&
+          result is Map<String, dynamic> &&
+          result['success'] == true) {
         String? contactTime = result['contact_time'];
         if (contactTime == null || contactTime.isEmpty) {
           final clockInTime = result['clock_in_time']?.toString();
@@ -590,11 +643,15 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
           if (clockInTime != null && clockOutTime != null) {
             try {
               final timeFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
-              final clockInDateTime = timeFormat.parse('$currentDate $clockInTime');
-              final clockOutDateTime = timeFormat.parse('$currentDate $clockOutTime');
-              final contactTimeDuration = clockOutDateTime.difference(clockInDateTime);
+              final clockInDateTime =
+                  timeFormat.parse('$currentDate $clockInTime');
+              final clockOutDateTime =
+                  timeFormat.parse('$currentDate $clockOutTime');
+              final contactTimeDuration =
+                  clockOutDateTime.difference(clockInDateTime);
               contactTime = formatDuration(contactTimeDuration);
-              print('Calculated contact time: $contactTime for learnerID=$learnerID');
+              print(
+                  'Calculated contact time: $contactTime for learnerID=$learnerID');
             } catch (e) {
               print('Error calculating contact time: $e');
             }
@@ -609,7 +666,8 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
           SnackBar(content: Text(result['message'])),
         );
       } else {
-        throw Exception('Server error: ${response.statusCode} - ${result['message'] ?? response.body}');
+        throw Exception(
+            'Server error: ${response.statusCode} - ${result['message'] ?? response.body}');
       }
     } catch (e) {
       print('Online clock-out failed: $e');
@@ -619,16 +677,19 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
 
   Future<void> _clockInOffline(String learnerID, String clockInTime) async {
     try {
-      print('Starting offline clock-in for learnerID: $learnerID at $clockInTime');
+      print(
+          'Starting offline clock-in for learnerID: $learnerID at $clockInTime');
       final dbHelper = DatabaseHelper();
       final clockDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
       // Temporarily disabled geolocator functionality
-      print('[LEARNER_LIST] Geolocator temporarily disabled - skipping location validation');
+      print(
+          '[LEARNER_LIST] Geolocator temporarily disabled - skipping location validation');
 
       // Save signature
       final appDir = await getApplicationDocumentsDirectory();
-      final signaturePath = '${appDir.path}/signature_${learnerID}_$clockDate.png';
+      final signaturePath =
+          '${appDir.path}/signature_${learnerID}_$clockDate.png';
       final signatureFile = File(signaturePath);
 
       final signatureImage = await _signatureController.toPngBytes();
@@ -639,7 +700,8 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
         return;
       }
       await signatureFile.writeAsBytes(signatureImage);
-      print('Signature saved at: $signaturePath, file exists: ${await signatureFile.exists()}');
+      print(
+          'Signature saved at: $signaturePath, file exists: ${await signatureFile.exists()}');
 
       // Store clock-in data
       final clockInData = {
@@ -648,9 +710,12 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
         'clock_date': clockDate,
         'signature': signaturePath,
         'synced': 0,
-        'user_latitude': '0.0', // Default coordinates since geolocator is disabled
-        'user_longitude': '0.0', // Default coordinates since geolocator is disabled
-        'user_accuracy': '10.0', // Default accuracy since geolocator is disabled
+        'user_latitude':
+            '0.0', // Default coordinates since geolocator is disabled
+        'user_longitude':
+            '0.0', // Default coordinates since geolocator is disabled
+        'user_accuracy':
+            '10.0', // Default accuracy since geolocator is disabled
         // 'classID': widget.classID, // Added classID for consistency
       };
 
@@ -663,10 +728,12 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Clock-in saved locally. Will sync when online.')),
+        const SnackBar(
+            content: Text('Clock-in saved locally. Will sync when online.')),
       );
     } catch (e, stackTrace) {
-      print('Offline clock-in error for learnerID: $learnerID: $e\nStack trace: $stackTrace');
+      print(
+          'Offline clock-in error for learnerID: $learnerID: $e\nStack trace: $stackTrace');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error saving offline clock-in: $e')),
       );
@@ -674,7 +741,8 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
     }
   }
 
-  Future<void> updateClockOut(String learnerID, String clockOutTime, String clockDate) async {
+  Future<void> updateClockOut(
+      String learnerID, String clockOutTime, String clockDate) async {
     try {
       final db = await DatabaseHelper().database;
       final existingRecords = await db.query(
@@ -697,7 +765,8 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
           final timeFormat = DateFormat('HH:mm:ss');
           final clockInDateTime = timeFormat.parse(clockInTime);
           final clockOutDateTime = timeFormat.parse(clockOutTime);
-          final contactTimeDuration = clockOutDateTime.difference(clockInDateTime);
+          final contactTimeDuration =
+              clockOutDateTime.difference(clockInDateTime);
           contactTime = formatDuration(contactTimeDuration);
         } catch (e) {
           print('Error calculating contact time: $e');
@@ -724,7 +793,8 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Clock-out saved locally. Will sync when online.')),
+        const SnackBar(
+            content: Text('Clock-out saved locally. Will sync when online.')),
       );
     } catch (e) {
       print('Offline clock-out error: $e');
@@ -785,7 +855,8 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
                           Navigator.of(context).pop(true);
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please provide a signature')),
+                            const SnackBar(
+                                content: Text('Please provide a signature')),
                           );
                         }
                       },
@@ -854,7 +925,8 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
                         Navigator.of(context).pop(true);
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Please provide a signature')),
+                          const SnackBar(
+                              content: Text('Please provide a signature')),
                         );
                       }
                     },
@@ -877,7 +949,8 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
       if (await _checkConnectivity()) {
         await _clockOutOnline(learnerID, signaturePath);
       } else {
-        await updateClockOut(learnerID, clockOutTime, DateFormat('yyyy-MM-dd').format(DateTime.now()));
+        await updateClockOut(learnerID, clockOutTime,
+            DateFormat('yyyy-MM-dd').format(DateTime.now()));
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -919,192 +992,219 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
             widget.learners.isEmpty
                 ? const Center(child: Text('No data available for this class'))
                 : Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.vertical,
-                  child: DataTable(
-                    columns: const [
-                      DataColumn(label: Text('Name')),
-                      DataColumn(label: Text('Surname')),
-                      DataColumn(label: Text('ID Number')),
-                      DataColumn(label: Text('Clock In Time')),
-                      DataColumn(label: Text('Clock Out Time')),
-                      DataColumn(label: Text('Contact Time')),
-                      DataColumn(
-                        label: Text(
-                          'Actions (Sick Note/Details/PPE)',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.vertical,
+                        child: DataTable(
+                          columns: const [
+                            DataColumn(label: Text('Name')),
+                            DataColumn(label: Text('Surname')),
+                            DataColumn(label: Text('ID Number')),
+                            DataColumn(label: Text('Clock In Time')),
+                            DataColumn(label: Text('Clock Out Time')),
+                            DataColumn(label: Text('Contact Time')),
+                            DataColumn(
+                              label: Text(
+                                'Actions (Sick Note/Details/PPE)',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                          rows: widget.learners.map((item) {
+                            String learnerID =
+                                item['LearnerID']?.toString() ?? '';
+                            String? clockInTime = clockInTimes[learnerID];
+                            String? clockOutTime = clockOutTimes[learnerID];
+                            String? contactTime = contactTimes[learnerID];
+
+                            return DataRow(
+                              cells: [
+                                DataCell(
+                                    Text(item['Name']?.toString() ?? 'N/A')),
+                                DataCell(
+                                    Text(item['Surname']?.toString() ?? 'N/A')),
+                                DataCell(Text(
+                                    item['IDNumber']?.toString() ?? 'N/A')),
+                                DataCell(
+                                  clockInTime != null && clockInTime.isNotEmpty
+                                      ? Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              clockInTime,
+                                              style: const TextStyle(
+                                                color: Colors.green,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            Text(
+                                              'Clocked In',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.green[800],
+                                              ),
+                                            ),
+                                          ],
+                                        )
+                                      : ElevatedButton(
+                                          onPressed: () async {
+                                            final success =
+                                                await clockInLearner(learnerID);
+                                            if (!success) {
+                                              print(
+                                                  'Clock-in failed for learnerID: $learnerID');
+                                            }
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.blue,
+                                            foregroundColor: Colors.white,
+                                          ),
+                                          child: const Text('Clock In'),
+                                        ),
+                                ),
+                                DataCell(
+                                  clockOutTime != null &&
+                                          clockOutTime.isNotEmpty
+                                      ? Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              clockOutTime,
+                                              style: const TextStyle(
+                                                color: Colors.red,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            Text(
+                                              'Clocked Out',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.red[800],
+                                              ),
+                                            ),
+                                          ],
+                                        )
+                                      : (clockInTime == null ||
+                                              clockInTime.isEmpty)
+                                          ? const Text('--',
+                                              style:
+                                                  TextStyle(color: Colors.grey))
+                                          : ElevatedButton(
+                                              onPressed: () =>
+                                                  clockOutLearner(learnerID),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.orange,
+                                                foregroundColor: Colors.white,
+                                              ),
+                                              child: const Text('Clock Out'),
+                                            ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    contactTime ?? '--',
+                                    style: TextStyle(
+                                      color: (contactTime != null &&
+                                              contactTime.isNotEmpty)
+                                          ? Colors.blue[800]
+                                          : Colors.grey,
+                                      fontWeight: (contactTime != null &&
+                                              contactTime.isNotEmpty)
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Tooltip(
+                                        message:
+                                            'Upload a sick note for this learner',
+                                        child: ElevatedButton.icon(
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    SickNotePage(
+                                                  learnerID:
+                                                      int.parse(learnerID),
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.blue[100],
+                                          ),
+                                          icon: const Icon(
+                                              Icons.medical_services,
+                                              size: 18),
+                                          label: const Text('Upload Sick Note'),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Tooltip(
+                                        message: 'View learner details',
+                                        child: ElevatedButton(
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    DetailsPage(
+                                                  learnerID:
+                                                      int.parse(learnerID),
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.white,
+                                          ),
+                                          child: const Text('Details'),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Tooltip(
+                                        message:
+                                            'Collect PPE sizes (Conti-Suits & Safety Boots)',
+                                        child: ElevatedButton.icon(
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    PPESizesPage(
+                                                  learnerID:
+                                                      int.parse(learnerID),
+                                                  learnerName:
+                                                      '${item['Name']} ${item['Surname']}',
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.green[100],
+                                          ),
+                                          icon: const Icon(Icons.checkroom,
+                                              size: 18),
+                                          label: const Text('PPE Sizes'),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            );
+                          }).toList(),
                         ),
                       ),
-                    ],
-                    rows: widget.learners.map((item) {
-                      String learnerID = item['LearnerID']?.toString() ?? '';
-                      String? clockInTime = clockInTimes[learnerID];
-                      String? clockOutTime = clockOutTimes[learnerID];
-                      String? contactTime = contactTimes[learnerID];
-
-                      return DataRow(
-                        cells: [
-                          DataCell(Text(item['Name']?.toString() ?? 'N/A')),
-                          DataCell(Text(item['Surname']?.toString() ?? 'N/A')),
-                          DataCell(Text(item['IDNumber']?.toString() ?? 'N/A')),
-                          DataCell(
-                            clockInTime != null && clockInTime.isNotEmpty
-                                ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  clockInTime,
-                                  style: const TextStyle(
-                                    color: Colors.green,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text(
-                                  'Clocked In',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.green[800],
-                                  ),
-                                ),
-                              ],
-                            )
-                                : ElevatedButton(
-                              onPressed: () async {
-                                final success = await clockInLearner(learnerID);
-                                if (!success) {
-                                  print('Clock-in failed for learnerID: $learnerID');
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                foregroundColor: Colors.white,
-                              ),
-                              child: const Text('Clock In'),
-                            ),
-                          ),
-                          DataCell(
-                            clockOutTime != null && clockOutTime.isNotEmpty
-                                ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  clockOutTime,
-                                  style: const TextStyle(
-                                    color: Colors.red,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text(
-                                  'Clocked Out',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.red[800],
-                                  ),
-                                ),
-                              ],
-                            )
-                                : (clockInTime == null || clockInTime.isEmpty)
-                                ? const Text('--', style: TextStyle(color: Colors.grey))
-                                : ElevatedButton(
-                              onPressed: () => clockOutLearner(learnerID),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange,
-                                foregroundColor: Colors.white,
-                              ),
-                              child: const Text('Clock Out'),
-                            ),
-                          ),
-                          DataCell(
-                            Text(
-                              contactTime ?? '--',
-                              style: TextStyle(
-                                color: (contactTime != null && contactTime.isNotEmpty)
-                                    ? Colors.blue[800]
-                                    : Colors.grey,
-                                fontWeight: (contactTime != null && contactTime.isNotEmpty)
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
-                              ),
-                            ),
-                          ),
-                          DataCell(
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Tooltip(
-                                  message: 'Upload a sick note for this learner',
-                                  child: ElevatedButton.icon(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => SickNotePage(
-                                            learnerID: int.parse(learnerID),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blue[100],
-                                    ),
-                                    icon: const Icon(Icons.medical_services, size: 18),
-                                    label: const Text('Upload Sick Note'),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Tooltip(
-                                  message: 'View learner details',
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => DetailsPage(
-                                            learnerID: int.parse(learnerID),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.white,
-                                    ),
-                                    child: const Text('Details'),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Tooltip(
-                                  message: 'Collect PPE sizes (Conti-Suits & Safety Boots)',
-                                  child: ElevatedButton.icon(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => PPESizesPage(
-                                            learnerID: int.parse(learnerID),
-                                            learnerName: '${item['Name']} ${item['Surname']}',
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green[100],
-                                    ),
-                                    icon: const Icon(Icons.checkroom, size: 18),
-                                    label: const Text('PPE Sizes'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
+                    ),
                   ),
-                ),
-              ),
-            ),
           ],
         ),
       ),

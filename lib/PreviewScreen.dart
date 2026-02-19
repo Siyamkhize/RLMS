@@ -6,7 +6,11 @@ import 'package:path_provider/path_provider.dart';
 
 class CroppingPage extends StatefulWidget {
   final String imagePath;
-  const CroppingPage({Key? key, required this.imagePath, required String type, required String exercise}) : super(key: key);
+  const CroppingPage(
+      {super.key,
+      required this.imagePath,
+      required String type,
+      required String exercise});
 
   @override
   _CroppingPageState createState() => _CroppingPageState();
@@ -29,14 +33,8 @@ class _CroppingPageState extends State<CroppingPage> {
       img.Image image = img.decodeImage(imageBytes)!; // Decode the image bytes
 
       // Get screen dimensions
-      final screenWidth = MediaQuery
-          .of(context)
-          .size
-          .width;
-      final screenHeight = MediaQuery
-          .of(context)
-          .size
-          .height;
+      final screenWidth = MediaQuery.of(context).size.width;
+      final screenHeight = MediaQuery.of(context).size.height;
 
       // Calculate crop dimensions proportional to the screen
       final cropWidth = screenWidth.toInt();
@@ -46,8 +44,8 @@ class _CroppingPageState extends State<CroppingPage> {
       final cropY = (image.height - cropHeight) ~/ 2;
 
       // Crop the image using calculated dimensions
-      img.Image cropped = img.copyCrop(
-          image, x: cropX, y: cropY, width: cropWidth, height: cropHeight);
+      img.Image cropped = img.copyCrop(image,
+          x: cropX, y: cropY, width: cropWidth, height: cropHeight);
 
       // Get the application documents directory
       final appDir = await getApplicationDocumentsDirectory();
@@ -94,24 +92,22 @@ class _CroppingPageState extends State<CroppingPage> {
             children: [
               croppedImage != null
                   ? FittedBox(
-                fit: BoxFit.contain,
-                // Ensures the image scales to fit within the screen while maintaining its aspect ratio
-                child: Container(
-                  width: MediaQuery
-                      .of(context)
-                      .size
-                      .width, // Set the width to fill the screen width
-                  height: MediaQuery
-                      .of(context)
-                      .size
-                      .height, // Set the height to use the entire screen height
-                  child: Image.file(
-                    croppedImage!,
-                    fit: BoxFit
-                        .contain, // Ensure the image scales proportionally within the container
-                  ),
-                ),
-              )
+                      fit: BoxFit.contain,
+                      // Ensures the image scales to fit within the screen while maintaining its aspect ratio
+                      child: SizedBox(
+                        width: MediaQuery.of(context)
+                            .size
+                            .width, // Set the width to fill the screen width
+                        height: MediaQuery.of(context)
+                            .size
+                            .height, // Set the height to use the entire screen height
+                        child: Image.file(
+                          croppedImage!,
+                          fit: BoxFit
+                              .contain, // Ensure the image scales proportionally within the container
+                        ),
+                      ),
+                    )
                   : const CircularProgressIndicator(),
               const SizedBox(height: 30),
               ElevatedButton(

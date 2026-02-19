@@ -4,10 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_doc_scanner/flutter_doc_scanner.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:image/image.dart' as img;
 import 'config.dart';
 
 class PoeDocumentScanner extends StatefulWidget {
@@ -110,7 +106,8 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
                     children: [
-                      const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                      const Icon(Icons.error_outline,
+                          color: Colors.red, size: 48),
                       const SizedBox(height: 12),
                       const Text(
                         '🔴 MAXIMUM: 100 Pages Per Batch',
@@ -157,7 +154,8 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
                   padding: const EdgeInsets.all(16.0),
                   child: Row(
                     children: [
-                      const Icon(Icons.picture_as_pdf, color: Colors.red, size: 32),
+                      const Icon(Icons.picture_as_pdf,
+                          color: Colors.red, size: 32),
                       const SizedBox(width: 12),
                       Expanded(
                         child: FutureBuilder<int>(
@@ -230,13 +228,13 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
                 onPressed: _isScanning ? null : _startScanning,
                 icon: _isScanning
                     ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
                     : const Icon(Icons.document_scanner),
                 label: Text(_isScanning ? 'Scanning...' : 'Start Scanning'),
                 style: ElevatedButton.styleFrom(
@@ -327,10 +325,10 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
           ],
         ),
       );
-      
+
       if (shouldContinue != true) return;
     }
-    
+
     setState(() {
       _isScanning = true;
       _statusMessage = 'Opening scanner... Scan continuously for best results!';
@@ -342,35 +340,36 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
       final dynamic scanResult = await FlutterDocScanner().getScanDocuments(
         page: 999, // Unlimited pages
       );
-      
+
       print('Scan Result: $scanResult');
-      
+
       if (scanResult is! Map ||
           !scanResult.containsKey('pdfUri') ||
           scanResult['pdfUri'] == null) {
         print('Invalid scan result: $scanResult');
         setState(() {
           _isScanning = false;
-          _statusMessage = 'Scanner session ended without saving. This happens when:\n'
+          _statusMessage =
+              'Scanner session ended without saving. This happens when:\n'
               '• You take long pauses (Android kills the scanner)\n'
               '• The document is too large (memory issues)\n'
               '• The app was backgrounded during scanning';
         });
-        
+
         // Show helpful message for large documents
         _showErrorDialog(
           'Scanner Session Lost',
           'The scanner session was terminated by Android. This commonly happens when:\n\n'
-          '❌ Taking long pauses between pages (>2-3 minutes)\n'
-          '❌ Scanning 100+ pages in one session\n'
-          '❌ Switching to other apps during scanning\n'
-          '❌ Device running low on memory\n\n'
-          'Solutions:\n'
-          '✓ Scan continuously without long pauses\n'
-          '✓ Scan in batches of 50-80 pages\n'
-          '✓ Keep this app in foreground\n'
-          '✓ Close other apps to free memory\n'
-          '✓ Restart device if problem persists',
+              '❌ Taking long pauses between pages (>2-3 minutes)\n'
+              '❌ Scanning 100+ pages in one session\n'
+              '❌ Switching to other apps during scanning\n'
+              '❌ Device running low on memory\n\n'
+              'Solutions:\n'
+              '✓ Scan continuously without long pauses\n'
+              '✓ Scan in batches of 50-80 pages\n'
+              '✓ Keep this app in foreground\n'
+              '✓ Close other apps to free memory\n'
+              '✓ Restart device if problem persists',
         );
         return;
       }
@@ -383,44 +382,47 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
       if (await file.exists()) {
         final fileSize = await file.length();
         print('PDF exists: ${file.path}, size: $fileSize bytes');
-        
+
         // Check if file is too large (> 150MB)
         if (fileSize > 150 * 1024 * 1024) {
           setState(() {
             _isScanning = false;
-            _statusMessage = 'PDF too large (${(fileSize / 1024 / 1024).toStringAsFixed(1)} MB). Maximum 150MB.';
+            _statusMessage =
+                'PDF too large (${(fileSize / 1024 / 1024).toStringAsFixed(1)} MB). Maximum 150MB.';
           });
           _showErrorDialog(
             'File Too Large',
             'The scanned PDF is ${(fileSize / 1024 / 1024).toStringAsFixed(1)} MB, which exceeds the 150MB limit.\n\n'
-            'Please scan fewer pages or reduce image quality.',
+                'Please scan fewer pages or reduce image quality.',
           );
           return;
         }
-        
+
         setState(() {
           _pdfFile = file;
           _scannedPages = [pdfPath]; // Store path for display
           _isScanning = false;
-          _statusMessage = 'PDF scanned successfully! Size: ${(fileSize / 1024 / 1024).toStringAsFixed(1)} MB\n'
+          _statusMessage =
+              'PDF scanned successfully! Size: ${(fileSize / 1024 / 1024).toStringAsFixed(1)} MB\n'
               'Tip: Upload now to avoid losing data!';
         });
-        
+
         _showSnackBar('PDF document scanned successfully! Upload it now.');
       } else {
         print('Error: PDF does not exist at $pdfPath');
         setState(() {
           _isScanning = false;
-          _statusMessage = 'PDF file not found. Scanner session was terminated.';
+          _statusMessage =
+              'PDF file not found. Scanner session was terminated.';
         });
-        
+
         _showErrorDialog(
           'Scanner Session Lost',
           'The scanner failed to save the PDF file. This happens when:\n\n'
-          '• Android terminated the scanner due to long idle time\n'
-          '• The document was too large for available memory\n'
-          '• The app was backgrounded during scanning\n\n'
-          'Solution: Scan in smaller batches (50-80 pages) without long pauses.',
+              '• Android terminated the scanner due to long idle time\n'
+              '• The document was too large for available memory\n'
+              '• The app was backgrounded during scanning\n\n'
+              'Solution: Scan in smaller batches (50-80 pages) without long pauses.',
         );
       }
     } catch (e, stackTrace) {
@@ -429,33 +431,33 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
         _isScanning = false;
         _statusMessage = 'Scanning error: $e';
       });
-      
+
       // Check for plugin initialization error
       if (e.toString().contains('UninitializedPropertyAccessException') ||
           e.toString().contains('resultChannel')) {
         _showErrorDialog(
           'Scanner Plugin Error',
           'The scanner plugin encountered an error. This can happen when scanning multiple times.\n\n'
-          'Solutions:\n'
-          '• Close this screen and open it again\n'
-          '• Restart the app\n'
-          '• If problem persists, restart your device\n\n'
-          'Your previous scan was saved successfully.',
+              'Solutions:\n'
+              '• Close this screen and open it again\n'
+              '• Restart the app\n'
+              '• If problem persists, restart your device\n\n'
+              'Your previous scan was saved successfully.',
         );
         return;
       }
-      
+
       // Check if it's the Google ML Kit cache error
-      if (e.toString().contains('FileNotFoundException') || 
+      if (e.toString().contains('FileNotFoundException') ||
           e.toString().contains('ENOENT')) {
         _showErrorDialog(
           'Scanner Cache Error',
           'The document scanner ran out of cache space. This typically happens with very large documents (100+ pages).\n\n'
-          'Solutions:\n'
-          '• Scan in smaller batches (50-100 pages)\n'
-          '• Clear app cache and try again\n'
-          '• Restart the device\n'
-          '• Free up device storage',
+              'Solutions:\n'
+              '• Scan in smaller batches (50-100 pages)\n'
+              '• Clear app cache and try again\n'
+              '• Restart the device\n'
+              '• Free up device storage',
         );
       } else {
         _showErrorDialog('Scanning Error', 'Error: $e');
@@ -498,7 +500,7 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
 
     print('=== Starting POE Document Upload ===');
     print('File path: ${_pdfFile!.path}');
-    
+
     setState(() {
       _isUploading = true;
       _uploadProgress = 0.0;
@@ -507,15 +509,16 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
 
     try {
       final fileSize = await _pdfFile!.length();
-      print('File size: $fileSize bytes (${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB)');
-      
+      print(
+          'File size: $fileSize bytes (${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB)');
+
       // ALWAYS use chunked upload since server requires it
       // Server is configured to only accept chunked uploads
       print('Using chunked upload (server requirement)...');
       await _uploadChunked();
 
       print('Upload completed successfully!');
-      
+
       if (mounted) {
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
@@ -529,7 +532,7 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
             duration: const Duration(seconds: 2),
           ),
         );
-        
+
         // Close the scanner screen after successful upload
         // This prevents the plugin initialization error on subsequent scans
         await Future.delayed(const Duration(seconds: 2));
@@ -544,14 +547,15 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
         _isUploading = false;
         _statusMessage = 'Upload failed: $e';
       });
-      
+
       // Show error dialog
       if (mounted) {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Upload Failed'),
-            content: Text('Error: $e\n\nPlease try again or contact support if the problem persists.'),
+            content: Text(
+                'Error: $e\n\nPlease try again or contact support if the problem persists.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
@@ -566,17 +570,19 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
 
   Future<void> _uploadDirect() async {
     print('Starting direct upload...');
-    
+
     // Use AppConfig to get the correct base URL
     // TEMPORARY: Using strict-mode-fixed endpoint to resolve 500 error
-    final uri = Uri.parse('${AppConfig.baseUrl}/upload_poe_document_strict_fixed.php');
+    final uri =
+        Uri.parse('${AppConfig.baseUrl}/upload_poe_document_strict_fixed.php');
     print('Upload URL: $uri');
 
     var request = http.MultipartRequest('POST', uri);
 
     request.fields['learner_id'] = widget.learnerId.toString();
     request.fields['learner_name'] = widget.learnerName;
-    request.fields['document_type'] = widget.partNumber != null ? 'POE_PART' : 'POE';
+    request.fields['document_type'] =
+        widget.partNumber != null ? 'POE_PART' : 'POE';
     request.fields['page_count'] = '0'; // Unknown page count from scanner
 
     if (widget.classId != null) {
@@ -589,12 +595,13 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
       request.fields['uploaded_by'] = widget.uploadedBy!;
     }
     if (widget.partNumber != null) {
-      request.fields['notes'] = 'Part ${widget.partNumber}${widget.totalParts != null ? ' of ${widget.totalParts}' : ''}';
+      request.fields['notes'] =
+          'Part ${widget.partNumber}${widget.totalParts != null ? ' of ${widget.totalParts}' : ''}';
     }
 
     print('Request fields: ${request.fields}');
     print('Adding file: ${_pdfFile!.path}');
-    
+
     request.files.add(
       await http.MultipartFile.fromPath('poe_document', _pdfFile!.path),
     );
@@ -606,19 +613,19 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
     print('Sending request...');
     final response = await request.send();
     final responseBody = await response.stream.bytesToString();
-    
+
     print('Response status: ${response.statusCode}');
     print('Response body: $responseBody');
 
-    if (response.statusCode == 200) { 
+    if (response.statusCode == 200) {
       try {
         final jsonResponse = json.decode(responseBody);
         print('Parsed JSON response: $jsonResponse');
-        
+
         if (jsonResponse['success'] != true) {
           throw Exception(jsonResponse['message'] ?? 'Upload failed');
         }
-        
+
         print('Direct upload successful!');
       } catch (e) {
         print('Error parsing response: $e');
@@ -630,130 +637,137 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
     }
   }
 
- Future<void> _uploadChunked() async {
-  print('Starting chunked upload...');
-  const chunkSize = 2 * 1024 * 1024; // 2MB chunks
-  
-  try {
-    // CRITICAL FIX: Don't load entire file into memory!
-    // For 200 pages (~50MB+), this causes out-of-memory crash
-    // Instead, read file size and stream chunks directly from disk
-    final fileSize = await _pdfFile!.length();
-    print('File size: $fileSize bytes (${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB)');
-    
-    final totalChunks = (fileSize / chunkSize).ceil();
-    final fileId = DateTime.now().millisecondsSinceEpoch.toString();
-    
-    print('Total chunks: $totalChunks, File ID: $fileId');
+  Future<void> _uploadChunked() async {
+    print('Starting chunked upload...');
+    const chunkSize = 2 * 1024 * 1024; // 2MB chunks
 
-    // Open file for reading
-    final randomAccessFile = await _pdfFile!.open(mode: FileMode.read);
-    
     try {
-      for (int i = 0; i < totalChunks; i++) {
-        print('Uploading chunk ${i + 1} of $totalChunks...');
-        
-        final start = i * chunkSize;
-        final end = min(start + chunkSize, fileSize);
-        final chunkLength = end - start;
-        
-        // Read only this chunk from disk (memory efficient!)
-        await randomAccessFile.setPosition(start);
-        final chunk = await randomAccessFile.read(chunkLength);
-        
-        print('Chunk $i: ${chunk.length} bytes (from $start to $end)');
+      // CRITICAL FIX: Don't load entire file into memory!
+      // For 200 pages (~50MB+), this causes out-of-memory crash
+      // Instead, read file size and stream chunks directly from disk
+      final fileSize = await _pdfFile!.length();
+      print(
+          'File size: $fileSize bytes (${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB)');
 
-        // TEMPORARY: Using strict-mode-fixed endpoint to resolve 500 error
-        final uri = Uri.parse('${AppConfig.baseUrl}/upload_poe_document_strict_fixed.php');
-        print('[CONFIG] Base URL: ${AppConfig.baseUrl}');
-        print('Upload URL: $uri');
-        
-        var request = http.MultipartRequest('POST', uri);
+      final totalChunks = (fileSize / chunkSize).ceil();
+      final fileId = DateTime.now().millisecondsSinceEpoch.toString();
 
-        request.fields['chunk_index'] = i.toString();
-        request.fields['total_chunks'] = totalChunks.toString();
-        request.fields['file_id'] = fileId;
-        request.fields['file_extension'] = 'pdf';
-        
-        // Send metadata with EVERY chunk
-        request.fields['learner_id'] = widget.learnerId.toString();
-        request.fields['learner_name'] = widget.learnerName;
-        request.fields['document_type'] = widget.partNumber != null ? 'POE_PART' : 'POE';
-        request.fields['page_count'] = '0';
-        
-        if (widget.classId != null) {
-          request.fields['class_id'] = widget.classId!;
-        }
-        if (widget.siteName != null) {
-          request.fields['site_name'] = widget.siteName!;
-        }
-        if (widget.uploadedBy != null) {
-          request.fields['uploaded_by'] = widget.uploadedBy!;
-        }
-        if (widget.partNumber != null) {
-          request.fields['notes'] = 'Part ${widget.partNumber}${widget.totalParts != null ? ' of ${widget.totalParts}' : ''}';
-        }
+      print('Total chunks: $totalChunks, File ID: $fileId');
 
-        // Send chunk as multipart file (not base64)
-        // PHP expects $_FILES['chunk']
-        request.files.add(
-          http.MultipartFile.fromBytes(
-            'chunk',
-            chunk,
-            filename: 'chunk_$i.bin',
-          ),
-        );
-        
-        print('Sending chunk ${i + 1}...');
-        final response = await request.send();
-        final responseBody = await response.stream.bytesToString();
-        
-        print('Chunk ${i + 1} response status: ${response.statusCode}');
-        print('Chunk ${i + 1} response body: $responseBody');
+      // Open file for reading
+      final randomAccessFile = await _pdfFile!.open(mode: FileMode.read);
 
-        if (response.statusCode != 200) {
-          throw Exception('Chunk $i upload failed: HTTP ${response.statusCode}');
-        }
-        
-        try {
-          final jsonResponse = json.decode(responseBody);
-          if (jsonResponse['success'] != true) {
-            throw Exception('Chunk $i failed: ${jsonResponse['message'] ?? 'Unknown error'}');
+      try {
+        for (int i = 0; i < totalChunks; i++) {
+          print('Uploading chunk ${i + 1} of $totalChunks...');
+
+          final start = i * chunkSize;
+          final end = min(start + chunkSize, fileSize);
+          final chunkLength = end - start;
+
+          // Read only this chunk from disk (memory efficient!)
+          await randomAccessFile.setPosition(start);
+          final chunk = await randomAccessFile.read(chunkLength);
+
+          print('Chunk $i: ${chunk.length} bytes (from $start to $end)');
+
+          // TEMPORARY: Using strict-mode-fixed endpoint to resolve 500 error
+          final uri = Uri.parse(
+              '${AppConfig.baseUrl}/upload_poe_document_strict_fixed.php');
+          print('[CONFIG] Base URL: ${AppConfig.baseUrl}');
+          print('Upload URL: $uri');
+
+          var request = http.MultipartRequest('POST', uri);
+
+          request.fields['chunk_index'] = i.toString();
+          request.fields['total_chunks'] = totalChunks.toString();
+          request.fields['file_id'] = fileId;
+          request.fields['file_extension'] = 'pdf';
+
+          // Send metadata with EVERY chunk
+          request.fields['learner_id'] = widget.learnerId.toString();
+          request.fields['learner_name'] = widget.learnerName;
+          request.fields['document_type'] =
+              widget.partNumber != null ? 'POE_PART' : 'POE';
+          request.fields['page_count'] = '0';
+
+          if (widget.classId != null) {
+            request.fields['class_id'] = widget.classId!;
           }
-          
-          print('Chunk ${i + 1} uploaded successfully');
-          
-          // Optional: Log the chunk size verification from server response
-          if (jsonResponse.containsKey('chunk_size')) {
-            print('Server confirmed chunk size: ${jsonResponse['chunk_size']} bytes');
+          if (widget.siteName != null) {
+            request.fields['site_name'] = widget.siteName!;
           }
-        } catch (e) {
-          print('Error parsing response for chunk $i: $e');
-          print('Raw response: $responseBody');
-          throw Exception('Invalid response for chunk $i: $e');
-        }
+          if (widget.uploadedBy != null) {
+            request.fields['uploaded_by'] = widget.uploadedBy!;
+          }
+          if (widget.partNumber != null) {
+            request.fields['notes'] =
+                'Part ${widget.partNumber}${widget.totalParts != null ? ' of ${widget.totalParts}' : ''}';
+          }
 
-        setState(() {
-          _uploadProgress = (i + 1) / totalChunks;
-          _statusMessage = 'Uploading chunk ${i + 1} of $totalChunks...';
-        });
-        
-        // Clear chunk from memory immediately
-        // This is critical for large files to prevent memory buildup
+          // Send chunk as multipart file (not base64)
+          // PHP expects $_FILES['chunk']
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              'chunk',
+              chunk,
+              filename: 'chunk_$i.bin',
+            ),
+          );
+
+          print('Sending chunk ${i + 1}...');
+          final response = await request.send();
+          final responseBody = await response.stream.bytesToString();
+
+          print('Chunk ${i + 1} response status: ${response.statusCode}');
+          print('Chunk ${i + 1} response body: $responseBody');
+
+          if (response.statusCode != 200) {
+            throw Exception(
+                'Chunk $i upload failed: HTTP ${response.statusCode}');
+          }
+
+          try {
+            final jsonResponse = json.decode(responseBody);
+            if (jsonResponse['success'] != true) {
+              throw Exception(
+                  'Chunk $i failed: ${jsonResponse['message'] ?? 'Unknown error'}');
+            }
+
+            print('Chunk ${i + 1} uploaded successfully');
+
+            // Optional: Log the chunk size verification from server response
+            if (jsonResponse.containsKey('chunk_size')) {
+              print(
+                  'Server confirmed chunk size: ${jsonResponse['chunk_size']} bytes');
+            }
+          } catch (e) {
+            print('Error parsing response for chunk $i: $e');
+            print('Raw response: $responseBody');
+            throw Exception('Invalid response for chunk $i: $e');
+          }
+
+          setState(() {
+            _uploadProgress = (i + 1) / totalChunks;
+            _statusMessage = 'Uploading chunk ${i + 1} of $totalChunks...';
+          });
+
+          // Clear chunk from memory immediately
+          // This is critical for large files to prevent memory buildup
+        }
+      } finally {
+        // Always close the file handle
+        await randomAccessFile.close();
+        print('File handle closed');
       }
-    } finally {
-      // Always close the file handle
-      await randomAccessFile.close();
-      print('File handle closed');
+
+      print('All chunks uploaded successfully!');
+    } catch (e, stackTrace) {
+      print('Chunked upload error: $e');
+      print('Stack trace: $stackTrace');
+      rethrow;
     }
-    
-    print('All chunks uploaded successfully!');
-  } catch (e, stackTrace) {
-    print('Chunked upload error: $e');
-    print('Stack trace: $stackTrace');
-    rethrow;
   }
-}
 
   void _clearScannedPages() {
     setState(() {

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'admin.dart';
 
@@ -6,14 +5,14 @@ class SdpLearningPathwaysPage extends StatefulWidget {
   final String sdpIdentifier;
   final String projectId;
   final String projectName;
-  final String projectPathwayJson;
+  final List<Map<String, dynamic>>? pathways;
 
   const SdpLearningPathwaysPage({
     super.key,
     required this.sdpIdentifier,
     required this.projectId,
     required this.projectName,
-    required this.projectPathwayJson,
+    this.pathways,
   });
 
   @override
@@ -28,74 +27,17 @@ class _SdpLearningPathwaysPageState extends State<SdpLearningPathwaysPage> {
   @override
   void initState() {
     super.initState();
-    _parsePathways();
-  }
-
-  void _parsePathways() {
-    setState(() => _isLoading = true);
-
-    try {
-      if (widget.projectPathwayJson.isEmpty ||
-          widget.projectPathwayJson == '[]') {
-        setState(() {
-          _pathways = [];
-          _isLoading = false;
-        });
-        return;
-      }
-
-      final List<dynamic> pathwayList = jsonDecode(widget.projectPathwayJson);
-
-      final List<Map<String, dynamic>> parsedPathways = [];
-
-      for (var pathway in pathwayList) {
-        if (pathway is Map) {
-          final pathwayId = pathway['id']?.toString() ?? '';
-          final pathwayName = pathway['name']?.toString() ?? 'Unknown Pathway';
-          final isInternship = pathway['isInternship'] ?? false;
-
-          // Extract qualifications
-          final qualTypes = pathway['qual_types'] as List<dynamic>? ?? [];
-          final List<Map<String, dynamic>> qualifications = [];
-
-          for (var qualType in qualTypes) {
-            if (qualType is Map && qualType['qualification'] != null) {
-              final qual = qualType['qualification'] as Map;
-              qualifications.add({
-                'id': qual['id']?.toString() ?? '',
-                'name': qual['name']?.toString() ?? 'Unknown Qualification',
-                'employment_status':
-                    qual['employment_status']?.toString() ?? '',
-                'num_participants': qual['num_participants']?.toString() ?? '',
-                'qual_type': qualType['qual_type']?.toString() ?? '',
-              });
-            }
-          }
-
-          parsedPathways.add({
-            'id': pathwayId,
-            'name': pathwayName,
-            'isInternship': isInternship,
-            'qualifications': qualifications,
-          });
-        }
-      }
-
+    // Use pathways from login if available
+    if (widget.pathways != null && widget.pathways!.isNotEmpty) {
       setState(() {
-        _pathways = parsedPathways;
+        _pathways = widget.pathways!;
         _isLoading = false;
       });
-    } catch (e) {
-      debugPrint('[SDP_PATHWAYS] Error parsing pathways: $e');
+    } else {
       setState(() {
         _pathways = [];
         _isLoading = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error parsing pathways: $e')),
-        );
-      }
     }
   }
 
@@ -141,73 +83,127 @@ class _SdpLearningPathwaysPageState extends State<SdpLearningPathwaysPage> {
                   itemCount: _pathways.length,
                   itemBuilder: (context, index) {
                     final pathway = _pathways[index];
-                    final qualifications = pathway['qualifications']
-                            as List<Map<String, dynamic>>? ??
-                        [];
+                    final qualTypes = pathway['qual_types'] as List? ?? [];
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
+                      elevation: 3,
                       child: ExpansionTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.green,
+                          child: Icon(
+                            pathway['is_internship'] == true
+                                ? Icons.work
+                                : Icons.school,
+                            color: Colors.white,
+                          ),
+                        ),
                         title: Text(
-                          pathway['name'] ?? 'Unknown Pathway',
+                          pathway['pathway_name'] ?? 'Unknown Pathway',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                           ),
                         ),
-                        subtitle: Text(
-                          pathway['isInternship'] == true
-                              ? 'Internship Programme'
-                              : 'Training Programme',
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              pathway['is_internship'] == true
+                                  ? 'Internship Programme'
+                                  : 'Training Programme',
+                              style: TextStyle(fontSize: 13),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Sites: ${pathway['site_count'] ?? 0}',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ],
                         ),
                         children: [
-                          if (qualifications.isEmpty)
+                          // Display qualifications
+                          if (qualTypes.isEmpty)
                             const Padding(
                               padding: EdgeInsets.all(16),
                               child: Text('No qualifications available'),
                             )
                           else
-                            ...qualifications.map((qual) {
+                            ...qualTypes.map((qualType) {
+                              final qual = qualType['qualification'] as Map?;
+                              if (qual == null) return SizedBox.shrink();
+
                               return ListTile(
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 24,
                                   vertical: 8,
                                 ),
-                                title: Text(qual['name'] ?? 'Unknown'),
+                                leading: Icon(Icons.verified,
+                                    color: Colors.orange, size: 20),
+                                title: Text(
+                                  qual['name']?.toString() ?? 'Unknown',
+                                  style: TextStyle(fontSize: 14),
+                                ),
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    if (qual['qual_type']?.isNotEmpty == true)
-                                      Text('Type: ${qual['qual_type']}'),
-                                    if (qual['employment_status']?.isNotEmpty ==
+                                    if (qualType['qual_type']
+                                            ?.toString()
+                                            .isNotEmpty ==
+                                        true)
+                                      Text('Type: ${qualType['qual_type']}',
+                                          style: TextStyle(fontSize: 12)),
+                                    if (qual['employment_status']
+                                            ?.toString()
+                                            .isNotEmpty ==
                                         true)
                                       Text(
-                                          'Status: ${qual['employment_status']}'),
-                                    if (qual['num_participants']?.isNotEmpty ==
+                                          'Status: ${qual['employment_status']}',
+                                          style: TextStyle(fontSize: 12)),
+                                    if (qual['num_participants']
+                                            ?.toString()
+                                            .isNotEmpty ==
                                         true)
                                       Text(
-                                          'Participants: ${qual['num_participants']}'),
+                                          'Participants: ${qual['num_participants']}',
+                                          style: TextStyle(fontSize: 12)),
                                   ],
                                 ),
-                                trailing: ElevatedButton(
-                                  onPressed: () {
-                                    // Navigate to sites filtered by this project and pathway
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => AdminPage(
-                                          sdp: widget.sdpIdentifier,
-                                          data: const [],
-                                          projectId: widget.projectId,
-                                          pathwayId: pathway['id']?.toString(),
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  child: const Text('View Sites'),
-                                ),
                               );
-                            }).toList(),
+                            }),
+                          // View Sites button
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                // Navigate to AdminPage with sites data
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => AdminPage(
+                                      sdp: widget.sdpIdentifier,
+                                      data: List<Map<String, dynamic>>.from(
+                                          pathway['sites'] ?? []),
+                                      projectId: widget.projectId,
+                                      pathwayId:
+                                          pathway['pathway_id']?.toString(),
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: Icon(Icons.location_on),
+                              label: Text(
+                                  'View ${pathway['site_count'] ?? 0} Sites'),
+                              style: ElevatedButton.styleFrom(
+                                minimumSize: Size(double.infinity, 45),
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     );

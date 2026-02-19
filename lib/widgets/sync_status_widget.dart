@@ -7,13 +7,13 @@ import 'package:intl/intl.dart';
 class SyncStatusWidget extends StatefulWidget {
   final String? classID;
   final VoidCallback? onSyncComplete;
-  
+
   const SyncStatusWidget({
-    Key? key,
+    super.key,
     this.classID,
     this.onSyncComplete,
-  }) : super(key: key);
-  
+  });
+
   @override
   State<SyncStatusWidget> createState() => _SyncStatusWidgetState();
 }
@@ -23,13 +23,13 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
   bool _isOnline = false;
   bool _isSyncing = false;
   DateTime? _lastSyncTime;
-  
+
   @override
   void initState() {
     super.initState();
     _checkConnectivity();
     _updateSyncStatus();
-    
+
     // Listen for connectivity changes
     Connectivity().onConnectivityChanged.listen((result) {
       if (mounted) {
@@ -39,7 +39,7 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
       }
     });
   }
-  
+
   Future<void> _checkConnectivity() async {
     final result = await Connectivity().checkConnectivity();
     if (mounted) {
@@ -48,7 +48,7 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
       });
     }
   }
-  
+
   void _updateSyncStatus() {
     if (mounted) {
       setState(() {
@@ -57,7 +57,7 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
       });
     }
   }
-  
+
   Future<void> _triggerManualSync() async {
     if (_isSyncing) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -68,7 +68,7 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
       );
       return;
     }
-    
+
     if (!_isOnline) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -78,20 +78,20 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
       );
       return;
     }
-    
+
     setState(() {
       _isSyncing = true;
     });
-    
+
     try {
       final result = await _syncService.syncAllData();
-      
+
       if (mounted) {
         setState(() {
           _isSyncing = false;
           _lastSyncTime = DateTime.now();
         });
-        
+
         if (result.success) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -101,7 +101,7 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
               backgroundColor: Colors.green,
             ),
           );
-          
+
           // Notify parent
           widget.onSyncComplete?.call();
         } else {
@@ -118,7 +118,7 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
         setState(() {
           _isSyncing = false;
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Sync error: $e'),
@@ -128,15 +128,15 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
       }
     }
   }
-  
+
   String _formatLastSyncTime() {
     if (_lastSyncTime == null) {
       return 'Never synced';
     }
-    
+
     final now = DateTime.now();
     final difference = now.difference(_lastSyncTime!);
-    
+
     if (difference.inMinutes < 1) {
       return 'Just now';
     } else if (difference.inMinutes < 60) {
@@ -147,7 +147,7 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
       return DateFormat('MMM d, HH:mm').format(_lastSyncTime!);
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -170,7 +170,7 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
             size: 20,
           ),
           const SizedBox(width: 8),
-          
+
           // Status text
           Expanded(
             child: Column(
@@ -181,7 +181,9 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
                   _isOnline ? 'Online' : 'Offline Mode',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: _isOnline ? Colors.green.shade700 : Colors.orange.shade700,
+                    color: _isOnline
+                        ? Colors.green.shade700
+                        : Colors.orange.shade700,
                     fontSize: 12,
                   ),
                 ),
@@ -195,7 +197,7 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
               ],
             ),
           ),
-          
+
           // Sync button
           if (_isOnline)
             _isSyncing
@@ -223,24 +225,25 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
 /// Compact version for app bar
 class CompactSyncStatusWidget extends StatefulWidget {
   final VoidCallback? onTap;
-  
+
   const CompactSyncStatusWidget({
-    Key? key,
+    super.key,
     this.onTap,
-  }) : super(key: key);
-  
+  });
+
   @override
-  State<CompactSyncStatusWidget> createState() => _CompactSyncStatusWidgetState();
+  State<CompactSyncStatusWidget> createState() =>
+      _CompactSyncStatusWidgetState();
 }
 
 class _CompactSyncStatusWidgetState extends State<CompactSyncStatusWidget> {
   bool _isOnline = false;
-  
+
   @override
   void initState() {
     super.initState();
     _checkConnectivity();
-    
+
     Connectivity().onConnectivityChanged.listen((result) {
       if (mounted) {
         setState(() {
@@ -249,7 +252,7 @@ class _CompactSyncStatusWidgetState extends State<CompactSyncStatusWidget> {
       }
     });
   }
-  
+
   Future<void> _checkConnectivity() async {
     final result = await Connectivity().checkConnectivity();
     if (mounted) {
@@ -258,7 +261,7 @@ class _CompactSyncStatusWidgetState extends State<CompactSyncStatusWidget> {
       });
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -283,7 +286,8 @@ class _CompactSyncStatusWidgetState extends State<CompactSyncStatusWidget> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: _isOnline ? Colors.green.shade700 : Colors.orange.shade700,
+                color:
+                    _isOnline ? Colors.green.shade700 : Colors.orange.shade700,
               ),
             ),
           ],

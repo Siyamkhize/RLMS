@@ -182,7 +182,10 @@ class Learner {
 class LearnerListPage extends StatefulWidget {
   final String classID;
 
-  const LearnerListPage({super.key, required this.classID});
+  const LearnerListPage({
+    super.key,
+    required this.classID,
+  });
 
   @override
   _LearnerListPageState createState() => _LearnerListPageState();
@@ -906,51 +909,19 @@ class _LearnerListPageState extends State<LearnerListPage> {
 
   Future<void> testBankDataInsertion() async {
     try {
-      print('Testing bank data insertion...');
-      final dbHelper = DatabaseHelper();
-      
-      // Test data
-      final testLearnerData = {
-        'classID': widget.classID,
-        'Title': 'Mr.',
-        'Name': 'Test',
-        'Surname': 'BankUser',
-        'IDNumber': '1234567890123',
-        'DateOfBirth': '1990-01-01',
-        'PhoneNumber': '1234567890',
-        'Email': 'test@example.com',
-        'Age': '33',
-        'Gender': 'Male',
-        'Race': 'African',
-        'Language': 'English',
-        'Disability': 'None',
-        'AddressLine1': 'Test Address',
-        'AddressLine2': '',
-        'AddressLine3': '',
-        'PostalCode': '1234',
-        'KinName': 'Test Kin',
-        'KinRelation': 'Parent',
-        'KinContact': '0987654321',
-        'SchoolName': 'Test School',
-        'SchoolCompletion': '2010',
-        'SchoolLocation': 'Test Location',
-        'SchoolGrade': '12',
-        'profile_image': '',
-        'signature': '',
-        'synced': 0,
-        'zkteco_left_template': '',
-        'zkteco_right_template': '',
-        'futronic_left_template': '',
-        'futronic_right_template': '',
-        'imagePath': '',
-        'activity_statu': '',
-        'witness_initials': '',
-        'learner_initials': '',
-        'witness_signature': '',
-      };
-      
-      final testBankData = {
-        'BankName': 'ABSA',
+      class LearnerListPage extends StatefulWidget {
+        final String classID;
+        final String? initialLearnerID; // Optional: auto-navigate to this learner
+
+        const LearnerListPage({
+          super.key,
+          required this.classID,
+          this.initialLearnerID,
+        });
+
+        @override
+        _LearnerListPageState createState() => _LearnerListPageState();
+      },
         'bankType': 'Savings',
         'BankAccount': '1234567890',
         'BankCode': '632005',

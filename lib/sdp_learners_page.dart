@@ -8,6 +8,7 @@ import 'DetailsPage.dart';
 import 'database_helper.dart';
 import 'poe_document_scanner.dart';
 import 'config.dart';
+import 'finance_register_history.dart';
 
 class SdpLearnersPage extends StatefulWidget {
   final String sdpIdentifier;
@@ -33,7 +34,7 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
   List<Map<String, dynamic>> _searchSuggestions = [];
   bool _isLoading = false;
   bool _isLoadingMore = false;
-  bool _isSyncing = false;
+  final bool _isSyncing = false;
   bool _isSearching = false;
   bool _showSuggestions = false;
   String? _errorMessage;
@@ -73,7 +74,8 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
       if (!_isLoadingMore && _hasNextPage) {
         _loadMoreLearners();
       }
@@ -83,10 +85,10 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
   // Smart search functionality
   void _onSearchChanged() {
     final query = _searchController.text.trim();
-    
+
     // Cancel previous timer
     _searchDebounceTimer?.cancel();
-    
+
     if (query.length < 2) {
       setState(() {
         _searchSuggestions.clear();
@@ -118,7 +120,7 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
 
   Future<void> _fetchSearchSuggestions(String query) async {
     if (!mounted || query.length < 2) return;
-    
+
     setState(() {
       _isSearching = true;
     });
@@ -130,15 +132,17 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
       });
 
       final response = await http.get(Uri.parse(url)).timeout(
-        const Duration(seconds: 5),
-      );
+            const Duration(seconds: 5),
+          );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true && mounted) {
           setState(() {
-            _searchSuggestions = List<Map<String, dynamic>>.from(data['suggestions'] ?? []);
-            _showSuggestions = _searchSuggestions.isNotEmpty && _searchFocusNode.hasFocus;
+            _searchSuggestions =
+                List<Map<String, dynamic>>.from(data['suggestions'] ?? []);
+            _showSuggestions =
+                _searchSuggestions.isNotEmpty && _searchFocusNode.hasFocus;
           });
         }
       }
@@ -162,11 +166,13 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
   void _selectSearchSuggestion(Map<String, dynamic> suggestion) {
     // Extract ID number from suggestion - backend should get (ID) only 9301156789012
     String extractedId = '';
-    
+
     // Try multiple fields to get the ID number (same logic as test file)
-    if (suggestion['id_number'] != null && suggestion['id_number'].toString().isNotEmpty) {
+    if (suggestion['id_number'] != null &&
+        suggestion['id_number'].toString().isNotEmpty) {
       extractedId = suggestion['id_number'].toString();
-    } else if (suggestion['search_value'] != null && suggestion['search_value'].toString().isNotEmpty) {
+    } else if (suggestion['search_value'] != null &&
+        suggestion['search_value'].toString().isNotEmpty) {
       extractedId = suggestion['search_value'].toString();
     } else if (suggestion['display_text'] != null) {
       // Extract ID from display text like "Doe John (9301156789012)"
@@ -176,18 +182,18 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
         extractedId = match.group(1) ?? '';
       }
     }
-    
+
     // Clean the ID number (remove any non-digits)
     extractedId = extractedId.replaceAll(RegExp(r'[^\d]'), '');
-    
+
     // Use the extracted ID number in the search field
     _searchController.text = extractedId;
-    
+
     setState(() {
       _showSuggestions = false;
       _searchQuery = extractedId;
     });
-    
+
     _searchFocusNode.unfocus();
     _loadLearners(reset: true);
   }
@@ -230,7 +236,7 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
       }
     } catch (e) {
       print('Error in _loadLearners: $e');
-      
+
       // If online fetch failed, try local database as fallback
       if (_isOnlineMode && _learners.isEmpty) {
         print('Online fetch failed, trying local database as fallback...');
@@ -322,7 +328,8 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
         queryParams['class'] = _selectedClass!;
       }
 
-      final uri = Uri.parse('https://rlms.rlms.co.za/mobile/get_sdp_learners_paginated.php')
+      final uri = Uri.parse(
+              'https://rlms.rlms.co.za/mobile/get_sdp_learners_paginated.php')
           .replace(queryParameters: queryParams);
 
       print('Fetching learners from: $uri');
@@ -351,9 +358,13 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
 
           setState(() {
             if (append) {
-              _learners.addAll(learnersData.map((item) => Map<String, dynamic>.from(item)).toList());
+              _learners.addAll(learnersData
+                  .map((item) => Map<String, dynamic>.from(item))
+                  .toList());
             } else {
-              _learners = learnersData.map((item) => Map<String, dynamic>.from(item)).toList();
+              _learners = learnersData
+                  .map((item) => Map<String, dynamic>.from(item))
+                  .toList();
             }
 
             _totalPages = pagination['total_pages'] ?? 1;
@@ -362,15 +373,18 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
 
             // Update filter options only on first load or reset
             if (!append) {
-              _availableSites = List<String>.from(filters['available_sites'] ?? []);
-              _availableClasses = List<String>.from(filters['available_classes'] ?? []);
+              _availableSites =
+                  List<String>.from(filters['available_sites'] ?? []);
+              _availableClasses =
+                  List<String>.from(filters['available_classes'] ?? []);
             }
 
             _isLoading = false;
             _isLoadingMore = false;
           });
 
-          print('Loaded ${learnersData.length} learners (page $_currentPage of $_totalPages)');
+          print(
+              'Loaded ${learnersData.length} learners (page $_currentPage of $_totalPages)');
         } else {
           throw Exception(jsonData['message'] ?? 'Failed to load learners');
         }
@@ -391,7 +405,7 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
   Future<void> _syncLearnersToLocal(List<dynamic> learnersData) async {
     try {
       print('Starting background sync of ${learnersData.length} learners...');
-      
+
       // Show a brief sync indicator
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -401,10 +415,12 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
                 const SizedBox(
                   width: 16,
                   height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
                 ),
                 const SizedBox(width: 12),
-                Text('Syncing ${learnersData.length} learners to local storage...'),
+                Text(
+                    'Syncing ${learnersData.length} learners to local storage...'),
               ],
             ),
             duration: const Duration(seconds: 2),
@@ -417,20 +433,21 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
       Future.microtask(() async {
         int syncedCount = 0;
         int updatedCount = 0;
-        
+
         for (final learnerData in learnersData) {
           try {
             // Convert to the format expected by local database
             final learnerMap = Map<String, dynamic>.from(learnerData);
-            
+
             // Add sync metadata
             learnerMap['sdp_identifier'] = widget.sdpIdentifier;
             learnerMap['synced_at'] = DateTime.now().toIso8601String();
             learnerMap['sync_source'] = 'api';
-            
+
             // Check if learner exists locally
-            final existingLearner = await _dbHelper.getLearnerById(learnerMap['LearnerID']);
-            
+            final existingLearner =
+                await _dbHelper.getLearnerById(learnerMap['LearnerID']);
+
             if (existingLearner == null) {
               // Insert new learner
               await _dbHelper.insertLearner(learnerMap);
@@ -445,14 +462,16 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
             // Continue with next learner even if one fails
           }
         }
-        
-        print('Background sync completed: $syncedCount new, $updatedCount updated');
-        
+
+        print(
+            'Background sync completed: $syncedCount new, $updatedCount updated');
+
         // Show completion message
         if (mounted && (syncedCount > 0 || updatedCount > 0)) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Synced $syncedCount new, updated $updatedCount learners'),
+              content: Text(
+                  'Synced $syncedCount new, updated $updatedCount learners'),
               backgroundColor: Colors.green,
               duration: const Duration(seconds: 2),
             ),
@@ -545,6 +564,45 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
     _openCameraScanPage(learnerId, learnerName);
   }
 
+  void _markAttendance(Map<String, dynamic> learner) {
+    final learnerIdValue = learner['LearnerID'];
+    final learnerId = learnerIdValue?.toString() ?? '';
+    final learnerName =
+        '${learner['Surname'] ?? ''} ${learner['Name'] ?? ''}'.trim();
+    final classId = learner['classID']?.toString() ?? '';
+    final className = learner['className']?.toString() ?? 'Class $classId';
+
+    if (learnerId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Unable to mark attendance - learner ID missing.')),
+      );
+      return;
+    }
+
+    if (classId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Unable to mark attendance - class ID missing.')),
+      );
+      return;
+    }
+
+    // Navigate to FinanceRegisterHistory (same as finance flow)
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FinanceRegisterHistory(
+          learnerId: learnerId,
+          learnerName: learnerName,
+          classId: classId,
+          className: className,
+          financeId: classId, // Use classId as financeId for tracking
+        ),
+      ),
+    );
+  }
+
   Future<void> _openCameraScanPage(int learnerId, String learnerName) async {
     try {
       // Get additional context for the upload
@@ -552,10 +610,10 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
         (l) => l['LearnerID'].toString() == learnerId.toString(),
         orElse: () => {},
       );
-      
+
       final classId = learnerData['classID']?.toString();
       final siteName = learnerData['siteName']?.toString();
-      
+
       // Navigate to POE Document Scanner
       final result = await Navigator.push(
         context,
@@ -574,7 +632,8 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
         // Document was uploaded successfully
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('POE document uploaded successfully for $learnerName'),
+            content:
+                Text('POE document uploaded successfully for $learnerName'),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 3),
           ),
@@ -694,7 +753,8 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
                       ),
                       if (_searchQuery.isNotEmpty && _isOnlineMode)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: Colors.blue.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
@@ -745,6 +805,19 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
                           const Text('Scan', style: TextStyle(fontSize: 10)),
                         ],
                       ),
+                      const SizedBox(width: 4),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            onPressed: () => _markAttendance(learner),
+                            icon: const Icon(Icons.calendar_today),
+                            tooltip: 'Mark Attendance',
+                            color: Colors.blue,
+                          ),
+                          const Text('Attend', style: TextStyle(fontSize: 10)),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -788,8 +861,10 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
                     if (_isOnlineMode && _searchQuery.isNotEmpty) ...[
                       const SizedBox(width: 4),
                       Chip(
-                        avatar: const Icon(Icons.auto_awesome, size: 14, color: Colors.blue),
-                        label: const Text('Smart', style: TextStyle(fontSize: 10)),
+                        avatar: const Icon(Icons.auto_awesome,
+                            size: 14, color: Colors.blue),
+                        label:
+                            const Text('Smart', style: TextStyle(fontSize: 10)),
                         backgroundColor: Colors.blue.withValues(alpha: 0.1),
                       ),
                     ],
@@ -800,7 +875,8 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.blue),
                         ),
                       ),
                     ],
@@ -860,7 +936,8 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.search, color: Colors.blue),
+                              icon:
+                                  const Icon(Icons.search, color: Colors.blue),
                               onPressed: _performSmartSearch,
                               tooltip: 'Search',
                             ),
@@ -882,7 +959,7 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
                     ],
                   ),
                 ),
-                
+
                 // Smart search suggestions
                 if (_showSuggestions && _searchSuggestions.isNotEmpty)
                   Container(
@@ -907,7 +984,8 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
                         final suggestion = _searchSuggestions[index];
                         return ListTile(
                           dense: true,
-                          leading: const Icon(Icons.person, size: 16, color: Colors.grey),
+                          leading: const Icon(Icons.person,
+                              size: 16, color: Colors.grey),
                           title: Text(
                             suggestion['text'] ?? '',
                             style: const TextStyle(fontSize: 14),
@@ -949,7 +1027,8 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
                       onChanged: (value) {
                         setState(() {
                           _selectedSite = value;
-                          _selectedClass = null; // Reset class when site changes
+                          _selectedClass =
+                              null; // Reset class when site changes
                         });
                         _applyFilters();
                       },
@@ -1018,7 +1097,9 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
                     ],
                   ),
                 ),
-                if (_selectedSite != null || _selectedClass != null || _searchQuery.isNotEmpty)
+                if (_selectedSite != null ||
+                    _selectedClass != null ||
+                    _searchQuery.isNotEmpty)
                   TextButton.icon(
                     onPressed: _clearFilters,
                     icon: const Icon(Icons.clear_all, size: 18),

@@ -2,15 +2,16 @@ class AppConfig {
   // ========================================
   // LIVE SERVER CONFIGURATION
   // ========================================
-  // static const String serverHost = 'rlms.rlms.co.za'; // Live server domain
-  // static const int serverPort = 443; // HTTPS port
-  // static const String serverProtocol = 'https'; // Live server uses HTTPS
-  // static const String basePath = '/mobile';
-  static const String serverHost =
-      '192.168.68.107'; // Updated production hostname
-  static const int serverPort = 8080; // HTTP poj   ``rt 8080
-  static const String serverProtocol = 'http'; // Local server uses HTTP
-  static const String basePath = '/assessorReport2/mobile';
+  static const String serverHost = 'tesing.mtltechnical.co.za';
+  // 'rlms.rlms.co.za'; // Live server domain
+  static const int serverPort = 443; // HTTPS port
+  static const String serverProtocol = 'https'; // Live server uses HTTPS
+  static const String basePath = '/mobile';
+  // static const String serverHost =
+  //     '192.168.68.102'; // Updated production hostname
+  // static const int serverPort = 8080; // HTTP poj   ``rt 8080
+  // static const String serverProtocol = 'http'; // Local server uses HTTP
+  // static const String basePath = '/assessorReport2/mobile';
 
   // Base URL for all API calls
   // Result: https://rlms.rlms.co.za/mobile
@@ -65,6 +66,10 @@ class AppConfig {
   static String get signaturesUrl => '$baseUrl/signatures';
   static String get getSdpUrl => '$baseUrl/get_sdp.php';
   static String get getSdpProjectsUrl => '$baseUrl/get_sdp_projects.php';
+  static String get getSdpSitesUrl => '$baseUrl/get_sdp_sites.php';
+  static String get getSdpAllDataUrl => '$baseUrl/get_sdp_all_data.php';
+  static String get searchLearnerByIdSdpUrl =>
+      '$baseUrl/search_learner_by_id_sdp.php';
   static String get syncSitesUrl => '$baseUrl/sync_sites.php';
   static String get syncClassUrl => '$baseUrl/sync_class.php';
   static String get syncLearningPathwayUrl =>

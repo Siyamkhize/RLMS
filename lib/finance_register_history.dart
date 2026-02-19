@@ -12,13 +12,13 @@ class FinanceRegisterHistory extends StatefulWidget {
   final String financeId;
 
   const FinanceRegisterHistory({
-    Key? key,
+    super.key,
     required this.learnerId,
     required this.learnerName,
     required this.classId,
     required this.className,
     required this.financeId,
-  }) : super(key: key);
+  });
 
   @override
   _FinanceRegisterHistoryState createState() => _FinanceRegisterHistoryState();
@@ -40,12 +40,13 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
     });
 
     try {
-      final url = AppConfig.buildUrl('get_learner_registers.php?learner_id=${widget.learnerId}');
+      final url = AppConfig.buildUrl(
+          'get_learner_registers.php?learner_id=${widget.learnerId}');
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data is List) {
           setState(() {
             registers = data;
@@ -74,8 +75,18 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
 
   String _getMonthName(int month) {
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
     ];
     return months[month - 1];
   }
@@ -122,16 +133,19 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.description_outlined, size: 80, color: Colors.grey),
+                            Icon(Icons.description_outlined,
+                                size: 80, color: Colors.grey),
                             SizedBox(height: 16),
                             Text(
                               'No registers scanned yet',
-                              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                              style: TextStyle(
+                                  fontSize: 16, color: Colors.grey[600]),
                             ),
                             SizedBox(height: 8),
                             Text(
                               'Tap the button below to mark attendance',
-                              style: TextStyle(fontSize: 14, color: Colors.grey),
+                              style:
+                                  TextStyle(fontSize: 14, color: Colors.grey),
                             ),
                           ],
                         ),
@@ -177,7 +191,8 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
     final year = register['register_year']?.toString() ?? '';
     final uploadedAt = register['uploaded_at']?.toString() ?? '';
     final fileName = register['file_name']?.toString() ?? '';
-    final monthName = month.isNotEmpty ? _getMonthName(int.parse(month)) : 'Unknown';
+    final monthName =
+        month.isNotEmpty ? _getMonthName(int.parse(month)) : 'Unknown';
     final monthInt = month.isNotEmpty ? int.parse(month) : 0;
     final yearInt = year.isNotEmpty ? int.parse(year) : 0;
 
@@ -215,7 +230,8 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
                   color: Colors.blue[100],
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.description, color: Colors.blue[700], size: 30),
+                child:
+                    Icon(Icons.description, color: Colors.blue[700], size: 30),
               ),
               SizedBox(width: 16),
               Expanded(
@@ -224,7 +240,8 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
                   children: [
                     Text(
                       '$monthName $year',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     SizedBox(height: 4),
                     Text(
@@ -249,7 +266,8 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
                     icon: Icon(Icons.delete, color: Colors.red, size: 20),
                     padding: EdgeInsets.zero,
                     constraints: BoxConstraints(),
-                    onPressed: () => _confirmDelete(monthName, year, monthInt, yearInt),
+                    onPressed: () =>
+                        _confirmDelete(monthName, year, monthInt, yearInt),
                   ),
                 ],
               ),
@@ -260,12 +278,14 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
     );
   }
 
-  Future<void> _confirmDelete(String monthName, String year, int month, int yearInt) async {
+  Future<void> _confirmDelete(
+      String monthName, String year, int month, int yearInt) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Delete Register'),
-        content: Text('Are you sure you want to delete the register for $monthName $year?\n\nThis will also delete all attendance records for this month.'),
+        content: Text(
+            'Are you sure you want to delete the register for $monthName $year?\n\nThis will also delete all attendance records for this month.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -302,7 +322,7 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

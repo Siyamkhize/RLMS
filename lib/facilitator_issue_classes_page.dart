@@ -12,18 +12,20 @@ class FacilitatorIssueClassesPage extends StatefulWidget {
   final String siteName;
 
   const FacilitatorIssueClassesPage({
-    Key? key,
+    super.key,
     required this.logisticsId,
     required this.logisticsName,
     required this.siteId,
     required this.siteName,
-  }) : super(key: key);
+  });
 
   @override
-  _FacilitatorIssueClassesPageState createState() => _FacilitatorIssueClassesPageState();
+  _FacilitatorIssueClassesPageState createState() =>
+      _FacilitatorIssueClassesPageState();
 }
 
-class _FacilitatorIssueClassesPageState extends State<FacilitatorIssueClassesPage> {
+class _FacilitatorIssueClassesPageState
+    extends State<FacilitatorIssueClassesPage> {
   List<dynamic> classes = [];
   bool isLoading = true;
   String errorMessage = '';
@@ -49,7 +51,7 @@ class _FacilitatorIssueClassesPageState extends State<FacilitatorIssueClassesPag
   void _onSearchChanged() {
     // Cancel previous timer
     _debounceTimer?.cancel();
-    
+
     // Start new timer for debounced search
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
       setState(() {
@@ -67,16 +69,17 @@ class _FacilitatorIssueClassesPageState extends State<FacilitatorIssueClassesPag
 
     try {
       // Build URL with search parameter
-      String url = 'get_logistics_classes.php?siteID=${widget.siteId}&account_id=${widget.logisticsId}';
+      String url =
+          'get_logistics_classes.php?siteID=${widget.siteId}&account_id=${widget.logisticsId}';
       if (_searchQuery.isNotEmpty) {
         url += '&search=${Uri.encodeComponent(_searchQuery)}';
       }
-      
+
       final response = await http.get(Uri.parse(AppConfig.buildUrl(url)));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data['success'] == true && data['classes'] != null) {
           setState(() {
             classes = data['classes'];
@@ -169,7 +172,8 @@ class _FacilitatorIssueClassesPageState extends State<FacilitatorIssueClassesPag
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.orange.shade600, width: 2),
+                      borderSide:
+                          BorderSide(color: Colors.orange.shade600, width: 2),
                     ),
                     filled: true,
                     fillColor: Colors.white,
@@ -186,7 +190,8 @@ class _FacilitatorIssueClassesPageState extends State<FacilitatorIssueClassesPag
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.error, size: 64, color: Colors.red),
+                            const Icon(Icons.error,
+                                size: 64, color: Colors.red),
                             const SizedBox(height: 16),
                             Text(
                               errorMessage,
@@ -206,7 +211,8 @@ class _FacilitatorIssueClassesPageState extends State<FacilitatorIssueClassesPag
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.class_outlined, size: 64, color: Colors.grey[400]),
+                                Icon(Icons.class_outlined,
+                                    size: 64, color: Colors.grey[400]),
                                 const SizedBox(height: 16),
                                 Text(
                                   'No classes found at this site',
@@ -225,18 +231,24 @@ class _FacilitatorIssueClassesPageState extends State<FacilitatorIssueClassesPag
                               itemCount: classes.length,
                               itemBuilder: (context, index) {
                                 final classData = classes[index];
-                                final hasFacilitator = classData['facilitator_name'] != null && 
-                                                     classData['facilitator_name'] != 'No Facilitator Assigned';
-                                
+                                final hasFacilitator =
+                                    classData['facilitator_name'] != null &&
+                                        classData['facilitator_name'] !=
+                                            'No Facilitator Assigned';
+
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 12),
                                   elevation: 4,
                                   child: ListTile(
                                     contentPadding: const EdgeInsets.all(16),
                                     leading: CircleAvatar(
-                                      backgroundColor: hasFacilitator ? Colors.orange : Colors.grey,
+                                      backgroundColor: hasFacilitator
+                                          ? Colors.orange
+                                          : Colors.grey,
                                       child: Icon(
-                                        hasFacilitator ? Icons.person : Icons.person_off,
+                                        hasFacilitator
+                                            ? Icons.person
+                                            : Icons.person_off,
                                         color: Colors.white,
                                       ),
                                     ),
@@ -250,16 +262,20 @@ class _FacilitatorIssueClassesPageState extends State<FacilitatorIssueClassesPag
                                       maxLines: 2,
                                     ),
                                     subtitle: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         const SizedBox(height: 4),
                                         Row(
                                           children: [
-                                            Icon(Icons.group, size: 16, color: Colors.grey[600]),
+                                            Icon(Icons.group,
+                                                size: 16,
+                                                color: Colors.grey[600]),
                                             const SizedBox(width: 4),
                                             Text(
                                               '${classData['total_learners'] ?? '0'} learners',
-                                              style: const TextStyle(fontSize: 14),
+                                              style:
+                                                  const TextStyle(fontSize: 14),
                                             ),
                                           ],
                                         ),
@@ -267,21 +283,26 @@ class _FacilitatorIssueClassesPageState extends State<FacilitatorIssueClassesPag
                                         Row(
                                           children: [
                                             Icon(
-                                              hasFacilitator ? Icons.person : Icons.person_off, 
-                                              size: 16, 
-                                              color: hasFacilitator ? Colors.green[600] : Colors.red[400]
-                                            ),
+                                                hasFacilitator
+                                                    ? Icons.person
+                                                    : Icons.person_off,
+                                                size: 16,
+                                                color: hasFacilitator
+                                                    ? Colors.green[600]
+                                                    : Colors.red[400]),
                                             const SizedBox(width: 4),
                                             Expanded(
                                               child: Text(
                                                 hasFacilitator
-                                                  ? 'Facilitator: ${classData['facilitator_name']}'
-                                                  : 'No Facilitator Assigned',
+                                                    ? 'Facilitator: ${classData['facilitator_name']}'
+                                                    : 'No Facilitator Assigned',
                                                 overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
                                                   fontSize: 14,
                                                   fontWeight: FontWeight.w500,
-                                                  color: hasFacilitator ? Colors.green[600] : Colors.red[400],
+                                                  color: hasFacilitator
+                                                      ? Colors.green[600]
+                                                      : Colors.red[400],
                                                 ),
                                               ),
                                             ),
@@ -290,11 +311,14 @@ class _FacilitatorIssueClassesPageState extends State<FacilitatorIssueClassesPag
                                         if (!hasFacilitator) ...[
                                           const SizedBox(height: 4),
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 4),
                                             decoration: BoxDecoration(
                                               color: Colors.red.shade50,
-                                              borderRadius: BorderRadius.circular(4),
-                                              border: Border.all(color: Colors.red.shade200),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                              border: Border.all(
+                                                  color: Colors.red.shade200),
                                             ),
                                             child: Text(
                                               'Cannot issue materials - No facilitator assigned',
@@ -308,26 +332,33 @@ class _FacilitatorIssueClassesPageState extends State<FacilitatorIssueClassesPag
                                         ],
                                       ],
                                     ),
-                                    trailing: hasFacilitator 
+                                    trailing: hasFacilitator
                                         ? const Icon(Icons.arrow_forward_ios)
-                                        : Icon(Icons.block, color: Colors.red[400]),
-                                    onTap: hasFacilitator ? () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => FacilitatorIssueFormPage(
-                                            classID: classData['classID'].toString(),
-                                          ),
-                                        ),
-                                      );
-                                    } : () {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Cannot issue materials - No facilitator assigned to this class'),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                    },
+                                        : Icon(Icons.block,
+                                            color: Colors.red[400]),
+                                    onTap: hasFacilitator
+                                        ? () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    FacilitatorIssueFormPage(
+                                                  classID: classData['classID']
+                                                      .toString(),
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        : () {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                    'Cannot issue materials - No facilitator assigned to this class'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          },
                                   ),
                                 );
                               },

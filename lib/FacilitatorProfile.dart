@@ -5,7 +5,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:signature/signature.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -13,16 +12,18 @@ import 'database_helper.dart';
 import 'facilitator_fingerprint_page.dart';
 
 import 'config.dart';
+
 /// Configuration class for app constants.
 class Config {
-  static String get baseUrl => AppConfig.baseUrl; // Use AppConfig for consistent URL management
+  static String get baseUrl =>
+      AppConfig.baseUrl; // Use AppConfig for consistent URL management
 }
 
 /// FacilitatorProfile screen to display and edit facilitator details.
 class FacilitatorProfile extends StatefulWidget {
   final String classID;
 
-  const FacilitatorProfile({Key? key, required this.classID}) : super(key: key);
+  const FacilitatorProfile({super.key, required this.classID});
 
   @override
   _FacilitatorProfileState createState() => _FacilitatorProfileState();
@@ -45,7 +46,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _assessorController = TextEditingController();
   final TextEditingController _idNumberController = TextEditingController();
-  final TextEditingController _assessorExpiryController = TextEditingController();
+  final TextEditingController _assessorExpiryController =
+      TextEditingController();
 
 // Signature controller
   SignatureController _signatureController = SignatureController(
@@ -87,7 +89,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
     }
     final mobilePattern = RegExp(r'^0[6-8][0-9]{8}$');
     final landlinePattern = RegExp(r'^0[1-5][0-9]{7,8}$');
-    if (!mobilePattern.hasMatch(cleanNumber) && !landlinePattern.hasMatch(cleanNumber)) {
+    if (!mobilePattern.hasMatch(cleanNumber) &&
+        !landlinePattern.hasMatch(cleanNumber)) {
       return 'Enter valid SA number:\nMobile: 082 123 4567\nLandline: 011 555 1234';
     }
     return null;
@@ -99,7 +102,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
       return 'ID number is required';
     }
     if (value.length != 13) return 'SA ID must be exactly 13 digits';
-    if (!RegExp(r'^\d{13}$').hasMatch(value)) return 'ID number must contain only digits';
+    if (!RegExp(r'^\d{13}$').hasMatch(value))
+      return 'ID number must contain only digits';
     int year = int.parse(value.substring(0, 2));
     int month = int.parse(value.substring(2, 4));
     int day = int.parse(value.substring(4, 6));
@@ -107,7 +111,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
     if (month < 1 || month > 12) return 'Invalid month in ID number';
     if (day < 1 || day > 31) return 'Invalid day in ID number';
     List<int> daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    if (month == 2 && (fullYear % 4 == 0 && fullYear % 100 != 0 || fullYear % 400 == 0)) {
+    if (month == 2 &&
+        (fullYear % 4 == 0 && fullYear % 100 != 0 || fullYear % 400 == 0)) {
       daysInMonth[1] = 29;
     }
     if (day > daysInMonth[month - 1]) return 'Invalid date in ID number';
@@ -125,7 +130,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
       sum += int.parse(evenSumStr[i]);
     }
     int checkDigit = (10 - (sum % 10)) % 10;
-    if (checkDigit != int.parse(value[12])) return 'Invalid SA ID number checksum';
+    if (checkDigit != int.parse(value[12]))
+      return 'Invalid SA ID number checksum';
     return null;
   }
 
@@ -145,32 +151,33 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
     if (value == null || value.isEmpty) {
       return 'Assessor certificate expiry date is required';
     }
-    
+
     try {
       final parts = value.split('/');
       if (parts.length != 3) return 'Please select a valid date';
-      
+
       final day = int.parse(parts[0]);
       final month = int.parse(parts[1]);
       final year = int.parse(parts[2]);
-      
+
       // Basic date validation
       if (day < 1 || day > 31) return 'Invalid day';
       if (month < 1 || month > 12) return 'Invalid month';
-      if (year < 2020 || year > 2050) return 'Year must be between 2020 and 2050';
-      
+      if (year < 2020 || year > 2050)
+        return 'Year must be between 2020 and 2050';
+
       // Create date and validate it's a real date
       final date = DateTime(year, month, day);
       if (date.day != day || date.month != month || date.year != year) {
         return 'Invalid date selected';
       }
-      
+
       // Check if expired (validation error)
       final now = DateTime.now();
       if (date.isBefore(DateTime(now.year, now.month, now.day))) {
         return 'Certificate has expired. Please renew your assessor certificate.';
       }
-      
+
       return null; // Valid date
     } catch (e) {
       return 'Please select a valid date';
@@ -178,18 +185,21 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
   }
 
   /// Loads assessor expiry date from server if missing locally.
-  Future<void> _loadAssessorExpiryFromServer(Map<String, dynamic> localData) async {
+  Future<void> _loadAssessorExpiryFromServer(
+      Map<String, dynamic> localData) async {
     var connectivityResult = await Connectivity().checkConnectivity();
     if (connectivityResult != ConnectivityResult.none) {
       try {
         final response = await http.get(
-          Uri.parse('${Config.baseUrl}/get_facilitator_profile.php?classID=${widget.classID}'),
+          Uri.parse(
+              '${Config.baseUrl}/get_facilitator_profile.php?classID=${widget.classID}'),
         );
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
           if (data['success'] && data['data'] != null) {
             final serverExpiryDate = data['data']['assessorExpiryDate'];
-            if (serverExpiryDate != null && serverExpiryDate.toString().isNotEmpty) {
+            if (serverExpiryDate != null &&
+                serverExpiryDate.toString().isNotEmpty) {
               // Update the local data map with server data
               localData['assessorExpiryDate'] = serverExpiryDate.toString();
             }
@@ -228,7 +238,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
     if (connectivityResult != ConnectivityResult.none) {
       try {
         final response = await http.get(
-          Uri.parse('${Config.baseUrl}/get_facilitator_profile.php?classID=${widget.classID}'),
+          Uri.parse(
+              '${Config.baseUrl}/get_facilitator_profile.php?classID=${widget.classID}'),
         );
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
@@ -249,28 +260,36 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
   /// Fetches facilitator data from local database with offline fallback.
   Future<Map<String, dynamic>> _fetchFacilitatorData() async {
     try {
-      final data = await DatabaseHelper().getFacilitatorDetailsByClassID(widget.classID);
-      
+      final data =
+          await DatabaseHelper().getFacilitatorDetailsByClassID(widget.classID);
+
       // If local database doesn't have assessorExpiryDate, try to get it from server
-      if (data['assessorExpiryDate'] == null || data['assessorExpiryDate'].toString().isEmpty) {
+      if (data['assessorExpiryDate'] == null ||
+          data['assessorExpiryDate'].toString().isEmpty) {
         await _loadAssessorExpiryFromServer(data);
       }
-      
-      String? storedImagePath = await DatabaseHelper().getFacilitatorProfileImage(widget.classID);
-      String? storedSignaturePath = await DatabaseHelper().getFacilitatorSignature(widget.classID);
+
+      String? storedImagePath =
+          await DatabaseHelper().getFacilitatorProfileImage(widget.classID);
+      String? storedSignaturePath =
+          await DatabaseHelper().getFacilitatorSignature(widget.classID);
       setState(() {
         profileImagePath = storedImagePath;
         signaturePath = storedSignaturePath;
-        _isProfileImageValid = storedImagePath != null && File(storedImagePath).existsSync();
-        _isSignatureFileValid = storedSignaturePath != null && File(storedSignaturePath).existsSync();
+        _isProfileImageValid =
+            storedImagePath != null && File(storedImagePath).existsSync();
+        _isSignatureFileValid = storedSignaturePath != null &&
+            File(storedSignaturePath).existsSync();
         _phoneController.text = data['phoneNumber']?.toString() ?? '';
         _assessorController.text = data['assessorNo']?.toString() ?? '';
         _idNumberController.text = data['f_IDNumber']?.toString() ?? '';
-        _assessorExpiryController.text = data['assessorExpiryDate']?.toString() ?? '';
+        _assessorExpiryController.text =
+            data['assessorExpiryDate']?.toString() ?? '';
       });
       return data;
     } catch (e) {
-      final offlineData = await DatabaseHelper().getFacilitatorDetailsByClassID(widget.classID);
+      final offlineData =
+          await DatabaseHelper().getFacilitatorDetailsByClassID(widget.classID);
       if (offlineData.isNotEmpty) return offlineData;
       throw 'No data available offline';
     }
@@ -319,8 +338,10 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
     if (image != null) {
       final directory = await getApplicationDocumentsDirectory();
       final imageDirectory = Directory('${directory.path}/profile_images');
-      if (!await imageDirectory.exists()) await imageDirectory.create(recursive: true);
-      final imagePath = '${imageDirectory.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      if (!await imageDirectory.exists())
+        await imageDirectory.create(recursive: true);
+      final imagePath =
+          '${imageDirectory.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
       await image.saveTo(imagePath);
       final bytes = await File(imagePath).readAsBytes();
       final base64Image = base64Encode(bytes);
@@ -329,7 +350,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
         onlineProfileImageUrl = null;
         _isProfileImageValid = true;
       });
-      await DatabaseHelper().updateFacilitatorProfileImage(widget.classID, base64Image);
+      await DatabaseHelper()
+          .updateFacilitatorProfileImage(widget.classID, base64Image);
       await _syncProfileImageOnline();
     }
     setState(() => isImageLoading = false);
@@ -363,7 +385,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                       ),
                     ),
                     SizedBox(height: 16),
-                    Text('Pen Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text('Pen Settings',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
                     Slider(
                       value: strokeWidth,
                       min: 1.0,
@@ -373,7 +396,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                       onChanged: (value) {
                         setDialogState(() {
                           strokeWidth = value;
-                          final points = _signatureController.points; // Preserve current signature
+                          final points = _signatureController
+                              .points; // Preserve current signature
                           _signatureController = SignatureController(
                             penStrokeWidth: strokeWidth,
                             penColor: Colors.black,
@@ -427,8 +451,10 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
       if (data != null) {
         final directory = await getApplicationDocumentsDirectory();
         final signatureDirectory = Directory('${directory.path}/signatures');
-        if (!await signatureDirectory.exists()) await signatureDirectory.create(recursive: true);
-        final signaturePath = '${signatureDirectory.path}/${DateTime.now().millisecondsSinceEpoch}.png';
+        if (!await signatureDirectory.exists())
+          await signatureDirectory.create(recursive: true);
+        final signaturePath =
+            '${signatureDirectory.path}/${DateTime.now().millisecondsSinceEpoch}.png';
         final file = File(signaturePath);
         await file.writeAsBytes(data);
         final base64Signature = base64Encode(data);
@@ -437,7 +463,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
           onlineSignatureUrl = null;
           _isSignatureFileValid = true;
         });
-        await DatabaseHelper().updateFacilitatorSignature(widget.classID, base64Signature);
+        await DatabaseHelper()
+            .updateFacilitatorSignature(widget.classID, base64Signature);
         await _syncDataOnline();
       }
       setState(() => isSignatureLoading = false);
@@ -455,7 +482,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
               SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white),
               ),
               SizedBox(width: 16),
               Text('Saving changes...'),
@@ -468,34 +496,39 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
 
       if (!_formKey.currentState!.validate()) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please fix validation errors'), backgroundColor: Colors.red),
+          SnackBar(
+              content: Text('Please fix validation errors'),
+              backgroundColor: Colors.red),
         );
         return;
       }
-      
+
       final updatedData = {
         'phoneNumber': _phoneController.text,
         'assessorNo': _assessorController.text,
         'f_IDNumber': _idNumberController.text,
         'assessorExpiryDate': _assessorExpiryController.text,
       };
-      
+
       // Save to local database
-      await DatabaseHelper().updateFacilitatorDetails(widget.classID, updatedData);
-      
+      await DatabaseHelper()
+          .updateFacilitatorDetails(widget.classID, updatedData);
+
       // Sync to server
       await _syncDataOnline();
-      
+
       // Update UI
       setState(() {
         isEditing = false;
         facilitatorData = _fetchFacilitatorData();
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Changes saved successfully'), backgroundColor: Colors.green),
+        SnackBar(
+            content: Text('Changes saved successfully'),
+            backgroundColor: Colors.green),
       );
-    } catch (e, stackTrace) {
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error saving changes: ${e.toString()}'),
@@ -508,7 +541,10 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
 
   /// Syncs profile image to the server using multipart request.
   Future<void> _syncProfileImageOnline() async {
-    if (profileImagePath == null || !await Connectivity().checkConnectivity().then((r) => r != ConnectivityResult.none)) {
+    if (profileImagePath == null ||
+        !await Connectivity()
+            .checkConnectivity()
+            .then((r) => r != ConnectivityResult.none)) {
       return;
     }
     int maxRetries = 3;
@@ -520,17 +556,22 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
           Uri.parse('${Config.baseUrl}/save_facilitator_profile.php'),
         );
         request.fields['classID'] = widget.classID;
-        request.files.add(await http.MultipartFile.fromPath('f_profile', profileImagePath!));
+        request.files.add(
+            await http.MultipartFile.fromPath('f_profile', profileImagePath!));
         var response = await request.send();
         var responseData = await http.Response.fromStream(response);
         if (response.statusCode == 200) {
           final data = json.decode(responseData.body);
           if (data['success']) {
             setState(() {
-              onlineProfileImageUrl = data['image_url'] != null ? '${Config.baseUrl}/${data['image_url']}' : null;
+              onlineProfileImageUrl = data['image_url'] != null
+                  ? '${Config.baseUrl}/${data['image_url']}'
+                  : null;
             });
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Profile image uploaded successfully'), backgroundColor: Colors.green),
+              SnackBar(
+                  content: Text('Profile image uploaded successfully'),
+                  backgroundColor: Colors.green),
             );
             return;
           }
@@ -541,7 +582,9 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
         attempt++;
         if (attempt == maxRetries) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to upload profile image: $e'), backgroundColor: Colors.red),
+            SnackBar(
+                content: Text('Failed to upload profile image: $e'),
+                backgroundColor: Colors.red),
           );
         }
         await Future.delayed(Duration(seconds: 2));
@@ -551,9 +594,13 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
 
   /// Syncs facilitator data to the server with retry mechanism.
   Future<void> _syncDataOnline() async {
-    if (!await Connectivity().checkConnectivity().then((r) => r != ConnectivityResult.none)) {
+    if (!await Connectivity()
+        .checkConnectivity()
+        .then((r) => r != ConnectivityResult.none)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No internet connection'), backgroundColor: Colors.orange),
+        SnackBar(
+            content: Text('No internet connection'),
+            backgroundColor: Colors.orange),
       );
       return;
     }
@@ -561,8 +608,9 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
     int attempt = 0;
     while (attempt < maxRetries) {
       try {
-        final data = await DatabaseHelper().getFacilitatorDetailsByClassID(widget.classID);
-        
+        final data = await DatabaseHelper()
+            .getFacilitatorDetailsByClassID(widget.classID);
+
         final apiData = {
           'classID': widget.classID,
           'firstName': data['firstName'],
@@ -572,20 +620,24 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
           'f_IDNumber': _idNumberController.text,
           'assessorNo': _assessorController.text,
           'assessorExpiryDate': _assessorExpiryController.text,
-          'f_signature': signaturePath != null ? await _imageToBase64(signaturePath!) : null,
+          'f_signature': signaturePath != null
+              ? await _imageToBase64(signaturePath!)
+              : null,
         };
-        
+
         final response = await http.post(
           Uri.parse('${Config.baseUrl}/save_facilitator.php'),
           headers: {'Content-Type': 'application/json'},
           body: json.encode(apiData),
         );
-        
+
         if (response.statusCode == 200) {
           final responseData = json.decode(response.body);
           if (responseData['success']) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Data synced successfully'), backgroundColor: Colors.green),
+              SnackBar(
+                  content: Text('Data synced successfully'),
+                  backgroundColor: Colors.green),
             );
             return;
           }
@@ -596,7 +648,9 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
         attempt++;
         if (attempt == maxRetries) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to sync data: $e'), backgroundColor: Colors.red),
+            SnackBar(
+                content: Text('Failed to sync data: $e'),
+                backgroundColor: Colors.red),
           );
         }
         await Future.delayed(Duration(seconds: 2));
@@ -623,28 +677,29 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
     if (expiryDate == null || expiryDate.isEmpty) {
       return 'Not Set';
     }
-    
+
     try {
       final parts = expiryDate.split('/');
       if (parts.length != 3) return expiryDate;
-      
+
       final day = int.parse(parts[0]);
       final month = int.parse(parts[1]);
       final year = int.parse(parts[2]);
       final date = DateTime(year, month, day);
       final now = DateTime.now();
-      
+
       // Check if expired
       if (date.isBefore(DateTime(now.year, now.month, now.day))) {
         return '$expiryDate\n(EXPIRED)';
       }
-      
+
       // Check if expiring soon (within 30 days)
-      final daysUntilExpiry = date.difference(DateTime(now.year, now.month, now.day)).inDays;
+      final daysUntilExpiry =
+          date.difference(DateTime(now.year, now.month, now.day)).inDays;
       if (daysUntilExpiry <= 30) {
-        return '$expiryDate\n(${daysUntilExpiry} days left)';
+        return '$expiryDate\n($daysUntilExpiry days left)';
       }
-      
+
       return expiryDate;
     } catch (e) {
       return expiryDate;
@@ -657,7 +712,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
       onTap: _pickImage,
       child: Stack(
         children: [
-          Container(
+          SizedBox(
             width: 140,
             height: 140,
             child: ClipRRect(
@@ -673,7 +728,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                 color: Colors.black.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(70),
               ),
-              child: Center(child: CircularProgressIndicator(color: Colors.white)),
+              child:
+                  Center(child: CircularProgressIndicator(color: Colors.white)),
             ),
           Positioned(
             bottom: 0,
@@ -696,7 +752,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
   /// Returns the appropriate profile image widget.
   Widget _getProfileImageWidget() {
     if (_isProfileImageValid) {
-      return Image.file(File(profileImagePath!), fit: BoxFit.cover, width: 140, height: 140);
+      return Image.file(File(profileImagePath!),
+          fit: BoxFit.cover, width: 140, height: 140);
     } else if (onlineProfileImageUrl != null) {
       return CachedNetworkImage(
         imageUrl: onlineProfileImageUrl!,
@@ -732,7 +789,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
         constraints: BoxConstraints(maxHeight: 150, minHeight: 80),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: Image.file(File(signaturePath!), fit: BoxFit.contain, width: double.infinity),
+          child: Image.file(File(signaturePath!),
+              fit: BoxFit.contain, width: double.infinity),
         ),
       );
     } else if (onlineSignatureUrl != null) {
@@ -744,19 +802,22 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
             imageUrl: onlineSignatureUrl!,
             fit: BoxFit.contain,
             width: double.infinity,
-            placeholder: (context, url) => Container(
+            placeholder: (context, url) => SizedBox(
               height: 100,
               child: Center(child: CircularProgressIndicator()),
             ),
-            errorWidget: (context, url, error) => Container(
+            errorWidget: (context, url, error) => SizedBox(
               height: 100,
               child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.error_outline, size: 30, color: Colors.red.shade400),
+                    Icon(Icons.error_outline,
+                        size: 30, color: Colors.red.shade400),
                     SizedBox(height: 8),
-                    Text('Failed to load signature', style: TextStyle(color: Colors.red.shade600, fontSize: 12)),
+                    Text('Failed to load signature',
+                        style: TextStyle(
+                            color: Colors.red.shade600, fontSize: 12)),
                   ],
                 ),
               ),
@@ -776,7 +837,10 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
             SizedBox(height: 8),
             Text(
               'No signature added yet',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 14, fontStyle: FontStyle.italic),
+              style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 14,
+                  fontStyle: FontStyle.italic),
             ),
           ],
         ),
@@ -793,7 +857,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
         actions: [
           IconButton(
             icon: Icon(isEditing ? Icons.save : Icons.edit),
-            onPressed: isEditing 
+            onPressed: isEditing
                 ? () {
                     _saveChanges();
                   }
@@ -831,7 +895,10 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                     SizedBox(height: 16),
                     Text(
                       data['fullName'] ?? 'N/A',
-                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black),
+                      style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black),
                     ),
                     SizedBox(height: 8),
                     Text(
@@ -844,7 +911,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        _buildInfoCard('Class Name', data['className'] ?? 'N/A'),
+                        _buildInfoCard(
+                            'Class Name', data['className'] ?? 'N/A'),
                         _buildInfoCard('Role', data['role'] ?? 'N/A'),
                       ],
                     ),
@@ -852,8 +920,10 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        _buildInfoCard('Assessor Number', data['assessorNo'] ?? 'N/A'),
-                        _buildExpiryInfoCard('Certificate Expiry', data['assessorExpiryDate']),
+                        _buildInfoCard(
+                            'Assessor Number', data['assessorNo'] ?? 'N/A'),
+                        _buildExpiryInfoCard(
+                            'Certificate Expiry', data['assessorExpiryDate']),
                       ],
                     ),
                     SizedBox(height: 20),
@@ -865,7 +935,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                         validator: _validatePhoneNumber,
                         keyboardType: TextInputType.phone,
                         inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'[\d\s\-\(\)\+]')),
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'[\d\s\-\(\)\+]')),
                           LengthLimitingTextInputFormatter(15),
                         ],
                         hintText: '082 123 4567 or 011 555 1234',
@@ -909,7 +980,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
       ),
     );
   }
-  
+
   /// Builds the fingerprint management section
   Widget _buildFingerprintSection(Map<String, dynamic> data) {
     return FutureBuilder<Map<String, dynamic>>(
@@ -918,21 +989,23 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Card(
             elevation: 4,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Padding(
               padding: EdgeInsets.all(16),
               child: Center(child: CircularProgressIndicator()),
             ),
           );
         }
-        
+
         final facilitatorData = snapshot.data;
         final facilitatorId = facilitatorData?['facilitator_id'] as int?;
         final fullName = facilitatorData?['fullName'] as String?;
-        
+
         return Card(
           elevation: 4,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: Padding(
             padding: EdgeInsets.all(16),
             child: Column(
@@ -944,14 +1017,18 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                     Flexible(
                       child: Text(
                         'Fingerprint Security',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                        style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blueAccent),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     Flexible(
                       child: ElevatedButton.icon(
-                        onPressed: facilitatorId != null 
-                            ? () => _navigateToFingerprintPage(facilitatorId, fullName ?? 'Facilitator')
+                        onPressed: facilitatorId != null
+                            ? () => _navigateToFingerprintPage(
+                                facilitatorId, fullName ?? 'Facilitator')
                             : null,
                         icon: Icon(Icons.fingerprint, size: 18),
                         label: Text(
@@ -961,8 +1038,10 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           minimumSize: Size(0, 36),
                         ),
                       ),
@@ -972,30 +1051,38 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                 SizedBox(height: 16),
                 if (facilitatorId != null)
                   FutureBuilder<bool>(
-                    future: DatabaseHelper().facilitatorHasFingerprints(facilitatorId),
+                    future: DatabaseHelper()
+                        .facilitatorHasFingerprints(facilitatorId),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return Center(child: CircularProgressIndicator());
                       }
-                      
+
                       final hasFingerprints = snapshot.data ?? false;
-                      
+
                       return Container(
                         width: double.infinity,
                         padding: EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: hasFingerprints ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+                          color: hasFingerprints
+                              ? Colors.green.withOpacity(0.1)
+                              : Colors.orange.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: hasFingerprints ? Colors.green : Colors.orange,
+                            color:
+                                hasFingerprints ? Colors.green : Colors.orange,
                             width: 2,
                           ),
                         ),
                         child: Row(
                           children: [
                             Icon(
-                              hasFingerprints ? Icons.check_circle : Icons.warning,
-                              color: hasFingerprints ? Colors.green : Colors.orange,
+                              hasFingerprints
+                                  ? Icons.check_circle
+                                  : Icons.warning,
+                              color: hasFingerprints
+                                  ? Colors.green
+                                  : Colors.orange,
                               size: 32,
                             ),
                             SizedBox(width: 12),
@@ -1004,16 +1091,20 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    hasFingerprints ? 'Fingerprints Enrolled' : 'No Fingerprints Enrolled',
+                                    hasFingerprints
+                                        ? 'Fingerprints Enrolled'
+                                        : 'No Fingerprints Enrolled',
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
-                                      color: hasFingerprints ? Colors.green : Colors.orange,
+                                      color: hasFingerprints
+                                          ? Colors.green
+                                          : Colors.orange,
                                     ),
                                   ),
                                   SizedBox(height: 4),
                                   Text(
-                                    hasFingerprints 
+                                    hasFingerprints
                                         ? 'Your fingerprints are enrolled. Tap "Manage" to update or clock in/out.'
                                         : 'Enroll your fingerprints for secure clock-in/out and quick access.',
                                     style: TextStyle(
@@ -1040,7 +1131,9 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                     child: Center(
                       child: Text(
                         'Fingerprint features not available',
-                        style: TextStyle(color: Colors.grey[600], fontStyle: FontStyle.italic),
+                        style: TextStyle(
+                            color: Colors.grey[600],
+                            fontStyle: FontStyle.italic),
                       ),
                     ),
                   ),
@@ -1051,7 +1144,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
       },
     );
   }
-  
+
   /// Get facilitator ID by classID (the old way)
   Future<Map<String, dynamic>> _getFacilitatorIdByClassID() async {
     try {
@@ -1062,29 +1155,30 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
         whereArgs: [widget.classID],
         limit: 1,
       );
-      
+
       if (result.isNotEmpty) {
         final facilitator = result.first;
         final facilitatorId = facilitator['facilitator_id'] as int?;
         final firstName = facilitator['firstName']?.toString() ?? '';
         final lastName = facilitator['lastName']?.toString() ?? '';
         final fullName = '$firstName $lastName'.trim();
-        
+
         return {
           'facilitator_id': facilitatorId,
           'fullName': fullName.isNotEmpty ? fullName : 'Facilitator',
         };
       }
-      
+
       return {};
     } catch (e) {
       debugPrint('[PROFILE] Error getting facilitator by classID: $e');
       return {};
     }
   }
-  
+
   /// Navigate to fingerprint management page
-  void _navigateToFingerprintPage(int facilitatorId, String facilitatorName) async {
+  void _navigateToFingerprintPage(
+      int facilitatorId, String facilitatorName) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -1096,7 +1190,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
         ),
       ),
     );
-    
+
     // Refresh the profile data after returning
     if (result == true && mounted) {
       setState(() {
@@ -1114,7 +1208,10 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.1), spreadRadius: 2, blurRadius: 8),
+          BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              spreadRadius: 2,
+              blurRadius: 8),
         ],
       ),
       child: Column(
@@ -1122,7 +1219,10 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
         children: [
           Text(
             title,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.blueAccent),
           ),
           SizedBox(height: 8),
           Text(
@@ -1139,13 +1239,13 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
   /// Builds a specialized info card for assessor certificate expiry with status colors.
   Widget _buildExpiryInfoCard(String title, String? expiryDate) {
     debugPrint('[PROFILE] _buildExpiryInfoCard called with: "$expiryDate"');
-    
+
     Color cardColor = Colors.white;
     Color textColor = Colors.black;
     Color titleColor = Colors.blueAccent;
     String displayText = 'Not Set';
     String statusText = '';
-    
+
     if (expiryDate != null && expiryDate.isNotEmpty) {
       try {
         final parts = expiryDate.split('/');
@@ -1155,9 +1255,9 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
           final year = int.parse(parts[2]);
           final date = DateTime(year, month, day);
           final now = DateTime.now();
-          
+
           displayText = expiryDate;
-          
+
           // Check if expired
           if (date.isBefore(DateTime(now.year, now.month, now.day))) {
             cardColor = Colors.red.shade50;
@@ -1167,7 +1267,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
           }
           // Check if expiring soon (within 30 days)
           else {
-            final daysUntilExpiry = date.difference(DateTime(now.year, now.month, now.day)).inDays;
+            final daysUntilExpiry =
+                date.difference(DateTime(now.year, now.month, now.day)).inDays;
             if (daysUntilExpiry <= 30) {
               cardColor = Colors.orange.shade50;
               textColor = Colors.orange.shade700;
@@ -1185,7 +1286,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
         displayText = expiryDate;
       }
     }
-    
+
     return Container(
       width: 150,
       padding: EdgeInsets.all(12),
@@ -1193,7 +1294,10 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
         color: cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.1), spreadRadius: 2, blurRadius: 8),
+          BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              spreadRadius: 2,
+              blurRadius: 8),
         ],
       ),
       child: Column(
@@ -1201,12 +1305,14 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
         children: [
           Text(
             title,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: titleColor),
+            style: TextStyle(
+                fontSize: 16, fontWeight: FontWeight.bold, color: titleColor),
           ),
           SizedBox(height: 8),
           Text(
             displayText,
-            style: TextStyle(fontSize: 14, color: textColor, fontWeight: FontWeight.w500),
+            style: TextStyle(
+                fontSize: 14, color: textColor, fontWeight: FontWeight.w500),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -1215,8 +1321,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
             Text(
               statusText,
               style: TextStyle(
-                fontSize: 12, 
-                color: textColor, 
+                fontSize: 12,
+                color: textColor,
                 fontWeight: FontWeight.bold,
                 fontStyle: FontStyle.italic,
               ),
@@ -1239,7 +1345,10 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
           children: [
             Text(
               title,
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blueAccent),
             ),
             SizedBox(height: 16),
             ...fields,
@@ -1251,14 +1360,14 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
 
   /// Builds an editable text field with validation.
   Widget _buildEditableField(
-      String label,
-      TextEditingController controller,
-      IconData icon, {
-        String? Function(String?)? validator,
-        TextInputType? keyboardType,
-        List<TextInputFormatter>? inputFormatters,
-        String? hintText,
-      }) {
+    String label,
+    TextEditingController controller,
+    IconData icon, {
+    String? Function(String?)? validator,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    String? hintText,
+  }) {
     return Padding(
       padding: EdgeInsets.only(bottom: 16),
       child: TextFormField(
@@ -1303,10 +1412,10 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
 
   /// Builds a date picker field for assessor certificate expiry date.
   Widget _buildDatePickerField(
-      String label,
-      TextEditingController controller, {
-        String? Function(String?)? validator,
-      }) {
+    String label,
+    TextEditingController controller, {
+    String? Function(String?)? validator,
+  }) {
     return Container(
       margin: EdgeInsets.only(bottom: 16),
       child: TextFormField(
@@ -1320,7 +1429,9 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
           labelText: label,
           hintText: 'Tap to select date',
           prefixIcon: Icon(Icons.calendar_today, color: Colors.blueAccent),
-          suffixIcon: isEditing ? Icon(Icons.arrow_drop_down, color: Colors.blueAccent) : null,
+          suffixIcon: isEditing
+              ? Icon(Icons.arrow_drop_down, color: Colors.blueAccent)
+              : null,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
@@ -1351,7 +1462,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
   }
 
   /// Shows date picker and updates the controller with selected date.
-  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
+  Future<void> _selectDate(
+      BuildContext context, TextEditingController controller) async {
     // Parse existing date if available
     DateTime? initialDate;
     if (controller.text.isNotEmpty) {
@@ -1401,15 +1513,16 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
           '${picked.month.toString().padLeft(2, '0')}/'
           '${picked.year}';
       controller.text = formattedDate;
-      
+
       // Show warning if certificate is expired or expiring soon
       final now = DateTime.now();
       final daysUntilExpiry = picked.difference(now).inDays;
-      
+
       if (daysUntilExpiry < 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('⚠️ Certificate has expired! Please renew your assessor certificate.'),
+            content: Text(
+                '⚠️ Certificate has expired! Please renew your assessor certificate.'),
             backgroundColor: Colors.red,
             duration: Duration(seconds: 4),
           ),
@@ -1417,7 +1530,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
       } else if (daysUntilExpiry <= 30) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('⚠️ Certificate expires in $daysUntilExpiry days. Consider renewing soon.'),
+            content: Text(
+                '⚠️ Certificate expires in $daysUntilExpiry days. Consider renewing soon.'),
             backgroundColor: Colors.orange,
             duration: Duration(seconds: 4),
           ),
@@ -1443,7 +1557,10 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                 Flexible(
                   child: Text(
                     'Digital Signature',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blueAccent),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -1458,7 +1575,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blueAccent,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       minimumSize: Size(0, 36),
                     ),
@@ -1474,7 +1592,10 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                 borderRadius: BorderRadius.circular(8),
                 color: hasSignature ? Colors.white : Colors.grey.shade50,
               ),
-              child: hasSignature ? Padding(padding: EdgeInsets.all(8), child: _getSignatureWidget()) : _getSignatureWidget(),
+              child: hasSignature
+                  ? Padding(
+                      padding: EdgeInsets.all(8), child: _getSignatureWidget())
+                  : _getSignatureWidget(),
             ),
             if (hasSignature)
               Padding(
@@ -1482,14 +1603,21 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                 child: Row(
                   children: [
                     Icon(
-                      _isSignatureFileValid ? Icons.phone_android : Icons.cloud_download,
+                      _isSignatureFileValid
+                          ? Icons.phone_android
+                          : Icons.cloud_download,
                       size: 16,
                       color: Colors.grey.shade600,
                     ),
                     SizedBox(width: 4),
                     Text(
-                      _isSignatureFileValid ? 'Local signature' : 'Server signature',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                      _isSignatureFileValid
+                          ? 'Local signature'
+                          : 'Server signature',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                          fontStyle: FontStyle.italic),
                     ),
                   ],
                 ),

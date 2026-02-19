@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 import 'learner_list_page.dart'; // Import your LearnerListPage
 import 'fingerprint_induction.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:path_provider/path_provider.dart';
 import 'dart:io'; // For checking network status
 import 'database_helper.dart'; // Import your DatabaseHelper
 import 'config.dart';
@@ -20,7 +19,8 @@ class ClassDetailsPage extends StatefulWidget {
 }
 
 class _ClassDetailsPageState extends State<ClassDetailsPage> {
-  List<Map<String, dynamic>> classData = []; // Make sure it's a List<Map<String, dynamic>>
+  List<Map<String, dynamic>> classData =
+      []; // Make sure it's a List<Map<String, dynamic>>
   bool isLoading = true;
 
   @override
@@ -54,14 +54,15 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
         if (response.statusCode == 200) {
           final jsonResponse = jsonDecode(response.body);
           if (jsonResponse['success'] == true) {
-            List<Map<String, dynamic>> serverClassData = List<Map<String, dynamic>>.from(jsonResponse['classDetails']);
-            
+            List<Map<String, dynamic>> serverClassData =
+                List<Map<String, dynamic>>.from(jsonResponse['classDetails']);
+
             // Calculate attendance data for each class from server
             List<Map<String, dynamic>> enrichedClassData = [];
             for (var classItem in serverClassData) {
               try {
                 String classID = classItem['classID'].toString();
-                
+
                 // Get total learners for this class from local database
                 final db = await DatabaseHelper().database;
                 final learnerCount = await db.query(
@@ -69,11 +70,11 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
                   where: 'classID = ?',
                   whereArgs: [classID],
                 );
-                
+
                 // Get today's date
                 final today = DateTime.now();
                 final todayString = DateFormat('yyyy-MM-dd').format(today);
-                
+
                 // Get learners who clocked in today
                 final clockedInLearners = await db.rawQuery('''
                   SELECT DISTINCT lc.LearnerID 
@@ -81,7 +82,7 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
                   JOIN learnerdetails ld ON lc.LearnerID = ld.LearnerID
                   WHERE ld.classID = ? AND lc.clock_date = ? AND lc.clock_in_time IS NOT NULL
                 ''', [classID, todayString]);
-                
+
                 // Get learners who clocked out today
                 final clockedOutLearners = await db.rawQuery('''
                   SELECT DISTINCT lc.LearnerID 
@@ -89,20 +90,21 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
                   JOIN learnerdetails ld ON lc.LearnerID = ld.LearnerID
                   WHERE ld.classID = ? AND lc.clock_date = ? AND lc.clock_out_time IS NOT NULL
                 ''', [classID, todayString]);
-                
+
                 // Calculate attendance statistics
                 int totalLearners = learnerCount.length;
                 int learnersClockedIn = clockedInLearners.length;
                 int learnersClockedOut = clockedOutLearners.length;
                 int learnersAbsent = totalLearners - learnersClockedIn;
-                
+
                 // Create enriched class data with attendance statistics
-                Map<String, dynamic> enrichedClass = Map<String, dynamic>.from(classItem);
+                Map<String, dynamic> enrichedClass =
+                    Map<String, dynamic>.from(classItem);
                 enrichedClass['totalLearners'] = totalLearners;
                 enrichedClass['learnersClockedIn'] = learnersClockedIn;
                 enrichedClass['learnersClockedOut'] = learnersClockedOut;
                 enrichedClass['learnersAbsent'] = learnersAbsent;
-                
+
                 enrichedClassData.add(enrichedClass);
               } catch (e) {
                 print('Error processing class ${classItem['classID']}: $e');
@@ -110,12 +112,13 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
                 enrichedClassData.add(classItem);
               }
             }
-            
+
             setState(() {
               classData = enrichedClassData;
               isLoading = false;
             });
-            _saveClassDataLocally(enrichedClassData); // Save data locally for offline use
+            _saveClassDataLocally(
+                enrichedClassData); // Save data locally for offline use
           } else {
             // Show error message from the API response
             ScaffoldMessenger.of(context).showSnackBar(
@@ -140,7 +143,8 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
   }
 
   // Function to save class data locally
-  Future<void> _saveClassDataLocally(List<Map<String, dynamic>> classData) async {
+  Future<void> _saveClassDataLocally(
+      List<Map<String, dynamic>> classData) async {
     try {
       final db = await DatabaseHelper().database;
       // Add the class data to the database
@@ -149,14 +153,15 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
         Map<String, dynamic> mappedData = {
           'classID': item['classID'],
           'className': item['className'],
-          'numberOfLearners': item['learnerCount'] ?? 0, // Map learnerCount to numberOfLearners
+          'numberOfLearners':
+              item['learnerCount'] ?? 0, // Map learnerCount to numberOfLearners
           'siteID': item['siteID'],
           'phase_id': item['phase_id'] ?? 0,
           'phase_name': item['phase_name'] ?? '',
           'pathway_id': item['pathway_id'] ?? '',
           'qualification_id': item['qualification_id'] ?? '',
         };
-        
+
         await db.insert(
           'class', // Use lowercase 'class' to match the actual table name
           mappedData,
@@ -188,18 +193,18 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
       for (var classItem in result) {
         try {
           String classID = classItem['classID'].toString();
-          
+
           // Get total learners for this class
           final learnerCount = await db.query(
             'learnerdetails',
             where: 'classID = ?',
             whereArgs: [classID],
           );
-          
+
           // Get today's date
           final today = DateTime.now();
           final todayString = DateFormat('yyyy-MM-dd').format(today);
-          
+
           // Get learners who clocked in today
           final clockedInLearners = await db.rawQuery('''
             SELECT DISTINCT lc.LearnerID 
@@ -207,7 +212,7 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
             JOIN learnerdetails ld ON lc.LearnerID = ld.LearnerID
             WHERE ld.classID = ? AND lc.clock_date = ? AND lc.clock_in_time IS NOT NULL
           ''', [classID, todayString]);
-          
+
           // Get learners who clocked out today
           final clockedOutLearners = await db.rawQuery('''
             SELECT DISTINCT lc.LearnerID 
@@ -215,20 +220,21 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
             JOIN learnerdetails ld ON lc.LearnerID = ld.LearnerID
             WHERE ld.classID = ? AND lc.clock_date = ? AND lc.clock_out_time IS NOT NULL
           ''', [classID, todayString]);
-          
+
           // Calculate attendance statistics
           int totalLearners = learnerCount.length;
           int learnersClockedIn = clockedInLearners.length;
           int learnersClockedOut = clockedOutLearners.length;
           int learnersAbsent = totalLearners - learnersClockedIn;
-          
+
           // Create enriched class data with attendance statistics
-          Map<String, dynamic> enrichedClass = Map<String, dynamic>.from(classItem);
+          Map<String, dynamic> enrichedClass =
+              Map<String, dynamic>.from(classItem);
           enrichedClass['totalLearners'] = totalLearners;
           enrichedClass['learnersClockedIn'] = learnersClockedIn;
           enrichedClass['learnersClockedOut'] = learnersClockedOut;
           enrichedClass['learnersAbsent'] = learnersAbsent;
-          
+
           enrichedClassData.add(enrichedClass);
         } catch (e) {
           print('Error processing class ${classItem['classID']}: $e');
@@ -256,8 +262,8 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            LearnerListPage(classID: classID), // Pass classID to LearnerListPage
+        builder: (context) => LearnerListPage(
+            classID: classID), // Pass classID to LearnerListPage
       ),
     );
   }
@@ -280,46 +286,57 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
         title: const Text('Class Information'),
       ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator()) // Show loading spinner while fetching data
+          ? const Center(
+              child:
+                  CircularProgressIndicator()) // Show loading spinner while fetching data
           : classData.isEmpty
-          ? const Center(child: Text('No class data available'))
-          : SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          columns: const [
-            DataColumn(label: Text('Class Name')),
-            DataColumn(label: Text('Learner Count')),
-            DataColumn(label: Text('Learners Clocked In')),
-            DataColumn(label: Text('Learners Clocked Out')),
-            DataColumn(label: Text('Learners Absent')),
-            DataColumn(label: Text('Action')), // Column for View Learners button
-            DataColumn(label: Text('Induction')), // Column for Induction Clocking button
-          ],
-          rows: classData.map<DataRow>((item) {
-            return DataRow(cells: [
-              DataCell(Text(item['className'] ?? 'N/A')), // Show 'N/A' if no className
-              DataCell(Text(item['totalLearners']?.toString() ?? 'N/A')), // Use calculated total learners
-              DataCell(Text(item['learnersClockedIn']?.toString() ?? 'N/A')), // Use calculated learners clocked in
-              DataCell(Text(item['learnersClockedOut']?.toString() ?? 'N/A')), // Use calculated learners clocked out
-              DataCell(Text(item['learnersAbsent']?.toString() ?? 'N/A')), // Use calculated learners absent
-              DataCell(
-                ElevatedButton(
-                  onPressed: () =>
-                      navigateToLearnerList(item['classID'].toString()),
-                  child: const Text('View Learners'),
+              ? const Center(child: Text('No class data available'))
+              : SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: DataTable(
+                    columns: const [
+                      DataColumn(label: Text('Class Name')),
+                      DataColumn(label: Text('Learner Count')),
+                      DataColumn(label: Text('Learners Clocked In')),
+                      DataColumn(label: Text('Learners Clocked Out')),
+                      DataColumn(label: Text('Learners Absent')),
+                      DataColumn(
+                          label: Text(
+                              'Action')), // Column for View Learners button
+                      DataColumn(
+                          label: Text(
+                              'Induction')), // Column for Induction Clocking button
+                    ],
+                    rows: classData.map<DataRow>((item) {
+                      return DataRow(cells: [
+                        DataCell(Text(item['className'] ??
+                            'N/A')), // Show 'N/A' if no className
+                        DataCell(Text(item['totalLearners']?.toString() ??
+                            'N/A')), // Use calculated total learners
+                        DataCell(Text(item['learnersClockedIn']?.toString() ??
+                            'N/A')), // Use calculated learners clocked in
+                        DataCell(Text(item['learnersClockedOut']?.toString() ??
+                            'N/A')), // Use calculated learners clocked out
+                        DataCell(Text(item['learnersAbsent']?.toString() ??
+                            'N/A')), // Use calculated learners absent
+                        DataCell(
+                          ElevatedButton(
+                            onPressed: () => navigateToLearnerList(
+                                item['classID'].toString()),
+                            child: const Text('View Learners'),
+                          ),
+                        ),
+                        DataCell(
+                          ElevatedButton(
+                            onPressed: () => navigateToInductionClocking(
+                                item['classID'].toString()),
+                            child: const Text('Induction Clocking'),
+                          ),
+                        ),
+                      ]);
+                    }).toList(),
+                  ),
                 ),
-              ),
-              DataCell(
-                ElevatedButton(
-                  onPressed: () =>
-                      navigateToInductionClocking(item['classID'].toString()),
-                  child: const Text('Induction Clocking'),
-                ),
-              ),
-            ]);
-          }).toList(),
-        ),
-      ),
     );
   }
 }

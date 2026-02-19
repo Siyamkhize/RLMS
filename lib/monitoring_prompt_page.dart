@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:vibration/vibration.dart';
 import 'services/fingerprint_service.dart';
@@ -11,20 +10,21 @@ class MonitoringPromptPage extends StatefulWidget {
   final Map<String, dynamic> prompt;
 
   const MonitoringPromptPage({
-    Key? key,
+    super.key,
     required this.learnerId,
     required this.prompt,
-  }) : super(key: key);
+  });
 
   @override
   State<MonitoringPromptPage> createState() => _MonitoringPromptPageState();
 }
 
-class _MonitoringPromptPageState extends State<MonitoringPromptPage> with WidgetsBindingObserver {
+class _MonitoringPromptPageState extends State<MonitoringPromptPage>
+    with WidgetsBindingObserver {
   final FingerprintService _fingerprintService = FingerprintService();
   final RandomPromptService _promptService = RandomPromptService();
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  
+
   int _timeRemaining = 0;
   Timer? _countdownTimer;
   bool _isVerifying = false;
@@ -72,7 +72,7 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage> with Widget
       if (mounted) {
         setState(() {
           _timeRemaining--;
-          
+
           if (_timeRemaining <= 0) {
             _handleTimeout();
           } else if (_timeRemaining <= 10 && _timeRemaining % 2 == 0) {
@@ -86,13 +86,13 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage> with Widget
 
   void _handleTimeout() {
     _countdownTimer?.cancel();
-    
+
     if (!_isCompleted) {
       setState(() {
         _isCompleted = true;
         _statusMessage = 'Time expired! Verification failed.';
       });
-      
+
       // Update status on server
       final responseTime = DateTime.now().difference(_startTime!).inSeconds;
       _promptService.updatePromptStatus(
@@ -100,9 +100,9 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage> with Widget
         status: 'timeout',
         responseTime: responseTime,
       );
-      
+
       _promptService.markPromptCompleted(widget.prompt['monitoring_id']);
-      
+
       // Show error and go back
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) {
@@ -122,16 +122,17 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage> with Widget
 
     try {
       // Get learner's fingerprint templates from database
-      final templates = await DatabaseHelper().getAllTemplates(widget.learnerId);
-      
+      final templates =
+          await DatabaseHelper().getAllTemplates(widget.learnerId);
+
       final zkLeft = templates['zkteco_left_template'];
       final zkRight = templates['zkteco_right_template'];
       final futLeft = templates['futronic_left_template'];
       final futRight = templates['futronic_right_template'];
 
-      if ((zkLeft == null || zkLeft.isEmpty) && 
-          (zkRight == null || zkRight.isEmpty) && 
-          (futLeft == null || futLeft.isEmpty) && 
+      if ((zkLeft == null || zkLeft.isEmpty) &&
+          (zkRight == null || zkRight.isEmpty) &&
+          (futLeft == null || futLeft.isEmpty) &&
           (futRight == null || futRight.isEmpty)) {
         throw Exception('No fingerprints enrolled for this learner');
       }
@@ -139,11 +140,12 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage> with Widget
       setState(() {
         _statusMessage = 'Place your finger on the scanner...';
       });
-      
+
       bool verified = false;
-      
+
       // Try ZKTeco first if templates available
-      if ((zkLeft != null && zkLeft.isNotEmpty) || (zkRight != null && zkRight.isNotEmpty)) {
+      if ((zkLeft != null && zkLeft.isNotEmpty) ||
+          (zkRight != null && zkRight.isNotEmpty)) {
         try {
           if (zkLeft != null && zkLeft.isNotEmpty) {
             verified = await _fingerprintService.verify('left', zkLeft);
@@ -155,12 +157,15 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage> with Widget
           debugPrint('[MONITORING] ZKTeco verification error: $e');
         }
       }
-      
+
       // Try Futronic if ZKTeco failed or not available
-      if (!verified && ((futLeft != null && futLeft.isNotEmpty) || (futRight != null && futRight.isNotEmpty))) {
+      if (!verified &&
+          ((futLeft != null && futLeft.isNotEmpty) ||
+              (futRight != null && futRight.isNotEmpty))) {
         try {
           final futronicService = FutronicService();
-          final hint = (futLeft != null && futLeft.isNotEmpty) ? 'left' : 'right';
+          final hint =
+              (futLeft != null && futLeft.isNotEmpty) ? 'left' : 'right';
           verified = await futronicService.verifyBoth(
             hintFinger: hint,
             leftTemplate: futLeft,
@@ -176,7 +181,6 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage> with Widget
       } else {
         _handleFailure();
       }
-
     } catch (e) {
       debugPrint('[MONITORING] Verification error: $e');
       setState(() {
@@ -188,7 +192,7 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage> with Widget
 
   void _handleSuccess() {
     _countdownTimer?.cancel();
-    
+
     setState(() {
       _isCompleted = true;
       _isVerifying = false;
@@ -202,7 +206,7 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage> with Widget
       status: 'completed',
       responseTime: responseTime,
     );
-    
+
     _promptService.markPromptCompleted(widget.prompt['monitoring_id']);
 
     // Show success and go back
@@ -268,7 +272,7 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage> with Widget
                     color: Colors.white,
                   ),
                   const SizedBox(height: 32),
-                  
+
                   // Title
                   Text(
                     'Biometric Verification Required',
@@ -280,10 +284,11 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage> with Widget
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Countdown Timer
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 32, vertical: 16),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(16),
@@ -300,7 +305,7 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage> with Widget
                     ),
                   ),
                   const SizedBox(height: 32),
-                  
+
                   // Status Message
                   Text(
                     _statusMessage,
@@ -311,15 +316,17 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage> with Widget
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 48),
-                  
+
                   // Verify Button
                   if (!_isCompleted && !isExpired)
                     ElevatedButton(
                       onPressed: _isVerifying ? null : _verifyFingerprint,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
-                        foregroundColor: isUrgent ? Colors.orange[900] : Colors.blue[900],
-                        padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 20),
+                        foregroundColor:
+                            isUrgent ? Colors.orange[900] : Colors.blue[900],
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 48, vertical: 20),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(30),
                         ),
@@ -334,7 +341,9 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage> with Widget
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
                                 valueColor: AlwaysStoppedAnimation(
-                                  isUrgent ? Colors.orange[900] : Colors.blue[900],
+                                  isUrgent
+                                      ? Colors.orange[900]
+                                      : Colors.blue[900],
                                 ),
                               ),
                             )
@@ -351,9 +360,9 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage> with Widget
                         ],
                       ),
                     ),
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   // Warning message
                   if (!_isCompleted && !isExpired)
                     Container(
@@ -387,4 +396,3 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage> with Widget
     );
   }
 }
-

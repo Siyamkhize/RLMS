@@ -1,16 +1,11 @@
 import 'dart:io';
-import 'dart:typed_data';
-import 'dart:convert';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
-import 'package:path/path.dart' as path;
 // import 'package:camera/camera.dart';  // Temporarily disabled due to Java 21 compatibility issues
-import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:math' as math;
-import 'package:flutter/foundation.dart';
 
 class CameraQualityScreen extends StatefulWidget {
   const CameraQualityScreen({super.key});
@@ -65,7 +60,8 @@ class _CameraQualityScreenState extends State<CameraQualityScreen> {
       int maxPixels = 0;
       for (var camera in _cameras!) {
         final pixels = 1280 * 720; // Placeholder for resolution
-        if (pixels > maxPixels && camera.lensDirection == CameraLensDirection.back) {
+        if (pixels > maxPixels &&
+            camera.lensDirection == CameraLensDirection.back) {
           maxPixels = pixels;
           selectedCamera = camera;
         }
@@ -109,7 +105,8 @@ class _CameraQualityScreenState extends State<CameraQualityScreen> {
     }
   }
 
-  Future<void> _onTapToFocus(TapDownDetails details, BoxConstraints constraints) async {
+  Future<void> _onTapToFocus(
+      TapDownDetails details, BoxConstraints constraints) async {
     if (_controller == null || !_controller!.value.isInitialized) return;
 
     final offset = Offset(
@@ -144,7 +141,8 @@ class _CameraQualityScreenState extends State<CameraQualityScreen> {
       }
       // Final resize for Siamese model
       final resized = img.copyResize(normalized, width: 224, height: 224);
-      debugPrint('[CAMERA] Preprocessed image: ${resized.width}x${resized.height}, channels: ${resized.numChannels}');
+      debugPrint(
+          '[CAMERA] Preprocessed image: ${resized.width}x${resized.height}, channels: ${resized.numChannels}');
       return resized;
     } catch (e) {
       debugPrint('[CAMERA] Preprocessing error: $e');
@@ -227,10 +225,12 @@ class _CameraQualityScreenState extends State<CameraQualityScreen> {
 
       double mean = luminances.reduce((a, b) => a + b) / luminances.length;
       double variance = luminances
-          .map((v) => (v - mean) * (v - mean))
-          .reduce((a, b) => a + b) / luminances.length;
+              .map((v) => (v - mean) * (v - mean))
+              .reduce((a, b) => a + b) /
+          luminances.length;
       bool isBlurry = variance < 600;
-      debugPrint('[CAMERA] Blurriness check: variance=$variance, isBlurry=$isBlurry');
+      debugPrint(
+          '[CAMERA] Blurriness check: variance=$variance, isBlurry=$isBlurry');
       return isBlurry;
     } catch (e) {
       debugPrint('[CAMERA] Blurriness check error: $e');
@@ -270,7 +270,7 @@ class _CameraQualityScreenState extends State<CameraQualityScreen> {
         _isProcessing = false;
         _qualityMessage = qualityMessage.isEmpty
             ? 'Local quality check passed!'
-            : qualityMessage + 'You can still use the image or retake.';
+            : '${qualityMessage}You can still use the image or retake.';
         _capturedFile = file;
       });
       debugPrint('[CAMERA] Quality check: $_qualityMessage');
@@ -305,250 +305,268 @@ class _CameraQualityScreenState extends State<CameraQualityScreen> {
         title: const Text('Fingerprint Capture'),
         backgroundColor: Colors.blue.shade700,
       ),
-      body: _isCameraInitialized == false || _controller == null || !_controller!.value.isInitialized
+      body: _isCameraInitialized == false ||
+              _controller == null ||
+              !_controller!.value.isInitialized
           ? Center(
-        child: _qualityMessage != null
-            ? Text(
-          _qualityMessage!,
-          style: const TextStyle(color: Colors.red, fontSize: 16),
-          textAlign: TextAlign.center,
-        )
-            : const CircularProgressIndicator(),
-      )
+              child: _qualityMessage != null
+                  ? Text(
+                      _qualityMessage!,
+                      style: const TextStyle(color: Colors.red, fontSize: 16),
+                      textAlign: TextAlign.center,
+                    )
+                  : const CircularProgressIndicator(),
+            )
           : Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            color: Colors.blue.shade50,
-            child: Text(
-              'Place your finger in the circle and tap to focus',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: Colors.blue.shade800,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final cameraAspectRatio = _controller!.value.aspectRatio;
-                  final screenAspectRatio = constraints.maxWidth / constraints.maxHeight;
-
-                  late double previewWidth;
-                  late double previewHeight;
-                  
-                  if (cameraAspectRatio > screenAspectRatio) {
-                    previewWidth = constraints.maxWidth;
-                    previewHeight = constraints.maxWidth / cameraAspectRatio;
-                  } else {
-                    previewHeight = constraints.maxHeight;
-                    previewWidth = constraints.maxHeight * cameraAspectRatio;
-                  }
-
-                  return Center(
-                    child: GestureDetector(
-                      onTapDown: (details) => _onTapToFocus(details, constraints),
-                      child: Container(
-                        width: previewWidth,
-                        height: previewHeight,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            ClipRect(
-                              child: Transform.scale(
-                                scale: 1.0,
-                                child: CameraPreview(_controller!),
-                              ),
-                            ),
-                            CustomPaint(
-                              size: Size(previewWidth, previewHeight),
-                              painter: _FingerprintOverlayPainter(),
-                            ),
-                            if (_qualityMessage == null)
-                              Positioned(
-                                bottom: 20,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black54,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: const Text(
-                                    'Tap to focus',
-                                    style: TextStyle(color: Colors.white, fontSize: 12),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
               children: [
-                if (!_isProcessing)
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.camera_alt, size: 24),
-                      label: const Text('Capture Fingerprint', style: TextStyle(fontSize: 16)),
-                      onPressed: _takePictureAndCheckQuality,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue.shade700,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                      ),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  color: Colors.blue.shade50,
+                  child: Text(
+                    'Place your finger in the circle and tap to focus',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.blue.shade800,
                     ),
                   ),
-                if (_isProcessing)
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        CircularProgressIndicator(color: Colors.blue),
-                        SizedBox(height: 8),
-                        Text('Analyzing image quality...'),
-                      ],
+                ),
+                Expanded(
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final cameraAspectRatio =
+                            _controller!.value.aspectRatio;
+                        final screenAspectRatio =
+                            constraints.maxWidth / constraints.maxHeight;
+
+                        late double previewWidth;
+                        late double previewHeight;
+
+                        if (cameraAspectRatio > screenAspectRatio) {
+                          previewWidth = constraints.maxWidth;
+                          previewHeight =
+                              constraints.maxWidth / cameraAspectRatio;
+                        } else {
+                          previewHeight = constraints.maxHeight;
+                          previewWidth =
+                              constraints.maxHeight * cameraAspectRatio;
+                        }
+
+                        return Center(
+                          child: GestureDetector(
+                            onTapDown: (details) =>
+                                _onTapToFocus(details, constraints),
+                            child: SizedBox(
+                              width: previewWidth,
+                              height: previewHeight,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  ClipRect(
+                                    child: Transform.scale(
+                                      scale: 1.0,
+                                      child: CameraPreview(_controller!),
+                                    ),
+                                  ),
+                                  CustomPaint(
+                                    size: Size(previewWidth, previewHeight),
+                                    painter: _FingerprintOverlayPainter(),
+                                  ),
+                                  if (_qualityMessage == null)
+                                    Positioned(
+                                      bottom: 20,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black54,
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                        ),
+                                        child: const Text(
+                                          'Tap to focus',
+                                          style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
-                // if (_capturedFile != null && !_isProcessing)  // Temporarily disabled due to Java 21 compatibility issues
-                //   Padding(
-                //     padding: const EdgeInsets.all(16),
-                //     child: Row(
-                //       children: [
-                //         Expanded(
-                //           child: SizedBox(
-                //             height: 50,
-                //             child: ElevatedButton.icon(
-                //               icon: const Icon(Icons.refresh, size: 24),
-                //               label: const Text('Retake', style: TextStyle(fontSize: 16)),
-                //               onPressed: () {
-                //                 setState(() {
-                //                   _capturedFile = null;
-                //                   _qualityMessage = null;
-                //                 });
-                //               },
-                //               style: ElevatedButton.styleFrom(
-                //                 backgroundColor: Colors.grey.shade600,
-                //                 foregroundColor: Colors.white,
-                //                 shape: RoundedRectangleBorder(
-                //                   borderRadius: BorderRadius.circular(25),
-                //                 ),
-                //               ),
-                //             ),
-                //           ),
-                //         ),
-                //         const SizedBox(width: 16),
-                //         Expanded(
-                //           child: SizedBox(
-                //             height: 50,
-                //             child: ElevatedButton.icon(
-                //               icon: const Icon(Icons.check, size: 24),
-                //               label: const Text('Use Image', style: TextStyle(fontSize: 16)),
-                //               onPressed: () async {
-                //                 final bytes = await File(_capturedFile!.path).readAsBytes();
-                //                 final image = img.decodeImage(bytes);
-                //                 if (image == null) {
-                //                   debugPrint('[CAMERA] Failed to decode captured image');
-                //                   setState(() {
-                //                     _qualityMessage = 'Failed to decode image';
-                //                   });
-                //                   return;
-                //                 }
-                //                 final processed = await _preprocessImage(image);
-                //                 if (processed == null) {
-                //                   debugPrint('[CAMERA] Preprocessing failed');
-                //                   setState(() {
-                //                     _qualityMessage = 'Failed to preprocess image';
-                //                   });
-                //                   return;
-                //                 }
-                //                 final processedBytes = img.encodePng(processed);
-                //                 final tempDir = await getTemporaryDirectory();
-                //                 final processedPath = path.join(tempDir.path, 'processed_${_capturedFile!.name}');
-                //                 await File(processedPath).writeAsBytes(processedBytes);
-                //                 Navigator.pop(context, processedPath);
-                //               },
-                //               style: ElevatedButton.styleFrom(
-                //                 backgroundColor: Colors.green.shade600,
-                //                 foregroundColor: Colors.white,
-                //                 shape: RoundedRectangleBorder(
-                //                   borderRadius: BorderRadius.circular(25),
-                //                 ),
-                //               ),
-                //             ),
-                //           ),
-                //         ),
-                //       ],
-                //     ),
-                //   ),
-                // if (_capturedFile != null)  // Temporarily disabled due to Java 21 compatibility issues
-                //   Padding(
-                //     padding: const EdgeInsets.symmetric(vertical: 8.0),
-                //     child: ClipRRect(
-                //       borderRadius: BorderRadius.circular(8),
-                //       child: Image.file(
-                //         File(_capturedFile!.path),
-                //         height: 100,
-                //         width: 100,
-                //         fit: BoxFit.cover,
-                //       ),
-                //     ),
-                //   ),
-                if (_qualityMessage != null)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    margin: const EdgeInsets.only(top: 8),
-                    decoration: BoxDecoration(
-                      color: _qualityMessage!.contains('passed')
-                          ? Colors.green.shade50
-                          : Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: _qualityMessage!.contains('passed') ? Colors.green : Colors.red,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _qualityMessage!.contains('passed') ? Icons.check_circle : Icons.warning,
-                          color: _qualityMessage!.contains('passed') ? Colors.green : Colors.red,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _qualityMessage!,
-                            style: TextStyle(
-                              color: _qualityMessage!.contains('passed')
-                                  ? Colors.green.shade800
-                                  : Colors.red.shade800,
-                              fontWeight: FontWeight.w500,
+                ),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      if (!_isProcessing)
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.camera_alt, size: 24),
+                            label: const Text('Capture Fingerprint',
+                                style: TextStyle(fontSize: 16)),
+                            onPressed: _takePictureAndCheckQuality,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue.shade700,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(25),
+                              ),
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      if (_isProcessing)
+                        const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Column(
+                            children: [
+                              CircularProgressIndicator(color: Colors.blue),
+                              SizedBox(height: 8),
+                              Text('Analyzing image quality...'),
+                            ],
+                          ),
+                        ),
+                      // if (_capturedFile != null && !_isProcessing)  // Temporarily disabled due to Java 21 compatibility issues
+                      //   Padding(
+                      //     padding: const EdgeInsets.all(16),
+                      //     child: Row(
+                      //       children: [
+                      //         Expanded(
+                      //           child: SizedBox(
+                      //             height: 50,
+                      //             child: ElevatedButton.icon(
+                      //               icon: const Icon(Icons.refresh, size: 24),
+                      //               label: const Text('Retake', style: TextStyle(fontSize: 16)),
+                      //               onPressed: () {
+                      //                 setState(() {
+                      //                   _capturedFile = null;
+                      //                   _qualityMessage = null;
+                      //                 });
+                      //               },
+                      //               style: ElevatedButton.styleFrom(
+                      //                 backgroundColor: Colors.grey.shade600,
+                      //                 foregroundColor: Colors.white,
+                      //                 shape: RoundedRectangleBorder(
+                      //                   borderRadius: BorderRadius.circular(25),
+                      //                 ),
+                      //               ),
+                      //             ),
+                      //           ),
+                      //         ),
+                      //         const SizedBox(width: 16),
+                      //         Expanded(
+                      //           child: SizedBox(
+                      //             height: 50,
+                      //             child: ElevatedButton.icon(
+                      //               icon: const Icon(Icons.check, size: 24),
+                      //               label: const Text('Use Image', style: TextStyle(fontSize: 16)),
+                      //               onPressed: () async {
+                      //                 final bytes = await File(_capturedFile!.path).readAsBytes();
+                      //                 final image = img.decodeImage(bytes);
+                      //                 if (image == null) {
+                      //                   debugPrint('[CAMERA] Failed to decode captured image');
+                      //                   setState(() {
+                      //                     _qualityMessage = 'Failed to decode image';
+                      //                   });
+                      //                   return;
+                      //                 }
+                      //                 final processed = await _preprocessImage(image);
+                      //                 if (processed == null) {
+                      //                   debugPrint('[CAMERA] Preprocessing failed');
+                      //                   setState(() {
+                      //                     _qualityMessage = 'Failed to preprocess image';
+                      //                   });
+                      //                   return;
+                      //                 }
+                      //                 final processedBytes = img.encodePng(processed);
+                      //                 final tempDir = await getTemporaryDirectory();
+                      //                 final processedPath = path.join(tempDir.path, 'processed_${_capturedFile!.name}');
+                      //                 await File(processedPath).writeAsBytes(processedBytes);
+                      //                 Navigator.pop(context, processedPath);
+                      //               },
+                      //               style: ElevatedButton.styleFrom(
+                      //                 backgroundColor: Colors.green.shade600,
+                      //                 foregroundColor: Colors.white,
+                      //                 shape: RoundedRectangleBorder(
+                      //                   borderRadius: BorderRadius.circular(25),
+                      //                 ),
+                      //               ),
+                      //             ),
+                      //           ),
+                      //         ),
+                      //       ],
+                      //     ),
+                      //   ),
+                      // if (_capturedFile != null)  // Temporarily disabled due to Java 21 compatibility issues
+                      //   Padding(
+                      //     padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      //     child: ClipRRect(
+                      //       borderRadius: BorderRadius.circular(8),
+                      //       child: Image.file(
+                      //         File(_capturedFile!.path),
+                      //         height: 100,
+                      //         width: 100,
+                      //         fit: BoxFit.cover,
+                      //       ),
+                      //     ),
+                      //   ),
+                      if (_qualityMessage != null)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(top: 8),
+                          decoration: BoxDecoration(
+                            color: _qualityMessage!.contains('passed')
+                                ? Colors.green.shade50
+                                : Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _qualityMessage!.contains('passed')
+                                  ? Colors.green
+                                  : Colors.red,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _qualityMessage!.contains('passed')
+                                    ? Icons.check_circle
+                                    : Icons.warning,
+                                color: _qualityMessage!.contains('passed')
+                                    ? Colors.green
+                                    : Colors.red,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _qualityMessage!,
+                                  style: TextStyle(
+                                    color: _qualityMessage!.contains('passed')
+                                        ? Colors.green.shade800
+                                        : Colors.red.shade800,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
+                ),
               ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }

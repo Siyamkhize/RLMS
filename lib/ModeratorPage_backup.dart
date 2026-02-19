@@ -4,16 +4,15 @@ import 'dart:convert';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
-import 'DetailsPage.dart'; // Assuming this is where you navigate for class details
+// Assuming this is where you navigate for class details
 import 'package:url_launcher/url_launcher.dart'; // For opening URLs
-import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config.dart';
 class ModeratorPage extends StatefulWidget {
   final String facilitator_id;
 
-  const ModeratorPage({Key? key, required this.facilitator_id}) : super(key: key);
+  const ModeratorPage({super.key, required this.facilitator_id});
 
   @override
   _ModeratorPageState createState() => _ModeratorPageState();
@@ -29,10 +28,10 @@ class _ModeratorPageState extends State<ModeratorPage> {
     _classes = fetchClasses(widget.facilitator_id);
   }
 
-  Future<List<dynamic>> fetchClasses(String facilitator_id) async {
+  Future<List<dynamic>> fetchClasses(String facilitatorId) async {
     try {
       final response = await http.get(
-        Uri.parse(AppConfig.buildUrl('get_classes.php?facilitator_id=$facilitator_id')),
+        Uri.parse(AppConfig.buildUrl('get_classes.php?facilitator_id=$facilitatorId')),
       );
 
       print('Response Body (get_classes): ${response.body}');
@@ -209,7 +208,7 @@ class _ModeratorPageState extends State<ModeratorPage> {
 class ModerationFeedbackPage extends StatefulWidget {
   final String facilitatorId;
 
-  const ModerationFeedbackPage({Key? key, required this.facilitatorId}) : super(key: key);
+  const ModerationFeedbackPage({super.key, required this.facilitatorId});
 
   @override
   _ModerationFeedbackPageState createState() => _ModerationFeedbackPageState();
@@ -404,7 +403,7 @@ class _ModerationFeedbackPageState extends State<ModerationFeedbackPage> {
 class PdfViewerPage extends StatelessWidget {
   final String pdfPath;
 
-  const PdfViewerPage({Key? key, required this.pdfPath}) : super(key: key);
+  const PdfViewerPage({super.key, required this.pdfPath});
 
   @override
   Widget build(BuildContext context) {
@@ -435,7 +434,7 @@ class PdfViewerPage extends StatelessWidget {
 class ModerationReportPage extends StatefulWidget {
   final String facilitatorId;
 
-  const ModerationReportPage({Key? key, required this.facilitatorId}) : super(key: key);
+  const ModerationReportPage({super.key, required this.facilitatorId});
 
   @override
   _ModerationReportPageState createState() => _ModerationReportPageState();
@@ -589,7 +588,7 @@ class _ModerationReportPageState extends State<ModerationReportPage> {
                           Color rowColor = _getRowColor(learnerData);
 
                           return DataRow(
-                            color: MaterialStateColor.resolveWith((states) => rowColor),
+                            color: WidgetStateColor.resolveWith((states) => rowColor),
                             cells: [
                               DataCell(Text(learnerId)),
                               DataCell(Text(firstName)),
@@ -618,7 +617,7 @@ class _ModerationReportPageState extends State<ModerationReportPage> {
 class ClassDetailsPage extends StatefulWidget {
   final String classId;
 
-  const ClassDetailsPage({required this.classId, Key? key}) : super(key: key);
+  const ClassDetailsPage({required this.classId, super.key});
 
   @override
   _ClassDetailsPageState createState() => _ClassDetailsPageState();
@@ -791,7 +790,7 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
 class AssessorMarkingPage extends StatefulWidget {
   final String learnerId;
 
-  const AssessorMarkingPage({required this.learnerId, Key? key}) : super(key: key);
+  const AssessorMarkingPage({required this.learnerId, super.key});
 
   @override
   _AssessorMarkingPageState createState() => _AssessorMarkingPageState();
@@ -984,7 +983,7 @@ class _AssessorMarkingPageState extends State<AssessorMarkingPage> with SingleTi
 class ModeratorPotholeChecklistPage extends StatelessWidget {
   final String facilitatorId;
 
-  const ModeratorPotholeChecklistPage({Key? key, required this.facilitatorId}) : super(key: key);
+  const ModeratorPotholeChecklistPage({super.key, required this.facilitatorId});
 
   @override
   Widget build(BuildContext context) {
@@ -1119,7 +1118,7 @@ class _POETabState extends State<POETab> {
                         title: Text(entry.key, style: const TextStyle(fontWeight: FontWeight.bold)),
                         children: _buildQualificationTiles(entry.value),
                       );
-                    }).toList(),
+                    }),
                     if (logbook.isNotEmpty)
                       ExpansionTile(
                         title: const Text('Logbook', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -1567,7 +1566,7 @@ class _ExerciseTileState extends State<ExerciseTile> {
           trailing: ElevatedButton(
             onPressed: () {
               String fileUrl = widget.exercise['fileUrl'] ?? widget.exercise['filePath'];
-              if (fileUrl != null && fileUrl.isNotEmpty) {
+              if (fileUrl.isNotEmpty) {
                 widget.onLaunch(fileUrl);
               } else {
                 widget.onResponseMessage('File URL is missing or invalid');
@@ -2060,7 +2059,7 @@ class _ModeratorPotholeChecklistViewPageState extends State<ModeratorPotholeChec
   final TextEditingController _moderatorCommentController = TextEditingController();
   String? _selectedDecision; // "Uphold" or "Withdraw"
   bool _isSaving = false;
-  bool _isLoading = false;
+  final bool _isLoading = false;
   
   // LogBook unit standards
   List<Map<String, dynamic>> _logbookUnitStandards = [];
@@ -2275,7 +2274,7 @@ class _ModeratorPotholeChecklistViewPageState extends State<ModeratorPotholeChec
                           const SizedBox(height: 16),
                           ...items.entries.map((section) {
                             return _buildSection(section.key, section.value as List);
-                          }).toList(),
+                          }),
                         ],
                       ),
                     ),
@@ -2398,7 +2397,7 @@ class _ModeratorPotholeChecklistViewPageState extends State<ModeratorPotholeChec
                                                     ],
                                                   ),
                                                 );
-                                              }).toList(),
+                                              }),
                                             ],
                                           ),
                                         ),
@@ -2419,7 +2418,7 @@ class _ModeratorPotholeChecklistViewPageState extends State<ModeratorPotholeChec
                                   ),
                                 ),
                               );
-                            }).toList(),
+                            }),
                           ],
                         ),
                       ),

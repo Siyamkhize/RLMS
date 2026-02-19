@@ -8,7 +8,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dashboard_page.dart';
-import 'admin.dart';
+import 'sdp_projects_page.dart';
 import 'database_helper.dart';
 import 'sync_service.dart';
 import 'config.dart';
@@ -17,7 +17,6 @@ import 'ModeratorPage.dart';
 import 'facilitator_fingerprint_page.dart';
 import 'finance_dashboard.dart';
 import 'logistics_dashboard.dart';
-import 'sdp_projects_page.dart';
 // MONITORING SYSTEM TEMPORARILY DISABLED - BUILD ISSUE
 // import 'services/random_prompt_service.dart';
 // import 'monitoring_prompt_page.dart';
@@ -28,7 +27,7 @@ const String connectivityCheckTask = "com.example.rlmss.connectivityCheckTask";
 
 // Initialize notifications
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-FlutterLocalNotificationsPlugin();
+    FlutterLocalNotificationsPlugin();
 
 // Request notification permission
 Future<void> requestNotificationPermission() async {
@@ -57,10 +56,11 @@ void callbackDispatcher() {
     try {
       // Initialize notifications in the background
       const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
+          AndroidInitializationSettings('@mipmap/ic_launcher');
       const DarwinInitializationSettings initializationSettingsIOS =
-      DarwinInitializationSettings();
-      const InitializationSettings initializationSettings = InitializationSettings(
+          DarwinInitializationSettings();
+      const InitializationSettings initializationSettings =
+          InitializationSettings(
         android: initializationSettingsAndroid,
         iOS: initializationSettingsIOS,
       );
@@ -72,8 +72,9 @@ void callbackDispatcher() {
         final syncService = SyncService();
 
         final connectivityResult = await Connectivity().checkConnectivity();
-        final hasNetwork = connectivityResult.contains(ConnectivityResult.wifi) ||
-            connectivityResult.contains(ConnectivityResult.mobile);
+        final hasNetwork =
+            connectivityResult.contains(ConnectivityResult.wifi) ||
+                connectivityResult.contains(ConnectivityResult.mobile);
 
         if (hasNetwork) {
           print("Background sync: Network available, starting sync...");
@@ -93,17 +94,20 @@ void callbackDispatcher() {
         print("Connectivity check task started at ${DateTime.now()}");
         final connectivityResult = await Connectivity().checkConnectivity();
         print("Connectivity result: $connectivityResult");
-        final hasNetwork = connectivityResult.contains(ConnectivityResult.wifi) ||
-            connectivityResult.contains(ConnectivityResult.mobile);
+        final hasNetwork =
+            connectivityResult.contains(ConnectivityResult.wifi) ||
+                connectivityResult.contains(ConnectivityResult.mobile);
         print("Has network: $hasNetwork");
 
         if (!hasNetwork) {
           print("No network detected, attempting to trigger alert...");
           try {
-            const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+            const AndroidNotificationDetails androidDetails =
+                AndroidNotificationDetails(
               'connectivity_channel',
               'Connectivity Alerts',
-              channelDescription: 'Notifications for network connectivity issues',
+              channelDescription:
+                  'Notifications for network connectivity issues',
               importance: Importance.max,
               priority: Priority.high,
               ticker: 'ticker',
@@ -111,7 +115,8 @@ void callbackDispatcher() {
               enableVibration: true,
               fullScreenIntent: true, // Show notification prominently
             );
-            const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+            const DarwinNotificationDetails iosDetails =
+                DarwinNotificationDetails(
               badgeNumber: 1,
             );
             const NotificationDetails platformDetails = NotificationDetails(
@@ -175,9 +180,9 @@ void main() async {
 
   // Initialize notifications
   const AndroidInitializationSettings initializationSettingsAndroid =
-  AndroidInitializationSettings('@mipmap/ic_launcher');
+      AndroidInitializationSettings('@mipmap/ic_launcher');
   const DarwinInitializationSettings initializationSettingsIOS =
-  DarwinInitializationSettings();
+      DarwinInitializationSettings();
   const InitializationSettings initializationSettings = InitializationSettings(
     android: initializationSettingsAndroid,
     iOS: initializationSettingsIOS,
@@ -211,10 +216,10 @@ void main() async {
 
   final dbHelper = DatabaseHelper();
   dbHelper.initConnectivityListener();
-  
+
   // Clean up old clocking records (keep only current day)
   await dbHelper.cleanupOldClockingRecords();
-  
+
   // Clean up duplicate clocking records
   await dbHelper.cleanupDuplicateClockingRecords();
 
@@ -230,7 +235,8 @@ class _DevHttpOverrides extends HttpOverrides {
   @override
   HttpClient createHttpClient(SecurityContext? context) {
     final client = super.createHttpClient(context);
-    client.badCertificateCallback = (X509Certificate cert, String host, int port) {
+    client.badCertificateCallback =
+        (X509Certificate cert, String host, int port) {
       return allowedHosts.contains(host);
     };
     return client;
@@ -280,7 +286,7 @@ class _LoginPageState extends State<LoginPage> {
     syncService.initSync();
     _initializeRandomPromptService();
   }
-  
+
   Future<void> _initializeRandomPromptService() async {
     try {
       debugPrint('[MAIN] Initializing random prompt service');
@@ -294,9 +300,11 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _checkConnectivity() async {
     try {
-      final List<ConnectivityResult> results = await Connectivity().checkConnectivity();
+      final List<ConnectivityResult> results =
+          await Connectivity().checkConnectivity();
       setState(() {
-        _isOffline = !results.contains(ConnectivityResult.wifi) && !results.contains(ConnectivityResult.mobile);
+        _isOffline = !results.contains(ConnectivityResult.wifi) &&
+            !results.contains(ConnectivityResult.mobile);
         _connectivityStatus = _getStatusMessage(results);
       });
     } catch (e) {
@@ -321,7 +329,9 @@ class _LoginPageState extends State<LoginPage> {
     try {
       bool isConnected = await dbHelper.isDatabaseConnected();
       setState(() {
-        _databaseStatus = isConnected ? 'Connected to SQLite Database' : 'Not connected to SQLite Database';
+        _databaseStatus = isConnected
+            ? 'Connected to SQLite Database'
+            : 'Not connected to SQLite Database';
       });
     } catch (e) {
       setState(() {
@@ -330,20 +340,20 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Future<Map<String, dynamic>?> _attemptLogin(String username, String password) async {
+  Future<Map<String, dynamic>?> _attemptLogin(
+      String username, String password) async {
     try {
-      final response = await http
-          .post(
-            Uri.parse(AppConfig.loginUrl),
-            body: {'email': username, 'password': password},
-          )
-          .timeout(const Duration(seconds: 15));
+      final response = await http.post(
+        Uri.parse(AppConfig.loginUrl),
+        body: {'email': username, 'password': password},
+      ).timeout(const Duration(seconds: 15));
 
       print("Raw login response: ${response.body}"); // Log raw response
 
       if (response.statusCode == 200) {
         // Clean response by removing HTML tags and trimming extra characters
-        String cleaned = response.body.replaceAll(RegExp(r'<[^>]+>'), '').trim();
+        String cleaned =
+            response.body.replaceAll(RegExp(r'<[^>]+>'), '').trim();
         // Try to extract JSON object if extra content exists
         final start = cleaned.indexOf('{');
         final end = cleaned.lastIndexOf('}');
@@ -382,7 +392,8 @@ class _LoginPageState extends State<LoginPage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Background sync completed successfully')),
+          const SnackBar(
+              content: Text('Background sync completed successfully')),
         );
       }
     } catch (syncError) {
@@ -410,20 +421,23 @@ class _LoginPageState extends State<LoginPage> {
         if (success) {
           // Debug: Print the entire response
           debugPrint('[LOGIN] Full login response: $data');
-          
+
           final role = data['role']?.toString() ?? '';
           final classID = data['classID']?.toString() ?? '';
           // Try multiple fields for SDP identifier
-          final sdp = data['sdp_id']?.toString() ?? data['sdp_name']?.toString() ?? data['sdpId']?.toString() ?? '';
+          final sdp = data['sdp_id']?.toString() ??
+              data['sdp_name']?.toString() ??
+              data['sdpId']?.toString() ??
+              '';
           final classData = data['data'] ?? [];
           final learners = data['learners'] ?? [];
-          final facilitator_id = data['facilitator_id']?.toString() ?? '';
+          final facilitatorId = data['facilitator_id']?.toString() ?? '';
           final classes = data['classes'] ?? [];
-          
+
           // Debug: Show what we extracted
           debugPrint('[LOGIN] Extracted values:');
           debugPrint('[LOGIN]   - role: "$role"');
-          debugPrint('[LOGIN]   - facilitator_id: "$facilitator_id"');
+          debugPrint('[LOGIN]   - facilitator_id: "$facilitatorId"');
           debugPrint('[LOGIN]   - classID: "$classID"');
           debugPrint('[LOGIN]   - role.toLowerCase(): "${role.toLowerCase()}"');
 
@@ -440,9 +454,12 @@ class _LoginPageState extends State<LoginPage> {
                 'f_signature': data['f_signature'],
                 'f_profile': data['f_profile'],
                 'role': role,
-                'facilitator_id': facilitator_id.isNotEmpty ? int.tryParse(facilitator_id) : null,
+                'facilitator_id': facilitatorId.isNotEmpty
+                    ? int.tryParse(facilitatorId)
+                    : null,
               });
-              debugPrint('[LOGIN] Saved facilitator data to local database for classID: $classID');
+              debugPrint(
+                  '[LOGIN] Saved facilitator data to local database for classID: $classID');
             } catch (e) {
               debugPrint('[LOGIN] Error saving facilitator data: $e');
             }
@@ -463,15 +480,18 @@ class _LoginPageState extends State<LoginPage> {
           }
 
           // Navigate immediately
-          _navigateBasedOnRole(role, classID, sdp, classData, learners, facilitator_id, classes, data);
+          _navigateBasedOnRole(role, classID, sdp, classData, learners,
+              facilitatorId, classes, data);
         } else {
-          final message = (data['message']?.toString().trim().isNotEmpty == true)
-              ? data['message'].toString()
-              : 'Invalid email or password';
+          final message =
+              (data['message']?.toString().trim().isNotEmpty == true)
+                  ? data['message'].toString()
+                  : 'Invalid email or password';
           _showError(message);
         }
       } else {
-        _showError('Unable to reach server or parse response. Please try again.');
+        _showError(
+            'Unable to reach server or parse response. Please try again.');
       }
 
       setState(() {
@@ -502,50 +522,68 @@ class _LoginPageState extends State<LoginPage> {
       String password = _passwordController.text;
 
       try {
-        Map<String, dynamic>? facilitator = await dbHelper.getFacilitator(username, password);
+        // Check SDP FIRST before checking facilitators
+        Map<String, dynamic>? sdpEntry =
+            await dbHelper.getSdp(username, password);
 
-        if (facilitator != null) {
-          String role = facilitator['role'];
-          if (role == 'Moderator') {
-            role = 'Moderator'; // Ensure case consistency with PHP
-          }
-          String classID = facilitator['classID']?.toString() ?? '';
-          String sdp = facilitator['sdp_name'] ?? '';
-          List classData = [];
-          List learners = [];
-          String facilitator_id = facilitator['facilitator_id']?.toString() ?? '';
-          List classes = facilitator['classes'] ?? [];
+        if (sdpEntry != null) {
+          String role = 'sdp';
+          String siteID = sdpEntry['siteID']?.toString() ?? '';
+          String classID = sdpEntry['classID']?.toString() ?? '';
+          // Try multiple fields for SDP identifier
+          String sdp = sdpEntry['sdp_id']?.toString() ??
+              sdpEntry['sdp_name']?.toString() ??
+              sdpEntry['Reg_number']?.toString() ??
+              '';
+          String facilitatorId = sdpEntry['facilitator_id']?.toString() ?? '';
+          List classes = sdpEntry['classes'] ?? [];
 
-          _navigateBasedOnRole(role, classID, sdp, classData, learners, facilitator_id, classes, {});
-        } else {
-          Map<String, dynamic>? sdpEntry = await dbHelper.getSdp(username, password);
+          int siteIDInt = int.tryParse(siteID) ?? 0;
+          List classData = await dbHelper.getClassData(classID);
 
-          if (sdpEntry != null) {
-            String role = 'sdp';
-            String siteID = sdpEntry['siteID']?.toString() ?? '';
-            String classID = sdpEntry['classID']?.toString() ?? '';
-            // Try multiple fields for SDP identifier
-            String sdp = sdpEntry['sdp_id']?.toString() ?? sdpEntry['sdp_name']?.toString() ?? sdpEntry['Reg_number']?.toString() ?? '';
-            String facilitator_id = sdpEntry['facilitator_id']?.toString() ?? '';
-            List classes = sdpEntry['classes'] ?? [];
-
-            int siteIDInt = int.tryParse(siteID) ?? 0;
-            List classData = await dbHelper.getClassData(classID);
-            
-            // Try to sync learners from server if we have a classID
-            if (classID.isNotEmpty) {
-              try {
-                await dbHelper.syncLearnersFromServer(classID);
-                print('Successfully synced learners for classID: $classID');
-              } catch (e) {
-                print('Failed to sync learners for classID $classID: $e');
-                // Continue with local data even if sync fails
-              }
+          // Try to sync learners from server if we have a classID
+          if (classID.isNotEmpty) {
+            try {
+              await dbHelper.syncLearnersFromServer(classID);
+              print('Successfully synced learners for classID: $classID');
+            } catch (e) {
+              print('Failed to sync learners for classID $classID: $e');
+              // Continue with local data even if sync fails
             }
-            
-            List learners = await dbHelper.getLearnersForClass(siteIDInt);
+          }
 
-            _navigateBasedOnRole(role, classID, sdp, classData, learners, facilitator_id, classes, {});
+          List learners = await dbHelper.getLearnersForClass(siteIDInt);
+
+          // Create data map with sdp_name for offline login
+          Map<String, dynamic> offlineData = {
+            'sdp_name': sdpEntry['sdp_name']?.toString() ??
+                sdpEntry['client_name']?.toString() ??
+                '',
+            'sdp_id': sdp,
+          };
+
+          _navigateBasedOnRole(role, classID, sdp, classData, learners,
+              facilitatorId, classes, offlineData);
+        } else {
+          // Check facilitator table only if not found in SDP
+          Map<String, dynamic>? facilitator =
+              await dbHelper.getFacilitator(username, password);
+
+          if (facilitator != null) {
+            String role = facilitator['role'];
+            if (role == 'Moderator') {
+              role = 'Moderator'; // Ensure case consistency with PHP
+            }
+            String classID = facilitator['classID']?.toString() ?? '';
+            String sdp = facilitator['sdp_name'] ?? '';
+            List classData = [];
+            List learners = [];
+            String facilitatorId =
+                facilitator['facilitator_id']?.toString() ?? '';
+            List classes = facilitator['classes'] ?? [];
+
+            _navigateBasedOnRole(role, classID, sdp, classData, learners,
+                facilitatorId, classes, {});
           } else {
             _showError('Invalid email or password');
           }
@@ -568,7 +606,8 @@ class _LoginPageState extends State<LoginPage> {
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('No Network Connection'),
-          content: const Text('No internet connection detected. Would you like to proceed with offline login?'),
+          content: const Text(
+              'No internet connection detected. Would you like to proceed with offline login?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -590,25 +629,37 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  void _navigateBasedOnRole(String role, String classID, String sdp, List classData, List learners, String facilitator_id, List classes, Map<String, dynamic> data) async {
+  void _navigateBasedOnRole(
+      String role,
+      String classID,
+      String sdp,
+      List classData,
+      List learners,
+      String facilitatorId,
+      List classes,
+      Map<String, dynamic> data) async {
     // Normalize role to lowercase for consistent comparison
     final normalizedRole = role.toLowerCase().trim();
-    
-    debugPrint('[NAVIGATION] Role: "$normalizedRole", classID: "$classID", facilitator_id: "$facilitator_id"');
-    
-    if (normalizedRole == 'sdp') {
-      // SDP users start at projects, then pathways, then admin/sites
-      final sdpId = data['sdp_id']?.toString() ?? sdp;
-      final sdpName = data['sdp_name']?.toString() ??
-          data['sdpName']?.toString() ??
-          sdp;
 
+    debugPrint('[NAVIGATION] ===== NAVIGATION DEBUG =====');
+    debugPrint('[NAVIGATION] Role: "$normalizedRole"');
+    debugPrint('[NAVIGATION] classID: "$classID"');
+    debugPrint('[NAVIGATION] sdp: "$sdp"');
+    debugPrint('[NAVIGATION] facilitator_id: "$facilitatorId"');
+    debugPrint('[NAVIGATION] data keys: ${data.keys.toList()}');
+    debugPrint('[NAVIGATION] =============================');
+
+    if (normalizedRole == 'sdp') {
+      // SDP users navigate to Projects page with full hierarchical data
+      debugPrint('[NAVIGATION] Navigating SDP to Projects Page');
+      final projects = data['projects'] ?? [];
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => SdpProjectsPage(
-            sdpId: sdpId,
-            sdpName: sdpName,
+            sdpIdentifier: sdp,
+            sdpDisplayName: data['sdp_name']?.toString(),
+            projects: List<Map<String, dynamic>>.from(projects),
           ),
         ),
       );
@@ -619,7 +670,7 @@ class _LoginPageState extends State<LoginPage> {
         context,
         MaterialPageRoute(
           builder: (context) => FinanceDashboard(
-            financeId: facilitator_id,
+            financeId: facilitatorId,
             financeName: _usernameController.text.split('@')[0],
           ),
         ),
@@ -628,9 +679,10 @@ class _LoginPageState extends State<LoginPage> {
       // Logistics role - navigate to logistics dashboard
       debugPrint('[NAVIGATION] Navigating to Logistics Dashboard');
       // Use account_id for logistics users, fallback to facilitator_id if not available
-      final logisticsId = data['account_id']?.toString() ?? facilitator_id;
-      final logisticsName = data['account_name']?.toString() ?? _usernameController.text.split('@')[0];
-      
+      final logisticsId = data['account_id']?.toString() ?? facilitatorId;
+      final logisticsName = data['account_name']?.toString() ??
+          _usernameController.text.split('@')[0];
+
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -644,14 +696,14 @@ class _LoginPageState extends State<LoginPage> {
       // Use classID to get facilitator (old reliable way)
       await _handleFacilitatorLoginByClassID(
         classID: classID,
-        facilitatorId: facilitator_id,
+        facilitatorId: facilitatorId,
         facilitatorName: 'Assessor',
         onSuccess: () {
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => AssessorPage(
-                facilitator_id: facilitator_id,
+                facilitator_id: facilitatorId,
               ),
             ),
           );
@@ -661,14 +713,14 @@ class _LoginPageState extends State<LoginPage> {
       // Use classID to get facilitator (old reliable way)
       await _handleFacilitatorLoginByClassID(
         classID: classID,
-        facilitatorId: facilitator_id,
+        facilitatorId: facilitatorId,
         facilitatorName: 'Moderator',
         onSuccess: () {
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => ModeratorPage(
-                facilitator_id: facilitator_id,
+                facilitator_id: facilitatorId,
               ),
             ),
           );
@@ -679,7 +731,7 @@ class _LoginPageState extends State<LoginPage> {
       debugPrint('[NAVIGATION] Navigating to Facilitator Dashboard');
       await _handleFacilitatorLoginByClassID(
         classID: classID,
-        facilitatorId: facilitator_id,
+        facilitatorId: facilitatorId,
         facilitatorName: 'Facilitator',
         onSuccess: () {
           Navigator.push(
@@ -742,14 +794,16 @@ class _LoginPageState extends State<LoginPage> {
               _isLoading
                   ? const CircularProgressIndicator()
                   : ElevatedButton(
-                onPressed: _handleLogin,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
-                ),
-                child: const Text('Login', style: TextStyle(fontSize: 16)),
-              ),
+                      onPressed: _handleLogin,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 50, vertical: 15),
+                      ),
+                      child:
+                          const Text('Login', style: TextStyle(fontSize: 16)),
+                    ),
               const SizedBox(height: 20),
               Text(
                 _connectivityStatus,
@@ -783,7 +837,7 @@ class _LoginPageState extends State<LoginPage> {
     try {
       // Use classID to get facilitator from database (the old way that works)
       debugPrint('[LOGIN] Getting facilitator by classID: $classID');
-      
+
       final db = await dbHelper.database;
       final result = await db.query(
         'facilitator',
@@ -791,31 +845,35 @@ class _LoginPageState extends State<LoginPage> {
         whereArgs: [classID],
         limit: 1,
       );
-      
+
       if (result.isEmpty) {
         debugPrint('[LOGIN] No facilitator found for classID: $classID');
-        debugPrint('[LOGIN] Bypassing fingerprint features, proceeding to dashboard');
+        debugPrint(
+            '[LOGIN] Bypassing fingerprint features, proceeding to dashboard');
         // No facilitator in database - bypass fingerprint features
         onSuccess();
         return;
       }
-      
+
       final facilitator = result.first;
       final facilitatorIdInt = facilitator['facilitator_id'] as int?;
-      
+
       if (facilitatorIdInt == null) {
-        debugPrint('[LOGIN] facilitator_id is null in database for classID: $classID');
-        debugPrint('[LOGIN] Bypassing fingerprint features, proceeding to dashboard');
+        debugPrint(
+            '[LOGIN] facilitator_id is null in database for classID: $classID');
+        debugPrint(
+            '[LOGIN] Bypassing fingerprint features, proceeding to dashboard');
         // No valid ID - bypass fingerprint features
         onSuccess();
         return;
       }
-      
+
       final firstName = facilitator['firstName']?.toString() ?? '';
       final lastName = facilitator['lastName']?.toString() ?? '';
       final fullName = '$firstName $lastName'.trim();
-      
-      debugPrint('[LOGIN] Found facilitator: ID=$facilitatorIdInt, Name=$fullName');
+
+      debugPrint(
+          '[LOGIN] Found facilitator: ID=$facilitatorIdInt, Name=$fullName');
 
       // Step 0: Sync facilitator data from server (including fingerprints) if online
       if (!_isOffline) {
@@ -831,11 +889,14 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       // Step 1: Check if facilitator has fingerprints enrolled (one-time setup)
-      final hasFingerprints = await dbHelper.facilitatorHasFingerprints(facilitatorIdInt);
-      debugPrint('[LOGIN] Facilitator $facilitatorIdInt has fingerprints: $hasFingerprints');
-      
+      final hasFingerprints =
+          await dbHelper.facilitatorHasFingerprints(facilitatorIdInt);
+      debugPrint(
+          '[LOGIN] Facilitator $facilitatorIdInt has fingerprints: $hasFingerprints');
+
       if (!hasFingerprints) {
-        debugPrint('[LOGIN] No fingerprints enrolled for facilitator $facilitatorIdInt');
+        debugPrint(
+            '[LOGIN] No fingerprints enrolled for facilitator $facilitatorIdInt');
         // Navigate to fingerprint enrollment (first-time setup)
         final enrolled = await Navigator.push(
           context,
@@ -847,9 +908,9 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
         );
-        
+
         if (!mounted) return;
-        
+
         if (enrolled != true) {
           // User didn't complete enrollment, stay on login page
           _showError('Fingerprint enrollment is required to continue');
@@ -858,10 +919,12 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       // Step 2: Check if facilitator has clocked in today (daily requirement)
-      final clockedInToday = await dbHelper.facilitatorClockedInToday(facilitatorIdInt);
-      
+      final clockedInToday =
+          await dbHelper.facilitatorClockedInToday(facilitatorIdInt);
+
       if (!clockedInToday) {
-        debugPrint('[LOGIN] Facilitator $facilitatorIdInt has NOT clocked in today');
+        debugPrint(
+            '[LOGIN] Facilitator $facilitatorIdInt has NOT clocked in today');
         // Show message that clock-in is required
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -872,7 +935,7 @@ class _LoginPageState extends State<LoginPage> {
             ),
           );
         }
-        
+
         // Navigate to fingerprint page for clock-in (required daily)
         final clockedIn = await Navigator.push(
           context,
@@ -885,9 +948,9 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
         );
-        
+
         if (!mounted) return;
-        
+
         if (clockedIn != true) {
           // User didn't clock in, stay on login page
           _showError('Clock-in is required to access the dashboard');
@@ -895,12 +958,15 @@ class _LoginPageState extends State<LoginPage> {
         }
       } else {
         // Already clocked in today, show confirmation
-        final clockInTime = await dbHelper.getFacilitatorTodayClockIn(facilitatorIdInt);
-        debugPrint('[LOGIN] Facilitator $facilitatorIdInt already clocked in at $clockInTime');
+        final clockInTime =
+            await dbHelper.getFacilitatorTodayClockIn(facilitatorIdInt);
+        debugPrint(
+            '[LOGIN] Facilitator $facilitatorIdInt already clocked in at $clockInTime');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Welcome back! Already clocked in at ${clockInTime ?? 'earlier'}'),
+              content: Text(
+                  'Welcome back! Already clocked in at ${clockInTime ?? 'earlier'}'),
               backgroundColor: Colors.green,
               duration: const Duration(seconds: 2),
             ),
@@ -909,9 +975,9 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       // Proceed to dashboard
-      debugPrint('[LOGIN] Proceeding to dashboard for facilitator $facilitatorIdInt');
+      debugPrint(
+          '[LOGIN] Proceeding to dashboard for facilitator $facilitatorIdInt');
       onSuccess();
-      
     } catch (e) {
       debugPrint('[LOGIN] Error in facilitator login flow: $e');
       // If any error occurs, bypass fingerprint and go to dashboard
@@ -922,7 +988,8 @@ class _LoginPageState extends State<LoginPage> {
 
   void _showError(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -935,7 +1002,8 @@ class _LoginPageState extends State<LoginPage> {
           child: Column(
             children: facilitators.map((facilitator) {
               return ListTile(
-                title: Text('${facilitator['firstName']} ${facilitator['lastName']}'),
+                title: Text(
+                    '${facilitator['firstName']} ${facilitator['lastName']}'),
                 subtitle: Text('Password: ${facilitator['password']}'),
               );
             }).toList(),

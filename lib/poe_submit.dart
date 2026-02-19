@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:signature/signature.dart';
@@ -19,14 +18,14 @@ class POESubmitPage extends StatefulWidget {
   final String logisticsName;
 
   const POESubmitPage({
-    Key? key,
+    super.key,
     required this.learner,
     required this.classId,
     required this.className,
     required this.facilitatorName,
     required this.logisticsId,
     required this.logisticsName,
-  }) : super(key: key);
+  });
 
   @override
   _POESubmitPageState createState() => _POESubmitPageState();
@@ -38,14 +37,15 @@ class _POESubmitPageState extends State<POESubmitPage> {
   final FutronicService _futronicService = FutronicService();
   final facilitatorController = TextEditingController();
   final representativeController = TextEditingController();
-  
+
   // Signature controllers - only representative signature needed
-  final SignatureController _representativeSignatureController = SignatureController(
+  final SignatureController _representativeSignatureController =
+      SignatureController(
     penStrokeWidth: 2,
     penColor: Colors.black,
     exportBackgroundColor: Colors.white,
   );
-  
+
   bool isLoading = false;
   bool fingerprintVerified = false;
   bool poeSubmitted = false;
@@ -54,7 +54,7 @@ class _POESubmitPageState extends State<POESubmitPage> {
   void initState() {
     super.initState();
     facilitatorController.text = widget.facilitatorName;
-    
+
     // Add listener to signature controller to update UI when signature changes
     _representativeSignatureController.addListener(() {
       setState(() {
@@ -98,17 +98,21 @@ class _POESubmitPageState extends State<POESubmitPage> {
                       ],
                     ),
                     const Divider(),
-                    _buildInfoRow('Name', widget.learner['FullName'] ?? '${widget.learner['Name']} ${widget.learner['Surname']}'),
-                    _buildInfoRow('ID Number', widget.learner['IDNumber'] ?? 'N/A'),
+                    _buildInfoRow(
+                        'Name',
+                        widget.learner['FullName'] ??
+                            '${widget.learner['Name']} ${widget.learner['Surname']}'),
+                    _buildInfoRow(
+                        'ID Number', widget.learner['IDNumber'] ?? 'N/A'),
                     _buildInfoRow('Class', widget.className),
                     _buildInfoRow('Logistics Officer', widget.logisticsName),
                   ],
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 20),
-            
+
             // POE Collection Form Card
             Card(
               elevation: 4,
@@ -138,7 +142,8 @@ class _POESubmitPageState extends State<POESubmitPage> {
                         labelText: 'Representative Name *',
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.badge),
-                        helperText: 'Person collecting the POE (required for verification)',
+                        helperText:
+                            'Person collecting the POE (required for verification)',
                       ),
                       onChanged: (value) {
                         // Reset fingerprint verification if representative name changes
@@ -162,7 +167,7 @@ class _POESubmitPageState extends State<POESubmitPage> {
                       enabled: false, // Read-only, pre-filled from class data
                     ),
                     const SizedBox(height: 20),
-                    
+
                     // Representative Signature Section
                     const Text(
                       'Representative Digital Signature',
@@ -177,31 +182,35 @@ class _POESubmitPageState extends State<POESubmitPage> {
                       style: TextStyle(color: Colors.grey),
                     ),
                     const SizedBox(height: 12),
-                    
+
                     Container(
                       height: 150,
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: representativeController.text.trim().isNotEmpty ? Colors.grey : Colors.grey.shade300,
+                          color: representativeController.text.trim().isNotEmpty
+                              ? Colors.grey
+                              : Colors.grey.shade300,
                           width: 2,
                         ),
                         borderRadius: BorderRadius.circular(8),
-                        color: representativeController.text.trim().isNotEmpty ? Colors.white : Colors.grey.shade100,
+                        color: representativeController.text.trim().isNotEmpty
+                            ? Colors.white
+                            : Colors.grey.shade100,
                       ),
-                      child: representativeController.text.trim().isNotEmpty 
-                        ? Signature(
-                            controller: _representativeSignatureController,
-                            backgroundColor: Colors.white,
-                          )
-                        : const Center(
-                            child: Text(
-                              'Enter representative name first',
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontStyle: FontStyle.italic,
+                      child: representativeController.text.trim().isNotEmpty
+                          ? Signature(
+                              controller: _representativeSignatureController,
+                              backgroundColor: Colors.white,
+                            )
+                          : const Center(
+                              child: Text(
+                                'Enter representative name first',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontStyle: FontStyle.italic,
+                                ),
                               ),
                             ),
-                          ),
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -221,9 +230,9 @@ class _POESubmitPageState extends State<POESubmitPage> {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 20),
-            
+
             // Biometric Verification Card - Moved to bottom
             Card(
               elevation: 4,
@@ -236,7 +245,8 @@ class _POESubmitPageState extends State<POESubmitPage> {
                       children: [
                         Icon(
                           Icons.fingerprint,
-                          color: fingerprintVerified ? Colors.green : Colors.grey,
+                          color:
+                              fingerprintVerified ? Colors.green : Colors.grey,
                         ),
                         const SizedBox(width: 8),
                         const Text(
@@ -254,20 +264,32 @@ class _POESubmitPageState extends State<POESubmitPage> {
                     const Divider(),
                     if (!fingerprintVerified) ...[
                       Text(
-                        _representativeSignatureController.isEmpty 
-                          ? 'Please provide your signature above, then verify learner fingerprint.'
-                          : 'Now verify the learner\'s fingerprint to complete POE collection.',
+                        _representativeSignatureController.isEmpty
+                            ? 'Please provide your signature above, then verify learner fingerprint.'
+                            : 'Now verify the learner\'s fingerprint to complete POE collection.',
                         style: const TextStyle(color: Colors.grey),
                       ),
                       const SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: (isLoading || representativeController.text.trim().isEmpty || _representativeSignatureController.isEmpty) ? null : _verifyFingerprint,
+                          onPressed: (isLoading ||
+                                  representativeController.text
+                                      .trim()
+                                      .isEmpty ||
+                                  _representativeSignatureController.isEmpty)
+                              ? null
+                              : _verifyFingerprint,
                           icon: const Icon(Icons.fingerprint),
                           label: const Text('Verify Learner Fingerprint'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: (representativeController.text.trim().isNotEmpty && !_representativeSignatureController.isEmpty) ? Colors.blue : Colors.grey,
+                            backgroundColor: (representativeController.text
+                                        .trim()
+                                        .isNotEmpty &&
+                                    _representativeSignatureController
+                                        .isNotEmpty)
+                                ? Colors.blue
+                                : Colors.grey,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
@@ -278,7 +300,8 @@ class _POESubmitPageState extends State<POESubmitPage> {
                           padding: EdgeInsets.only(top: 8),
                           child: Text(
                             'Enter representative name to enable signature',
-                            style: TextStyle(color: Colors.orange, fontSize: 12),
+                            style:
+                                TextStyle(color: Colors.orange, fontSize: 12),
                           ),
                         )
                       else if (_representativeSignatureController.isEmpty)
@@ -286,7 +309,8 @@ class _POESubmitPageState extends State<POESubmitPage> {
                           padding: EdgeInsets.only(top: 8),
                           child: Text(
                             'Provide signature to enable fingerprint verification',
-                            style: TextStyle(color: Colors.orange, fontSize: 12),
+                            style:
+                                TextStyle(color: Colors.orange, fontSize: 12),
                           ),
                         ),
                     ] else ...[
@@ -310,9 +334,9 @@ class _POESubmitPageState extends State<POESubmitPage> {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 20),
-            
+
             // Status Display
             if (isLoading)
               const Card(
@@ -354,7 +378,8 @@ class _POESubmitPageState extends State<POESubmitPage> {
                   ),
                 ),
               )
-            else if (fingerprintVerified && _representativeSignatureController.isEmpty)
+            else if (fingerprintVerified &&
+                _representativeSignatureController.isEmpty)
               Card(
                 color: Colors.blue.shade50,
                 child: Padding(
@@ -431,16 +456,18 @@ class _POESubmitPageState extends State<POESubmitPage> {
       // GEOFENCING CHECK: Verify user is within 300 meters before allowing POE collection
       print('[POE_SUBMIT] Starting geofence check...');
       bool withinRadius = await _checkLocationAndRadius();
-      
+
       if (!withinRadius) {
-        print('[POE_SUBMIT] ❌ Geofence check failed - user not within 300 meters');
+        print(
+            '[POE_SUBMIT] ❌ Geofence check failed - user not within 300 meters');
         setState(() {
           isLoading = false;
         });
         return;
       }
-      
-      print('[POE_SUBMIT] ✅ Geofence check passed - proceeding with fingerprint verification');
+
+      print(
+          '[POE_SUBMIT] ✅ Geofence check passed - proceeding with fingerprint verification');
 
       // Use the EXACT same verification logic as clock_in_page.dart
       final verified = await _performDirectFingerprintVerification();
@@ -454,7 +481,7 @@ class _POESubmitPageState extends State<POESubmitPage> {
             backgroundColor: Colors.green,
           ),
         );
-        
+
         // Show confirmation dialog before submitting
         await _showSubmitConfirmationDialog();
       } else {
@@ -483,11 +510,12 @@ class _POESubmitPageState extends State<POESubmitPage> {
   Future<bool> _performDirectFingerprintVerification() async {
     try {
       print('[POE_SUBMIT] Starting direct fingerprint verification...');
-      
+
       // Get learner ID from learner data
-      final learnerId = widget.learner['learnerID'] ?? widget.learner['LearnerID'] ?? 0;
+      final learnerId =
+          widget.learner['learnerID'] ?? widget.learner['LearnerID'] ?? 0;
       print('[POE_SUBMIT] Learner ID: $learnerId');
-      
+
       if (learnerId == 0) {
         print('[POE_SUBMIT] ❌ Invalid learner ID');
         ScaffoldMessenger.of(context).showSnackBar(
@@ -504,7 +532,8 @@ class _POESubmitPageState extends State<POESubmitPage> {
         print('[POE_SUBMIT] ❌ Invalid learner ID format');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Invalid learner ID format. Cannot verify fingerprint.'),
+            content:
+                Text('Invalid learner ID format. Cannot verify fingerprint.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -518,29 +547,40 @@ class _POESubmitPageState extends State<POESubmitPage> {
       print('[POE_SUBMIT] Scanner detected: $scanner');
 
       // Evaluate available templates per scanner - EXACT SAME AS CLOCK_IN_PAGE
-      final hasZkLeft = (templates['zkteco_left_template']?.isNotEmpty ?? false);
-      final hasZkRight = (templates['zkteco_right_template']?.isNotEmpty ?? false);
-      final hasFutLeft = (templates['futronic_left_template']?.isNotEmpty ?? false);
-      final hasFutRight = (templates['futronic_right_template']?.isNotEmpty ?? false);
+      final hasZkLeft =
+          (templates['zkteco_left_template']?.isNotEmpty ?? false);
+      final hasZkRight =
+          (templates['zkteco_right_template']?.isNotEmpty ?? false);
+      final hasFutLeft =
+          (templates['futronic_left_template']?.isNotEmpty ?? false);
+      final hasFutRight =
+          (templates['futronic_right_template']?.isNotEmpty ?? false);
 
-      print('[POE_SUBMIT] Template availability - ZK Left: $hasZkLeft, ZK Right: $hasZkRight, Fut Left: $hasFutLeft, Fut Right: $hasFutRight');
+      print(
+          '[POE_SUBMIT] Template availability - ZK Left: $hasZkLeft, ZK Right: $hasZkRight, Fut Left: $hasFutLeft, Fut Right: $hasFutRight');
 
       // If current scanner has no templates but the other scanner does, guide user - EXACT SAME AS CLOCK_IN_PAGE
-      if (scanner == 'futronic' && !(hasFutLeft || hasFutRight) && (hasZkLeft || hasZkRight)) {
+      if (scanner == 'futronic' &&
+          !(hasFutLeft || hasFutRight) &&
+          (hasZkLeft || hasZkRight)) {
         print('[POE_SUBMIT] ❌ Futronic scanner but only ZKTeco templates');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('This learner\'s fingerprint is enrolled on ZKTeco. Please use the ZKTeco scanner or re-enroll on Futronic for this learner.'),
+            content: Text(
+                'This learner\'s fingerprint is enrolled on ZKTeco. Please use the ZKTeco scanner or re-enroll on Futronic for this learner.'),
             backgroundColor: Colors.orange,
           ),
         );
         return false;
       }
-      if (scanner == 'zkteco' && !(hasZkLeft || hasZkRight) && (hasFutLeft || hasFutRight)) {
+      if (scanner == 'zkteco' &&
+          !(hasZkLeft || hasZkRight) &&
+          (hasFutLeft || hasFutRight)) {
         print('[POE_SUBMIT] ❌ ZKTeco scanner but only Futronic templates');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('This learner\'s fingerprint is enrolled on Futronic. Please use the Futronic scanner or re-enroll on ZKTeco for this learner.'),
+            content: Text(
+                'This learner\'s fingerprint is enrolled on Futronic. Please use the Futronic scanner or re-enroll on ZKTeco for this learner.'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -550,16 +590,19 @@ class _POESubmitPageState extends State<POESubmitPage> {
       // Get template for verification - EXACT SAME AS CLOCK_IN_PAGE
       String? template;
       if (scanner == 'zkteco') {
-        template = templates['zkteco_left_template'] ?? templates['zkteco_right_template'];
+        template = templates['zkteco_left_template'] ??
+            templates['zkteco_right_template'];
       } else if (scanner == 'futronic') {
-        template = templates['futronic_left_template'] ?? templates['futronic_right_template'];
+        template = templates['futronic_left_template'] ??
+            templates['futronic_right_template'];
       }
-      
+
       if (template == null || template.isEmpty) {
         print('[POE_SUBMIT] ❌ No templates available');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No fingerprints enrolled for this learner. Please enroll fingerprints first.'),
+            content: Text(
+                'No fingerprints enrolled for this learner. Please enroll fingerprints first.'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -569,15 +612,23 @@ class _POESubmitPageState extends State<POESubmitPage> {
       // Build guidance message based on available templates for active scanner - EXACT SAME AS CLOCK_IN_PAGE
       String guidance = 'Place finger on scanner for verification...';
       if (scanner == 'futronic') {
-        if (hasFutLeft && hasFutRight) guidance = 'Place either thumb on Futronic scanner for verification...';
-        else if (hasFutLeft) guidance = 'Place LEFT thumb on Futronic scanner for verification...';
-        else if (hasFutRight) guidance = 'Place RIGHT thumb on Futronic scanner for verification...';
+        if (hasFutLeft && hasFutRight) {
+          guidance =
+              'Place either thumb on Futronic scanner for verification...';
+        } else if (hasFutLeft)
+          guidance = 'Place LEFT thumb on Futronic scanner for verification...';
+        else if (hasFutRight)
+          guidance =
+              'Place RIGHT thumb on Futronic scanner for verification...';
       } else if (scanner == 'zkteco') {
-        if (hasZkLeft && hasZkRight) guidance = 'Place either thumb on ZKTeco scanner for verification...';
-        else if (hasZkLeft) guidance = 'Place LEFT thumb on ZKTeco scanner for verification...';
-        else if (hasZkRight) guidance = 'Place RIGHT thumb on ZKTeco scanner for verification...';
+        if (hasZkLeft && hasZkRight) {
+          guidance = 'Place either thumb on ZKTeco scanner for verification...';
+        } else if (hasZkLeft)
+          guidance = 'Place LEFT thumb on ZKTeco scanner for verification...';
+        else if (hasZkRight)
+          guidance = 'Place RIGHT thumb on ZKTeco scanner for verification...';
       }
-      
+
       print('[POE_SUBMIT] Guidance: $guidance');
       _showProgressDialog(guidance);
 
@@ -585,11 +636,13 @@ class _POESubmitPageState extends State<POESubmitPage> {
       try {
         bool match = false;
         print('[POE_SUBMIT] Starting verification with scanner: $scanner');
-        
+
         if (scanner == 'zkteco') {
           // EXACT SAME AS CLOCK_IN_PAGE
-          print('[POE_SUBMIT] ZKTeco verification - Template length: ${template.length}');
-          match = await _fingerprintService.verify('left', template) || await _fingerprintService.verify('right', template);
+          print(
+              '[POE_SUBMIT] ZKTeco verification - Template length: ${template.length}');
+          match = await _fingerprintService.verify('left', template) ||
+              await _fingerprintService.verify('right', template);
           print('[POE_SUBMIT] ZKTeco verification result: $match');
         } else if (scanner == 'futronic') {
           // EXACT SAME AS CLOCK_IN_PAGE
@@ -597,10 +650,13 @@ class _POESubmitPageState extends State<POESubmitPage> {
             print('[POE_SUBMIT] Attempting Futronic verification');
             final leftTemplate = templates['futronic_left_template'];
             final rightTemplate = templates['futronic_right_template'];
-            final hint = (leftTemplate != null && leftTemplate.isNotEmpty) ? 'left' : 'right';
-            
-            print('[POE_SUBMIT] Futronic verification - Left template length: ${leftTemplate?.length ?? 0}, Right template length: ${rightTemplate?.length ?? 0}, Hint: $hint');
-            
+            final hint = (leftTemplate != null && leftTemplate.isNotEmpty)
+                ? 'left'
+                : 'right';
+
+            print(
+                '[POE_SUBMIT] Futronic verification - Left template length: ${leftTemplate?.length ?? 0}, Right template length: ${rightTemplate?.length ?? 0}, Hint: $hint');
+
             match = await _futronicService.verifyBoth(
               hintFinger: hint,
               leftTemplate: leftTemplate,
@@ -613,12 +669,17 @@ class _POESubmitPageState extends State<POESubmitPage> {
 
             // Provide specific error messages for common Futronic issues - EXACT SAME AS CLOCK_IN_PAGE
             String errorMessage = 'Fingerprint verification failed';
-            if (futronicError.toString().contains('USB_OPEN_FAILED') || futronicError.toString().contains('DEVICE_OPEN_FAILED')) {
-              errorMessage = 'Scanner connection failed. Please check USB connection and try again.';
+            if (futronicError.toString().contains('USB_OPEN_FAILED') ||
+                futronicError.toString().contains('DEVICE_OPEN_FAILED')) {
+              errorMessage =
+                  'Scanner connection failed. Please check USB connection and try again.';
             } else if (futronicError.toString().contains('CAPTURE_FAILED')) {
-              errorMessage = 'Could not capture fingerprint. Please place finger firmly on scanner and try again.';
-            } else if (futronicError.toString().contains('TIMEOUT') || futronicError.toString().contains('Timeout')) {
-              errorMessage = 'Timeout waiting for fingerprint. Please try again.';
+              errorMessage =
+                  'Could not capture fingerprint. Please place finger firmly on scanner and try again.';
+            } else if (futronicError.toString().contains('TIMEOUT') ||
+                futronicError.toString().contains('Timeout')) {
+              errorMessage =
+                  'Timeout waiting for fingerprint. Please try again.';
             }
 
             ScaffoldMessenger.of(context).showSnackBar(
@@ -636,7 +697,8 @@ class _POESubmitPageState extends State<POESubmitPage> {
           print('[POE_SUBMIT] ❌ No scanner detected');
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('No fingerprint scanner detected. Please connect a scanner.'),
+              content: Text(
+                  'No fingerprint scanner detected. Please connect a scanner.'),
               backgroundColor: Colors.orange,
             ),
           );
@@ -647,7 +709,6 @@ class _POESubmitPageState extends State<POESubmitPage> {
         print('[POE_SUBMIT] Final verification result: $match');
 
         return match;
-        
       } catch (e) {
         print('[POE_SUBMIT] Verification error: $e');
         _hideProgressDialog();
@@ -659,7 +720,6 @@ class _POESubmitPageState extends State<POESubmitPage> {
         );
         return false;
       }
-      
     } catch (e) {
       print('[POE_SUBMIT] Fingerprint verification error: $e');
       _hideProgressDialog();
@@ -676,7 +736,7 @@ class _POESubmitPageState extends State<POESubmitPage> {
   // Scanner detection methods - EXACT SAME AS CLOCK_IN_PAGE
   Future<String> _detectScanner() async {
     print('[POE_SUBMIT] Starting scanner detection...');
-    
+
     // Try ZKTeco first
     try {
       print('[POE_SUBMIT] Trying ZKTeco scanner...');
@@ -704,8 +764,10 @@ class _POESubmitPageState extends State<POESubmitPage> {
     for (int attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         print('[POE_SUBMIT] Futronic attempt $attempt/$maxAttempts...');
-        final isFutronicConnected = await _futronicService.isFutronicConnected();
-        print('[POE_SUBMIT] Futronic attempt $attempt result: $isFutronicConnected');
+        final isFutronicConnected =
+            await _futronicService.isFutronicConnected();
+        print(
+            '[POE_SUBMIT] Futronic attempt $attempt result: $isFutronicConnected');
 
         if (isFutronicConnected) {
           print('[POE_SUBMIT] ✅ Futronic detected on attempt $attempt!');
@@ -757,19 +819,19 @@ class _POESubmitPageState extends State<POESubmitPage> {
   }
 
   bool _areSignaturesComplete() {
-    return !_representativeSignatureController.isEmpty;
+    return _representativeSignatureController.isNotEmpty;
   }
 
   bool _isReadyForSubmission() {
     return representativeController.text.trim().isNotEmpty &&
-           !_representativeSignatureController.isEmpty &&
-           fingerprintVerified;
+        _representativeSignatureController.isNotEmpty &&
+        fingerprintVerified;
   }
 
   // Auto-submit when fingerprint is verified and signature is provided
   Future<void> _autoSubmitPOECollection() async {
     if (poeSubmitted) return; // Prevent double submission
-    
+
     // Validate representative name is provided
     if (representativeController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -802,16 +864,18 @@ class _POESubmitPageState extends State<POESubmitPage> {
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      print('[POE_SUBMIT] Location: ${position.latitude}, ${position.longitude} (accuracy: ${position.accuracy}m)');
+      print(
+          '[POE_SUBMIT] Location: ${position.latitude}, ${position.longitude} (accuracy: ${position.accuracy}m)');
 
       // Convert signature to base64
-      final representativeSignatureBytes = await _representativeSignatureController.toPngBytes();
-      final representativeSignatureBase64 = representativeSignatureBytes != null 
-        ? base64Encode(representativeSignatureBytes) 
-        : '';
+      final representativeSignatureBytes =
+          await _representativeSignatureController.toPngBytes();
+      final representativeSignatureBase64 = representativeSignatureBytes != null
+          ? base64Encode(representativeSignatureBytes)
+          : '';
 
       final url = AppConfig.buildUrl('poe_collection_submit.php');
-      
+
       // Step 1: Mark learner as received in material_receipt_form
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -840,7 +904,8 @@ class _POESubmitPageState extends State<POESubmitPage> {
         body: {
           'mark_received': '1',
           'classID': widget.classId,
-          'received_learners[]': '${widget.learner['IDNumber']}|${widget.learner['FullName'] ?? '${widget.learner['Name']} ${widget.learner['Surname']}'}',
+          'received_learners[]':
+              '${widget.learner['IDNumber']}|${widget.learner['FullName'] ?? '${widget.learner['Name']} ${widget.learner['Surname']}'}',
         },
       );
 
@@ -878,8 +943,10 @@ class _POESubmitPageState extends State<POESubmitPage> {
           'facilitator_signature': '', // Not needed for logistics workflow
           'representative_signature': representativeSignatureBase64,
           'fingerprint_verified': 'true',
-          'learner_id': widget.learner['learnerID'] ?? widget.learner['LearnerID'] ?? '',
-          'learner_name': widget.learner['FullName'] ?? '${widget.learner['Name']} ${widget.learner['Surname']}',
+          'learner_id':
+              widget.learner['learnerID'] ?? widget.learner['LearnerID'] ?? '',
+          'learner_name': widget.learner['FullName'] ??
+              '${widget.learner['Name']} ${widget.learner['Surname']}',
           'user_latitude': position.latitude.toString(),
           'user_longitude': position.longitude.toString(),
           'user_accuracy': position.accuracy.toString(),
@@ -891,7 +958,7 @@ class _POESubmitPageState extends State<POESubmitPage> {
         // Parse responses to check for success
         final receiptData = json.decode(receiptResponse.body);
         final formData = json.decode(formResponse.body);
-        
+
         if (receiptData['success'] == true && formData['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -900,28 +967,32 @@ class _POESubmitPageState extends State<POESubmitPage> {
               duration: Duration(seconds: 3),
             ),
           );
-          
+
           // Wait a moment for user to see success message, then navigate back
           await Future.delayed(const Duration(seconds: 2));
           if (mounted) {
             Navigator.of(context).pop(true);
           }
         } else {
-          throw Exception('Server error: ${receiptData['error'] ?? formData['error'] ?? 'Unknown error'}');
+          throw Exception(
+              'Server error: ${receiptData['error'] ?? formData['error'] ?? 'Unknown error'}');
         }
       } else {
-        throw Exception('HTTP error: Receipt ${receiptResponse.statusCode}, Form ${formResponse.statusCode}');
+        throw Exception(
+            'HTTP error: Receipt ${receiptResponse.statusCode}, Form ${formResponse.statusCode}');
       }
     } catch (e) {
       print('Error submitting POE collection: $e');
       setState(() {
         poeSubmitted = false; // Allow retry
       });
-      
+
       // Provide more specific error messages
       String errorMessage = 'Error submitting POE: ';
-      if (e.toString().contains('SocketException') || e.toString().contains('NetworkException')) {
-        errorMessage += 'Network connection failed. Please check your internet connection and try again.';
+      if (e.toString().contains('SocketException') ||
+          e.toString().contains('NetworkException')) {
+        errorMessage +=
+            'Network connection failed. Please check your internet connection and try again.';
       } else if (e.toString().contains('TimeoutException')) {
         errorMessage += 'Request timed out. Please try again.';
       } else if (e.toString().contains('FormatException')) {
@@ -929,7 +1000,7 @@ class _POESubmitPageState extends State<POESubmitPage> {
       } else {
         errorMessage += e.toString();
       }
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(errorMessage),
@@ -939,7 +1010,8 @@ class _POESubmitPageState extends State<POESubmitPage> {
             label: 'Retry',
             textColor: Colors.white,
             onPressed: () {
-              if (fingerprintVerified && !_representativeSignatureController.isEmpty) {
+              if (fingerprintVerified &&
+                  _representativeSignatureController.isNotEmpty) {
                 _autoSubmitPOECollection();
               }
             },
@@ -980,9 +1052,11 @@ class _POESubmitPageState extends State<POESubmitPage> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text('POE Collection Details:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('POE Collection Details:',
+                style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text('Learner: ${widget.learner['FullName'] ?? '${widget.learner['Name']} ${widget.learner['Surname']}'}'),
+            Text(
+                'Learner: ${widget.learner['FullName'] ?? '${widget.learner['Name']} ${widget.learner['Surname']}'}'),
             Text('ID Number: ${widget.learner['IDNumber'] ?? 'N/A'}'),
             Text('Class: ${widget.className}'),
             Text('Representative: ${representativeController.text.trim()}'),
@@ -998,7 +1072,8 @@ class _POESubmitPageState extends State<POESubmitPage> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.check_circle, color: Colors.green.shade700, size: 20),
+                      Icon(Icons.check_circle,
+                          color: Colors.green.shade700, size: 20),
                       const SizedBox(width: 8),
                       const Expanded(
                         child: Text(
@@ -1014,7 +1089,8 @@ class _POESubmitPageState extends State<POESubmitPage> {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.check_circle, color: Colors.green.shade700, size: 20),
+                      Icon(Icons.check_circle,
+                          color: Colors.green.shade700, size: 20),
                       const SizedBox(width: 8),
                       const Expanded(
                         child: Text(
@@ -1070,14 +1146,15 @@ class _POESubmitPageState extends State<POESubmitPage> {
   Future<bool> _checkLocationAndRadius() async {
     try {
       print('[POE_GEOFENCE] Checking location permissions...');
-      
+
       // Check if location services are enabled
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Location services are disabled. Please enable GPS.'),
+              content:
+                  Text('Location services are disabled. Please enable GPS.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -1106,7 +1183,8 @@ class _POESubmitPageState extends State<POESubmitPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Location permissions are permanently denied. Please enable in settings.'),
+              content: Text(
+                  'Location permissions are permanently denied. Please enable in settings.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -1121,7 +1199,8 @@ class _POESubmitPageState extends State<POESubmitPage> {
         timeLimit: const Duration(seconds: 10),
       );
 
-      print('[POE_GEOFENCE] Current position: ${position.latitude}, ${position.longitude}');
+      print(
+          '[POE_GEOFENCE] Current position: ${position.latitude}, ${position.longitude}');
       print('[POE_GEOFENCE] Accuracy: ${position.accuracy} meters');
 
       // Check if within site radius (300 meters)
@@ -1145,13 +1224,17 @@ class _POESubmitPageState extends State<POESubmitPage> {
     }
   }
 
-  Future<bool> _isWithinSiteRadius(String classID, double userLat, double userLon, double userAccuracy) async {
-    if (userAccuracy > 50) { // Accuracy threshold for 300 meter radius
-      print('[POE_GEOFENCE] Geolocation accuracy too low: $userAccuracy meters');
+  Future<bool> _isWithinSiteRadius(String classID, double userLat,
+      double userLon, double userAccuracy) async {
+    if (userAccuracy > 50) {
+      // Accuracy threshold for 300 meter radius
+      print(
+          '[POE_GEOFENCE] Geolocation accuracy too low: $userAccuracy meters');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('GPS accuracy too low. Please wait for better signal.'),
+            content:
+                Text('GPS accuracy too low. Please wait for better signal.'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -1167,7 +1250,8 @@ class _POESubmitPageState extends State<POESubmitPage> {
       final sites = await db.query('sites');
       print('[POE_GEOFENCE] Class table contents: $classes');
       print('[POE_GEOFENCE] Sites table contents: $sites');
-      print('[POE_GEOFENCE] Querying coordinates for classID: $classID (type: ${classID.runtimeType})');
+      print(
+          '[POE_GEOFENCE] Querying coordinates for classID: $classID (type: ${classID.runtimeType})');
 
       final result = await db.rawQuery(
         'SELECT s.latitude, s.longitude FROM class c JOIN sites s ON c.siteID = s.siteID WHERE c.classID = ?',
@@ -1179,21 +1263,26 @@ class _POESubmitPageState extends State<POESubmitPage> {
           print('[POE_GEOFENCE] Class table is empty');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('No class data available in local database.')),
+              const SnackBar(
+                  content: Text('No class data available in local database.')),
             );
           }
         } else if (sites.isEmpty) {
           print('[POE_GEOFENCE] Sites table is empty');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('No site data available in local database.')),
+              const SnackBar(
+                  content: Text('No site data available in local database.')),
             );
           }
         } else {
-          print('[POE_GEOFENCE] No matching class or site found for classID: $classID');
+          print(
+              '[POE_GEOFENCE] No matching class or site found for classID: $classID');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('No site coordinates found for class $classID.')),
+              SnackBar(
+                  content:
+                      Text('No site coordinates found for class $classID.')),
             );
           }
         }
@@ -1204,10 +1293,12 @@ class _POESubmitPageState extends State<POESubmitPage> {
       final siteLon = double.tryParse(result.first['longitude'].toString());
 
       if (siteLat == null || siteLon == null) {
-        print('[POE_GEOFENCE] Invalid site coordinates for classID: $classID, lat: ${result.first['latitude']}, lon: ${result.first['longitude']}');
+        print(
+            '[POE_GEOFENCE] Invalid site coordinates for classID: $classID, lat: ${result.first['latitude']}, lon: ${result.first['longitude']}');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Invalid site coordinates in database.')),
+            const SnackBar(
+                content: Text('Invalid site coordinates in database.')),
           );
         }
         return false;
@@ -1215,15 +1306,18 @@ class _POESubmitPageState extends State<POESubmitPage> {
 
       final distance = _calculateDistance(userLat, userLon, siteLat, siteLon);
 
-      print('[POE_GEOFENCE] Distance to site for classID $classID: ${distance.toStringAsFixed(2)} meters');
+      print(
+          '[POE_GEOFENCE] Distance to site for classID $classID: ${distance.toStringAsFixed(2)} meters');
       print('[POE_GEOFENCE] Site coordinates: $siteLat, $siteLon');
       print('[POE_GEOFENCE] User coordinates: $userLat, $userLon');
-      
-      if (distance > 50) { // 50 meters radius
+
+      if (distance > 50) {
+        // 50 meters radius
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('You are ${distance.toStringAsFixed(0)} meters away. Must be within 50 meters to collect POE.'),
+              content: Text(
+                  'You are ${distance.toStringAsFixed(0)} meters away. Must be within 50 meters to collect POE.'),
               backgroundColor: Colors.red,
               duration: const Duration(seconds: 4),
             ),
@@ -1231,11 +1325,12 @@ class _POESubmitPageState extends State<POESubmitPage> {
         }
         return false;
       }
-      
+
       print('[POE_GEOFENCE] ✅ Within 50 meter radius - POE collection allowed');
       return true;
     } catch (e, stackTrace) {
-      print('[POE_GEOFENCE] Error checking site radius for classID $classID: $e\nStack trace: $stackTrace');
+      print(
+          '[POE_GEOFENCE] Error checking site radius for classID $classID: $e\nStack trace: $stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error checking location: $e')),
@@ -1245,7 +1340,8 @@ class _POESubmitPageState extends State<POESubmitPage> {
     }
   }
 
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+      double lat1, double lon1, double lat2, double lon2) {
     const double R = 6371e3; // Earth radius in meters
     final double phi1 = lat1 * math.pi / 180;
     final double phi2 = lat2 * math.pi / 180;
@@ -1253,7 +1349,10 @@ class _POESubmitPageState extends State<POESubmitPage> {
     final double deltaLambda = (lon2 - lon1) * math.pi / 180;
 
     final double a = math.sin(deltaPhi / 2) * math.sin(deltaPhi / 2) +
-        math.cos(phi1) * math.cos(phi2) * math.sin(deltaLambda / 2) * math.sin(deltaLambda / 2);
+        math.cos(phi1) *
+            math.cos(phi2) *
+            math.sin(deltaLambda / 2) *
+            math.sin(deltaLambda / 2);
     final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
 
     return R * c; // Distance in meters

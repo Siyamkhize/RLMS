@@ -10,10 +10,10 @@ class FacilitatorIssueSitesPage extends StatefulWidget {
   final String logisticsName;
 
   const FacilitatorIssueSitesPage({
-    Key? key,
+    super.key,
     required this.logisticsId,
     required this.logisticsName,
-  }) : super(key: key);
+  });
 
   @override
   _FacilitatorIssueSitesPageState createState() =>
@@ -60,7 +60,7 @@ class _FacilitatorIssueSitesPageState extends State<FacilitatorIssueSitesPage> {
 
   Future<void> fetchSites() async {
     if (!mounted) return;
-    
+
     setState(() {
       isLoading = true;
       errorMessage = '';

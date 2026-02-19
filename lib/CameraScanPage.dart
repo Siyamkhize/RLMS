@@ -7,11 +7,11 @@ import 'package:http_parser/http_parser.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:flutter_doc_scanner/flutter_doc_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:image_picker/image_picker.dart';
 import 'database_helper.dart';
 import 'package:intl/intl.dart';
 
 import 'config.dart';
+
 class CameraScanPage extends StatefulWidget {
   final String type;
   final String exercise;
@@ -19,12 +19,12 @@ class CameraScanPage extends StatefulWidget {
   final String? logbookText;
 
   const CameraScanPage({
-    Key? key,
+    super.key,
     required this.type,
     required this.exercise,
     required this.learnerID,
     this.logbookText,
-  }) : super(key: key);
+  });
 
   @override
   _CameraScanPageState createState() => _CameraScanPageState();
@@ -38,7 +38,13 @@ class _CameraScanPageState extends State<CameraScanPage> {
   @override
   void initState() {
     super.initState();
-    if (!['LogBook', 'Formative', 'Summative', 'FormativeRemedial', 'SummativeRemedial'].contains(widget.type)) {
+    if (![
+      'LogBook',
+      'Formative',
+      'Summative',
+      'FormativeRemedial',
+      'SummativeRemedial'
+    ].contains(widget.type)) {
       print('Error: Invalid type ${widget.type}');
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _showErrorSnackBar('Invalid assessment type: ${widget.type}');
@@ -69,9 +75,8 @@ class _CameraScanPageState extends State<CameraScanPage> {
     try {
       // All types (including LogBook) now use FlutterDocScanner for multi-page scanning with edge detection
       final dynamic scanResult = await FlutterDocScanner().getScanDocuments(
-        // Remove page limitation by setting to unlimited (high number)
-        page: 999
-      );
+          // Remove page limitation by setting to unlimited (high number)
+          page: 999);
       print('Scan Result: $scanResult');
       if (scanResult is! Map ||
           !scanResult.containsKey('pdfUri') ||
@@ -117,9 +122,9 @@ class _CameraScanPageState extends State<CameraScanPage> {
 
     try {
       final List<String> filePaths =
-      scannedImages.map((file) => file.path).toList();
+          scannedImages.map((file) => file.path).toList();
       final String logbookText =
-      widget.type == 'LogBook' ? _logbookTextController.text : '';
+          widget.type == 'LogBook' ? _logbookTextController.text : '';
 
       if (await _checkConnectivity()) {
         await _uploadImages(filePaths, logbookText);
@@ -151,8 +156,7 @@ class _CameraScanPageState extends State<CameraScanPage> {
   Future<void> _uploadImages(
       List<String> imagePaths, String logbookText) async {
     try {
-      final uri =
-      Uri.parse(AppConfig.buildUrl('save_metadata.php'));
+      final uri = Uri.parse(AppConfig.buildUrl('save_metadata.php'));
       final request = http.MultipartRequest('POST', uri);
 
       for (final path in imagePaths) {
@@ -314,10 +318,10 @@ class _CameraScanPageState extends State<CameraScanPage> {
         backgroundColor: Colors.red,
         action: retryable
             ? SnackBarAction(
-          label: 'Retry',
-          textColor: Colors.white,
-          onPressed: () => _scanDocument(),
-        )
+                label: 'Retry',
+                textColor: Colors.white,
+                onPressed: () => _scanDocument(),
+              )
             : null,
       ),
     );
@@ -395,10 +399,10 @@ class _CameraScanPageState extends State<CameraScanPage> {
                                     onPressed: isScanning
                                         ? null
                                         : () {
-                                      setState(() {
-                                        scannedImages.removeAt(index);
-                                      });
-                                    },
+                                            setState(() {
+                                              scannedImages.removeAt(index);
+                                            });
+                                          },
                                   ),
                                 ),
                               ],
@@ -424,10 +428,10 @@ class _CameraScanPageState extends State<CameraScanPage> {
       floatingActionButton: isScanning
           ? null
           : FloatingActionButton(
-        onPressed: _scanDocument,
-        child: const Icon(Icons.document_scanner),
-        tooltip: 'Scan PDF Document',
-      ),
+              onPressed: _scanDocument,
+              tooltip: 'Scan PDF Document',
+              child: const Icon(Icons.document_scanner),
+            ),
     );
   }
 }

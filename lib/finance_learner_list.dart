@@ -11,12 +11,12 @@ class FinanceLearnerList extends StatefulWidget {
   final String financeName;
 
   const FinanceLearnerList({
-    Key? key,
+    super.key,
     required this.classId,
     required this.className,
     required this.financeId,
     required this.financeName,
-  }) : super(key: key);
+  });
 
   @override
   _FinanceLearnerListState createState() => _FinanceLearnerListState();
@@ -40,12 +40,13 @@ class _FinanceLearnerListState extends State<FinanceLearnerList> {
     });
 
     try {
-      final url = AppConfig.buildUrl('get_finance_learners.php?classID=${widget.classId}');
+      final url = AppConfig.buildUrl(
+          'get_finance_learners.php?classID=${widget.classId}');
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data is List) {
           setState(() {
             learners = data;
@@ -101,7 +102,8 @@ class _FinanceLearnerListState extends State<FinanceLearnerList> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.people_outline, size: 60, color: Colors.grey),
+                          Icon(Icons.people_outline,
+                              size: 60, color: Colors.grey),
                           SizedBox(height: 16),
                           Text('No learners found in this class'),
                         ],
@@ -122,7 +124,8 @@ class _FinanceLearnerListState extends State<FinanceLearnerList> {
   }
 
   Widget _buildLearnerCard(Map<String, dynamic> learner) {
-    final learnerName = '${learner['name'] ?? ''} ${learner['surname'] ?? ''}'.trim();
+    final learnerName =
+        '${learner['name'] ?? ''} ${learner['surname'] ?? ''}'.trim();
     final learnerId = learner['learner_id']?.toString() ?? '';
     final idNumber = learner['id_number']?.toString() ?? 'N/A';
     final registerCount = learner['register_count']?.toString() ?? '0';
@@ -141,7 +144,8 @@ class _FinanceLearnerListState extends State<FinanceLearnerList> {
                   backgroundColor: Colors.green[100],
                   child: Text(
                     learnerName.isNotEmpty ? learnerName[0].toUpperCase() : 'L',
-                    style: TextStyle(color: Colors.green[700], fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        color: Colors.green[700], fontWeight: FontWeight.bold),
                   ),
                 ),
                 SizedBox(width: 12),
@@ -150,7 +154,9 @@ class _FinanceLearnerListState extends State<FinanceLearnerList> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        learnerName.isNotEmpty ? learnerName : 'Unknown Learner',
+                        learnerName.isNotEmpty
+                            ? learnerName
+                            : 'Unknown Learner',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,

@@ -1,20 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:flutter_pdfview/flutter_pdfview.dart';
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
-import 'DetailsPage.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'dart:math';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config.dart';
 
 class ModeratorPage extends StatefulWidget {
   final String facilitator_id;
 
-  const ModeratorPage({Key? key, required this.facilitator_id}) : super(key: key);
+  const ModeratorPage({super.key, required this.facilitator_id});
 
   @override
   _ModeratorPageState createState() => _ModeratorPageState();
@@ -30,10 +23,10 @@ class _ModeratorPageState extends State<ModeratorPage> {
     _classes = fetchClasses(widget.facilitator_id);
   }
 
-  Future<List<dynamic>> fetchClasses(String facilitator_id) async {
+  Future<List<dynamic>> fetchClasses(String facilitatorId) async {
     try {
       final response = await http.get(
-        Uri.parse(AppConfig.buildUrl('get_classes.php?facilitator_id=$facilitator_id')),
+        Uri.parse(AppConfig.buildUrl('get_classes.php?facilitator_id=$facilitatorId')),
       );
 
       print('Response Body (get_classes): ${response.body}');
@@ -212,7 +205,7 @@ class _ModeratorPageState extends State<ModeratorPage> {
 class ClassDetailsPage extends StatefulWidget {
   final String classId;
 
-  const ClassDetailsPage({required this.classId, Key? key}) : super(key: key);
+  const ClassDetailsPage({required this.classId, super.key});
 
   @override
   _ClassDetailsPageState createState() => _ClassDetailsPageState();
@@ -322,12 +315,12 @@ class ModeratorMarkingPage extends StatelessWidget {
   final String? learnerIdNumber;
 
   const ModeratorMarkingPage({
-    Key? key,
+    super.key,
     required this.learnerId,
     this.learnerFirstName,
     this.learnerLastName,
     this.learnerIdNumber,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -361,7 +354,7 @@ class ModeratorMarkingPage extends StatelessWidget {
 class LearnerInformationTab extends StatelessWidget {
   final String learnerId;
 
-  const LearnerInformationTab({Key? key, required this.learnerId}) : super(key: key);
+  const LearnerInformationTab({super.key, required this.learnerId});
 
   @override
   Widget build(BuildContext context) {
@@ -378,7 +371,7 @@ class LearnerInformationTab extends StatelessWidget {
 class ModeratorPOETab extends StatefulWidget {
   final String learnerId;
 
-  const ModeratorPOETab({Key? key, required this.learnerId}) : super(key: key);
+  const ModeratorPOETab({super.key, required this.learnerId});
 
   @override
   _ModeratorPOETabState createState() => _ModeratorPOETabState();
@@ -455,7 +448,7 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
                   children: _buildQualificationTiles(entry.value),
                 ),
               );
-            }).toList(),
+            }),
             
             // LogBook Section
             _buildLogBookSection(poeData),
@@ -565,7 +558,7 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
 class ModerationFeedbackPage extends StatelessWidget {
   final String facilitatorId;
 
-  const ModerationFeedbackPage({Key? key, required this.facilitatorId}) : super(key: key);
+  const ModerationFeedbackPage({super.key, required this.facilitatorId});
 
   @override
   Widget build(BuildContext context) {
@@ -576,7 +569,7 @@ class ModerationFeedbackPage extends StatelessWidget {
 class ModerationReportPage extends StatelessWidget {
   final String facilitatorId;
 
-  const ModerationReportPage({Key? key, required this.facilitatorId}) : super(key: key);
+  const ModerationReportPage({super.key, required this.facilitatorId});
 
   @override
   Widget build(BuildContext context) {
@@ -587,7 +580,7 @@ class ModerationReportPage extends StatelessWidget {
 class ModeratorPotholeChecklistPage extends StatelessWidget {
   final String facilitatorId;
 
-  const ModeratorPotholeChecklistPage({Key? key, required this.facilitatorId}) : super(key: key);
+  const ModeratorPotholeChecklistPage({super.key, required this.facilitatorId});
 
   @override
   Widget build(BuildContext context) {

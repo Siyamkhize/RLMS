@@ -14,6 +14,7 @@ import 'CameraScanPage.dart';
 import 'services/fingerprint_service.dart';
 
 import 'config.dart';
+
 class DetailsPage extends StatelessWidget {
   final int learnerID;
   const DetailsPage({super.key, required this.learnerID});
@@ -61,7 +62,7 @@ class _POETabContentState extends State<POETabContent> {
   Map<String, TextEditingController> logBookControllers = {};
   int unsyncedCount = 0;
   bool isSyncing = false;
-  
+
   // Add class-level fingerprint service instances like in clock_in_page.dart
   final FingerprintService _fingerprintService = FingerprintService();
   final FutronicService _futronicService = FutronicService();
@@ -96,11 +97,12 @@ class _POETabContentState extends State<POETabContent> {
   Future<void> _refreshUploadStatus() async {
     try {
       // Store current state to preserve recently completed exercises
-      final currentUploadedExercises = Map<String, bool>.from(uploadedExercises);
-      
+      final currentUploadedExercises =
+          Map<String, bool>.from(uploadedExercises);
+
       // Update unsynced count
       await _updateUnsyncedCount();
-      
+
       if (await _checkConnectivity()) {
         // Try to sync offline POE data first
         await _syncOfflinePOE();
@@ -108,7 +110,7 @@ class _POETabContentState extends State<POETabContent> {
       } else {
         await checkLocalUploadedStatus();
       }
-      
+
       // Ensure recently completed exercises are not lost
       setState(() {
         currentUploadedExercises.forEach((key, value) {
@@ -125,7 +127,8 @@ class _POETabContentState extends State<POETabContent> {
   Future<void> _updateUnsyncedCount() async {
     try {
       final DatabaseHelper dbHelper = DatabaseHelper();
-      final List<Map<String, dynamic>> unsynced = await dbHelper.getUnsyncedPOE(widget.learnerID);
+      final List<Map<String, dynamic>> unsynced =
+          await dbHelper.getUnsyncedPOE(widget.learnerID);
       setState(() {
         unsyncedCount = unsynced.length;
       });
@@ -136,15 +139,16 @@ class _POETabContentState extends State<POETabContent> {
 
   Future<void> _syncOfflinePOE() async {
     if (isSyncing) return;
-    
+
     setState(() {
       isSyncing = true;
     });
-    
+
     try {
       final DatabaseHelper dbHelper = DatabaseHelper();
-      final List<Map<String, dynamic>> unsyncedPOE = await dbHelper.getUnsyncedPOE(widget.learnerID);
-      
+      final List<Map<String, dynamic>> unsyncedPOE =
+          await dbHelper.getUnsyncedPOE(widget.learnerID);
+
       if (unsyncedPOE.isEmpty) {
         print('[POE_SYNC] No unsynced POE data to upload');
         setState(() {
@@ -153,18 +157,18 @@ class _POETabContentState extends State<POETabContent> {
         });
         return;
       }
-      
+
       print('[POE_SYNC] Found ${unsyncedPOE.length} unsynced POE records');
       int successCount = 0;
       int failCount = 0;
-      
+
       for (var poe in unsyncedPOE) {
         final id = poe['id'] as int;
         final type = poe['type'] as String;
         final exercise = poe['exercise'] as String;
         final filePath = poe['filePath'] as String;
         final logbookText = poe['logbook_text'] as String?;
-        
+
         // Check if file exists
         final file = File(filePath);
         if (!await file.exists()) {
@@ -172,28 +176,29 @@ class _POETabContentState extends State<POETabContent> {
           failCount++;
           continue;
         }
-        
+
         try {
           final url = Uri.parse(AppConfig.buildUrl('save_metadata.php'));
           var request = http.MultipartRequest('POST', url)
             ..fields['learnerID'] = widget.learnerID.toString()
             ..fields['exercise'] = exercise
             ..fields['type'] = type;
-          
+
           if (type == 'LogBook' && logbookText != null) {
             request.fields['logbook_text'] = logbookText;
           }
-          
-          request.files.add(await http.MultipartFile.fromPath('files[]', filePath));
-          
+
+          request.files
+              .add(await http.MultipartFile.fromPath('files[]', filePath));
+
           final response = await request.send().timeout(
-            const Duration(seconds: 30),
-            onTimeout: () => throw Exception('Upload timeout'),
-          );
-          
+                const Duration(seconds: 30),
+                onTimeout: () => throw Exception('Upload timeout'),
+              );
+
           final responseBody = await response.stream.bytesToString();
           final decoded = json.decode(responseBody);
-          
+
           if (decoded['status'] == 'success') {
             // Mark as synced in database
             await dbHelper.markPOEAsSynced(id);
@@ -208,9 +213,9 @@ class _POETabContentState extends State<POETabContent> {
           print('[POE_SYNC] ❌ Upload failed: $e');
         }
       }
-      
+
       await _updateUnsyncedCount();
-      
+
       if (successCount > 0 && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -220,7 +225,7 @@ class _POETabContentState extends State<POETabContent> {
           ),
         );
       }
-      
+
       if (failCount > 0 && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -230,7 +235,7 @@ class _POETabContentState extends State<POETabContent> {
           ),
         );
       }
-      
+
       print('[POE_SYNC] Complete: $successCount synced, $failCount failed');
     } catch (e) {
       print('[POE_SYNC] Error during sync: $e');
@@ -244,70 +249,63 @@ class _POETabContentState extends State<POETabContent> {
   Future<void> _manualMarkAsUploaded(String type, String exercise) async {
     // Show confirmation dialog
     bool confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Mark as Uploaded'),
-          content: Text(
-            'Are you sure you want to mark this $type exercise as uploaded?\n\n'
-            'Exercise: $exercise\n\n'
-            'This will allow you to continue with other exercises, but make sure you have actually completed this exercise.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Mark as Uploaded'),
+              content: Text(
+                'Are you sure you want to mark this $type exercise as uploaded?\n\n'
+                'Exercise: $exercise\n\n'
+                'This will allow you to continue with other exercises, but make sure you have actually completed this exercise.',
               ),
-              child: const Text('Mark as Uploaded'),
-            ),
-          ],
-        );
-      },
-    ) ?? false;
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                  ),
+                  child: const Text('Mark as Uploaded'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
 
     if (confirmed) {
       try {
         final dbHelper = DatabaseHelper();
         final timestamp = DateTime.now().toIso8601String();
-        
+
         // Save a manual entry to local database with synced=1
         await dbHelper.saveManualMarkToLocalPoe(
-          widget.learnerID, 
-          type, 
-          exercise, 
-          'MANUALLY_MARKED_${timestamp}'
-        );
-        
+            widget.learnerID, type, exercise, 'MANUALLY_MARKED_$timestamp');
+
         if (type == 'LogBook') {
-          await dbHelper.saveLogBookText(
-            widget.learnerID.toString(), 
-            type, 
-            exercise, 
-            'Manually marked as completed on $timestamp'
-          );
+          await dbHelper.saveLogBookText(widget.learnerID.toString(), type,
+              exercise, 'Manually marked as completed on $timestamp');
         }
-        
+
         // Update the UI state
         setState(() {
           final uploadKey = '$type-$exercise-${widget.learnerID}';
           uploadedExercises[uploadKey] = true;
         });
-        
+
         // Refresh upload status
         await _refreshUploadStatus();
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('✅ $type exercise "$exercise" marked as uploaded'),
             backgroundColor: Colors.green,
           ),
         );
-        
+
         print('Manual mark as uploaded: $type-$exercise-${widget.learnerID}');
       } catch (e) {
         print('Error manually marking as uploaded: $e');
@@ -324,7 +322,8 @@ class _POETabContentState extends State<POETabContent> {
   // Manual mark all formative questions
   Future<void> _manualMarkAllFormative(BuildContext context,
       List<dynamic> formativeQuestions, String unitStandard) async {
-    print('DEBUG: _manualMarkAllFormative called for unitStandard: $unitStandard');
+    print(
+        'DEBUG: _manualMarkAllFormative called for unitStandard: $unitStandard');
     print('DEBUG: formativeQuestions count: ${formativeQuestions.length}');
 
     // Check how many questions are not yet completed
@@ -347,32 +346,33 @@ class _POETabContentState extends State<POETabContent> {
 
     // Show confirmation dialog
     bool confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Manual Mark All Formative'),
-          content: Text(
-            'Are you sure you want to manually mark all pending formative questions as uploaded?\n\n'
-            'Unit Standard: $unitStandard\n'
-            'Pending Questions: ${pendingQuestions.length}\n\n'
-            'This will mark all remaining questions as completed without scanning documents.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Manual Mark All Formative'),
+              content: Text(
+                'Are you sure you want to manually mark all pending formative questions as uploaded?\n\n'
+                'Unit Standard: $unitStandard\n'
+                'Pending Questions: ${pendingQuestions.length}\n\n'
+                'This will mark all remaining questions as completed without scanning documents.',
               ),
-              child: const Text('Mark All as Uploaded'),
-            ),
-          ],
-        );
-      },
-    ) ?? false;
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                  ),
+                  child: const Text('Mark All as Uploaded'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
 
     if (!confirmed) return;
 
@@ -380,20 +380,19 @@ class _POETabContentState extends State<POETabContent> {
       final dbHelper = DatabaseHelper();
       int markedCount = 0;
 
-      print('Starting manual mark all for ${pendingQuestions.length} formative questions');
+      print(
+          'Starting manual mark all for ${pendingQuestions.length} formative questions');
 
       // First, try to find an existing document from a completed formative question
       String? existingDocumentPath = await dbHelper.getExistingDocumentPath(
-        widget.learnerID, 
-        'Formative', 
-        unitStandard
-      );
+          widget.learnerID, 'Formative', unitStandard);
 
       if (existingDocumentPath == null) {
         // No existing document found, show error
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('❌ No scanned document found. Please scan at least one question first.'),
+            content: Text(
+                '❌ No scanned document found. Please scan at least one question first.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -406,23 +405,21 @@ class _POETabContentState extends State<POETabContent> {
       for (var item in formativeQuestions) {
         final exercise = item['exercise']?.toString() ?? 'N/A';
         final uploadKey = 'Formative-$exercise-${widget.learnerID}';
-        
+
         // Only mark if not already completed
         if (!(uploadedExercises[uploadKey] ?? false)) {
           // Use the same document path from the existing scan
-          await dbHelper.saveManualMarkToLocalPoe(
-            widget.learnerID, 
-            'Formative', 
-            exercise, 
-            existingDocumentPath  // Use the actual scanned document
-          );
-          
+          await dbHelper.saveManualMarkToLocalPoe(widget.learnerID, 'Formative',
+              exercise, existingDocumentPath // Use the actual scanned document
+              );
+
           setState(() {
             uploadedExercises[uploadKey] = true;
           });
-          
+
           markedCount++;
-          print('✅ Linked formative exercise to existing document: $exercise ($markedCount/${pendingQuestions.length})');
+          print(
+              '✅ Linked formative exercise to existing document: $exercise ($markedCount/${pendingQuestions.length})');
         }
       }
 
@@ -431,12 +428,14 @@ class _POETabContentState extends State<POETabContent> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('✅ Linked $markedCount formative questions to existing scanned document'),
+          content: Text(
+              '✅ Linked $markedCount formative questions to existing scanned document'),
           backgroundColor: Colors.green,
         ),
       );
 
-      print('Manual mark all formative complete: $markedCount questions linked to document: $existingDocumentPath');
+      print(
+          'Manual mark all formative complete: $markedCount questions linked to document: $existingDocumentPath');
     } catch (e, stackTrace) {
       print('Error in _manualMarkAllFormative: $e\nStackTrace: $stackTrace');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -448,7 +447,8 @@ class _POETabContentState extends State<POETabContent> {
   // Manual mark all logbook items
   Future<void> _manualMarkAllLogBook(BuildContext context,
       List<dynamic> logBookItems, String unitStandard) async {
-    print('DEBUG: _manualMarkAllLogBook called for unitStandard: $unitStandard');
+    print(
+        'DEBUG: _manualMarkAllLogBook called for unitStandard: $unitStandard');
     print('DEBUG: logBookItems count: ${logBookItems.length}');
 
     // Check how many logbook items are not yet completed
@@ -471,32 +471,33 @@ class _POETabContentState extends State<POETabContent> {
 
     // Show confirmation dialog
     bool confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Manual Mark All LogBook'),
-          content: Text(
-            'Are you sure you want to manually mark all pending logbook items as uploaded?\n\n'
-            'Unit Standard: $unitStandard\n'
-            'Pending Items: ${pendingItems.length}\n\n'
-            'This will mark all remaining logbook items as completed without scanning documents.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Manual Mark All LogBook'),
+              content: Text(
+                'Are you sure you want to manually mark all pending logbook items as uploaded?\n\n'
+                'Unit Standard: $unitStandard\n'
+                'Pending Items: ${pendingItems.length}\n\n'
+                'This will mark all remaining logbook items as completed without scanning documents.',
               ),
-              child: const Text('Mark All as Uploaded'),
-            ),
-          ],
-        );
-      },
-    ) ?? false;
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                  ),
+                  child: const Text('Mark All as Uploaded'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
 
     if (!confirmed) return;
 
@@ -504,20 +505,19 @@ class _POETabContentState extends State<POETabContent> {
       final dbHelper = DatabaseHelper();
       int markedCount = 0;
 
-      print('Starting manual mark all for ${pendingItems.length} logbook items');
+      print(
+          'Starting manual mark all for ${pendingItems.length} logbook items');
 
       // First, try to find an existing document from a completed logbook item
       String? existingDocumentPath = await dbHelper.getExistingDocumentPath(
-        widget.learnerID, 
-        'LogBook', 
-        unitStandard
-      );
+          widget.learnerID, 'LogBook', unitStandard);
 
       if (existingDocumentPath == null) {
         // No existing document found, show error
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('❌ No scanned document found. Please scan at least one logbook item first.'),
+            content: Text(
+                '❌ No scanned document found. Please scan at least one logbook item first.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -530,31 +530,28 @@ class _POETabContentState extends State<POETabContent> {
       for (var item in logBookItems) {
         final exercise = item['exercise']?.toString() ?? 'N/A';
         final uploadKey = 'LogBook-$exercise-${widget.learnerID}';
-        
+
         // Only mark if not already completed
         if (!(uploadedExercises[uploadKey] ?? false)) {
           // Use the same document path from the existing scan
-          await dbHelper.saveManualMarkToLocalPoe(
-            widget.learnerID, 
-            'LogBook', 
-            exercise, 
-            existingDocumentPath  // Use the actual scanned document
-          );
-          
+          await dbHelper.saveManualMarkToLocalPoe(widget.learnerID, 'LogBook',
+              exercise, existingDocumentPath // Use the actual scanned document
+              );
+
           // Also save logbook text
           await dbHelper.saveLogBookText(
-            widget.learnerID.toString(), 
-            'LogBook', 
-            exercise, 
-            'Logbook entry for $exercise - $unitStandard (manually marked)'
-          );
-          
+              widget.learnerID.toString(),
+              'LogBook',
+              exercise,
+              'Logbook entry for $exercise - $unitStandard (manually marked)');
+
           setState(() {
             uploadedExercises[uploadKey] = true;
           });
-          
+
           markedCount++;
-          print('✅ Linked logbook item to existing document: $exercise ($markedCount/${pendingItems.length})');
+          print(
+              '✅ Linked logbook item to existing document: $exercise ($markedCount/${pendingItems.length})');
         }
       }
 
@@ -563,12 +560,14 @@ class _POETabContentState extends State<POETabContent> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('✅ Linked $markedCount logbook items to existing scanned document'),
+          content: Text(
+              '✅ Linked $markedCount logbook items to existing scanned document'),
           backgroundColor: Colors.green,
         ),
       );
 
-      print('Manual mark all logbook complete: $markedCount items linked to document: $existingDocumentPath');
+      print(
+          'Manual mark all logbook complete: $markedCount items linked to document: $existingDocumentPath');
     } catch (e, stackTrace) {
       print('Error in _manualMarkAllLogBook: $e\nStackTrace: $stackTrace');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -580,7 +579,8 @@ class _POETabContentState extends State<POETabContent> {
   // Manual mark all summative questions
   Future<void> _manualMarkAllSummative(BuildContext context,
       List<dynamic> summativeQuestions, String unitStandard) async {
-    print('DEBUG: _manualMarkAllSummative called for unitStandard: $unitStandard');
+    print(
+        'DEBUG: _manualMarkAllSummative called for unitStandard: $unitStandard');
     print('DEBUG: summativeQuestions count: ${summativeQuestions.length}');
 
     // Check how many questions are not yet completed
@@ -603,32 +603,33 @@ class _POETabContentState extends State<POETabContent> {
 
     // Show confirmation dialog
     bool confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Manual Mark All Summative'),
-          content: Text(
-            'Are you sure you want to manually mark all pending summative questions as uploaded?\n\n'
-            'Unit Standard: $unitStandard\n'
-            'Pending Questions: ${pendingQuestions.length}\n\n'
-            'This will mark all remaining questions as completed without scanning documents.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Manual Mark All Summative'),
+              content: Text(
+                'Are you sure you want to manually mark all pending summative questions as uploaded?\n\n'
+                'Unit Standard: $unitStandard\n'
+                'Pending Questions: ${pendingQuestions.length}\n\n'
+                'This will mark all remaining questions as completed without scanning documents.',
               ),
-              child: const Text('Mark All as Uploaded'),
-            ),
-          ],
-        );
-      },
-    ) ?? false;
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                  ),
+                  child: const Text('Mark All as Uploaded'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
 
     if (!confirmed) return;
 
@@ -636,20 +637,19 @@ class _POETabContentState extends State<POETabContent> {
       final dbHelper = DatabaseHelper();
       int markedCount = 0;
 
-      print('Starting manual mark all for ${pendingQuestions.length} summative questions');
+      print(
+          'Starting manual mark all for ${pendingQuestions.length} summative questions');
 
       // First, try to find an existing document from a completed summative question
       String? existingDocumentPath = await dbHelper.getExistingDocumentPath(
-        widget.learnerID, 
-        'Summative', 
-        unitStandard
-      );
+          widget.learnerID, 'Summative', unitStandard);
 
       if (existingDocumentPath == null) {
         // No existing document found, show error
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('❌ No scanned document found. Please scan at least one question first.'),
+            content: Text(
+                '❌ No scanned document found. Please scan at least one question first.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -662,23 +662,21 @@ class _POETabContentState extends State<POETabContent> {
       for (var item in summativeQuestions) {
         final exercise = item['exercise']?.toString() ?? 'N/A';
         final uploadKey = 'Summative-$exercise-${widget.learnerID}';
-        
+
         // Only mark if not already completed
         if (!(uploadedExercises[uploadKey] ?? false)) {
           // Use the same document path from the existing scan
-          await dbHelper.saveManualMarkToLocalPoe(
-            widget.learnerID, 
-            'Summative', 
-            exercise, 
-            existingDocumentPath  // Use the actual scanned document
-          );
-          
+          await dbHelper.saveManualMarkToLocalPoe(widget.learnerID, 'Summative',
+              exercise, existingDocumentPath // Use the actual scanned document
+              );
+
           setState(() {
             uploadedExercises[uploadKey] = true;
           });
-          
+
           markedCount++;
-          print('✅ Linked summative exercise to existing document: $exercise ($markedCount/${pendingQuestions.length})');
+          print(
+              '✅ Linked summative exercise to existing document: $exercise ($markedCount/${pendingQuestions.length})');
         }
       }
 
@@ -687,12 +685,14 @@ class _POETabContentState extends State<POETabContent> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('✅ Linked $markedCount summative questions to existing scanned document'),
+          content: Text(
+              '✅ Linked $markedCount summative questions to existing scanned document'),
           backgroundColor: Colors.green,
         ),
       );
 
-      print('Manual mark all summative complete: $markedCount questions linked to document: $existingDocumentPath');
+      print(
+          'Manual mark all summative complete: $markedCount questions linked to document: $existingDocumentPath');
     } catch (e, stackTrace) {
       print('Error in _manualMarkAllSummative: $e\nStackTrace: $stackTrace');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -752,7 +752,7 @@ class _POETabContentState extends State<POETabContent> {
         print('Compressed size at quality $quality: $currentSize bytes');
         quality -= 5;
         targetPath =
-        '${dir.path}/compressed_${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}';
+            '${dir.path}/compressed_${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}';
       } catch (e) {
         print('Compression error: $e');
         ScaffoldMessenger.of(context).showSnackBar(
@@ -807,7 +807,7 @@ class _POETabContentState extends State<POETabContent> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content:
-              Text('Image file is empty. Please select a valid image.')),
+                  Text('Image file is empty. Please select a valid image.')),
         );
         return null;
       }
@@ -839,7 +839,7 @@ class _POETabContentState extends State<POETabContent> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content:
-              Text('Image data is empty. Please select a valid image.')),
+                  Text('Image data is empty. Please select a valid image.')),
         );
         return null;
       }
@@ -856,7 +856,7 @@ class _POETabContentState extends State<POETabContent> {
               pw.Text(
                 heading,
                 style:
-                pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+                    pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
               ),
               pw.SizedBox(height: 20),
               pw.Image(pdfImage, fit: pw.BoxFit.contain),
@@ -903,7 +903,7 @@ class _POETabContentState extends State<POETabContent> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content:
-              Text('Generated PDF too large. Please use a smaller image.')),
+                  Text('Generated PDF too large. Please use a smaller image.')),
         );
         return null;
       }
@@ -920,10 +920,11 @@ class _POETabContentState extends State<POETabContent> {
   }
 
   Future<void> fetchLearnerData() async {
-    print('[FETCH] Starting fetchLearnerData for learnerID=${widget.learnerID}');
+    print(
+        '[FETCH] Starting fetchLearnerData for learnerID=${widget.learnerID}');
     bool isConnected = await _checkConnectivity();
     print('[FETCH] Connectivity check: ${isConnected ? "ONLINE" : "OFFLINE"}');
-    
+
     if (isConnected) {
       print('[FETCH] Attempting online fetch...');
       bool onlineSuccess = await fetchOnlineLearnerData();
@@ -966,7 +967,7 @@ class _POETabContentState extends State<POETabContent> {
             errorMessage = decodedResponse['error'] ?? 'Unknown API error';
             if (decodedResponse['debug']?['learnerID_exists'] == false) {
               errorMessage =
-              'Learner ID ${widget.learnerID} not found in database.';
+                  'Learner ID ${widget.learnerID} not found in database.';
             }
             isLoading = false;
             pathwaysData = null;
@@ -976,11 +977,12 @@ class _POETabContentState extends State<POETabContent> {
         }
         if (decodedResponse['pathways'] != null &&
             decodedResponse['pathways'] is Map) {
-          final pathways = Map<String, dynamic>.from(decodedResponse['pathways']);
-          
+          final pathways =
+              Map<String, dynamic>.from(decodedResponse['pathways']);
+
           // Save to local database for offline access
           await _saveLearnerDataLocally(pathways);
-          
+
           setState(() {
             pathwaysData = pathways;
             isLoading = false;
@@ -1017,15 +1019,18 @@ class _POETabContentState extends State<POETabContent> {
 
   Future<void> _saveLearnerDataLocally(Map<String, dynamic> pathways) async {
     try {
-      print('[OFFLINE_CACHE] Starting to save learner data for learnerID=${widget.learnerID}');
+      print(
+          '[OFFLINE_CACHE] Starting to save learner data for learnerID=${widget.learnerID}');
       print('[OFFLINE_CACHE] Pathways data keys: ${pathways.keys}');
-      
+
       final DatabaseHelper dbHelper = DatabaseHelper();
       // Save the pathways JSON as a cached response for offline use
       await dbHelper.saveLearnerPathwaysCache(widget.learnerID, pathways);
-      
-      print('[OFFLINE_CACHE] ✅ Successfully saved learner pathway data for offline access');
-      print('[OFFLINE_CACHE] Data size: ${pathways.toString().length} characters');
+
+      print(
+          '[OFFLINE_CACHE] ✅ Successfully saved learner pathway data for offline access');
+      print(
+          '[OFFLINE_CACHE] Data size: ${pathways.toString().length} characters');
     } catch (e, stackTrace) {
       print('[OFFLINE_CACHE] ❌ Error saving learner data locally: $e');
       print('[OFFLINE_CACHE] Stack trace: $stackTrace');
@@ -1034,29 +1039,35 @@ class _POETabContentState extends State<POETabContent> {
 
   Future<void> fetchOfflineLearnerData() async {
     try {
-      print('[OFFLINE_CACHE] Attempting to load cached data for learnerID=${widget.learnerID}');
+      print(
+          '[OFFLINE_CACHE] Attempting to load cached data for learnerID=${widget.learnerID}');
       final DatabaseHelper dbHelper = DatabaseHelper();
-      
+
       // First try to get cached pathways data (simpler and faster)
-      final Map<String, dynamic>? cachedPathways = await dbHelper.getLearnerPathwaysCache(widget.learnerID);
-      
+      final Map<String, dynamic>? cachedPathways =
+          await dbHelper.getLearnerPathwaysCache(widget.learnerID);
+
       if (cachedPathways != null) {
         print('[OFFLINE_CACHE] ✅ Found cached pathway data!');
-        print('[OFFLINE_CACHE] Cache has ${cachedPathways.keys.length} pathway(s)');
+        print(
+            '[OFFLINE_CACHE] Cache has ${cachedPathways.keys.length} pathway(s)');
         setState(() {
           pathwaysData = cachedPathways;
           isLoading = false;
-          
+
           // Initialize logbook controllers from cached data
           pathwaysData?.forEach((pathwayName, pathwayData) {
-            (pathwayData['qualifications'] as Map?)?.forEach((qualificationName, qualData) {
-              (qualData['unitstandards'] as Map?)?.forEach((unitStandardName, unitData) {
+            (pathwayData['qualifications'] as Map?)
+                ?.forEach((qualificationName, qualData) {
+              (qualData['unitstandards'] as Map?)
+                  ?.forEach((unitStandardName, unitData) {
                 final logbook = unitData['logbook'] ?? [];
                 for (var item in logbook) {
                   final exercise = item['exercise']?.toString() ?? 'N/A';
                   final key = 'LogBook-$exercise-${widget.learnerID}';
                   if (!logBookControllers.containsKey(key)) {
-                    logBookControllers[key] = TextEditingController(text: item['logbook_text'] ?? '');
+                    logBookControllers[key] =
+                        TextEditingController(text: item['logbook_text'] ?? '');
                   }
                 }
               });
@@ -1065,7 +1076,7 @@ class _POETabContentState extends State<POETabContent> {
         });
         return;
       }
-      
+
       // Fallback to complex database query if no cache exists
       print('[OFFLINE_CACHE] No cached data, trying database query...');
       final localData = await dbHelper.getLearnerData(widget.learnerID);
@@ -1076,7 +1087,7 @@ class _POETabContentState extends State<POETabContent> {
 
         for (var row in localData) {
           final Map<String, dynamic> typedRow =
-          (row as Map).map((key, value) => MapEntry(key.toString(), value));
+              (row as Map).map((key, value) => MapEntry(key.toString(), value));
 
           String pathwayName =
               typedRow['pathway_name']?.toString() ?? 'Unknown Pathway';
@@ -1089,20 +1100,20 @@ class _POETabContentState extends State<POETabContent> {
           String logBookText = typedRow['logbook_text']?.toString() ?? '';
 
           structuredData.putIfAbsent(pathwayName,
-                  () => <String, dynamic>{'qualifications': <String, dynamic>{}});
+              () => <String, dynamic>{'qualifications': <String, dynamic>{}});
           final qualifications = structuredData[pathwayName]['qualifications']
-          as Map<String, dynamic>;
+              as Map<String, dynamic>;
           qualifications.putIfAbsent(qualificationName,
-                  () => <String, dynamic>{'unitstandards': <String, dynamic>{}});
+              () => <String, dynamic>{'unitstandards': <String, dynamic>{}});
           final unitStandards = qualifications[qualificationName]
-          ['unitstandards'] as Map<String, dynamic>;
+              ['unitstandards'] as Map<String, dynamic>;
           unitStandards.putIfAbsent(
               unitStandardName,
-                  () => <String, dynamic>{
-                'formative': <Map<String, String>>[],
-                'summative': <Map<String, String>>[],
-                'logbook': <Map<String, String>>[],
-              });
+              () => <String, dynamic>{
+                    'formative': <Map<String, String>>[],
+                    'summative': <Map<String, String>>[],
+                    'logbook': <Map<String, String>>[],
+                  });
 
           if (typedRow.containsKey('assessments') &&
               typedRow['assessments'] != null) {
@@ -1115,16 +1126,16 @@ class _POETabContentState extends State<POETabContent> {
 
             if (assessments['formative'] != null) {
               final formativeList = unitStandards[unitStandardName]['formative']
-              as List<Map<String, String>>;
+                  as List<Map<String, String>>;
               assessments['formative'].forEach((assessment) {
                 final entry = {
                   'exercise': assessment['exercise']?.toString() ?? 'N/A',
                   'question_number':
-                  assessment['question_number']?.toString() ?? 'N/A',
+                      assessment['question_number']?.toString() ?? 'N/A',
                 };
                 bool isDuplicate = formativeList.any(
-                      (a) =>
-                  a['question_number'] == entry['question_number'] &&
+                  (a) =>
+                      a['question_number'] == entry['question_number'] &&
                       a['exercise'] == entry['exercise'],
                 );
                 if (!isDuplicate) {
@@ -1135,16 +1146,16 @@ class _POETabContentState extends State<POETabContent> {
 
             if (assessments['summative'] != null) {
               final summativeList = unitStandards[unitStandardName]['summative']
-              as List<Map<String, String>>;
+                  as List<Map<String, String>>;
               assessments['summative'].forEach((assessment) {
                 final entry = {
                   'exercise': assessment['exercise']?.toString() ?? 'N/A',
                   'question_number':
-                  assessment['question_number']?.toString() ?? 'N/A',
+                      assessment['question_number']?.toString() ?? 'N/A',
                 };
                 bool isDuplicate = summativeList.any(
-                      (a) =>
-                  a['question_number'] == entry['question_number'] &&
+                  (a) =>
+                      a['question_number'] == entry['question_number'] &&
                       a['exercise'] == entry['exercise'],
                 );
                 if (!isDuplicate) {
@@ -1155,17 +1166,17 @@ class _POETabContentState extends State<POETabContent> {
 
             if (assessments['logbook'] != null) {
               final logbookList = unitStandards[unitStandardName]['logbook']
-              as List<Map<String, String>>;
+                  as List<Map<String, String>>;
               assessments['logbook'].forEach((assessment) {
                 final entry = {
                   'exercise': assessment['exercise']?.toString() ?? 'N/A',
                   'question_number':
-                  assessment['question_number']?.toString() ?? 'N/A',
+                      assessment['question_number']?.toString() ?? 'N/A',
                   'logbook_text': logBookText,
                 };
                 bool isDuplicate = logbookList.any(
-                      (a) =>
-                  a['question_number'] == entry['question_number'] &&
+                  (a) =>
+                      a['question_number'] == entry['question_number'] &&
                       a['exercise'] == entry['exercise'],
                 );
                 if (!isDuplicate) {
@@ -1177,7 +1188,7 @@ class _POETabContentState extends State<POETabContent> {
             }
           } else {
             String assessmentType =
-                typedRow['assessment_type']?.toString()?.toLowerCase() ??
+                typedRow['assessment_type']?.toString().toLowerCase() ??
                     'unknown';
             String questionNumber =
                 typedRow['question_number']?.toString() ?? 'N/A';
@@ -1190,10 +1201,10 @@ class _POETabContentState extends State<POETabContent> {
                 assessmentType == 'summative' ||
                 assessmentType == 'logbook') {
               final assessmentList = unitStandards[unitStandardName]
-              [assessmentType] as List<Map<String, String>>;
+                  [assessmentType] as List<Map<String, String>>;
               bool isDuplicate = assessmentList.any(
-                    (a) =>
-                a['question_number'] == questionNumber &&
+                (a) =>
+                    a['question_number'] == questionNumber &&
                     a['exercise'] == exercise,
               );
               if (!isDuplicate) {
@@ -1256,12 +1267,14 @@ class _POETabContentState extends State<POETabContent> {
       } else {
         setState(() {
           errorMessage =
-          'No offline data available.\n\nTo use offline POE functionality:\n1. Connect to internet\n2. Open this learner\'s POE tab\n3. Data will be cached automatically\n\nThen you can work offline.';
+              'No offline data available.\n\nTo use offline POE functionality:\n1. Connect to internet\n2. Open this learner\'s POE tab\n3. Data will be cached automatically\n\nThen you can work offline.';
           isLoading = false;
           pathwaysData = null;
         });
-        print('[OFFLINE_CACHE] No cached or local data for learnerID: ${widget.learnerID}');
-        print('[OFFLINE_CACHE] User must load data online first to enable offline access');
+        print(
+            '[OFFLINE_CACHE] No cached or local data for learnerID: ${widget.learnerID}');
+        print(
+            '[OFFLINE_CACHE] User must load data online first to enable offline access');
       }
     } catch (e) {
       print('Error in fetchOfflineLearnerData: $e');
@@ -1283,8 +1296,7 @@ class _POETabContentState extends State<POETabContent> {
 
   Future<void> checkUploadedStatus() async {
     try {
-      final url = Uri.parse(
-          AppConfig.buildUrl('check_uploads.php'));
+      final url = Uri.parse(AppConfig.buildUrl('check_uploads.php'));
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -1308,20 +1320,23 @@ class _POETabContentState extends State<POETabContent> {
           } else {
             // Get local status first to preserve locally-saved records
             final dbHelper = DatabaseHelper();
-            final localStatus = await dbHelper.getLocalUploadStatus(widget.learnerID.toString());
-            
+            final localStatus = await dbHelper
+                .getLocalUploadStatus(widget.learnerID.toString());
+
             // Merge server status with local status
             // Local status takes precedence to preserve completed exercises
-            final serverStatus = decodedResponse.map((key, value) => MapEntry(key, value as bool));
-            
+            final serverStatus = decodedResponse
+                .map((key, value) => MapEntry(key, value as bool));
+
             setState(() {
               // Start with server status
               uploadedExercises = Map.from(serverStatus);
               // Overlay local status (includes unsynced records and completed exercises)
               uploadedExercises.addAll(localStatus);
             });
-            
-            print('Merged uploadedExercises: ${uploadedExercises.length} total (${serverStatus.length} from server, ${localStatus.length} from local)');
+
+            print(
+                'Merged uploadedExercises: ${uploadedExercises.length} total (${serverStatus.length} from server, ${localStatus.length} from local)');
             print('Server status keys: ${serverStatus.keys.toList()}');
             print('Local status keys: ${localStatus.keys.toList()}');
             print('Final merged keys: ${uploadedExercises.keys.toList()}');
@@ -1329,12 +1344,14 @@ class _POETabContentState extends State<POETabContent> {
         } else if (decodedResponse is List && decodedResponse.isEmpty) {
           // Server has no records, but check local database
           final dbHelper = DatabaseHelper();
-          final localStatus = await dbHelper.getLocalUploadStatus(widget.learnerID.toString());
-          
+          final localStatus =
+              await dbHelper.getLocalUploadStatus(widget.learnerID.toString());
+
           setState(() {
             uploadedExercises = localStatus;
           });
-          print('Server empty, using local status: ${uploadedExercises.length} exercises');
+          print(
+              'Server empty, using local status: ${uploadedExercises.length} exercises');
         } else {
           setState(() {
             errorMessage = 'Unexpected response format from  .php';
@@ -1359,7 +1376,7 @@ class _POETabContentState extends State<POETabContent> {
     try {
       final dbHelper = DatabaseHelper();
       final localUploads =
-      await dbHelper.getLocalUploadStatus(widget.learnerID.toString());
+          await dbHelper.getLocalUploadStatus(widget.learnerID.toString());
       setState(() {
         uploadedExercises = localUploads;
       });
@@ -1430,7 +1447,7 @@ class _POETabContentState extends State<POETabContent> {
     print('DEBUG: currentKey: $currentKey');
     print('DEBUG: exerciseSequence length: ${exerciseSequence.length}');
     print('DEBUG: uploadedExercises: $uploadedExercises');
-    
+
     // If this exercise is already completed, don't allow re-upload
     if (uploadedExercises[currentKey] == true) {
       print('DEBUG: Exercise already completed: $currentKey');
@@ -1452,7 +1469,7 @@ class _POETabContentState extends State<POETabContent> {
 
     // Find the current exercise in the sequence
     int currentIndex =
-    exerciseSequence.indexWhere((e) => e['key'] == currentKey);
+        exerciseSequence.indexWhere((e) => e['key'] == currentKey);
     print('DEBUG: currentIndex in sequence: $currentIndex');
 
     // If exercise not found in sequence, allow it (might be first unit standard)
@@ -1460,7 +1477,7 @@ class _POETabContentState extends State<POETabContent> {
       // Check if this is the first unit standard by looking at the exercise name
       // or if no exercises have been completed yet
       bool anyExercisesCompleted =
-      uploadedExercises.values.any((completed) => completed);
+          uploadedExercises.values.any((completed) => completed);
       print(
           'DEBUG: Exercise not in sequence, anyExercisesCompleted: $anyExercisesCompleted');
       if (!anyExercisesCompleted) {
@@ -1536,7 +1553,7 @@ class _POETabContentState extends State<POETabContent> {
         return currentNotCompleted;
       }
     }
-    
+
     // Special case: Allow any exercise within the same unit standard if some exercises in that unit are already completed
     // This handles cases where "Scan All" partially succeeded
     String? currentUnitStandard;
@@ -1546,7 +1563,7 @@ class _POETabContentState extends State<POETabContent> {
         break;
       }
     }
-    
+
     if (currentUnitStandard != null) {
       // Check if any exercise in this unit standard is already completed
       bool anyInUnitCompleted = false;
@@ -1559,9 +1576,10 @@ class _POETabContentState extends State<POETabContent> {
           }
         }
       }
-      
+
       if (anyInUnitCompleted) {
-        print('DEBUG: Some exercises in unit $currentUnitStandard already completed, allowing $type-$exercise');
+        print(
+            'DEBUG: Some exercises in unit $currentUnitStandard already completed, allowing $type-$exercise');
         return true;
       }
     }
@@ -1642,71 +1660,91 @@ class _POETabContentState extends State<POETabContent> {
       // Get learner templates from database
       final DatabaseHelper dbHelper = DatabaseHelper();
       final templates = await dbHelper.getAllTemplates(widget.learnerID);
-      
+
       // Detect available scanner using class-level instances
       final scanner = await _detectScanner();
-      
+
       // Check if learner has fingerprints enrolled
-      final hasZkLeft = (templates['zkteco_left_template']?.isNotEmpty ?? false);
-      final hasZkRight = (templates['zkteco_right_template']?.isNotEmpty ?? false);
-      final hasFutLeft = (templates['futronic_left_template']?.isNotEmpty ?? false);
-      final hasFutRight = (templates['futronic_right_template']?.isNotEmpty ?? false);
-      
+      final hasZkLeft =
+          (templates['zkteco_left_template']?.isNotEmpty ?? false);
+      final hasZkRight =
+          (templates['zkteco_right_template']?.isNotEmpty ?? false);
+      final hasFutLeft =
+          (templates['futronic_left_template']?.isNotEmpty ?? false);
+      final hasFutRight =
+          (templates['futronic_right_template']?.isNotEmpty ?? false);
+
       if (!hasZkLeft && !hasZkRight && !hasFutLeft && !hasFutRight) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No fingerprints enrolled for this learner. Please enroll fingerprints first.'),
+            content: Text(
+                'No fingerprints enrolled for this learner. Please enroll fingerprints first.'),
             backgroundColor: Colors.orange,
           ),
         );
         return false;
       }
-      
+
       // If current scanner has no templates but the other scanner does, guide user
-      if (scanner == 'futronic' && !(hasFutLeft || hasFutRight) && (hasZkLeft || hasZkRight)) {
+      if (scanner == 'futronic' &&
+          !(hasFutLeft || hasFutRight) &&
+          (hasZkLeft || hasZkRight)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('This learner\'s fingerprint is enrolled on ZKTeco. Please use the ZKTeco scanner or re-enroll on Futronic for this learner.'),
+            content: Text(
+                'This learner\'s fingerprint is enrolled on ZKTeco. Please use the ZKTeco scanner or re-enroll on Futronic for this learner.'),
             backgroundColor: Colors.orange,
           ),
         );
         return false;
       }
-      if (scanner == 'zkteco' && !(hasZkLeft || hasZkRight) && (hasFutLeft || hasFutRight)) {
+      if (scanner == 'zkteco' &&
+          !(hasZkLeft || hasZkRight) &&
+          (hasFutLeft || hasFutRight)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('This learner\'s fingerprint is enrolled on Futronic. Please use the Futronic scanner or re-enroll on ZKTeco for this learner.'),
+            content: Text(
+                'This learner\'s fingerprint is enrolled on Futronic. Please use the Futronic scanner or re-enroll on ZKTeco for this learner.'),
             backgroundColor: Colors.orange,
           ),
         );
         return false;
       }
-      
+
       if (scanner == 'none') {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No fingerprint scanner detected. Please connect a scanner.'),
+            content: Text(
+                'No fingerprint scanner detected. Please connect a scanner.'),
             backgroundColor: Colors.red,
           ),
         );
         return false;
       }
-      
+
       // Build guidance message based on available templates for active scanner
       String guidance = 'Place finger on scanner for verification...';
       if (scanner == 'futronic') {
-        if (hasFutLeft && hasFutRight) guidance = 'Place either thumb on Futronic scanner for verification...';
-        else if (hasFutLeft) guidance = 'Place LEFT thumb on Futronic scanner for verification...';
-        else if (hasFutRight) guidance = 'Place RIGHT thumb on Futronic scanner for verification...';
+        if (hasFutLeft && hasFutRight) {
+          guidance =
+              'Place either thumb on Futronic scanner for verification...';
+        } else if (hasFutLeft)
+          guidance = 'Place LEFT thumb on Futronic scanner for verification...';
+        else if (hasFutRight)
+          guidance =
+              'Place RIGHT thumb on Futronic scanner for verification...';
       } else if (scanner == 'zkteco') {
-        if (hasZkLeft && hasZkRight) guidance = 'Place either thumb on ZKTeco scanner for verification...';
-        else if (hasZkLeft) guidance = 'Place LEFT thumb on ZKTeco scanner for verification...';
-        else if (hasZkRight) guidance = 'Place RIGHT thumb on ZKTeco scanner for verification...';
+        if (hasZkLeft && hasZkRight) {
+          guidance = 'Place either thumb on ZKTeco scanner for verification...';
+        } else if (hasZkLeft)
+          guidance = 'Place LEFT thumb on ZKTeco scanner for verification...';
+        else if (hasZkRight)
+          guidance = 'Place RIGHT thumb on ZKTeco scanner for verification...';
       }
-      
+
       // Show progress dialog
       _showProgressDialog(guidance);
-      
+
       // Perform fingerprint verification using class-level instances
       bool match = false;
       try {
@@ -1714,7 +1752,7 @@ class _POETabContentState extends State<POETabContent> {
           // Use ZKTeco scanner with available templates
           final leftTemplate = templates['zkteco_left_template'];
           final rightTemplate = templates['zkteco_right_template'];
-          
+
           if (leftTemplate != null && leftTemplate.isNotEmpty) {
             match = await _fingerprintService.verify('left', leftTemplate);
           }
@@ -1725,7 +1763,9 @@ class _POETabContentState extends State<POETabContent> {
           // Use Futronic scanner with available templates
           final leftTemplate = templates['futronic_left_template'];
           final rightTemplate = templates['futronic_right_template'];
-          final hint = (leftTemplate != null && leftTemplate.isNotEmpty) ? 'left' : 'right';
+          final hint = (leftTemplate != null && leftTemplate.isNotEmpty)
+              ? 'left'
+              : 'right';
           match = await _futronicService.verifyBoth(
             hintFinger: hint,
             leftTemplate: leftTemplate,
@@ -1735,17 +1775,21 @@ class _POETabContentState extends State<POETabContent> {
       } catch (e) {
         print('Fingerprint verification error: $e');
         _hideProgressDialog();
-        
+
         // Provide specific error messages for common issues
         String errorMessage = 'Fingerprint verification failed';
-        if (e.toString().contains('USB_OPEN_FAILED') || e.toString().contains('DEVICE_OPEN_FAILED')) {
-          errorMessage = 'Scanner connection failed. Please check USB connection and try again.';
+        if (e.toString().contains('USB_OPEN_FAILED') ||
+            e.toString().contains('DEVICE_OPEN_FAILED')) {
+          errorMessage =
+              'Scanner connection failed. Please check USB connection and try again.';
         } else if (e.toString().contains('CAPTURE_FAILED')) {
-          errorMessage = 'Could not capture fingerprint. Please place finger firmly on scanner and try again.';
-        } else if (e.toString().contains('TIMEOUT') || e.toString().contains('Timeout')) {
+          errorMessage =
+              'Could not capture fingerprint. Please place finger firmly on scanner and try again.';
+        } else if (e.toString().contains('TIMEOUT') ||
+            e.toString().contains('Timeout')) {
           errorMessage = 'Timeout waiting for fingerprint. Please try again.';
         }
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
@@ -1755,10 +1799,10 @@ class _POETabContentState extends State<POETabContent> {
         );
         return false;
       }
-      
+
       // Close the progress dialog
       _hideProgressDialog();
-      
+
       if (match) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1776,7 +1820,6 @@ class _POETabContentState extends State<POETabContent> {
         );
         return false;
       }
-      
     } catch (e) {
       print('Fingerprint verification error: $e');
       _hideProgressDialog();
@@ -1808,7 +1851,8 @@ class _POETabContentState extends State<POETabContent> {
     for (int attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         print('[DETECT] Futronic attempt $attempt/$maxAttempts...');
-        final isFutronicConnected = await _futronicService.isFutronicConnected();
+        final isFutronicConnected =
+            await _futronicService.isFutronicConnected();
 
         if (isFutronicConnected) {
           print('[DETECT] ✅ Futronic detected on attempt $attempt!');
@@ -1873,8 +1917,8 @@ class _POETabContentState extends State<POETabContent> {
     if (!verificationValid) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content:
-            Text('Fingerprint verification failed. Document access denied.')),
+            content: Text(
+                'Fingerprint verification failed. Document access denied.')),
       );
       return;
     }
@@ -2062,8 +2106,7 @@ class _POETabContentState extends State<POETabContent> {
       if (_isExerciseAllowed(assessmentType, exercise)) {
         bool isConnected = await _checkConnectivity();
         if (isConnected) {
-          final url = Uri.parse(
-              AppConfig.buildUrl('save_metadata.php'));
+          final url = Uri.parse(AppConfig.buildUrl('save_metadata.php'));
           var request = http.MultipartRequest('POST', url)
             ..fields['learnerID'] = widget.learnerID.toString()
             ..fields['exercise'] = exercise
@@ -2177,7 +2220,7 @@ class _POETabContentState extends State<POETabContent> {
 
     // Check if this is the first unit standard by checking if any exercises are completed
     bool anyExercisesCompleted =
-    uploadedExercises.values.any((completed) => completed);
+        uploadedExercises.values.any((completed) => completed);
     print('DEBUG: anyExercisesCompleted: $anyExercisesCompleted');
 
     // If no exercises are completed yet, this is effectively the first unit standard
@@ -2221,8 +2264,8 @@ class _POETabContentState extends State<POETabContent> {
     if (!verificationValid) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content:
-            Text('Fingerprint verification failed. Document access denied.')),
+            content: Text(
+                'Fingerprint verification failed. Document access denied.')),
       );
       return;
     }
@@ -2328,43 +2371,38 @@ class _POETabContentState extends State<POETabContent> {
         return;
       }
 
-      if (document == null) {
-        print('Error: Document creation failed');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Failed to generate or process document')),
-        );
-        return;
-      }
-
       // Upload the same document for all formative questions
       bool isConnected = await _checkConnectivity();
-      
+
       print('📊 FORMATIVE UPLOAD DEBUG:');
       print('   Total questions to process: ${formativeQuestions.length}');
-      print('   Questions list: ${formativeQuestions.map((q) => q['exercise']).toList()}');
+      print(
+          '   Questions list: ${formativeQuestions.map((q) => q['exercise']).toList()}');
       print('   Is connected: $isConnected');
-      
+
       if (isConnected) {
-        final url = Uri.parse(
-            AppConfig.buildUrl('save_metadata.php'));
+        final url = Uri.parse(AppConfig.buildUrl('save_metadata.php'));
 
         int totalQuestions = formativeQuestions.length;
         int successfulUploads = 0;
         int failedUploads = 0;
-        
+
         print('Starting formative upload for $totalQuestions questions');
-        
+
         // Send a single bulk request for all formative questions
         var request = http.MultipartRequest('POST', url)
           ..fields['learnerID'] = widget.learnerID.toString()
           ..fields['type'] = 'Formative'
-          ..fields['exercises'] = json.encode(formativeQuestions.map((item) => item['exercise']?.toString() ?? 'N/A').toList())
+          ..fields['exercises'] = json.encode(formativeQuestions
+              .map((item) => item['exercise']?.toString() ?? 'N/A')
+              .toList())
           ..fields['unit_standard_upload'] = 'true'
           ..fields['unit_standard_name'] = unitStandard;
 
-        print('Uploading single formative document for ${formativeQuestions.length} questions: ${document.path}, Size: ${await document.length()} bytes');
-        request.files.add(await http.MultipartFile.fromPath('files[]', document.path));
+        print(
+            'Uploading single formative document for ${formativeQuestions.length} questions: ${document.path}, Size: ${await document.length()} bytes');
+        request.files
+            .add(await http.MultipartFile.fromPath('files[]', document.path));
 
         try {
           // Add timeout to prevent hanging
@@ -2384,7 +2422,8 @@ class _POETabContentState extends State<POETabContent> {
               await _saveLocally(document, 'Formative', exercise, null);
             }
             successfulUploads = formativeQuestions.length;
-            print('✅ Successfully uploaded formative document for all ${formativeQuestions.length} questions');
+            print(
+                '✅ Successfully uploaded formative document for all ${formativeQuestions.length} questions');
           } else {
             print('❌ Server error for formative upload: ${decoded['message']}');
             // Save locally for all exercises
@@ -2413,10 +2452,9 @@ class _POETabContentState extends State<POETabContent> {
           });
         }
 
+        print(
+            'Formative upload complete: $successfulUploads successful, $failedUploads failed/saved locally');
 
-        
-        print('Formative upload complete: $successfulUploads successful, $failedUploads failed/saved locally');
-        
         // Force UI update by ensuring all formative questions are marked as completed
         setState(() {
           for (var item in formativeQuestions) {
@@ -2425,36 +2463,43 @@ class _POETabContentState extends State<POETabContent> {
             uploadedExercises[uploadKey] = true;
           }
         });
-        
+
         // Refresh upload status to ensure UI is updated
         await _refreshUploadStatus();
-        
-        print('📊 AFTER REFRESH - uploadedExercises count: ${uploadedExercises.length}');
-        print('   Formative exercises marked: ${uploadedExercises.keys.where((k) => k.startsWith('Formative-')).toList()}');
+
+        print(
+            '📊 AFTER REFRESH - uploadedExercises count: ${uploadedExercises.length}');
+        print(
+            '   Formative exercises marked: ${uploadedExercises.keys.where((k) => k.startsWith('Formative-')).toList()}');
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('✅ All ${formativeQuestions.length} formative questions completed! ($successfulUploads uploaded, $failedUploads saved locally)')),
+              content: Text(
+                  '✅ All ${formativeQuestions.length} formative questions completed! ($successfulUploads uploaded, $failedUploads saved locally)')),
         );
       } else {
         // Save locally for all formative questions
-        print('[OFFLINE_SCAN] No internet connection, saving all ${formativeQuestions.length} formative questions locally');
+        print(
+            '[OFFLINE_SCAN] No internet connection, saving all ${formativeQuestions.length} formative questions locally');
         int localSaveCount = 0;
-        
+
         for (var item in formativeQuestions) {
           final exercise = item['exercise']?.toString() ?? 'N/A';
-          print('[OFFLINE_SCAN] Processing question $localSaveCount/${formativeQuestions.length}: $exercise');
-          
+          print(
+              '[OFFLINE_SCAN] Processing question $localSaveCount/${formativeQuestions.length}: $exercise');
+
           await _saveLocally(document, 'Formative', exercise, null);
           localSaveCount++;
-          
+
           // Verify it was marked
           final uploadKey = 'Formative-$exercise-${widget.learnerID}';
-          print('[OFFLINE_SCAN] Question $exercise marked as: ${uploadedExercises[uploadKey]}');
+          print(
+              '[OFFLINE_SCAN] Question $exercise marked as: ${uploadedExercises[uploadKey]}');
         }
-        
-        print('[OFFLINE_SCAN] All $localSaveCount questions saved, forcing UI update...');
-        
+
+        print(
+            '[OFFLINE_SCAN] All $localSaveCount questions saved, forcing UI update...');
+
         // Force UI update by ensuring all formative questions are marked as completed
         setState(() {
           for (var item in formativeQuestions) {
@@ -2463,15 +2508,16 @@ class _POETabContentState extends State<POETabContent> {
             uploadedExercises[uploadKey] = true;
           }
         });
-        
+
         // Refresh upload status to update UI from database
         await _refreshUploadStatus();
-        
+
         print('[OFFLINE_SCAN] UI refresh complete');
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('✅ All $localSaveCount formative questions completed and saved locally!')),
+              content: Text(
+                  '✅ All $localSaveCount formative questions completed and saved locally!')),
         );
       }
     } catch (e, stackTrace) {
@@ -2508,7 +2554,7 @@ class _POETabContentState extends State<POETabContent> {
 
     // Check if this is the first unit standard by checking if any exercises are completed
     bool anyExercisesCompleted =
-    uploadedExercises.values.any((completed) => completed);
+        uploadedExercises.values.any((completed) => completed);
     bool isFirstUnitStandard = !anyExercisesCompleted;
 
     // Check if all summative questions are allowed
@@ -2518,22 +2564,27 @@ class _POETabContentState extends State<POETabContent> {
       if (isFirstUnitStandard) {
         // This is the first unit standard, check if all formative questions in this unit are complete
         bool allFormativeCompleted = true;
-        
+
         // Find all formative questions for this unit standard from pathwaysData
         if (pathwaysData != null) {
           pathwaysData!.forEach((pathwayName, pathwayData) {
             if (pathwayData['qualifications'] != null) {
-              (pathwayData['qualifications'] as Map).forEach((qualificationName, qualData) {
+              (pathwayData['qualifications'] as Map)
+                  .forEach((qualificationName, qualData) {
                 if (qualData['unitstandards'] != null) {
-                  (qualData['unitstandards'] as Map).forEach((unitStandardName, unitData) {
+                  (qualData['unitstandards'] as Map)
+                      .forEach((unitStandardName, unitData) {
                     if (unitStandardName == unitStandard) {
                       final formative = unitData['formative'] ?? [];
                       for (var formativeItem in formative) {
-                        final formativeExercise = formativeItem['exercise']?.toString() ?? 'N/A';
-                        final formativeKey = 'Formative-$formativeExercise-${widget.learnerID}';
+                        final formativeExercise =
+                            formativeItem['exercise']?.toString() ?? 'N/A';
+                        final formativeKey =
+                            'Formative-$formativeExercise-${widget.learnerID}';
                         if (!(uploadedExercises[formativeKey] ?? false)) {
                           allFormativeCompleted = false;
-                          print('DEBUG: Formative exercise not completed: $formativeExercise');
+                          print(
+                              'DEBUG: Formative exercise not completed: $formativeExercise');
                           return;
                         }
                       }
@@ -2544,7 +2595,7 @@ class _POETabContentState extends State<POETabContent> {
             }
           });
         }
-        
+
         if (!allFormativeCompleted) {
           allAllowed = false;
           break;
@@ -2561,7 +2612,8 @@ class _POETabContentState extends State<POETabContent> {
     if (!allAllowed) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Complete all formative exercises in this unit standard first.')),
+            content: Text(
+                'Complete all formative exercises in this unit standard first.')),
       );
       return;
     }
@@ -2570,8 +2622,8 @@ class _POETabContentState extends State<POETabContent> {
     if (!verificationValid) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content:
-            Text('Fingerprint verification failed. Document access denied.')),
+            content: Text(
+                'Fingerprint verification failed. Document access denied.')),
       );
       return;
     }
@@ -2677,43 +2729,38 @@ class _POETabContentState extends State<POETabContent> {
         return;
       }
 
-      if (document == null) {
-        print('Error: Document creation failed');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Failed to generate or process document')),
-        );
-        return;
-      }
-
       // Upload the same document for all summative questions
       bool isConnected = await _checkConnectivity();
-      
+
       print('📊 SUMMATIVE UPLOAD DEBUG:');
       print('   Total questions to process: ${summativeQuestions.length}');
-      print('   Questions list: ${summativeQuestions.map((q) => q['exercise']).toList()}');
+      print(
+          '   Questions list: ${summativeQuestions.map((q) => q['exercise']).toList()}');
       print('   Is connected: $isConnected');
-      
+
       if (isConnected) {
-        final url = Uri.parse(
-            AppConfig.buildUrl('save_metadata.php'));
+        final url = Uri.parse(AppConfig.buildUrl('save_metadata.php'));
 
         int totalQuestions = summativeQuestions.length;
         int successfulUploads = 0;
         int failedUploads = 0;
-        
+
         print('Starting summative upload for $totalQuestions questions');
-        
+
         // Send a single bulk request for all summative questions
         var request = http.MultipartRequest('POST', url)
           ..fields['learnerID'] = widget.learnerID.toString()
           ..fields['type'] = 'Summative'
-          ..fields['exercises'] = json.encode(summativeQuestions.map((item) => item['exercise']?.toString() ?? 'N/A').toList())
+          ..fields['exercises'] = json.encode(summativeQuestions
+              .map((item) => item['exercise']?.toString() ?? 'N/A')
+              .toList())
           ..fields['unit_standard_upload'] = 'true'
           ..fields['unit_standard_name'] = unitStandard;
 
-        print('Uploading single summative document for ${summativeQuestions.length} questions: ${document.path}, Size: ${await document.length()} bytes');
-        request.files.add(await http.MultipartFile.fromPath('files[]', document.path));
+        print(
+            'Uploading single summative document for ${summativeQuestions.length} questions: ${document.path}, Size: ${await document.length()} bytes');
+        request.files
+            .add(await http.MultipartFile.fromPath('files[]', document.path));
 
         try {
           // Add timeout to prevent hanging
@@ -2733,7 +2780,8 @@ class _POETabContentState extends State<POETabContent> {
               await _saveLocally(document, 'Summative', exercise, null);
             }
             successfulUploads = summativeQuestions.length;
-            print('✅ Successfully uploaded summative document for all ${summativeQuestions.length} questions');
+            print(
+                '✅ Successfully uploaded summative document for all ${summativeQuestions.length} questions');
           } else {
             print('❌ Server error for summative upload: ${decoded['message']}');
             // Save locally for all exercises
@@ -2761,9 +2809,10 @@ class _POETabContentState extends State<POETabContent> {
             uploadedExercises[uploadKey] = true;
           });
         }
-        
-        print('Summative upload complete: $successfulUploads successful, $failedUploads failed/saved locally');
-        
+
+        print(
+            'Summative upload complete: $successfulUploads successful, $failedUploads failed/saved locally');
+
         // Force UI update by ensuring all summative questions are marked as completed
         setState(() {
           for (var item in summativeQuestions) {
@@ -2772,36 +2821,43 @@ class _POETabContentState extends State<POETabContent> {
             uploadedExercises[uploadKey] = true;
           }
         });
-        
+
         // Refresh upload status to ensure UI is updated
         await _refreshUploadStatus();
-        
-        print('📊 AFTER REFRESH - uploadedExercises count: ${uploadedExercises.length}');
-        print('   Summative exercises marked: ${uploadedExercises.keys.where((k) => k.startsWith('Summative-')).toList()}');
+
+        print(
+            '📊 AFTER REFRESH - uploadedExercises count: ${uploadedExercises.length}');
+        print(
+            '   Summative exercises marked: ${uploadedExercises.keys.where((k) => k.startsWith('Summative-')).toList()}');
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('✅ All ${summativeQuestions.length} summative questions completed! ($successfulUploads uploaded, $failedUploads saved locally)')),
+              content: Text(
+                  '✅ All ${summativeQuestions.length} summative questions completed! ($successfulUploads uploaded, $failedUploads saved locally)')),
         );
       } else {
         // Save locally for all summative questions
-        print('[OFFLINE_SCAN] No internet connection, saving all ${summativeQuestions.length} summative questions locally');
+        print(
+            '[OFFLINE_SCAN] No internet connection, saving all ${summativeQuestions.length} summative questions locally');
         int localSaveCount = 0;
-        
+
         for (var item in summativeQuestions) {
           final exercise = item['exercise']?.toString() ?? 'N/A';
-          print('[OFFLINE_SCAN] Processing question $localSaveCount/${summativeQuestions.length}: $exercise');
-          
+          print(
+              '[OFFLINE_SCAN] Processing question $localSaveCount/${summativeQuestions.length}: $exercise');
+
           await _saveLocally(document, 'Summative', exercise, null);
           localSaveCount++;
-          
+
           // Verify it was marked
           final uploadKey = 'Summative-$exercise-${widget.learnerID}';
-          print('[OFFLINE_SCAN] Question $exercise marked as: ${uploadedExercises[uploadKey]}');
+          print(
+              '[OFFLINE_SCAN] Question $exercise marked as: ${uploadedExercises[uploadKey]}');
         }
-        
-        print('[OFFLINE_SCAN] All $localSaveCount questions saved, forcing UI update...');
-        
+
+        print(
+            '[OFFLINE_SCAN] All $localSaveCount questions saved, forcing UI update...');
+
         // Force UI update by ensuring all summative questions are marked as completed
         setState(() {
           for (var item in summativeQuestions) {
@@ -2810,15 +2866,16 @@ class _POETabContentState extends State<POETabContent> {
             uploadedExercises[uploadKey] = true;
           }
         });
-        
+
         // Refresh upload status to update UI from database
         await _refreshUploadStatus();
-        
+
         print('[OFFLINE_SCAN] UI refresh complete');
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('✅ All $localSaveCount summative questions completed and saved locally!')),
+              content: Text(
+                  '✅ All $localSaveCount summative questions completed and saved locally!')),
         );
       }
     } catch (e, stackTrace) {
@@ -2832,16 +2889,18 @@ class _POETabContentState extends State<POETabContent> {
   }
 
   // Remedial camera - optional, doesn't block anything
-  Future<void> _openRemedialCamera(BuildContext context, String unitStandard, String remedialType) async {
-    print('[REMEDIAL] Opening $remedialType camera for unit standard: $unitStandard');
-    
+  Future<void> _openRemedialCamera(
+      BuildContext context, String unitStandard, String remedialType) async {
+    print(
+        '[REMEDIAL] Opening $remedialType camera for unit standard: $unitStandard');
+
     // Remedial is always allowed - it's optional and doesn't block anything
     bool verificationValid = await _showFingerprintVerificationDialog(context);
     if (!verificationValid) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content:
-            Text('Fingerprint verification failed. Document access denied.')),
+            content: Text(
+                'Fingerprint verification failed. Document access denied.')),
       );
       return;
     }
@@ -2926,20 +2985,17 @@ class _POETabContentState extends State<POETabContent> {
       } else {
         // Gallery selection
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gallery selection not yet implemented for remedial')),
+          const SnackBar(
+              content:
+                  Text('Gallery selection not yet implemented for remedial')),
         );
-        return;
-      }
-
-      if (document == null) {
-        print('[REMEDIAL] Document is null');
         return;
       }
 
       // Save remedial document with specific type
       final exercise = '$remedialType-$unitStandard';
       bool isConnected = await _checkConnectivity();
-      
+
       if (isConnected) {
         // Try to upload to server
         final url = Uri.parse(AppConfig.buildUrl('save_metadata.php'));
@@ -2948,14 +3004,15 @@ class _POETabContentState extends State<POETabContent> {
           ..fields['exercise'] = exercise
           ..fields['type'] = remedialType;
 
-        request.files.add(await http.MultipartFile.fromPath('files[]', document.path));
+        request.files
+            .add(await http.MultipartFile.fromPath('files[]', document.path));
 
         try {
           final response = await request.send().timeout(
-            const Duration(seconds: 30),
-            onTimeout: () => throw Exception('Upload timeout'),
-          );
-          
+                const Duration(seconds: 30),
+                onTimeout: () => throw Exception('Upload timeout'),
+              );
+
           final responseBody = await response.stream.bytesToString();
           final decoded = json.decode(responseBody);
 
@@ -2979,7 +3036,7 @@ class _POETabContentState extends State<POETabContent> {
         // Save locally
         await _saveLocally(document, remedialType, exercise, null);
       }
-      
+
       print('[REMEDIAL] $remedialType document saved for $unitStandard');
     } catch (e, stackTrace) {
       print('[REMEDIAL] Error: $e\nStackTrace: $stackTrace');
@@ -3036,8 +3093,8 @@ class _POETabContentState extends State<POETabContent> {
     if (!verificationValid) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content:
-            Text('Fingerprint verification failed. Document access denied.')),
+            content: Text(
+                'Fingerprint verification failed. Document access denied.')),
       );
       return;
     }
@@ -3130,21 +3187,12 @@ class _POETabContentState extends State<POETabContent> {
         print('Error: Expected PDF file for LogBook, got ${file.path}');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text(
-                  'Invalid file format. Expected a PDF for logbook.')),
+              content:
+                  Text('Invalid file format. Expected a PDF for logbook.')),
         );
         return;
       }
       document = file;
-
-      if (document == null) {
-        print('Error: Document creation failed');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Failed to generate or process document')),
-        );
-        return;
-      }
 
       // Upload the same document for all logbook items
       bool isConnected = await _checkConnectivity();
@@ -3154,20 +3202,24 @@ class _POETabContentState extends State<POETabContent> {
         int totalItems = logBookItems.length;
         int successfulUploads = 0;
         int failedUploads = 0;
-        
+
         print('Starting logbook upload for $totalItems items');
-        
+
         // Send a single bulk request for all logbook items
         var request = http.MultipartRequest('POST', url)
           ..fields['learnerID'] = widget.learnerID.toString()
           ..fields['type'] = 'LogBook'
-          ..fields['exercises'] = json.encode(logBookItems.map((item) => item['exercise']?.toString() ?? 'N/A').toList())
+          ..fields['exercises'] = json.encode(logBookItems
+              .map((item) => item['exercise']?.toString() ?? 'N/A')
+              .toList())
           ..fields['unit_standard_upload'] = 'true'
           ..fields['unit_standard_name'] = unitStandard
           ..fields['logbook_text'] = 'Logbook entries for $unitStandard';
 
-        print('Uploading single logbook document for ${logBookItems.length} items: ${document.path}, Size: ${await document.length()} bytes');
-        request.files.add(await http.MultipartFile.fromPath('files[]', document.path));
+        print(
+            'Uploading single logbook document for ${logBookItems.length} items: ${document.path}, Size: ${await document.length()} bytes');
+        request.files
+            .add(await http.MultipartFile.fromPath('files[]', document.path));
 
         try {
           // Add timeout to prevent hanging
@@ -3184,16 +3236,19 @@ class _POETabContentState extends State<POETabContent> {
             // Save to local database for all exercises
             for (var item in logBookItems) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
-              await _saveLocally(document, 'LogBook', exercise, 'Logbook entry for $exercise - $unitStandard');
+              await _saveLocally(document, 'LogBook', exercise,
+                  'Logbook entry for $exercise - $unitStandard');
             }
             successfulUploads = logBookItems.length;
-            print('✅ Successfully uploaded logbook document for all ${logBookItems.length} items');
+            print(
+                '✅ Successfully uploaded logbook document for all ${logBookItems.length} items');
           } else {
             print('❌ Server error for logbook upload: ${decoded['message']}');
             // Save locally for all exercises
             for (var item in logBookItems) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
-              await _saveLocally(document, 'LogBook', exercise, 'Logbook entry for $exercise - $unitStandard');
+              await _saveLocally(document, 'LogBook', exercise,
+                  'Logbook entry for $exercise - $unitStandard');
             }
             failedUploads = logBookItems.length;
           }
@@ -3202,7 +3257,8 @@ class _POETabContentState extends State<POETabContent> {
           // Save locally for all exercises
           for (var item in logBookItems) {
             final exercise = item['exercise']?.toString() ?? 'N/A';
-            await _saveLocally(document, 'LogBook', exercise, 'Logbook entry for $exercise - $unitStandard');
+            await _saveLocally(document, 'LogBook', exercise,
+                'Logbook entry for $exercise - $unitStandard');
           }
           failedUploads = logBookItems.length;
         }
@@ -3215,9 +3271,10 @@ class _POETabContentState extends State<POETabContent> {
             uploadedExercises[uploadKey] = true;
           });
         }
-        
-        print('Logbook upload complete: $successfulUploads successful, $failedUploads failed/saved locally');
-        
+
+        print(
+            'Logbook upload complete: $successfulUploads successful, $failedUploads failed/saved locally');
+
         // Force UI update by ensuring all logbook items are marked as completed
         setState(() {
           for (var item in logBookItems) {
@@ -3226,33 +3283,39 @@ class _POETabContentState extends State<POETabContent> {
             uploadedExercises[uploadKey] = true;
           }
         });
-        
+
         // Refresh upload status to ensure UI is updated
         await _refreshUploadStatus();
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('✅ All ${logBookItems.length} logbook items completed! ($successfulUploads uploaded, $failedUploads saved locally)')),
+              content: Text(
+                  '✅ All ${logBookItems.length} logbook items completed! ($successfulUploads uploaded, $failedUploads saved locally)')),
         );
       } else {
         // Save locally for all logbook items
-        print('[OFFLINE_SCAN] No internet connection, saving all ${logBookItems.length} logbook items locally');
+        print(
+            '[OFFLINE_SCAN] No internet connection, saving all ${logBookItems.length} logbook items locally');
         int localSaveCount = 0;
-        
+
         for (var item in logBookItems) {
           final exercise = item['exercise']?.toString() ?? 'N/A';
-          print('[OFFLINE_SCAN] Processing logbook item $localSaveCount/${logBookItems.length}: $exercise');
-          
-          await _saveLocally(document, 'LogBook', exercise, 'Logbook entry for $exercise - $unitStandard');
+          print(
+              '[OFFLINE_SCAN] Processing logbook item $localSaveCount/${logBookItems.length}: $exercise');
+
+          await _saveLocally(document, 'LogBook', exercise,
+              'Logbook entry for $exercise - $unitStandard');
           localSaveCount++;
-          
+
           // Verify it was marked
           final uploadKey = 'LogBook-$exercise-${widget.learnerID}';
-          print('[OFFLINE_SCAN] Logbook item $exercise marked as: ${uploadedExercises[uploadKey]}');
+          print(
+              '[OFFLINE_SCAN] Logbook item $exercise marked as: ${uploadedExercises[uploadKey]}');
         }
-        
-        print('[OFFLINE_SCAN] All $localSaveCount logbook items saved, forcing UI update...');
-        
+
+        print(
+            '[OFFLINE_SCAN] All $localSaveCount logbook items saved, forcing UI update...');
+
         // Force UI update by ensuring all logbook items are marked as completed
         setState(() {
           for (var item in logBookItems) {
@@ -3261,15 +3324,16 @@ class _POETabContentState extends State<POETabContent> {
             uploadedExercises[uploadKey] = true;
           }
         });
-        
+
         // Refresh upload status to update UI from database
         await _refreshUploadStatus();
-        
+
         print('[OFFLINE_SCAN] UI refresh complete');
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('✅ All $localSaveCount logbook items completed and saved locally!')),
+              content: Text(
+                  '✅ All $localSaveCount logbook items completed and saved locally!')),
         );
       }
     } catch (e, stackTrace) {
@@ -3284,7 +3348,7 @@ class _POETabContentState extends State<POETabContent> {
 
   Future<File?> _captureImage(BuildContext context) async {
     final pickedImage =
-    await ImagePicker().pickImage(source: ImageSource.camera);
+        await ImagePicker().pickImage(source: ImageSource.camera);
     if (pickedImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No image captured.')),
@@ -3344,8 +3408,7 @@ class _POETabContentState extends State<POETabContent> {
 
     final isConnected = await _checkConnectivity();
     if (isConnected) {
-      final url = Uri.parse(
-          AppConfig.buildUrl('save_metadata.php'));
+      final url = Uri.parse(AppConfig.buildUrl('save_metadata.php'));
       var request = http.MultipartRequest('POST', url)
         ..fields['learnerID'] = widget.learnerID.toString()
         ..fields['exercise'] = exercise
@@ -3357,8 +3420,7 @@ class _POETabContentState extends State<POETabContent> {
 
       request.files
           .add(await http.MultipartFile.fromPath('files[]', pdfFile.path));
-      request.files
-          .add(await http.MultipartFile.fromBytes('signature', signature));
+      request.files.add(http.MultipartFile.fromBytes('signature', signature));
 
       try {
         final response = await request.send();
@@ -3396,7 +3458,7 @@ class _POETabContentState extends State<POETabContent> {
       String exercise, String? logbookText) async {
     final dbHelper = DatabaseHelper();
     String filePath = document.path;
-    
+
     try {
       // Always copy file to app directory for persistence
       final appDir = await getApplicationDocumentsDirectory();
@@ -3404,12 +3466,13 @@ class _POETabContentState extends State<POETabContent> {
       if (!poeDir.existsSync()) {
         poeDir.createSync(recursive: true);
       }
-      
+
       final extension = filePath.split('.').last;
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final newFileName = '${assessmentType}_${widget.learnerID}_${exercise.replaceAll(' ', '_')}_$timestamp.$extension';
+      final newFileName =
+          '${assessmentType}_${widget.learnerID}_${exercise.replaceAll(' ', '_')}_$timestamp.$extension';
       final newFilePath = '${poeDir.path}/$newFileName';
-      
+
       // Copy file to app directory
       await document.copy(newFilePath);
       filePath = newFilePath;
@@ -3419,24 +3482,25 @@ class _POETabContentState extends State<POETabContent> {
       // If copy fails, use original path
       filePath = document.path;
     }
-    
+
     // Save to local database with synced=0 (pending sync)
     await dbHelper.saveUploadToLocalPoe(
         widget.learnerID, assessmentType, exercise, filePath);
-    
+
     if (assessmentType == 'LogBook' && logbookText != null) {
       await dbHelper.saveLogBookText(
           widget.learnerID.toString(), assessmentType, exercise, logbookText);
     }
-    
+
     // Mark as uploaded in UI (locally completed)
     setState(() {
       final uploadKey = '$assessmentType-$exercise-${widget.learnerID}';
       uploadedExercises[uploadKey] = true;
     });
-    
-    print('[POE_OFFLINE] Saved locally: learnerID=${widget.learnerID}, exercise=$exercise, type=$assessmentType');
-    
+
+    print(
+        '[POE_OFFLINE] Saved locally: learnerID=${widget.learnerID}, exercise=$exercise, type=$assessmentType');
+
     // Show offline indicator
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -3595,25 +3659,25 @@ class _POETabContentState extends State<POETabContent> {
             return ExpansionTile(
               title: Text(entry.key),
               children:
-              (entry.value['qualifications'] as Map<String, dynamic>? ?? {})
-                  .entries
-                  .map((qualEntry) {
+                  (entry.value['qualifications'] as Map<String, dynamic>? ?? {})
+                      .entries
+                      .map((qualEntry) {
                 return ExpansionTile(
                   title: Text(qualEntry.key),
                   children: (qualEntry.value['unitstandards']
-                  as Map<String, dynamic>? ??
-                      {})
+                              as Map<String, dynamic>? ??
+                          {})
                       .entries
                       .map((unitEntry) {
                     final formative = unitEntry.value['formative'] ?? [];
                     final summative = unitEntry.value['summative'] ?? [];
                     final logbook = unitEntry.value['logbook'] ?? [];
-                    
+
                     print('[DEBUG] Unit Standard: ${unitEntry.key}');
                     print('[DEBUG]   Formative count: ${formative.length}');
                     print('[DEBUG]   Summative count: ${summative.length}');
                     print('[DEBUG]   LogBook count: ${logbook.length}');
-                    
+
                     return ExpansionTile(
                       title: Text(unitEntry.key),
                       children: [
@@ -3666,7 +3730,7 @@ class _POETabContentState extends State<POETabContent> {
                                         ? Icons.check_circle
                                         : Icons.radio_button_unchecked,
                                     color:
-                                    isUploaded ? Colors.green : Colors.grey,
+                                        isUploaded ? Colors.green : Colors.grey,
                                   ),
                                   title: Text('Question: $exercise'),
                                   subtitle: Text(
@@ -3679,56 +3743,58 @@ class _POETabContentState extends State<POETabContent> {
                                   ),
                                   trailing: !isUploaded
                                       ? Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (shouldShowCamera)
-                                        IconButton(
-                                          icon: const Icon(Icons.camera_alt,
-                                              color: Colors.blue),
-                                          onPressed: () => _openFormativeCamera(
-                                              context,
-                                              formative,
-                                              unitEntry.key),
-                                          tooltip: 'Scan All Formative',
-                                        ),
-                                      IconButton(
-                                        icon: const Icon(Icons.check_box_outlined,
-                                            color: Colors.orange),
-                                        onPressed: () => _manualMarkAsUploaded(
-                                            'Formative', exercise),
-                                        tooltip: 'Mark as Uploaded',
-                                      ),
-                                    ],
-                                  )
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (shouldShowCamera)
+                                              IconButton(
+                                                icon: const Icon(
+                                                    Icons.camera_alt,
+                                                    color: Colors.blue),
+                                                onPressed: () =>
+                                                    _openFormativeCamera(
+                                                        context,
+                                                        formative,
+                                                        unitEntry.key),
+                                                tooltip: 'Scan All Formative',
+                                              ),
+                                            IconButton(
+                                              icon: const Icon(
+                                                  Icons.check_box_outlined,
+                                                  color: Colors.orange),
+                                              onPressed: () =>
+                                                  _manualMarkAsUploaded(
+                                                      'Formative', exercise),
+                                              tooltip: 'Mark as Uploaded',
+                                            ),
+                                          ],
+                                        )
                                       : Container(
-                                    padding:
-                                    const EdgeInsets.all(8.0),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green[100],
-                                      borderRadius:
-                                      BorderRadius.circular(8),
-                                      border: Border.all(
-                                          color: Colors.green),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.check_circle,
-                                            color: Colors.green,
-                                            size: 16),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'COMPLETED',
-                                          style: TextStyle(
-                                            color: Colors.green,
-                                            fontSize: 10,
-                                            fontWeight:
-                                            FontWeight.bold,
+                                          padding: const EdgeInsets.all(8.0),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green[100],
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            border:
+                                                Border.all(color: Colors.green),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.check_circle,
+                                                  color: Colors.green,
+                                                  size: 16),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'COMPLETED',
+                                                style: TextStyle(
+                                                  color: Colors.green,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                  ),
                                 );
                               }).toList(),
                               // Single camera button for all formative questions (only if ready)
@@ -3738,125 +3804,142 @@ class _POETabContentState extends State<POETabContent> {
                                   padding: const EdgeInsets.all(16.0),
                                   child: ElevatedButton.icon(
                                     onPressed: formative.where((item) {
-                                      final exercise = item['exercise']
-                                          ?.toString() ??
-                                          'N/A';
-                                      final uploadKey =
-                                          'Formative-$exercise-${widget.learnerID}';
-                                      return uploadedExercises[
-                                      uploadKey] ??
-                                          false;
-                                    }).length ==
-                                        formative.length
+                                              final exercise = item['exercise']
+                                                      ?.toString() ??
+                                                  'N/A';
+                                              final uploadKey =
+                                                  'Formative-$exercise-${widget.learnerID}';
+                                              return uploadedExercises[
+                                                      uploadKey] ??
+                                                  false;
+                                            }).length ==
+                                            formative.length
                                         ? null // Disable if all completed
                                         : () => _openFormativeCamera(
-                                        context, formative, unitEntry.key),
+                                            context, formative, unitEntry.key),
                                     icon: Icon(
                                       formative.where((item) {
-                                        final exercise =
-                                            item['exercise']
-                                                ?.toString() ??
-                                                'N/A';
-                                        final uploadKey =
-                                            'Formative-$exercise-${widget.learnerID}';
-                                        return uploadedExercises[
-                                        uploadKey] ??
-                                            false;
-                                      }).length ==
-                                          formative.length
+                                                final exercise =
+                                                    item['exercise']
+                                                            ?.toString() ??
+                                                        'N/A';
+                                                final uploadKey =
+                                                    'Formative-$exercise-${widget.learnerID}';
+                                                return uploadedExercises[
+                                                        uploadKey] ??
+                                                    false;
+                                              }).length ==
+                                              formative.length
                                           ? Icons.check_circle
                                           : Icons.camera_alt,
                                     ),
                                     label: Text(
                                       formative.where((item) {
-                                        final exercise =
-                                            item['exercise']
-                                                ?.toString() ??
-                                                'N/A';
-                                        final uploadKey =
-                                            'Formative-$exercise-${widget.learnerID}';
-                                        return uploadedExercises[
-                                        uploadKey] ??
-                                            false;
-                                      }).length ==
-                                          formative.length
+                                                final exercise =
+                                                    item['exercise']
+                                                            ?.toString() ??
+                                                        'N/A';
+                                                final uploadKey =
+                                                    'Formative-$exercise-${widget.learnerID}';
+                                                return uploadedExercises[
+                                                        uploadKey] ??
+                                                    false;
+                                              }).length ==
+                                              formative.length
                                           ? 'All Formative Completed ✓'
                                           : 'Scan All Formative Answers',
                                     ),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: formative.where((item) {
-                                        final exercise =
-                                            item['exercise']
-                                                ?.toString() ??
-                                                'N/A';
-                                        final uploadKey =
-                                            'Formative-$exercise-${widget.learnerID}';
-                                        return uploadedExercises[
-                                        uploadKey] ??
-                                            false;
-                                      }).length ==
-                                          formative.length
+                                                final exercise =
+                                                    item['exercise']
+                                                            ?.toString() ??
+                                                        'N/A';
+                                                final uploadKey =
+                                                    'Formative-$exercise-${widget.learnerID}';
+                                                return uploadedExercises[
+                                                        uploadKey] ??
+                                                    false;
+                                              }).length ==
+                                              formative.length
                                           ? Colors.green
                                           : Colors.blue,
                                       foregroundColor: Colors.white,
                                       minimumSize:
-                                      const Size(double.infinity, 50),
+                                          const Size(double.infinity, 50),
                                     ),
-                                                                  ),
-                              ),
+                                  ),
+                                ),
                               // Manual Mark All Formative button
-                              if (_isUnitStandardReadyForFormative(unitEntry.key))
+                              if (_isUnitStandardReadyForFormative(
+                                  unitEntry.key))
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8.0),
                                   child: ElevatedButton.icon(
                                     onPressed: formative.where((item) {
-                                      final exercise =
-                                          item['exercise']?.toString() ?? 'N/A';
-                                      final uploadKey =
-                                          'Formative-$exercise-${widget.learnerID}';
-                                      return uploadedExercises[uploadKey] ?? false;
-                                    }).length ==
-                                        formative.length
+                                              final exercise = item['exercise']
+                                                      ?.toString() ??
+                                                  'N/A';
+                                              final uploadKey =
+                                                  'Formative-$exercise-${widget.learnerID}';
+                                              return uploadedExercises[
+                                                      uploadKey] ??
+                                                  false;
+                                            }).length ==
+                                            formative.length
                                         ? null // Disable if all completed
                                         : () => _manualMarkAllFormative(
-                                        context, formative, unitEntry.key),
+                                            context, formative, unitEntry.key),
                                     icon: Icon(
                                       formative.where((item) {
-                                        final exercise =
-                                            item['exercise']?.toString() ?? 'N/A';
-                                        final uploadKey =
-                                            'Formative-$exercise-${widget.learnerID}';
-                                        return uploadedExercises[uploadKey] ?? false;
-                                      }).length ==
-                                          formative.length
+                                                final exercise =
+                                                    item['exercise']
+                                                            ?.toString() ??
+                                                        'N/A';
+                                                final uploadKey =
+                                                    'Formative-$exercise-${widget.learnerID}';
+                                                return uploadedExercises[
+                                                        uploadKey] ??
+                                                    false;
+                                              }).length ==
+                                              formative.length
                                           ? Icons.check_circle
                                           : Icons.check_box_outlined,
                                     ),
                                     label: Text(
                                       formative.where((item) {
-                                        final exercise =
-                                            item['exercise']?.toString() ?? 'N/A';
-                                        final uploadKey =
-                                            'Formative-$exercise-${widget.learnerID}';
-                                        return uploadedExercises[uploadKey] ?? false;
-                                      }).length ==
-                                          formative.length
+                                                final exercise =
+                                                    item['exercise']
+                                                            ?.toString() ??
+                                                        'N/A';
+                                                final uploadKey =
+                                                    'Formative-$exercise-${widget.learnerID}';
+                                                return uploadedExercises[
+                                                        uploadKey] ??
+                                                    false;
+                                              }).length ==
+                                              formative.length
                                           ? 'All Formative Completed ✓'
                                           : 'Manual Mark All Formative',
                                     ),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: formative.where((item) {
-                                        final exercise =
-                                            item['exercise']?.toString() ?? 'N/A';
-                                        final uploadKey =
-                                            'Formative-$exercise-${widget.learnerID}';
-                                        return uploadedExercises[uploadKey] ?? false;
-                                      }).length ==
-                                          formative.length
+                                                final exercise =
+                                                    item['exercise']
+                                                            ?.toString() ??
+                                                        'N/A';
+                                                final uploadKey =
+                                                    'Formative-$exercise-${widget.learnerID}';
+                                                return uploadedExercises[
+                                                        uploadKey] ??
+                                                    false;
+                                              }).length ==
+                                              formative.length
                                           ? Colors.green
                                           : Colors.orange,
                                       foregroundColor: Colors.white,
-                                      minimumSize: const Size(double.infinity, 50),
+                                      minimumSize:
+                                          const Size(double.infinity, 50),
                                     ),
                                   ),
                                 ),
@@ -3864,9 +3947,11 @@ class _POETabContentState extends State<POETabContent> {
                           )
                         else
                           ListTile(
-                            leading: const Icon(Icons.info_outline, color: Colors.grey),
+                            leading: const Icon(Icons.info_outline,
+                                color: Colors.grey),
                             title: const Text('No formative data available'),
-                            subtitle: Text('This unit standard may only have logbook entries'),
+                            subtitle: Text(
+                                'This unit standard may only have logbook entries'),
                           ),
                         if (summative.isNotEmpty)
                           ExpansionTile(
@@ -3917,7 +4002,7 @@ class _POETabContentState extends State<POETabContent> {
                                         ? Icons.check_circle
                                         : Icons.radio_button_unchecked,
                                     color:
-                                    isUploaded ? Colors.green : Colors.grey,
+                                        isUploaded ? Colors.green : Colors.grey,
                                   ),
                                   title: Text('Question: $exercise'),
                                   subtitle: Text(
@@ -3930,56 +4015,58 @@ class _POETabContentState extends State<POETabContent> {
                                   ),
                                   trailing: !isUploaded
                                       ? Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (shouldShowCamera)
-                                        IconButton(
-                                          icon: const Icon(Icons.camera_alt,
-                                              color: Colors.orange),
-                                          onPressed: () => _openSummativeCamera(
-                                              context,
-                                              summative,
-                                              unitEntry.key),
-                                          tooltip: 'Scan All Summative',
-                                        ),
-                                      IconButton(
-                                        icon: const Icon(Icons.check_box_outlined,
-                                            color: Colors.orange),
-                                        onPressed: () => _manualMarkAsUploaded(
-                                            'Summative', exercise),
-                                        tooltip: 'Mark as Uploaded',
-                                      ),
-                                    ],
-                                  )
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (shouldShowCamera)
+                                              IconButton(
+                                                icon: const Icon(
+                                                    Icons.camera_alt,
+                                                    color: Colors.orange),
+                                                onPressed: () =>
+                                                    _openSummativeCamera(
+                                                        context,
+                                                        summative,
+                                                        unitEntry.key),
+                                                tooltip: 'Scan All Summative',
+                                              ),
+                                            IconButton(
+                                              icon: const Icon(
+                                                  Icons.check_box_outlined,
+                                                  color: Colors.orange),
+                                              onPressed: () =>
+                                                  _manualMarkAsUploaded(
+                                                      'Summative', exercise),
+                                              tooltip: 'Mark as Uploaded',
+                                            ),
+                                          ],
+                                        )
                                       : Container(
-                                     padding:
-                                    const EdgeInsets.all(8.0),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green[100],
-                                      borderRadius:
-                                      BorderRadius.circular(8),
-                                      border: Border.all(
-                                          color: Colors.green),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.check_circle,
-                                            color: Colors.green,
-                                            size: 16),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'COMPLETED',
-                                          style: TextStyle(
-                                            color: Colors.green,
-                                            fontSize: 10,
-                                            fontWeight:
-                                            FontWeight.bold,
+                                          padding: const EdgeInsets.all(8.0),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green[100],
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            border:
+                                                Border.all(color: Colors.green),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.check_circle,
+                                                  color: Colors.green,
+                                                  size: 16),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'COMPLETED',
+                                                style: TextStyle(
+                                                  color: Colors.green,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                  ),
                                 );
                               }).toList(),
                               // Single camera button for all summative questions (only if ready)
@@ -3989,125 +4076,142 @@ class _POETabContentState extends State<POETabContent> {
                                   padding: const EdgeInsets.all(16.0),
                                   child: ElevatedButton.icon(
                                     onPressed: summative.where((item) {
-                                      final exercise = item['exercise']
-                                          ?.toString() ??
-                                          'N/A';
-                                      final uploadKey =
-                                          'Summative-$exercise-${widget.learnerID}';
-                                      return uploadedExercises[
-                                      uploadKey] ??
-                                          false;
-                                    }).length ==
-                                        summative.length
+                                              final exercise = item['exercise']
+                                                      ?.toString() ??
+                                                  'N/A';
+                                              final uploadKey =
+                                                  'Summative-$exercise-${widget.learnerID}';
+                                              return uploadedExercises[
+                                                      uploadKey] ??
+                                                  false;
+                                            }).length ==
+                                            summative.length
                                         ? null // Disable if all completed
                                         : () => _openSummativeCamera(
-                                        context, summative, unitEntry.key),
+                                            context, summative, unitEntry.key),
                                     icon: Icon(
                                       summative.where((item) {
-                                        final exercise =
-                                            item['exercise']
-                                                ?.toString() ??
-                                                'N/A';
-                                        final uploadKey =
-                                            'Summative-$exercise-${widget.learnerID}';
-                                        return uploadedExercises[
-                                        uploadKey] ??
-                                            false;
-                                      }).length ==
-                                          summative.length
+                                                final exercise =
+                                                    item['exercise']
+                                                            ?.toString() ??
+                                                        'N/A';
+                                                final uploadKey =
+                                                    'Summative-$exercise-${widget.learnerID}';
+                                                return uploadedExercises[
+                                                        uploadKey] ??
+                                                    false;
+                                              }).length ==
+                                              summative.length
                                           ? Icons.check_circle
                                           : Icons.camera_alt,
                                     ),
                                     label: Text(
-                                      summative.where((item) {   
-                                        final exercise =
-                                            item['exercise']
-                                                ?.toString() ??
-                                                'N/A';
-                                        final uploadKey =
-                                            'Summative-$exercise-${widget.learnerID}';
-                                        return uploadedExercises[
-                                        uploadKey] ??
-                                            false;
-                                      }).length ==
-                                          summative.length
+                                      summative.where((item) {
+                                                final exercise =
+                                                    item['exercise']
+                                                            ?.toString() ??
+                                                        'N/A';
+                                                final uploadKey =
+                                                    'Summative-$exercise-${widget.learnerID}';
+                                                return uploadedExercises[
+                                                        uploadKey] ??
+                                                    false;
+                                              }).length ==
+                                              summative.length
                                           ? 'All Summative Completed ✓'
                                           : 'Scan All Summative Answers',
                                     ),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: summative.where((item) {
-                                        final exercise =
-                                            item['exercise']
-                                                ?.toString() ??
-                                                'N/A';
-                                        final uploadKey =
-                                            'Summative-$exercise-${widget.learnerID}';
-                                        return uploadedExercises[
-                                        uploadKey] ??
-                                            false;
-                                      }).length ==
-                                          summative.length
+                                                final exercise =
+                                                    item['exercise']
+                                                            ?.toString() ??
+                                                        'N/A';
+                                                final uploadKey =
+                                                    'Summative-$exercise-${widget.learnerID}';
+                                                return uploadedExercises[
+                                                        uploadKey] ??
+                                                    false;
+                                              }).length ==
+                                              summative.length
                                           ? Colors.green
                                           : Colors.orange,
                                       foregroundColor: Colors.white,
                                       minimumSize:
-                                      const Size(double.infinity, 50),
+                                          const Size(double.infinity, 50),
                                     ),
-                                                                  ),
-                              ),
+                                  ),
+                                ),
                               // Manual Mark All Summative button
-                              if (_isUnitStandardReadyForSummative(unitEntry.key, formative))
+                              if (_isUnitStandardReadyForSummative(
+                                  unitEntry.key, formative))
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8.0),
                                   child: ElevatedButton.icon(
                                     onPressed: summative.where((item) {
-                                      final exercise =
-                                          item['exercise']?.toString() ?? 'N/A';
-                                      final uploadKey =
-                                          'Summative-$exercise-${widget.learnerID}';
-                                      return uploadedExercises[uploadKey] ?? false;
-                                    }).length ==
-                                        summative.length
+                                              final exercise = item['exercise']
+                                                      ?.toString() ??
+                                                  'N/A';
+                                              final uploadKey =
+                                                  'Summative-$exercise-${widget.learnerID}';
+                                              return uploadedExercises[
+                                                      uploadKey] ??
+                                                  false;
+                                            }).length ==
+                                            summative.length
                                         ? null // Disable if all completed
                                         : () => _manualMarkAllSummative(
-                                        context, summative, unitEntry.key),
+                                            context, summative, unitEntry.key),
                                     icon: Icon(
                                       summative.where((item) {
-                                        final exercise =
-                                            item['exercise']?.toString() ?? 'N/A';
-                                        final uploadKey =
-                                            'Summative-$exercise-${widget.learnerID}';
-                                        return uploadedExercises[uploadKey] ?? false;
-                                      }).length ==
-                                          summative.length
+                                                final exercise =
+                                                    item['exercise']
+                                                            ?.toString() ??
+                                                        'N/A';
+                                                final uploadKey =
+                                                    'Summative-$exercise-${widget.learnerID}';
+                                                return uploadedExercises[
+                                                        uploadKey] ??
+                                                    false;
+                                              }).length ==
+                                              summative.length
                                           ? Icons.check_circle
                                           : Icons.check_box_outlined,
                                     ),
                                     label: Text(
                                       summative.where((item) {
-                                        final exercise =
-                                            item['exercise']?.toString() ?? 'N/A';
-                                        final uploadKey =
-                                            'Summative-$exercise-${widget.learnerID}';
-                                        return uploadedExercises[uploadKey] ?? false;
-                                      }).length ==
-                                          summative.length
+                                                final exercise =
+                                                    item['exercise']
+                                                            ?.toString() ??
+                                                        'N/A';
+                                                final uploadKey =
+                                                    'Summative-$exercise-${widget.learnerID}';
+                                                return uploadedExercises[
+                                                        uploadKey] ??
+                                                    false;
+                                              }).length ==
+                                              summative.length
                                           ? 'All Summative Completed ✓'
                                           : 'Manual Mark All Summative',
                                     ),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: summative.where((item) {
-                                        final exercise =
-                                            item['exercise']?.toString() ?? 'N/A';
-                                        final uploadKey =
-                                            'Summative-$exercise-${widget.learnerID}';
-                                        return uploadedExercises[uploadKey] ?? false;
-                                      }).length ==
-                                          summative.length
+                                                final exercise =
+                                                    item['exercise']
+                                                            ?.toString() ??
+                                                        'N/A';
+                                                final uploadKey =
+                                                    'Summative-$exercise-${widget.learnerID}';
+                                                return uploadedExercises[
+                                                        uploadKey] ??
+                                                    false;
+                                              }).length ==
+                                              summative.length
                                           ? Colors.green
                                           : Colors.deepOrange,
                                       foregroundColor: Colors.white,
-                                      minimumSize: const Size(double.infinity, 50),
+                                      minimumSize:
+                                          const Size(double.infinity, 50),
                                     ),
                                   ),
                                 ),
@@ -4115,9 +4219,11 @@ class _POETabContentState extends State<POETabContent> {
                           )
                         else
                           ListTile(
-                            leading: const Icon(Icons.info_outline, color: Colors.grey),
+                            leading: const Icon(Icons.info_outline,
+                                color: Colors.grey),
                             title: const Text('No summative data available'),
-                            subtitle: Text('This unit standard may only have logbook entries'),
+                            subtitle: Text(
+                                'This unit standard may only have logbook entries'),
                           ),
                         // Formative Remedial Section (Optional)
                         ExpansionTile(
@@ -4160,13 +4266,17 @@ class _POETabContentState extends State<POETabContent> {
                                   const SizedBox(height: 16),
                                   ElevatedButton.icon(
                                     onPressed: () => _openRemedialCamera(
-                                        context, unitEntry.key, 'FormativeRemedial'),
+                                        context,
+                                        unitEntry.key,
+                                        'FormativeRemedial'),
                                     icon: const Icon(Icons.camera_alt),
-                                    label: const Text('Scan Formative Remedial'),
+                                    label:
+                                        const Text('Scan Formative Remedial'),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.purple,
                                       foregroundColor: Colors.white,
-                                      minimumSize: const Size(double.infinity, 50),
+                                      minimumSize:
+                                          const Size(double.infinity, 50),
                                     ),
                                   ),
                                 ],
@@ -4215,13 +4325,17 @@ class _POETabContentState extends State<POETabContent> {
                                   const SizedBox(height: 16),
                                   ElevatedButton.icon(
                                     onPressed: () => _openRemedialCamera(
-                                        context, unitEntry.key, 'SummativeRemedial'),
+                                        context,
+                                        unitEntry.key,
+                                        'SummativeRemedial'),
                                     icon: const Icon(Icons.camera_alt),
-                                    label: const Text('Scan Summative Remedial'),
+                                    label:
+                                        const Text('Scan Summative Remedial'),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.deepPurple,
                                       foregroundColor: Colors.white,
-                                      minimumSize: const Size(double.infinity, 50),
+                                      minimumSize:
+                                          const Size(double.infinity, 50),
                                     ),
                                   ),
                                 ],
@@ -4235,22 +4349,23 @@ class _POETabContentState extends State<POETabContent> {
                 );
               }).toList(),
             );
-          }).toList(),
+          }),
           // Group logbook items by unit standard for better organization
           ...(() {
             Map<String, List<Map<String, dynamic>>> logBooksByUnit = {};
             for (var item in allLogBooks) {
-              final unitStandard = item['unitStandard']?.toString() ?? 'Unknown';
+              final unitStandard =
+                  item['unitStandard']?.toString() ?? 'Unknown';
               if (!logBooksByUnit.containsKey(unitStandard)) {
                 logBooksByUnit[unitStandard] = [];
               }
               logBooksByUnit[unitStandard]!.add(item);
             }
-            
+
             return logBooksByUnit.entries.map<Widget>((entry) {
               final unitStandard = entry.key;
               final logBookItems = entry.value;
-              
+
               return ExpansionTile(
                 title: Row(
                   children: [
@@ -4271,8 +4386,10 @@ class _POETabContentState extends State<POETabContent> {
                       ),
                       child: Text(
                         '${logBookItems.where((item) {
-                          final exercise = item['exercise']?.toString() ?? 'N/A';
-                          final uploadKey = 'LogBook-$exercise-${widget.learnerID}';
+                          final exercise =
+                              item['exercise']?.toString() ?? 'N/A';
+                          final uploadKey =
+                              'LogBook-$exercise-${widget.learnerID}';
                           return uploadedExercises[uploadKey] ?? false;
                         }).length}/${logBookItems.length}',
                         style: const TextStyle(
@@ -4290,10 +4407,12 @@ class _POETabContentState extends State<POETabContent> {
                     final exercise = item['exercise']?.toString() ?? 'N/A';
                     final uploadKey = 'LogBook-$exercise-${widget.learnerID}';
                     final isUploaded = uploadedExercises[uploadKey] ?? false;
-                    final shouldShowCamera = _shouldShowCameraIcon('LogBook', exercise, unitStandard);
+                    final shouldShowCamera = _shouldShowCameraIcon(
+                        'LogBook', exercise, unitStandard);
 
                     return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8.0, vertical: 4.0),
                       child: Row(
                         children: [
                           Icon(
@@ -4317,7 +4436,9 @@ class _POETabContentState extends State<POETabContent> {
                                 Text(
                                   isUploaded ? 'Completed' : 'Pending',
                                   style: TextStyle(
-                                    color: isUploaded ? Colors.green : Colors.orange,
+                                    color: isUploaded
+                                        ? Colors.green
+                                        : Colors.orange,
                                     fontSize: 12,
                                   ),
                                 ),
@@ -4338,8 +4459,8 @@ class _POETabContentState extends State<POETabContent> {
                             IconButton(
                               icon: const Icon(Icons.check_box_outlined,
                                   color: Colors.orange, size: 20),
-                              onPressed: () => _manualMarkAsUploaded(
-                                  'LogBook', exercise),
+                              onPressed: () =>
+                                  _manualMarkAsUploaded('LogBook', exercise),
                               tooltip: 'Mark as Uploaded',
                               padding: const EdgeInsets.all(8),
                               constraints: const BoxConstraints(),
@@ -4373,43 +4494,56 @@ class _POETabContentState extends State<POETabContent> {
                         ],
                       ),
                     );
-                  }).toList(),
-                  
+                  }),
+
                   // Scan All LogBook button
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: ElevatedButton.icon(
                       onPressed: logBookItems.where((item) {
-                        final exercise = item['exercise']?.toString() ?? 'N/A';
-                        final uploadKey = 'LogBook-$exercise-${widget.learnerID}';
-                        return uploadedExercises[uploadKey] ?? false;
-                      }).length == logBookItems.length
+                                final exercise =
+                                    item['exercise']?.toString() ?? 'N/A';
+                                final uploadKey =
+                                    'LogBook-$exercise-${widget.learnerID}';
+                                return uploadedExercises[uploadKey] ?? false;
+                              }).length ==
+                              logBookItems.length
                           ? null // Disable if all completed
-                          : () => _openLogBookCamera(context, logBookItems, unitStandard),
+                          : () => _openLogBookCamera(
+                              context, logBookItems, unitStandard),
                       icon: Icon(
                         logBookItems.where((item) {
-                          final exercise = item['exercise']?.toString() ?? 'N/A';
-                          final uploadKey = 'LogBook-$exercise-${widget.learnerID}';
-                          return uploadedExercises[uploadKey] ?? false;
-                        }).length == logBookItems.length
+                                  final exercise =
+                                      item['exercise']?.toString() ?? 'N/A';
+                                  final uploadKey =
+                                      'LogBook-$exercise-${widget.learnerID}';
+                                  return uploadedExercises[uploadKey] ?? false;
+                                }).length ==
+                                logBookItems.length
                             ? Icons.check_circle
                             : Icons.camera_alt,
                       ),
                       label: Text(
                         logBookItems.where((item) {
-                          final exercise = item['exercise']?.toString() ?? 'N/A';
-                          final uploadKey = 'LogBook-$exercise-${widget.learnerID}';
-                          return uploadedExercises[uploadKey] ?? false;
-                        }).length == logBookItems.length
+                                  final exercise =
+                                      item['exercise']?.toString() ?? 'N/A';
+                                  final uploadKey =
+                                      'LogBook-$exercise-${widget.learnerID}';
+                                  return uploadedExercises[uploadKey] ?? false;
+                                }).length ==
+                                logBookItems.length
                             ? 'All LogBook Completed ✓'
                             : 'Scan All LogBook Entries',
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: logBookItems.where((item) {
-                          final exercise = item['exercise']?.toString() ?? 'N/A';
-                          final uploadKey = 'LogBook-$exercise-${widget.learnerID}';
-                          return uploadedExercises[uploadKey] ?? false;
-                        }).length == logBookItems.length
+                                  final exercise =
+                                      item['exercise']?.toString() ?? 'N/A';
+                                  final uploadKey =
+                                      'LogBook-$exercise-${widget.learnerID}';
+                                  return uploadedExercises[uploadKey] ?? false;
+                                }).length ==
+                                logBookItems.length
                             ? Colors.green
                             : Colors.green[700],
                         foregroundColor: Colors.white,
@@ -4417,42 +4551,56 @@ class _POETabContentState extends State<POETabContent> {
                       ),
                     ),
                   ),
-                  
+
                   // Manual Mark All LogBook button
                   Padding(
-                    padding: const EdgeInsets.only(top: 8.0, left: 16.0, right: 16.0, bottom: 16.0),
+                    padding: const EdgeInsets.only(
+                        top: 8.0, left: 16.0, right: 16.0, bottom: 16.0),
                     child: ElevatedButton.icon(
                       onPressed: logBookItems.where((item) {
-                        final exercise = item['exercise']?.toString() ?? 'N/A';
-                        final uploadKey = 'LogBook-$exercise-${widget.learnerID}';
-                        return uploadedExercises[uploadKey] ?? false;
-                      }).length == logBookItems.length
+                                final exercise =
+                                    item['exercise']?.toString() ?? 'N/A';
+                                final uploadKey =
+                                    'LogBook-$exercise-${widget.learnerID}';
+                                return uploadedExercises[uploadKey] ?? false;
+                              }).length ==
+                              logBookItems.length
                           ? null // Disable if all completed
-                          : () => _manualMarkAllLogBook(context, logBookItems, unitStandard),
+                          : () => _manualMarkAllLogBook(
+                              context, logBookItems, unitStandard),
                       icon: Icon(
                         logBookItems.where((item) {
-                          final exercise = item['exercise']?.toString() ?? 'N/A';
-                          final uploadKey = 'LogBook-$exercise-${widget.learnerID}';
-                          return uploadedExercises[uploadKey] ?? false;
-                        }).length == logBookItems.length
+                                  final exercise =
+                                      item['exercise']?.toString() ?? 'N/A';
+                                  final uploadKey =
+                                      'LogBook-$exercise-${widget.learnerID}';
+                                  return uploadedExercises[uploadKey] ?? false;
+                                }).length ==
+                                logBookItems.length
                             ? Icons.check_circle
                             : Icons.check_box_outlined,
                       ),
                       label: Text(
                         logBookItems.where((item) {
-                          final exercise = item['exercise']?.toString() ?? 'N/A';
-                          final uploadKey = 'LogBook-$exercise-${widget.learnerID}';
-                          return uploadedExercises[uploadKey] ?? false;
-                        }).length == logBookItems.length
+                                  final exercise =
+                                      item['exercise']?.toString() ?? 'N/A';
+                                  final uploadKey =
+                                      'LogBook-$exercise-${widget.learnerID}';
+                                  return uploadedExercises[uploadKey] ?? false;
+                                }).length ==
+                                logBookItems.length
                             ? 'All LogBook Completed ✓'
                             : 'Manual Mark All LogBook',
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: logBookItems.where((item) {
-                          final exercise = item['exercise']?.toString() ?? 'N/A';
-                          final uploadKey = 'LogBook-$exercise-${widget.learnerID}';
-                          return uploadedExercises[uploadKey] ?? false;
-                        }).length == logBookItems.length
+                                  final exercise =
+                                      item['exercise']?.toString() ?? 'N/A';
+                                  final uploadKey =
+                                      'LogBook-$exercise-${widget.learnerID}';
+                                  return uploadedExercises[uploadKey] ?? false;
+                                }).length ==
+                                logBookItems.length
                             ? Colors.green
                             : Colors.orange,
                         foregroundColor: Colors.white,
@@ -4464,7 +4612,7 @@ class _POETabContentState extends State<POETabContent> {
               );
             }).toList();
           })(),
-          
+
           if (allLogBooks.isEmpty)
             const ListTile(
               title: Text('No log book data available'),

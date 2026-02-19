@@ -594,7 +594,7 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
           if (result['success'] == true) {
             debugPrint('[SAVE] ✅ Save successful!');
             _showSuccess(
-                '✅ ${selectedLearningMaterialType} issued to ${learner['FullName']}');
+                '✅ $selectedLearningMaterialType issued to ${learner['FullName']}');
 
             // Refresh learner list to remove the learner who just received the material
             await _filterLearnersByMaterialType();

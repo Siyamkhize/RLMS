@@ -39,9 +39,9 @@ class _AssessorPageState extends State<AssessorPage> {
       final url = AppConfig.buildUrl('get_classes.php', queryParams: {
         'facilitator_id': facilitatorId,
       });
-      
+
       print('[AssessorPage] Fetching classes from: $url');
-      
+
       final response = await http.get(Uri.parse(url));
 
       print('[AssessorPage] Response Status: ${response.statusCode}');
@@ -49,12 +49,12 @@ class _AssessorPageState extends State<AssessorPage> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
+
         // Check if response is an error object
         if (data is Map && data['status'] == 'error') {
           throw Exception('Server error: ${data['message']}');
         }
-        
+
         // Return the data (should be a list)
         if (data is List) {
           return data;
@@ -97,7 +97,7 @@ class _AssessorPageState extends State<AssessorPage> {
         return NonComplianceAndFeedbackPage(
             facilitatorId: widget.facilitator_id,
             learnerId:
-            'LEARNER_ID'); // Replace 'LEARNER_ID' with actual learner ID
+                'LEARNER_ID'); // Replace 'LEARNER_ID' with actual learner ID
       case 8:
         return PotholeChecklistClassListPage(
           facilitatorId: widget.facilitator_id,
@@ -149,7 +149,7 @@ class _AssessorPageState extends State<AssessorPage> {
                         String classId = classData['classID'].toString();
                         String className = classData['className'] ?? 'Unknown';
                         String numberOfLearners =
-                        classData['numberOfLearners'].toString();
+                            classData['numberOfLearners'].toString();
                         String siteId = classData['siteID'].toString();
 
                         return DataRow(cells: [
@@ -418,11 +418,11 @@ class _AssessmentPreparationPageState extends State<AssessmentPreparationPage> {
                                       MaterialPageRoute(
                                         builder: (context) =>
                                             UnitStandardDetailPage(
-                                              unitStandardId:
+                                          unitStandardId:
                                               unitStandard['unitstandard_id']
                                                   .toString(),
-                                              facilitatorId: widget.facilitatorId,
-                                            ),
+                                          facilitatorId: widget.facilitatorId,
+                                        ),
                                       ),
                                     );
                                   },
@@ -471,7 +471,7 @@ class _UnitStandardDetailPageState extends State<UnitStandardDetailPage> {
   final List<Map<String, String>> _prepRows = [
     {
       'step':
-      'Explain to the candidate why you are meeting and the purpose of the assessment.',
+          'Explain to the candidate why you are meeting and the purpose of the assessment.',
       'doc': 'NQF Framework Assessment process',
     },
     {
@@ -480,7 +480,7 @@ class _UnitStandardDetailPageState extends State<UnitStandardDetailPage> {
     },
     {
       'step':
-      'Explain assessment process, show assessment instruments to candidate and describe assessment conditions.',
+          'Explain assessment process, show assessment instruments to candidate and describe assessment conditions.',
       'doc': 'Assessment instruments',
     },
     {
@@ -497,27 +497,27 @@ class _UnitStandardDetailPageState extends State<UnitStandardDetailPage> {
     },
     {
       'step':
-      'Explain to the candidate how to prepare:  Give candidate summative task description.',
+          'Explain to the candidate how to prepare:  Give candidate summative task description.',
       'doc': 'Summative task description',
     },
     {
       'step':
-      'Confirm with the candidate what he/she should bring to the assessment.',
+          'Confirm with the candidate what he/she should bring to the assessment.',
       'doc': 'Detailed briefing on exact requirements to be given to candidate',
     },
     {
       'step':
-      'Ensure that candidate understands the procedures of all assessment practices.',
+          'Ensure that candidate understands the procedures of all assessment practices.',
       'doc': 'Appeals procedure\nModeration procedure\nAssessment policy',
     },
     {
       'step':
-      'Ask the candidate if he/she foresees any problems or identify any special needs.',
+          'Ask the candidate if he/she foresees any problems or identify any special needs.',
       'doc': 'List needs',
     },
     {
       'step':
-      'Check with candidate that he/she clearly understands the assessment procedure.',
+          'Check with candidate that he/she clearly understands the assessment procedure.',
       'doc': '',
     },
   ];
@@ -553,12 +553,12 @@ class _UnitStandardDetailPageState extends State<UnitStandardDetailPage> {
       try {
         final prepTable = List.generate(
             _prepRows.length,
-                (index) => {
-              'step': _prepRows[index]['step'],
-              'doc': _prepRows[index]['doc'],
-              'agree': _agreeList[index],
-              'action': _actionControllers[index].text,
-            });
+            (index) => {
+                  'step': _prepRows[index]['step'],
+                  'doc': _prepRows[index]['doc'],
+                  'agree': _agreeList[index],
+                  'action': _actionControllers[index].text,
+                });
 
         final payload = {
           'unitstandard_id': widget.unitStandardId,
@@ -595,7 +595,7 @@ class _UnitStandardDetailPageState extends State<UnitStandardDetailPage> {
         } else {
           setState(() {
             _responseMessage =
-            'Server error: ${response.statusCode} - ${response.body}';
+                'Server error: ${response.statusCode} - ${response.body}';
             _isSubmitting = false;
           });
           ScaffoldMessenger.of(context).showSnackBar(
@@ -690,7 +690,7 @@ class _UnitStandardDetailPageState extends State<UnitStandardDetailPage> {
                     const Text(
                       'Assessment Preparation',
                       style:
-                      TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -869,11 +869,11 @@ class _AssessmentPlanPageState extends State<AssessmentPlanPage> {
                                       MaterialPageRoute(
                                         builder: (context) =>
                                             AssessmentPlanDetailPage(
-                                              unitStandardId:
+                                          unitStandardId:
                                               unitStandard['unitstandard_id']
                                                   .toString(),
-                                              facilitatorId: widget.facilitatorId,
-                                            ),
+                                          facilitatorId: widget.facilitatorId,
+                                        ),
                                       ),
                                     );
                                   },
@@ -924,7 +924,7 @@ class _AssessmentPlanDetailPageState extends State<AssessmentPlanDetailPage> {
   DateTime? _endDate;
   final TextEditingController _venueController = TextEditingController();
   final TextEditingController _contactPersonController =
-  TextEditingController();
+      TextEditingController();
   String? _languageMedium;
   String? _assessmentMethod;
   String _responseMessage = '';
@@ -997,7 +997,7 @@ class _AssessmentPlanDetailPageState extends State<AssessmentPlanDetailPage> {
         } else {
           setState(() {
             _responseMessage =
-            'Server error: ${response.statusCode} - ${response.body}';
+                'Server error: ${response.statusCode} - ${response.body}';
             _isSubmitting = false;
           });
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1070,13 +1070,13 @@ class _AssessmentPlanDetailPageState extends State<AssessmentPlanDetailPage> {
                         shape: BoxShape.circle,
                       ),
                       child:
-                      const Icon(Icons.calendar_today, color: Colors.white),
+                          const Icon(Icons.calendar_today, color: Colors.white),
                     ),
                     const SizedBox(width: 8),
                     const Text(
                       'Assessment Plan',
                       style:
-                      TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -1099,15 +1099,15 @@ class _AssessmentPlanDetailPageState extends State<AssessmentPlanDetailPage> {
                         const SizedBox(height: 16),
                         _buildDropdownField(
                             'Language Medium', _languageMedium, _languages,
-                                (val) {
-                              setState(() => _languageMedium = val);
-                            }),
+                            (val) {
+                          setState(() => _languageMedium = val);
+                        }),
                         const SizedBox(height: 16),
                         _buildDropdownField(
                             'Method of Assessment', _assessmentMethod, _methods,
-                                (val) {
-                              setState(() => _assessmentMethod = val);
-                            }),
+                            (val) {
+                          setState(() => _assessmentMethod = val);
+                        }),
                         const SizedBox(height: 24),
                         ElevatedButton(
                           onPressed: _isSubmitting ? null : _submitForm,
@@ -1119,7 +1119,7 @@ class _AssessmentPlanDetailPageState extends State<AssessmentPlanDetailPage> {
                           ),
                           child: _isSubmitting
                               ? const CircularProgressIndicator(
-                              color: Colors.white)
+                                  color: Colors.white)
                               : const Text('Submit'),
                         ),
                       ],
@@ -1269,7 +1269,7 @@ class _AssessorReportPageState extends State<AssessorReportPage> {
         if (response.body.startsWith('No data found')) {
           setState(() {
             _statusMessage =
-            'No data found for Facilitator ID: ${widget.facilitatorId}';
+                'No data found for Facilitator ID: ${widget.facilitatorId}';
             _isGenerating = false;
           });
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1302,7 +1302,7 @@ class _AssessorReportPageState extends State<AssessorReportPage> {
       } else {
         setState(() {
           _statusMessage =
-          'Failed to generate report. Server error: ${response.statusCode}';
+              'Failed to generate report. Server error: ${response.statusCode}';
           _isGenerating = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1339,7 +1339,7 @@ class _AssessorReportPageState extends State<AssessorReportPage> {
                 backgroundColor: Colors.blue,
                 foregroundColor: Colors.white,
                 padding:
-                const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
               ),
               child: _isGenerating
                   ? const CircularProgressIndicator(color: Colors.white)
@@ -1408,14 +1408,15 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
         'classID': classId,
         '_': DateTime.now().millisecondsSinceEpoch.toString(),
       });
-      
+
       print('[ClassDetailsPage] Fetching learners from: $url');
       final response = await http.get(Uri.parse(url));
 
       print('[ClassDetailsPage] Response Status: ${response.statusCode}');
       print('[ClassDetailsPage] Response Headers: ${response.headers}');
       print('[ClassDetailsPage] Response Body Length: ${response.body.length}');
-      print('[ClassDetailsPage] Response Body (get_learners): ${response.body}');
+      print(
+          '[ClassDetailsPage] Response Body (get_learners): ${response.body}');
 
       if (response.statusCode == 200) {
         if (response.body.isEmpty) {
@@ -1435,7 +1436,7 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
           final poeUrl = AppConfig.buildUrl('get_poe.php', queryParams: {
             'learnerId': learnerId,
           });
-          
+
           print('[ClassDetailsPage] Fetching POE from: $poeUrl');
           final poeResponse = await http.get(Uri.parse(poeUrl));
 
@@ -1500,7 +1501,7 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
           for (var assessment in assessments['summative'] ?? []) {
             print(
                 'Checking summative assessment for learner $learnerId, exercise: ${assessment['exercise']}, '
-                    'filePath: ${assessment['filePath']}, marks_scored: ${assessment['marks_scored']}');
+                'filePath: ${assessment['filePath']}, marks_scored: ${assessment['marks_scored']}');
             if (assessment['filePath'] != null &&
                 assessment['filePath'].isNotEmpty) {
               hasFile = true;
@@ -1513,7 +1514,7 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
               allMarksScored = false;
               print(
                   'Missing or zero marks for summative exercise ${assessment['exercise']} in learner $learnerId, '
-                      'setting allMarksScored to false');
+                  'setting allMarksScored to false');
             }
           }
 
@@ -1521,7 +1522,7 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
           for (var assessment in assessments['formative'] ?? []) {
             print(
                 'Checking formative assessment for learner $learnerId, exercise: ${assessment['exercise']}, '
-                    'filePath: ${assessment['filePath']}, marks_scored: ${assessment['marks_scored']}');
+                'filePath: ${assessment['filePath']}, marks_scored: ${assessment['marks_scored']}');
             if (assessment['filePath'] != null &&
                 assessment['filePath'].isNotEmpty) {
               hasFile = true;
@@ -1534,7 +1535,7 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
               allMarksScored = false;
               print(
                   'Missing or zero marks for formative exercise ${assessment['exercise']} in learner $learnerId, '
-                      'setting allMarksScored to false');
+                  'setting allMarksScored to false');
             }
           }
         }
@@ -1587,7 +1588,7 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
                         ],
                         rows: learners.map<DataRow>((learnerData) {
                           String learnerId =
-                          learnerData['LearnerID'].toString();
+                              learnerData['LearnerID'].toString();
                           String firstName = learnerData['Name'] ?? 'Unknown';
                           String lastName = learnerData['Surname'] ?? 'Unknown';
                           String idNumber =
@@ -1596,7 +1597,7 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
 
                           return DataRow(
                             color: WidgetStateColor.resolveWith(
-                                    (states) => rowColor),
+                                (states) => rowColor),
                             cells: [
                               DataCell(Text(learnerId)),
                               DataCell(Text(firstName)),
@@ -1610,11 +1611,11 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
                                       MaterialPageRoute(
                                         builder: (context) =>
                                             AssessorMarkingPage(
-                                              learnerId: learnerId,
-                                              learnerFirstName: firstName,
-                                              learnerLastName: lastName,
-                                              learnerIdNumber: idNumber,
-                                            ),
+                                          learnerId: learnerId,
+                                          learnerFirstName: firstName,
+                                          learnerLastName: lastName,
+                                          learnerIdNumber: idNumber,
+                                        ),
                                       ),
                                     );
                                   },
@@ -1762,13 +1763,13 @@ class _PotholeChecklistTabState extends State<PotholeChecklistTab> {
         'entries': [
           {
             'label':
-            'Cleans the pothole of all loose material, debris and water',
+                'Cleans the pothole of all loose material, debris and water',
             'value': null,
             'notes': ''
           },
           {
             'label':
-            'Setting out done correctly (marking, straightness, corners)',
+                'Setting out done correctly (marking, straightness, corners)',
             'value': null,
             'notes': ''
           },
@@ -1812,7 +1813,7 @@ class _PotholeChecklistTabState extends State<PotholeChecklistTab> {
           },
           {
             'label':
-            'Final compacted surface is flush with surrounding road surfaces',
+                'Final compacted surface is flush with surrounding road surfaces',
             'value': null,
             'notes': ''
           },
@@ -2116,7 +2117,7 @@ class _POETabState extends State<POETab> {
       final url = AppConfig.buildUrl('get_poe.php', queryParams: {
         'learnerId': learnerId,
       });
-      
+
       print('[POETab] Fetching POE from: $url');
       final response = await http.get(Uri.parse(url));
 
@@ -2162,14 +2163,15 @@ class _POETabState extends State<POETab> {
                     ...pathways.entries.map((entry) {
                       return ExpansionTile(
                         title: Text(entry.key,
-                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
                         children: _buildQualificationTiles(entry.value),
                       );
-                    }).toList(),
-                    
+                    }),
+
                     // Separate LogBook Section
                     _buildLogBookSection(poeData),
-                    
+
                     // Separate Pothole Checklist Section
                     _buildPotholeChecklistMainSection(),
                   ],
@@ -2231,13 +2233,12 @@ class _POETabState extends State<POETab> {
       TextEditingController commentController = TextEditingController();
       String existingComment = formative.first['a_comment'] ?? '';
       commentController.text = existingComment;
-      
+
       // Check if any marks have been submitted
-      bool hasMarks = formative.any((exercise) => 
-        exercise['marks_scored'] != null && 
-        exercise['marks_scored'].toString().isNotEmpty &&
-        exercise['marks_scored'].toString() != '0'
-      );
+      bool hasMarks = formative.any((exercise) =>
+          exercise['marks_scored'] != null &&
+          exercise['marks_scored'].toString().isNotEmpty &&
+          exercise['marks_scored'].toString() != '0');
 
       assessmentTiles.add(
         ExpansionTile(
@@ -2270,15 +2271,15 @@ class _POETabState extends State<POETab> {
               ),
             Padding(
               padding:
-              const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: TextFormField(
                 controller: commentController,
                 decoration: InputDecoration(
                   labelText: 'Comments',
                   border: const OutlineInputBorder(),
                   hintText: 'Enter your comments for formative assessments',
-                  helperText: existingComment.isNotEmpty 
-                      ? 'Editing existing comment' 
+                  helperText: existingComment.isNotEmpty
+                      ? 'Editing existing comment'
                       : (hasMarks ? null : 'Marks required before commenting'),
                 ),
                 maxLines: 3,
@@ -2287,12 +2288,15 @@ class _POETabState extends State<POETab> {
             ),
             Padding(
               padding:
-              const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: ElevatedButton(
-                onPressed: hasMarks 
-                    ? () => saveComment('formative', commentController.text, existingComment.isNotEmpty)
+                onPressed: hasMarks
+                    ? () => saveComment('formative', commentController.text,
+                        existingComment.isNotEmpty)
                     : null,
-                child: Text(existingComment.isEmpty ? 'Submit Comment' : 'Update Comment'),
+                child: Text(existingComment.isEmpty
+                    ? 'Submit Comment'
+                    : 'Update Comment'),
               ),
             ),
           ],
@@ -2305,13 +2309,12 @@ class _POETabState extends State<POETab> {
       TextEditingController commentController = TextEditingController();
       String existingComment = summative.first['a_comment'] ?? '';
       commentController.text = existingComment;
-      
+
       // Check if any marks have been submitted
-      bool hasMarks = summative.any((exercise) => 
-        exercise['marks_scored'] != null && 
-        exercise['marks_scored'].toString().isNotEmpty &&
-        exercise['marks_scored'].toString() != '0'
-      );
+      bool hasMarks = summative.any((exercise) =>
+          exercise['marks_scored'] != null &&
+          exercise['marks_scored'].toString().isNotEmpty &&
+          exercise['marks_scored'].toString() != '0');
 
       assessmentTiles.add(
         ExpansionTile(
@@ -2344,15 +2347,15 @@ class _POETabState extends State<POETab> {
               ),
             Padding(
               padding:
-              const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: TextFormField(
                 controller: commentController,
                 decoration: InputDecoration(
                   labelText: 'Comments',
                   border: const OutlineInputBorder(),
                   hintText: 'Enter your comments for summative assessments',
-                  helperText: existingComment.isNotEmpty 
-                      ? 'Editing existing comment' 
+                  helperText: existingComment.isNotEmpty
+                      ? 'Editing existing comment'
                       : (hasMarks ? null : 'Marks required before commenting'),
                 ),
                 maxLines: 3,
@@ -2361,12 +2364,15 @@ class _POETabState extends State<POETab> {
             ),
             Padding(
               padding:
-              const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: ElevatedButton(
-                onPressed: hasMarks 
-                    ? () => saveComment('summative', commentController.text, existingComment.isNotEmpty)
+                onPressed: hasMarks
+                    ? () => saveComment('summative', commentController.text,
+                        existingComment.isNotEmpty)
                     : null,
-                child: Text(existingComment.isEmpty ? 'Submit Comment' : 'Update Comment'),
+                child: Text(existingComment.isEmpty
+                    ? 'Submit Comment'
+                    : 'Update Comment'),
               ),
             ),
           ],
@@ -2419,11 +2425,10 @@ class _POETabState extends State<POETab> {
           commentController.text = existingComment;
 
           // Check if any marks have been submitted
-          bool hasMarks = logbookItems.any((exercise) => 
-            exercise['marks_scored'] != null && 
-            exercise['marks_scored'].toString().isNotEmpty &&
-            exercise['marks_scored'].toString() != '0'
-          );
+          bool hasMarks = logbookItems.any((exercise) =>
+              exercise['marks_scored'] != null &&
+              exercise['marks_scored'].toString().isNotEmpty &&
+              exercise['marks_scored'].toString() != '0');
 
           return ExpansionTile(
             title: Text(item['unitStandardName']),
@@ -2455,16 +2460,18 @@ class _POETabState extends State<POETab> {
                 ),
               Padding(
                 padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: TextFormField(
                   controller: commentController,
                   decoration: InputDecoration(
                     labelText: 'Comments',
                     border: const OutlineInputBorder(),
                     hintText: 'Enter your comments for logbook assessments',
-                    helperText: existingComment.isNotEmpty 
-                        ? 'Editing existing comment' 
-                        : (hasMarks ? null : 'Marks required before commenting'),
+                    helperText: existingComment.isNotEmpty
+                        ? 'Editing existing comment'
+                        : (hasMarks
+                            ? null
+                            : 'Marks required before commenting'),
                   ),
                   maxLines: 3,
                   enabled: hasMarks,
@@ -2472,12 +2479,15 @@ class _POETabState extends State<POETab> {
               ),
               Padding(
                 padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: ElevatedButton(
-                  onPressed: hasMarks 
-                      ? () => saveComment('logbook', commentController.text, existingComment.isNotEmpty)
+                  onPressed: hasMarks
+                      ? () => saveComment('logbook', commentController.text,
+                          existingComment.isNotEmpty)
                       : null,
-                  child: Text(existingComment.isEmpty ? 'Submit Comment' : 'Update Comment'),
+                  child: Text(existingComment.isEmpty
+                      ? 'Submit Comment'
+                      : 'Update Comment'),
                 ),
               ),
             ],
@@ -2554,7 +2564,8 @@ class _POETabState extends State<POETab> {
               ),
               subtitle: const Text('Tap to view and mark'),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () => _viewPotholeChecklist(checklistType!, checklistData?['data']),
+              onTap: () =>
+                  _viewPotholeChecklist(checklistType!, checklistData?['data']),
             ),
             const Divider(),
             _buildPotholeChecklistMarkingSection(checklistData),
@@ -2567,16 +2578,19 @@ class _POETabState extends State<POETab> {
   Future<Map<String, dynamic>> _checkPotholeChecklistStatus() async {
     try {
       final assessmentDate = DateTime.now().toIso8601String().split('T').first;
-      
-      print('DEBUG Pothole: Checking for learner ${widget.learnerId}, date $assessmentDate');
+
+      print(
+          'DEBUG Pothole: Checking for learner ${widget.learnerId}, date $assessmentDate');
 
       // PRIORITY 1: Check server first using unified endpoint (checks both scanned and system)
       try {
-        final url = '${AppConfig.baseUrl}/view_pothole_checklists.php?learner_id=${widget.learnerId}';
+        final url =
+            '${AppConfig.baseUrl}/view_pothole_checklists.php?learner_id=${widget.learnerId}';
         print('DEBUG Pothole: Checking server at $url');
-        
-        final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
-        
+
+        final response =
+            await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+
         print('DEBUG Pothole: Response status ${response.statusCode}');
         print('DEBUG Pothole: Response body ${response.body}');
 
@@ -2591,7 +2605,8 @@ class _POETabState extends State<POETab> {
               'data': data['data'],
             };
           } else {
-            print('DEBUG Pothole: No checklist on server - ${data['message'] ?? 'Unknown error'}');
+            print(
+                'DEBUG Pothole: No checklist on server - ${data['message'] ?? 'Unknown error'}');
           }
         } else {
           print('DEBUG Pothole: Server returned status ${response.statusCode}');
@@ -2602,15 +2617,15 @@ class _POETabState extends State<POETab> {
 
       // PRIORITY 2: Fallback to local database for scanned document
       print('DEBUG Pothole: Checking local database as fallback');
-      final scannedDoc = await DatabaseHelper()
-          .getScannedPotholeChecklist(
+      final scannedDoc = await DatabaseHelper().getScannedPotholeChecklist(
         learnerId: widget.learnerId,
         assessorId: '', // Empty to check any assessor
         assessmentDate: '', // Empty to check any date
       );
 
       if (scannedDoc != null) {
-        print('DEBUG Pothole: Found scanned document in local DB at ${scannedDoc['document_path']}');
+        print(
+            'DEBUG Pothole: Found scanned document in local DB at ${scannedDoc['document_path']}');
         return {
           'exists': true,
           'type': 'scanned',
@@ -2638,12 +2653,12 @@ class _POETabState extends State<POETab> {
     print('DEBUG: _viewPotholeChecklist called with type=$type');
     print('DEBUG: data keys: ${data?.keys}');
     print('DEBUG: Full data: $data');
-    
+
     // The data is already the inner data object from the server response
     if (type == 'scanned' && data?['document_path'] != null) {
       print('DEBUG: Navigating to scanned PDF view page');
       print('DEBUG: document_path=${data!['document_path']}');
-      
+
       // Navigate to scanned document view page with marking
       Navigator.push(
         context,
@@ -2652,14 +2667,16 @@ class _POETabState extends State<POETab> {
             documentPath: data['document_path'],
             learnerId: widget.learnerId,
             assessorId: data['assessor_id'] ?? '',
-            assessmentDate: data['assessment_date'] ?? DateTime.now().toIso8601String().split('T').first,
+            assessmentDate: data['assessment_date'] ??
+                DateTime.now().toIso8601String().split('T').first,
           ),
         ),
       );
     } else if (type == 'system' && data != null) {
       print('DEBUG: Navigating to system checklist view page');
-      print('DEBUG: checklist_items count: ${(data['checklist_items'] as Map?)?.length ?? 0}');
-      
+      print(
+          'DEBUG: checklist_items count: ${(data['checklist_items'] as Map?)?.length ?? 0}');
+
       // Navigate to full page view for system-generated checklist
       Navigator.push(
         context,
@@ -2672,7 +2689,8 @@ class _POETabState extends State<POETab> {
       );
     } else {
       print('DEBUG: No action taken - type=$type, has data=${data != null}');
-      print('DEBUG: Expected document_path or checklist_items but got: ${data?.keys}');
+      print(
+          'DEBUG: Expected document_path or checklist_items but got: ${data?.keys}');
     }
   }
 
@@ -2681,7 +2699,8 @@ class _POETabState extends State<POETab> {
       return const Text('No data available');
     }
 
-    final items = checklistData['checklist_items'] as Map<String, dynamic>? ?? {};
+    final items =
+        checklistData['checklist_items'] as Map<String, dynamic>? ?? {};
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2731,11 +2750,11 @@ class _POETabState extends State<POETab> {
                     ],
                   ),
                 );
-              }).toList(),
+              }),
               const Divider(),
             ],
           );
-        }).toList(),
+        }),
       ],
     );
   }
@@ -2809,10 +2828,10 @@ class _POETabState extends State<POETab> {
 
     try {
       final url = AppConfig.buildUrl('save_comment.php');
-      
+
       print('[POETab] Saving comment to: $url');
       print('[POETab] Assessment type: $assessmentType, isUpdate: $isUpdate');
-      
+
       final response = await http.post(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
@@ -2829,18 +2848,18 @@ class _POETabState extends State<POETab> {
 
       if (response.statusCode == 200) {
         var responseData = jsonDecode(response.body);
-        
+
         if (responseData['status'] == 'success') {
           setState(() {
-            _responseMessage = isUpdate 
+            _responseMessage = isUpdate
                 ? 'Comment updated successfully!'
                 : 'Comment saved successfully!';
           });
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(_responseMessage)),
           );
-          
+
           // Refresh the POE data to show updated comment
           setState(() {
             _poeData = fetchPOE(widget.learnerId);
@@ -2858,10 +2877,12 @@ class _POETabState extends State<POETab> {
                   children: [
                     Text(responseData['message']),
                     const SizedBox(height: 8),
-                    const Text('Existing comment:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text('Existing comment:',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
                     Text(responseData['existing_comment'] ?? 'N/A'),
                     const SizedBox(height: 8),
-                    const Text('New comment:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text('New comment:',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
                     Text(comment),
                   ],
                 ),
@@ -2885,16 +2906,17 @@ class _POETabState extends State<POETab> {
             // Show more helpful error message
             String errorMessage = responseData['message'];
             String errorTitle = 'Error';
-            
+
             // Check if it's the "no marks" error
             if (errorMessage.contains('No marks records found')) {
               errorTitle = 'Marks Required';
-              errorMessage = 'Please submit marks for this assessment type before adding comments.\n\n'
+              errorMessage =
+                  'Please submit marks for this assessment type before adding comments.\n\n'
                   'Comments are linked to marks records. You need to:\n'
                   '1. Submit marks for at least one exercise\n'
                   '2. Then you can add comments';
             }
-            
+
             showDialog(
               context: context,
               builder: (context) => AlertDialog(
@@ -2947,8 +2969,8 @@ class _POETabState extends State<POETab> {
       }
 
       // Check if this exercise already has marks (for update vs insert)
-      bool hasExistingMarks = exercise['marks_scored'] != null && 
-                             exercise['marks_scored'].toString().isNotEmpty;
+      bool hasExistingMarks = exercise['marks_scored'] != null &&
+          exercise['marks_scored'].toString().isNotEmpty;
 
       final payload = {
         'learnerId': learnerId,
@@ -2958,7 +2980,8 @@ class _POETabState extends State<POETab> {
         'specific_outcome': specificOutcomeArray,
         'isUpdate': hasExistingMarks, // Tell backend this is an update
       };
-      print("Submitting payload (isUpdate: $hasExistingMarks): ${jsonEncode(payload)}");
+      print(
+          "Submitting payload (isUpdate: $hasExistingMarks): ${jsonEncode(payload)}");
 
       final response = await http.post(
         Uri.parse('https://rlms.rlms.co.za/mobile/save_marks.php'),
@@ -2968,14 +2991,14 @@ class _POETabState extends State<POETab> {
 
       if (response.statusCode == 200) {
         var responseData = jsonDecode(response.body);
-        
+
         String successMessage = 'Marks saved successfully!';
         if (responseData['action'] == 'update') {
           successMessage = 'Marks updated successfully!';
         } else if (responseData['action'] == 'insert') {
           successMessage = 'Marks saved successfully!';
         }
-        
+
         setState(() {
           _responseMessage = responseData['status'] == 'success'
               ? successMessage
@@ -2987,7 +3010,7 @@ class _POETabState extends State<POETab> {
             }
           }
         });
-        
+
         if (responseData['status'] == 'error') {
           // Check if it's a duplicate that can be updated
           if (responseData['can_update'] == true) {
@@ -3016,13 +3039,14 @@ class _POETabState extends State<POETab> {
                       // Retry with update flag
                       final updatePayload = Map<String, dynamic>.from(payload);
                       updatePayload['isUpdate'] = true;
-                      
+
                       final updateResponse = await http.post(
-                        Uri.parse('https://rlms.rlms.co.za/mobile/save_marks.php'),
+                        Uri.parse(
+                            'https://rlms.rlms.co.za/mobile/save_marks.php'),
                         headers: {'Content-Type': 'application/json'},
                         body: jsonEncode(updatePayload),
                       );
-                      
+
                       if (updateResponse.statusCode == 200) {
                         var updateData = jsonDecode(updateResponse.body);
                         setState(() {
@@ -3059,7 +3083,7 @@ class _POETabState extends State<POETab> {
       } else {
         setState(() {
           _responseMessage =
-          'Server error: ${response.statusCode} - ${response.body}';
+              'Server error: ${response.statusCode} - ${response.body}';
         });
       }
     } catch (e) {
@@ -3074,10 +3098,10 @@ class ExerciseTile extends StatefulWidget {
   final Map<String, dynamic> exercise;
   final String learnerId;
   final Future<void> Function({
-  required String learnerId,
-  required Map<String, dynamic> exercise,
-  required String marksScored,
-  required String specificOutcome,
+    required String learnerId,
+    required Map<String, dynamic> exercise,
+    required String marksScored,
+    required String specificOutcome,
   }) onSubmitMarks;
   final void Function(String) onResponseMessage;
 
@@ -3178,7 +3202,7 @@ class _ExerciseTileState extends State<ExerciseTile> {
         if (marksScored.isNotEmpty && !showInputField)
           Padding(
             padding:
-            const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Row(
               children: [
                 Expanded(
@@ -3211,7 +3235,7 @@ class _ExerciseTileState extends State<ExerciseTile> {
         if (showInputField)
           Padding(
             padding:
-            const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Column(
               children: [
                 TextFormField(
@@ -3260,17 +3284,21 @@ class _ExerciseTileState extends State<ExerciseTile> {
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: marksScored.isNotEmpty ? Colors.orange : Colors.green,
+                          backgroundColor: marksScored.isNotEmpty
+                              ? Colors.orange
+                              : Colors.green,
                           foregroundColor: Colors.white,
                         ),
-                        child: Text(marksScored.isNotEmpty ? 'Update' : 'Submit'),
+                        child:
+                            Text(marksScored.isNotEmpty ? 'Update' : 'Submit'),
                       ),
                     ),
                     const SizedBox(width: 8.0),
                     ElevatedButton(
                       onPressed: () {
                         setState(() {
-                          controller.text = marksScored; // Reset to original value
+                          controller.text =
+                              marksScored; // Reset to original value
                           showInputField = false;
                         });
                       },
@@ -3343,22 +3371,22 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         child: _isLoading
             ? const CircularProgressIndicator()
             : _error != null
-            ? Text(_error!)
-            : _localPath != null
-            ? PDFView(
-          filePath: _localPath!,
-          onError: (error) {
-            setState(() {
-              _error = 'Error loading PDF: $error';
-            });
-          },
-          onPageError: (page, error) {
-            setState(() {
-              _error = 'Error on page $page: $error';
-            });
-          },
-        )
-            : const Text('No PDF available'),
+                ? Text(_error!)
+                : _localPath != null
+                    ? PDFView(
+                        filePath: _localPath!,
+                        onError: (error) {
+                          setState(() {
+                            _error = 'Error loading PDF: $error';
+                          });
+                        },
+                        onPageError: (page, error) {
+                          setState(() {
+                            _error = 'Error on page $page: $error';
+                          });
+                        },
+                      )
+                    : const Text('No PDF available'),
       ),
     );
   }
@@ -3370,9 +3398,9 @@ Widget _buildAssessorFeedback({required String facilitatorId}) {
       final url = AppConfig.buildUrl('get_classes.php', queryParams: {
         'facilitator_id': facilitatorId,
       });
-      
+
       print('[AssessorFeedback] Fetching classes from: $url');
-      
+
       final response = await http.get(Uri.parse(url));
 
       print('[AssessorFeedback] Response Status: ${response.statusCode}');
@@ -3380,12 +3408,12 @@ Widget _buildAssessorFeedback({required String facilitatorId}) {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
+
         // Check if response is an error object
         if (data is Map && data['status'] == 'error') {
           throw Exception('Server error: ${data['message']}');
         }
-        
+
         // Return the data (should be a list)
         if (data is List) {
           return data;
@@ -3443,7 +3471,7 @@ Widget _buildAssessorFeedback({required String facilitatorId}) {
                       String classId = classData['classID'].toString();
                       String className = classData['className'] ?? 'Unknown';
                       String numberOfLearners =
-                      classData['numberOfLearners'].toString();
+                          classData['numberOfLearners'].toString();
                       String siteId = classData['siteID'].toString();
 
                       return DataRow(cells: [
@@ -3753,11 +3781,11 @@ class _AssessmentReviewPageState extends State<AssessmentReviewPage> {
                                       MaterialPageRoute(
                                         builder: (context) =>
                                             AssessmentReviewDetailPage(
-                                              unitStandardId:
+                                          unitStandardId:
                                               unitStandard['unitstandard_id']
                                                   .toString(),
-                                              facilitatorId: widget.facilitatorId,
-                                            ),
+                                          facilitatorId: widget.facilitatorId,
+                                        ),
                                       ),
                                     );
                                   },
@@ -3817,7 +3845,7 @@ class _AssessmentReviewDetailPageState
   final List<Map<String, dynamic>> _reviewDimensions = [
     {
       'description':
-      'The principles/criteria for good assessment were achieved.',
+          'The principles/criteria for good assessment were achieved.',
       'assessorAgree': false,
       'assessorDisagree': false,
       'learnerAgree': false,
@@ -3842,7 +3870,7 @@ class _AssessmentReviewDetailPageState
     },
     {
       'description':
-      'It was time efficient and cost-effective and did not interfere with my normal responsibilities.',
+          'It was time efficient and cost-effective and did not interfere with my normal responsibilities.',
       'assessorAgree': false,
       'assessorDisagree': false,
       'learnerAgree': false,
@@ -3851,7 +3879,7 @@ class _AssessmentReviewDetailPageState
     },
     {
       'description':
-      'The assessment instruments were fair, clear and understandable.',
+          'The assessment instruments were fair, clear and understandable.',
       'assessorAgree': false,
       'assessorDisagree': false,
       'learnerAgree': false,
@@ -3860,7 +3888,7 @@ class _AssessmentReviewDetailPageState
     },
     {
       'description':
-      'The assessment judgements were made against set requirements.',
+          'The assessment judgements were made against set requirements.',
       'assessorAgree': false,
       'assessorDisagree': false,
       'learnerAgree': false,
@@ -3877,7 +3905,7 @@ class _AssessmentReviewDetailPageState
     },
     {
       'description':
-      'Special needs were identified and assessment plan was adjusted.',
+          'Special needs were identified and assessment plan was adjusted.',
       'assessorAgree': false,
       'assessorDisagree': false,
       'learnerAgree': false,
@@ -4010,7 +4038,7 @@ class _AssessmentReviewDetailPageState
     try {
       // Fetch facilitator details
       var facilitatorDetails =
-      await _fetchFacilitatorDetails(widget.facilitatorId);
+          await _fetchFacilitatorDetails(widget.facilitatorId);
       String facilitatorFirstName = facilitatorDetails['firstName'];
       String facilitatorLastName = facilitatorDetails['lastName'];
       String classId = facilitatorDetails['classID'];
@@ -4021,7 +4049,7 @@ class _AssessmentReviewDetailPageState
       // Update the form fields
       setState(() {
         _assessorNameController.text =
-        '$facilitatorFirstName $facilitatorLastName';
+            '$facilitatorFirstName $facilitatorLastName';
         _venueController.text = className;
       });
     } catch (e) {
@@ -4066,13 +4094,13 @@ class _AssessmentReviewDetailPageState
           'review_date': _reviewDate?.toIso8601String().split('T')[0],
           'review_dimensions': _reviewDimensions
               .map((dim) => {
-            'description': dim['description'],
-            'assessor_agree': dim['assessorAgree'] ?? false,
-            'assessor_disagree': dim['assessorDisagree'] ?? false,
-            'learner_agree': dim['learnerAgree'] ?? false,
-            'learner_disagree': dim['learnerDisagree'] ?? false,
-            'action': dim['action'].text,
-          })
+                    'description': dim['description'],
+                    'assessor_agree': dim['assessorAgree'] ?? false,
+                    'assessor_disagree': dim['assessorDisagree'] ?? false,
+                    'learner_agree': dim['learnerAgree'] ?? false,
+                    'learner_disagree': dim['learnerDisagree'] ?? false,
+                    'action': dim['action'].text,
+                  })
               .toList(),
         };
 
@@ -4105,7 +4133,7 @@ class _AssessmentReviewDetailPageState
         } else {
           setState(() {
             _responseMessage =
-            'Server error: ${response.statusCode} - ${response.body}';
+                'Server error: ${response.statusCode} - ${response.body}';
             _isSubmitting = false;
           });
           ScaffoldMessenger.of(context).showSnackBar(
@@ -4258,7 +4286,7 @@ class _AssessmentReviewDetailPageState
                         ),
                         child: _isSubmitting
                             ? const CircularProgressIndicator(
-                            color: Colors.white)
+                                color: Colors.white)
                             : const Text('Save Review'),
                       ),
                     ],
@@ -4534,7 +4562,7 @@ class _AppealFormPageState extends State<AppealFormPage> {
                   padding: const EdgeInsets.all(8.0),
                   decoration: const BoxDecoration(
                     gradient:
-                    LinearGradient(colors: [Colors.blue, Colors.indigo]),
+                        LinearGradient(colors: [Colors.blue, Colors.indigo]),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.approval, color: Colors.white),
@@ -4542,7 +4570,7 @@ class _AppealFormPageState extends State<AppealFormPage> {
                 const SizedBox(width: 8),
                 const Text('Appeal Form',
                     style:
-                    TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                        TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 8),
@@ -4599,10 +4627,10 @@ class _AppealFormPageState extends State<AppealFormPage> {
                                       builder: (context) =>
                                           AppealFormDetailPage(
                                               unitStandardId: unitStandard[
-                                              'unitstandard_id']
+                                                      'unitstandard_id']
                                                   .toString(),
                                               facilitatorId:
-                                              widget.facilitatorId),
+                                                  widget.facilitatorId),
                                     ),
                                   );
                                 },
@@ -4650,26 +4678,26 @@ class _AppealFormDetailPageState extends State<AppealFormDetailPage> {
   DateTime? _assessmentDate;
   // Section B: Candidate Details
   final TextEditingController _candidateSurnameController =
-  TextEditingController();
+      TextEditingController();
   final TextEditingController _candidateNameController =
-  TextEditingController();
+      TextEditingController();
   final TextEditingController _candidateIdNumberController =
-  TextEditingController();
+      TextEditingController();
   final TextEditingController _reasonDisagreementController =
-  TextEditingController();
+      TextEditingController();
   final SignatureController _candidateSignatureController =
-  SignatureController(penStrokeWidth: 5, penColor: Colors.black);
+      SignatureController(penStrokeWidth: 5, penColor: Colors.black);
   DateTime? _candidateDate;
   // Section C: Assessor Details
   final TextEditingController _assessorSurnameController =
-  TextEditingController();
+      TextEditingController();
   final TextEditingController _assessorNameController = TextEditingController();
   final TextEditingController _assessorRegNumberController =
-  TextEditingController();
+      TextEditingController();
   final TextEditingController _reasonDecisionController =
-  TextEditingController();
+      TextEditingController();
   final SignatureController _assessorSignatureController =
-  SignatureController(penStrokeWidth: 5, penColor: Colors.black);
+      SignatureController(penStrokeWidth: 5, penColor: Colors.black);
   DateTime? _assessorDate;
 
   String _responseMessage = '';
@@ -4731,7 +4759,7 @@ class _AppealFormDetailPageState extends State<AppealFormDetailPage> {
           children: [
             pw.Text('A. Detail of Appeal',
                 style:
-                pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                    pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
             pw.Text('Title: ${_titleController.text}'),
             pw.Text('NQF Level: ${_nqfLevelController.text}'),
             pw.Text('Number: ${_numberController.text}'),
@@ -4741,7 +4769,7 @@ class _AppealFormDetailPageState extends State<AppealFormDetailPage> {
             pw.SizedBox(height: 20),
             pw.Text('B. Candidate Details',
                 style:
-                pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                    pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
             pw.Text('Surname: ${_candidateSurnameController.text}'),
             pw.Text('Name: ${_candidateNameController.text}'),
             pw.Text('ID Number: ${_candidateIdNumberController.text}'),
@@ -4751,14 +4779,14 @@ class _AppealFormDetailPageState extends State<AppealFormDetailPage> {
                 style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
             _candidateSignature != null
                 ? pw.Image(pw.MemoryImage(_candidateSignature!),
-                width: 100, height: 50)
+                    width: 100, height: 50)
                 : pw.Text('No signature provided'),
             pw.Text(
                 'Date: ${_candidateDate?.toIso8601String().split('T')[0] ?? ''}'),
             pw.SizedBox(height: 20),
             pw.Text('C. Assessor Details',
                 style:
-                pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                    pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
             pw.Text('Surname: ${_assessorSurnameController.text}'),
             pw.Text('Name: ${_assessorNameController.text}'),
             pw.Text('Reg Number: ${_assessorRegNumberController.text}'),
@@ -4767,7 +4795,7 @@ class _AppealFormDetailPageState extends State<AppealFormDetailPage> {
                 style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
             _assessorSignature != null
                 ? pw.Image(pw.MemoryImage(_assessorSignature!),
-                width: 100, height: 50)
+                    width: 100, height: 50)
                 : pw.Text('No signature provided'),
             pw.Text(
                 'Date: ${_assessorDate?.toIso8601String().split('T')[0] ?? ''}'),
@@ -4778,7 +4806,7 @@ class _AppealFormDetailPageState extends State<AppealFormDetailPage> {
 
     final directory = await getTemporaryDirectory();
     final file =
-    File('${directory.path}/appeal_form_${widget.unitStandardId}.pdf');
+        File('${directory.path}/appeal_form_${widget.unitStandardId}.pdf');
     await file.writeAsBytes(await pdf.save());
 
     setState(() {
@@ -4805,7 +4833,7 @@ class _AppealFormDetailPageState extends State<AppealFormDetailPage> {
             'number': _numberController.text,
             'credits': _creditsController.text,
             'assessment_date':
-            _assessmentDate?.toIso8601String().split('T')[0] ?? '',
+                _assessmentDate?.toIso8601String().split('T')[0] ?? '',
           },
           'candidate_details': {
             'surname': _candidateSurnameController.text,
@@ -4814,8 +4842,8 @@ class _AppealFormDetailPageState extends State<AppealFormDetailPage> {
             'reason_disagreement': _reasonDisagreementController.text,
             'signature': _candidateSignatureController.isNotEmpty
                 ? base64Encode(
-                await _candidateSignatureController.toPngBytes() ??
-                    Uint8List(0))
+                    await _candidateSignatureController.toPngBytes() ??
+                        Uint8List(0))
                 : '',
             'date': _candidateDate?.toIso8601String().split('T')[0] ?? '',
           },
@@ -4826,8 +4854,8 @@ class _AppealFormDetailPageState extends State<AppealFormDetailPage> {
             'reason_decision': _reasonDecisionController.text,
             'signature': _assessorSignatureController.isNotEmpty
                 ? base64Encode(
-                await _assessorSignatureController.toPngBytes() ??
-                    Uint8List(0))
+                    await _assessorSignatureController.toPngBytes() ??
+                        Uint8List(0))
                 : '',
             'date': _assessorDate?.toIso8601String().split('T')[0] ?? '',
           },
@@ -4856,7 +4884,7 @@ class _AppealFormDetailPageState extends State<AppealFormDetailPage> {
           } catch (e) {
             setState(() {
               _responseMessage =
-              'Failed to parse server response: $e\nRaw response: ${response.body}';
+                  'Failed to parse server response: $e\nRaw response: ${response.body}';
               _isSubmitting = false;
             });
           }
@@ -4865,7 +4893,7 @@ class _AppealFormDetailPageState extends State<AppealFormDetailPage> {
         } else {
           setState(() {
             _responseMessage =
-            'Server error: ${response.statusCode} - ${response.body}';
+                'Server error: ${response.statusCode} - ${response.body}';
             _isSubmitting = false;
           });
           ScaffoldMessenger.of(context)
@@ -5052,25 +5080,25 @@ class _NonComplianceAndFeedbackPageState
     extends State<NonComplianceAndFeedbackPage> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _candidateNameController =
-  TextEditingController();
+      TextEditingController();
   final TextEditingController _idNumberController = TextEditingController();
   final TextEditingController _unitStandardController = TextEditingController();
   final TextEditingController _attemptController = TextEditingController();
   final TextEditingController _specificOutcomeController =
-  TextEditingController();
+      TextEditingController();
   final TextEditingController _actionController = TextEditingController();
   final TextEditingController _usTitleController = TextEditingController();
   final TextEditingController _assessmentDateController =
-  TextEditingController();
+      TextEditingController();
   final TextEditingController _assessmentTimeController =
-  TextEditingController();
+      TextEditingController();
   final TextEditingController _numberOfAttemptsController =
-  TextEditingController();
+      TextEditingController();
   final TextEditingController _assessorFeedbackController =
-  TextEditingController();
+      TextEditingController();
 
   final SignatureController _candidateSignatureController =
-  SignatureController(penStrokeWidth: 5, penColor: Colors.black);
+      SignatureController(penStrokeWidth: 5, penColor: Colors.black);
   String _responseMessage = '';
   bool _isSubmitting = false;
   Uint8List? _candidateSignature;
@@ -5102,7 +5130,7 @@ class _NonComplianceAndFeedbackPageState
     if (picked != null) {
       setState(() {
         _assessmentDateController.text =
-        "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+            "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
       });
     }
   }
@@ -5115,7 +5143,7 @@ class _NonComplianceAndFeedbackPageState
     if (picked != null) {
       setState(() {
         _assessmentTimeController.text =
-        "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}:00";
+            "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}:00";
       });
     }
   }
@@ -5134,7 +5162,7 @@ class _NonComplianceAndFeedbackPageState
           children: [
             pw.Text('NON-COMPLIANCE & ACTION PLAN',
                 style:
-                pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                    pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 10),
             pw.Text('Candidate: ${_candidateNameController.text}'),
             pw.Text('I.D No.: ${_idNumberController.text}'),
@@ -5145,13 +5173,13 @@ class _NonComplianceAndFeedbackPageState
                 style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
             _candidateSignature != null
                 ? pw.Image(pw.MemoryImage(_candidateSignature!),
-                width: 100, height: 50)
+                    width: 100, height: 50)
                 : pw.Text('No signature provided'),
             pw.Text('Date: ${DateTime.now().toString().split(' ')[0]}'),
             pw.SizedBox(height: 20),
             pw.Text('LEARNING DEVELOPMENT',
                 style:
-                pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                    pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
             pw.Text('Specific Outcome No.: ${_specificOutcomeController.text}'),
             pw.SizedBox(height: 10),
             pw.Text('Action to be taken:'),
@@ -5159,7 +5187,7 @@ class _NonComplianceAndFeedbackPageState
             pw.SizedBox(height: 30),
             pw.Text('ASSESSMENT FEEDBACK',
                 style:
-                pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                    pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 10),
             pw.Text('U.S TITLE: ${_usTitleController.text}'),
             pw.Text('LEARNER NAME: ${_candidateNameController.text}'),
@@ -5203,7 +5231,7 @@ class _NonComplianceAndFeedbackPageState
     } catch (e) {
       setState(() {
         _responseMessage =
-        'Error: Attempt and Number of Attempts must be integers';
+            'Error: Attempt and Number of Attempts must be integers';
         _isSubmitting = false;
       });
       return;
@@ -5264,14 +5292,14 @@ class _NonComplianceAndFeedbackPageState
         } catch (e) {
           setState(() {
             _responseMessage =
-            'Error decoding response: $e\nResponse: ${response.body.isNotEmpty ? response.body.substring(0, response.body.length < 100 ? response.body.length : 100) : "Empty response"}';
+                'Error decoding response: $e\nResponse: ${response.body.isNotEmpty ? response.body.substring(0, response.body.length < 100 ? response.body.length : 100) : "Empty response"}';
             _isSubmitting = false;
           });
         }
       } else {
         setState(() {
           _responseMessage =
-          'Server error: ${response.statusCode}\nResponse: ${response.body.isNotEmpty ? response.body.substring(0, response.body.length < 100 ? response.body.length : 100) : "Empty response"}';
+              'Server error: ${response.statusCode}\nResponse: ${response.body.isNotEmpty ? response.body.substring(0, response.body.length < 100 ? response.body.length : 100) : "Empty response"}';
           _isSubmitting = false;
         });
       }
@@ -5347,7 +5375,7 @@ class _NonComplianceAndFeedbackPageState
                   padding: const EdgeInsets.all(8.0),
                   decoration: const BoxDecoration(
                     gradient:
-                    LinearGradient(colors: [Colors.blue, Colors.indigo]),
+                        LinearGradient(colors: [Colors.blue, Colors.indigo]),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.feedback, color: Colors.white),
@@ -5483,7 +5511,7 @@ class _NonComplianceAndFeedbackPageState
                             ),
                             child: _isSubmitting
                                 ? const CircularProgressIndicator(
-                                color: Colors.white)
+                                    color: Colors.white)
                                 : const Text('Save & Generate PDF'),
                           ),
                         ],
@@ -5546,25 +5574,26 @@ class _PotholeChecklistClassListPageState
     final url = AppConfig.buildUrl('get_classes.php', queryParams: {
       'facilitator_id': facilitatorId,
     });
-    
+
     print('[PotholeChecklistClassList] Fetching classes from: $url');
-    
+
     final response = await http.get(
       Uri.parse(url),
       headers: {'Content-Type': 'application/json'},
     );
 
-    print('[PotholeChecklistClassList] Response Status: ${response.statusCode}');
+    print(
+        '[PotholeChecklistClassList] Response Status: ${response.statusCode}');
     print('[PotholeChecklistClassList] Response Body: ${response.body}');
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      
+
       // Check if response is an error object
       if (data is Map && data['status'] == 'error') {
         throw Exception('Server error: ${data['message']}');
       }
-      
+
       // Return the data (should be a list)
       if (data is List) {
         return data;
@@ -5628,10 +5657,10 @@ class _PotholeChecklistClassListPageState
                           MaterialPageRoute(
                             builder: (context) =>
                                 PotholeChecklistLearnerListPage(
-                                  facilitatorId: widget.facilitatorId,
-                                  classId: classId,
-                                  className: className,
-                                ),
+                              facilitatorId: widget.facilitatorId,
+                              classId: classId,
+                              className: className,
+                            ),
                           ),
                         );
                       },
@@ -5660,25 +5689,26 @@ class _PotholeChecklistLearnerListPageState
     final url = AppConfig.buildUrl('get_learners.php', queryParams: {
       'classID': classId,
     });
-    
+
     print('[PotholeChecklistLearnerList] Fetching learners from: $url');
-    
+
     final response = await http.get(
       Uri.parse(url),
       headers: {'Content-Type': 'application/json'},
     );
 
-    print('[PotholeChecklistLearnerList] Response Status: ${response.statusCode}');
+    print(
+        '[PotholeChecklistLearnerList] Response Status: ${response.statusCode}');
     print('[PotholeChecklistLearnerList] Response Body: ${response.body}');
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      
+
       // Check if response is an error object
       if (data is Map && data['status'] == 'error') {
         throw Exception('Server error: ${data['message']}');
       }
-      
+
       // Return the data (should be a list)
       if (data is List) {
         return data;
@@ -5705,7 +5735,8 @@ class _PotholeChecklistLearnerListPageState
       // View existing checklist
       if (checklistType == 'scanned') {
         // View scanned document
-        final documentPath = checklistData?['data']?['document_path'] as String?;
+        final documentPath =
+            checklistData?['data']?['document_path'] as String?;
         if (documentPath != null) {
           await _viewScannedDocument(context, documentPath);
         } else {
@@ -5713,16 +5744,19 @@ class _PotholeChecklistLearnerListPageState
         }
       } else if (checklistType == 'system') {
         // View system checklist
-        await _viewSystemChecklist(context, learnerId, firstName, lastName, idNumber);
+        await _viewSystemChecklist(
+            context, learnerId, firstName, lastName, idNumber);
       }
     } else {
       // No checklist exists - show creation options
-      await _showChecklistCreationDialog(context, learnerId, firstName, lastName, idNumber);
+      await _showChecklistCreationDialog(
+          context, learnerId, firstName, lastName, idNumber);
     }
   }
 
   /// View scanned document
-  Future<void> _viewScannedDocument(BuildContext context, String documentPath) async {
+  Future<void> _viewScannedDocument(
+      BuildContext context, String documentPath) async {
     try {
       final file = File(documentPath);
       if (await file.exists()) {
@@ -5792,7 +5826,8 @@ class _PotholeChecklistLearnerListPageState
           ElevatedButton.icon(
             onPressed: () {
               Navigator.pop(dialogContext);
-              _openChecklistForm(context, learnerId, firstName, lastName, idNumber);
+              _openChecklistForm(
+                  context, learnerId, firstName, lastName, idNumber);
             },
             icon: const Icon(Icons.edit),
             label: const Text('Fill Form'),
@@ -5815,17 +5850,17 @@ class _PotholeChecklistLearnerListPageState
   ) async {
     try {
       final docScanner = FlutterDocScanner();
-      
+
       // Open document scanner
       final scannedDoc = await docScanner.getScanDocuments();
-      
+
       if (scannedDoc != null) {
         // Prepare permanent storage location BEFORE processing
         final appDir = await getApplicationDocumentsDirectory();
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         final fileName = 'pothole_checklist_${learnerId}_$timestamp.pdf';
         final permanentPath = '${appDir.path}/$fileName';
-        
+
         // Extract path from scanner result
         String? scannedPath;
         if (scannedDoc is String) {
@@ -5833,21 +5868,21 @@ class _PotholeChecklistLearnerListPageState
         } else if (scannedDoc is List && scannedDoc.isNotEmpty) {
           scannedPath = scannedDoc.first.toString();
         } else if (scannedDoc is Map) {
-          scannedPath = scannedDoc['path']?.toString() ?? 
-                       scannedDoc['scannedPath']?.toString() ??
-                       scannedDoc.values.first?.toString();
+          scannedPath = scannedDoc['path']?.toString() ??
+              scannedDoc['scannedPath']?.toString() ??
+              scannedDoc.values.first?.toString();
         }
-        
+
         if (scannedPath != null && scannedPath.isNotEmpty) {
           // Remove file:// prefix if present
           if (scannedPath.startsWith('file://')) {
             scannedPath = scannedPath.substring(7);
           }
-          
+
           try {
             // CRITICAL: Read file SYNCHRONOUSLY and IMMEDIATELY
             final sourceFile = File(scannedPath);
-            
+
             // Use synchronous read to get bytes before file is deleted
             Uint8List? bytes;
             try {
@@ -5858,16 +5893,17 @@ class _PotholeChecklistLearnerListPageState
                 bytes = await sourceFile.readAsBytes();
               }
             }
-            
+
             if (bytes != null && bytes.isNotEmpty) {
               // Write to permanent location synchronously
               final permanentFile = File(permanentPath);
               permanentFile.writeAsBytesSync(bytes);
-              
+
               // Verify file was saved
               if (permanentFile.existsSync()) {
                 // Save to database
-                final assessmentDate = DateTime.now().toIso8601String().split('T').first;
+                final assessmentDate =
+                    DateTime.now().toIso8601String().split('T').first;
                 final dbHelper = DatabaseHelper();
                 await dbHelper.saveScannedPotholeChecklist(
                   learnerId: learnerId,
@@ -5875,19 +5911,21 @@ class _PotholeChecklistLearnerListPageState
                   documentPath: permanentPath,
                   assessmentDate: assessmentDate,
                 );
-                
+
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Checklist scanned for $firstName $lastName'),
+                      content:
+                          Text('Checklist scanned for $firstName $lastName'),
                       backgroundColor: Colors.green,
                       duration: const Duration(seconds: 3),
                     ),
                   );
-                  
+
                   // Sync to server if online (in background)
-                  _syncScannedDocument(permanentPath, learnerId, assessmentDate);
-                  
+                  _syncScannedDocument(
+                      permanentPath, learnerId, assessmentDate);
+
                   // Refresh the page to update button
                   setState(() {});
                 }
@@ -5921,40 +5959,42 @@ class _PotholeChecklistLearnerListPageState
   }
 
   /// Sync scanned document to server
-  Future<void> _syncScannedDocument(String documentPath, String learnerId, String assessmentDate) async {
+  Future<void> _syncScannedDocument(
+      String documentPath, String learnerId, String assessmentDate) async {
     try {
       print('[SYNC] Starting sync for learner: $learnerId');
       print('[SYNC] Document path: $documentPath');
       print('[SYNC] Assessment date: $assessmentDate');
-      
+
       final file = File(documentPath);
       if (!await file.exists()) {
         print('[SYNC] ERROR: File does not exist at path');
         return;
       }
-      
+
       print('[SYNC] File exists, size: ${await file.length()} bytes');
-      
+
       final url = '${AppConfig.baseUrl}/upload_scanned_pothole_checklist.php';
       print('[SYNC] Uploading to: $url');
-      
+
       final request = http.MultipartRequest('POST', Uri.parse(url));
-      
+
       request.fields['learner_id'] = learnerId;
       request.fields['assessor_id'] = widget.facilitatorId ?? '';
       request.fields['assessment_date'] = assessmentDate;
-      
+
       print('[SYNC] Adding file to request...');
       request.files.add(await http.MultipartFile.fromPath(
         'document',
         documentPath,
       ));
-      
+
       print('[SYNC] Sending request...');
-      final response = await request.send().timeout(const Duration(seconds: 30));
-      
+      final response =
+          await request.send().timeout(const Duration(seconds: 30));
+
       print('[SYNC] Response status: ${response.statusCode}');
-      
+
       if (response.statusCode == 200) {
         final responseBody = await response.stream.bytesToString();
         print('[SYNC] Response body: $responseBody');
@@ -6004,10 +6044,11 @@ class _PotholeChecklistLearnerListPageState
   }
 
   /// Check if pothole checklist exists for a learner
-  Future<Map<String, dynamic>> _checkPotholeChecklistStatus(String learnerId) async {
+  Future<Map<String, dynamic>> _checkPotholeChecklistStatus(
+      String learnerId) async {
     try {
       final assessmentDate = DateTime.now().toIso8601String().split('T').first;
-      
+
       // Check local database for scanned document
       final dbHelper = DatabaseHelper();
       final scannedDoc = await dbHelper.getScannedPotholeChecklist(
@@ -6015,7 +6056,7 @@ class _PotholeChecklistLearnerListPageState
         assessorId: widget.facilitatorId ?? '',
         assessmentDate: assessmentDate,
       );
-      
+
       if (scannedDoc != null) {
         return {
           'exists': true,
@@ -6023,13 +6064,14 @@ class _PotholeChecklistLearnerListPageState
           'data': scannedDoc,
         };
       }
-      
+
       // Check server for system-generated checklist
       try {
-        final response = await http.get(Uri.parse(
-          '${AppConfig.baseUrl}/view_pothole_checklists.php?learner_id=$learnerId&assessor_id=${widget.facilitatorId}&assessment_date=$assessmentDate'
-        )).timeout(const Duration(seconds: 5));
-        
+        final response = await http
+            .get(Uri.parse(
+                '${AppConfig.baseUrl}/view_pothole_checklists.php?learner_id=$learnerId&assessor_id=${widget.facilitatorId}&assessment_date=$assessmentDate'))
+            .timeout(const Duration(seconds: 5));
+
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           if (data['status'] == 'success' && data['data'] != null) {
@@ -6044,7 +6086,7 @@ class _PotholeChecklistLearnerListPageState
         // Offline or server error - just return no checklist
         print('Server check failed: $e');
       }
-      
+
       return {
         'exists': false,
         'type': 'none',
@@ -6067,11 +6109,11 @@ class _PotholeChecklistLearnerListPageState
     String lastName,
   ) async {
     final ImagePicker imagePicker = ImagePicker();
-    
+
     try {
       // Pick multiple images
       final List<XFile> images = await imagePicker.pickMultiImage();
-      
+
       if (images.isEmpty) {
         return;
       }
@@ -6095,7 +6137,8 @@ class _PotholeChecklistLearnerListPageState
       // Add form fields
       request.fields['learnerID'] = learnerId;
       request.fields['assessorID'] = widget.facilitatorId;
-      request.fields['assessmentDate'] = DateTime.now().toIso8601String().split('T').first;
+      request.fields['assessmentDate'] =
+          DateTime.now().toIso8601String().split('T').first;
 
       // Add image files - each with array notation
       for (int i = 0; i < images.length; i++) {
@@ -6112,18 +6155,19 @@ class _PotholeChecklistLearnerListPageState
       print('Sending ${images.length} images for learner $learnerId');
       print('Request fields: ${request.fields}');
       print('Request files count: ${request.files.length}');
-      
+
       var response = await request.send();
       var responseData = await response.stream.bytesToString();
-      
+
       print('Response status: ${response.statusCode}');
       print('Response data: $responseData');
-      
+
       // Check for non-200 status
       if (response.statusCode != 200) {
-        throw Exception('Server returned status ${response.statusCode}: $responseData');
+        throw Exception(
+            'Server returned status ${response.statusCode}: $responseData');
       }
-      
+
       // Try to parse JSON response
       dynamic jsonResponse;
       try {
@@ -6138,17 +6182,19 @@ class _PotholeChecklistLearnerListPageState
 
       if (jsonResponse['status'] == 'success') {
         // Show detailed success message with debug info
-        String successMsg = '${jsonResponse['success_count']} image(s) uploaded for $firstName $lastName';
-        
+        String successMsg =
+            '${jsonResponse['success_count']} image(s) uploaded for $firstName $lastName';
+
         // Add debug info if available
         if (jsonResponse['uploaded_files'] != null) {
           print('Uploaded files: ${jsonResponse['uploaded_files']}');
         }
-        if (jsonResponse['errors'] != null && (jsonResponse['errors'] as List).isNotEmpty) {
+        if (jsonResponse['errors'] != null &&
+            (jsonResponse['errors'] as List).isNotEmpty) {
           print('Partial errors: ${jsonResponse['errors']}');
           successMsg += '\n(Some files had errors - check console)';
         }
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(successMsg),
@@ -6159,8 +6205,9 @@ class _PotholeChecklistLearnerListPageState
       } else {
         // Show detailed error message
         String errorMsg = jsonResponse['message'] ?? 'Upload failed';
-        if (jsonResponse['errors'] != null && jsonResponse['errors'].isNotEmpty) {
-          errorMsg += '\n' + (jsonResponse['errors'] as List).join('\n');
+        if (jsonResponse['errors'] != null &&
+            jsonResponse['errors'].isNotEmpty) {
+          errorMsg += '\n${(jsonResponse['errors'] as List).join('\n')}';
         }
         if (jsonResponse['debug'] != null) {
           print('Debug info: ${jsonResponse['debug']}');
@@ -6172,9 +6219,9 @@ class _PotholeChecklistLearnerListPageState
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
-      
+
       print('Upload error: $e');
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error uploading images: $e'),
@@ -6237,25 +6284,28 @@ class _PotholeChecklistLearnerListPageState
                             future: _checkPotholeChecklistStatus(learnerId),
                             builder: (context, snapshot) {
                               // Default state while loading
-                              if (snapshot.connectionState == ConnectionState.waiting) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
                                 return ElevatedButton(
                                   onPressed: null,
                                   child: const SizedBox(
                                     width: 16,
                                     height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
                                   ),
                                 );
                               }
 
                               // Determine button properties based on checklist status
-                              final checklistExists = snapshot.data?['exists'] == true;
+                              final checklistExists =
+                                  snapshot.data?['exists'] == true;
                               final checklistType = snapshot.data?['type'];
-                              
+
                               String buttonLabel;
                               Color buttonColor;
                               IconData buttonIcon;
-                              
+
                               if (checklistExists) {
                                 if (checklistType == 'scanned') {
                                   buttonLabel = 'View Scanned';
@@ -6290,7 +6340,8 @@ class _PotholeChecklistLearnerListPageState
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: buttonColor,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
                                 ),
                               );
                             },
@@ -6327,7 +6378,6 @@ class _PotholeChecklistLearnerListPageState
   }
 }
 
-
 // Pothole Checklist View Page for Marking
 class PotholeChecklistViewPage extends StatefulWidget {
   final Map<String, dynamic> checklistData;
@@ -6340,7 +6390,8 @@ class PotholeChecklistViewPage extends StatefulWidget {
   });
 
   @override
-  State<PotholeChecklistViewPage> createState() => _PotholeChecklistViewPageState();
+  State<PotholeChecklistViewPage> createState() =>
+      _PotholeChecklistViewPageState();
 }
 
 class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
@@ -6348,12 +6399,12 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
   final TextEditingController _commentsController = TextEditingController();
   bool _isLoading = false;
   bool _isSaving = false;
-  
+
   // LogBook unit standards
   List<Map<String, dynamic>> _logbookUnitStandards = [];
-  Map<String, TextEditingController> _logbookMarksControllers = {};
+  final Map<String, TextEditingController> _logbookMarksControllers = {};
   bool _isLoadingLogbook = false;
-  
+
   // Pothole evidence images
   List<Map<String, dynamic>> _potholeImages = [];
   bool _isLoadingImages = false;
@@ -6365,24 +6416,26 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
     _loadLogbookUnitStandards();
     _loadPotholeImages();
   }
-  
+
   Future<void> _loadPotholeImages() async {
     setState(() => _isLoadingImages = true);
-    
+
     try {
-      final url = '${AppConfig.baseUrl}/get_pothole_images.php?learner_id=${widget.learnerId}';
+      final url =
+          '${AppConfig.baseUrl}/get_pothole_images.php?learner_id=${widget.learnerId}';
       print('DEBUG Images: Loading from $url');
-      
+
       final response = await http.get(Uri.parse(url));
-      
+
       print('DEBUG Images: Response status ${response.statusCode}');
       print('DEBUG Images: Response body ${response.body}');
-      
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == 'success') {
           setState(() {
-            _potholeImages = List<Map<String, dynamic>>.from(data['data'] ?? []);
+            _potholeImages =
+                List<Map<String, dynamic>>.from(data['data'] ?? []);
           });
           print('DEBUG Images: Loaded ${_potholeImages.length} images');
         } else {
@@ -6398,15 +6451,15 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
 
   Future<void> _loadExistingMarks() async {
     setState(() => _isLoading = true);
-    
+
     try {
-      final assessmentDate = widget.checklistData['assessment_date'] ?? DateTime.now().toIso8601String().split('T').first;
+      final assessmentDate = widget.checklistData['assessment_date'] ??
+          DateTime.now().toIso8601String().split('T').first;
       final assessorId = widget.checklistData['assessor_id'] ?? '';
-      
+
       final response = await http.get(Uri.parse(
-        '${AppConfig.baseUrl}/get_pothole_checklist_marks.php?learner_id=${widget.learnerId}&assessor_id=$assessorId&assessment_date=$assessmentDate'
-      ));
-      
+          '${AppConfig.baseUrl}/get_pothole_checklist_marks.php?learner_id=${widget.learnerId}&assessor_id=$assessorId&assessment_date=$assessmentDate'));
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == 'success' && data['data'] != null) {
@@ -6425,28 +6478,30 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
 
   Future<void> _loadLogbookUnitStandards() async {
     setState(() => _isLoadingLogbook = true);
-    
+
     try {
       final response = await http.get(Uri.parse(
-        '${AppConfig.baseUrl}/get_logbook_unit_standards.php?learner_id=${widget.learnerId}'
-      ));
-      
+          '${AppConfig.baseUrl}/get_logbook_unit_standards.php?learner_id=${widget.learnerId}'));
+
       print('DEBUG LogBook: Response status ${response.statusCode}');
       print('DEBUG LogBook: Response body ${response.body}');
-      
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == 'success') {
           setState(() {
-            _logbookUnitStandards = List<Map<String, dynamic>>.from(data['data']);
-            
+            _logbookUnitStandards =
+                List<Map<String, dynamic>>.from(data['data']);
+
             // Create controllers for each unit standard
             for (var us in _logbookUnitStandards) {
-              _logbookMarksControllers[us['unit_standard_id']] = TextEditingController();
+              _logbookMarksControllers[us['unit_standard_id']] =
+                  TextEditingController();
             }
           });
-          
-          print('DEBUG LogBook: Loaded ${_logbookUnitStandards.length} unit standards');
+
+          print(
+              'DEBUG LogBook: Loaded ${_logbookUnitStandards.length} unit standards');
           await _loadLogbookMarks();
         }
       }
@@ -6459,22 +6514,23 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
 
   Future<void> _loadLogbookMarks() async {
     try {
-      final assessmentDate = widget.checklistData['assessment_date'] ?? DateTime.now().toIso8601String().split('T').first;
+      final assessmentDate = widget.checklistData['assessment_date'] ??
+          DateTime.now().toIso8601String().split('T').first;
       final assessorId = widget.checklistData['assessor_id'] ?? '';
-      
+
       final response = await http.get(Uri.parse(
-        '${AppConfig.baseUrl}/get_logbook_marks.php?learner_id=${widget.learnerId}&assessor_id=$assessorId&assessment_date=$assessmentDate'
-      ));
-      
+          '${AppConfig.baseUrl}/get_logbook_marks.php?learner_id=${widget.learnerId}&assessor_id=$assessorId&assessment_date=$assessmentDate'));
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == 'success') {
           final marks = data['data'] as Map<String, dynamic>;
-          
+
           setState(() {
             marks.forEach((unitStandardId, mark) {
               if (_logbookMarksControllers.containsKey(unitStandardId)) {
-                _logbookMarksControllers[unitStandardId]!.text = mark.toString();
+                _logbookMarksControllers[unitStandardId]!.text =
+                    mark.toString();
               }
             });
           });
@@ -6488,12 +6544,12 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
   Future<void> _saveLogbookMarks() async {
     // Validate all marks
     Map<String, int> marksToSave = {};
-    
+
     for (var us in _logbookUnitStandards) {
       final unitStandardId = us['unit_standard_id'];
       final controller = _logbookMarksControllers[unitStandardId];
       final markText = controller?.text.trim() ?? '';
-      
+
       if (markText.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -6503,25 +6559,27 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
         );
         return;
       }
-      
+
       final mark = int.tryParse(markText);
       if (mark == null || mark < 0 || mark > 50) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Mark for ${us['unit_standard_name']} must be between 0 and 50'),
+            content: Text(
+                'Mark for ${us['unit_standard_name']} must be between 0 and 50'),
             backgroundColor: Colors.red,
           ),
         );
         return;
       }
-      
+
       marksToSave[unitStandardId] = mark;
     }
 
     setState(() => _isSaving = true);
 
     try {
-      final assessmentDate = widget.checklistData['assessment_date'] ?? DateTime.now().toIso8601String().split('T').first;
+      final assessmentDate = widget.checklistData['assessment_date'] ??
+          DateTime.now().toIso8601String().split('T').first;
       final assessorId = widget.checklistData['assessor_id'] ?? '';
 
       final response = await http.post(
@@ -6539,7 +6597,9 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
         final data = jsonDecode(response.body);
         if (data['status'] == 'success') {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('LogBook marks saved successfully!'), backgroundColor: Colors.green),
+            const SnackBar(
+                content: Text('LogBook marks saved successfully!'),
+                backgroundColor: Colors.green),
           );
         } else {
           throw Exception(data['message']);
@@ -6549,7 +6609,9 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving LogBook marks: $e'), backgroundColor: Colors.red),
+        SnackBar(
+            content: Text('Error saving LogBook marks: $e'),
+            backgroundColor: Colors.red),
       );
     } finally {
       setState(() => _isSaving = false);
@@ -6559,7 +6621,8 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
   Future<void> _saveMarks() async {
     if (_marksController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter marks'), backgroundColor: Colors.red),
+        const SnackBar(
+            content: Text('Please enter marks'), backgroundColor: Colors.red),
       );
       return;
     }
@@ -6567,7 +6630,9 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
     final marks = int.tryParse(_marksController.text.trim());
     if (marks == null || marks < 0 || marks > 100) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Marks must be between 0 and 100'), backgroundColor: Colors.red),
+        const SnackBar(
+            content: Text('Marks must be between 0 and 100'),
+            backgroundColor: Colors.red),
       );
       return;
     }
@@ -6575,7 +6640,8 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
     setState(() => _isSaving = true);
 
     try {
-      final assessmentDate = widget.checklistData['assessment_date'] ?? DateTime.now().toIso8601String().split('T').first;
+      final assessmentDate = widget.checklistData['assessment_date'] ??
+          DateTime.now().toIso8601String().split('T').first;
       final assessorId = widget.checklistData['assessor_id'] ?? '';
 
       final response = await http.post(
@@ -6594,7 +6660,9 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
         final data = jsonDecode(response.body);
         if (data['status'] == 'success') {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Marks saved successfully!'), backgroundColor: Colors.green),
+            const SnackBar(
+                content: Text('Marks saved successfully!'),
+                backgroundColor: Colors.green),
           );
           Navigator.pop(context); // Go back after saving
         } else {
@@ -6605,7 +6673,9 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving marks: $e'), backgroundColor: Colors.red),
+        SnackBar(
+            content: Text('Error saving marks: $e'),
+            backgroundColor: Colors.red),
       );
     } finally {
       setState(() => _isSaving = false);
@@ -6615,11 +6685,15 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
   @override
   Widget build(BuildContext context) {
     print('DEBUG ViewPage: checklistData keys: ${widget.checklistData.keys}');
-    print('DEBUG ViewPage: learner_name: ${widget.checklistData['learner_name']}');
-    print('DEBUG ViewPage: checklist_items type: ${widget.checklistData['checklist_items'].runtimeType}');
-    print('DEBUG ViewPage: checklist_items: ${widget.checklistData['checklist_items']}');
-    
-    final items = widget.checklistData['checklist_items'] as Map<String, dynamic>? ?? {};
+    print(
+        'DEBUG ViewPage: learner_name: ${widget.checklistData['learner_name']}');
+    print(
+        'DEBUG ViewPage: checklist_items type: ${widget.checklistData['checklist_items'].runtimeType}');
+    print(
+        'DEBUG ViewPage: checklist_items: ${widget.checklistData['checklist_items']}');
+
+    final items =
+        widget.checklistData['checklist_items'] as Map<String, dynamic>? ?? {};
     print('DEBUG ViewPage: items count: ${items.length}');
 
     return Scaffold(
@@ -6645,14 +6719,24 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                         children: [
                           const Text(
                             'Learner Information',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+                            style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue),
                           ),
                           const SizedBox(height: 12),
-                          _buildInfoRow('Learner', widget.checklistData['learner_name'] ?? 'N/A'),
-                          _buildInfoRow('ID Number', widget.checklistData['learner_id_number'] ?? 'N/A'),
-                          _buildInfoRow('Assessor', widget.checklistData['assessor_name'] ?? 'N/A'),
-                          _buildInfoRow('Venue', widget.checklistData['venue'] ?? 'N/A'),
-                          _buildInfoRow('Date', widget.checklistData['assessment_date'] ?? 'N/A'),
+                          _buildInfoRow('Learner',
+                              widget.checklistData['learner_name'] ?? 'N/A'),
+                          _buildInfoRow(
+                              'ID Number',
+                              widget.checklistData['learner_id_number'] ??
+                                  'N/A'),
+                          _buildInfoRow('Assessor',
+                              widget.checklistData['assessor_name'] ?? 'N/A'),
+                          _buildInfoRow(
+                              'Venue', widget.checklistData['venue'] ?? 'N/A'),
+                          _buildInfoRow('Date',
+                              widget.checklistData['assessment_date'] ?? 'N/A'),
                         ],
                       ),
                     ),
@@ -6670,12 +6754,16 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                         children: [
                           const Text(
                             'Assessment Criteria',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+                            style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue),
                           ),
                           const SizedBox(height: 16),
                           ...items.entries.map((section) {
-                            return _buildSection(section.key, section.value as List);
-                          }).toList(),
+                            return _buildSection(
+                                section.key, section.value as List);
+                          }),
                         ],
                       ),
                     ),
@@ -6683,7 +6771,7 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
 
                   const SizedBox(height: 16),
 
-                  // LogBook Unit Standards Section  
+                  // LogBook Unit Standards Section
                   if (_isLoadingLogbook)
                     const Center(child: CircularProgressIndicator())
                   else if (_logbookUnitStandards.isNotEmpty)
@@ -6697,19 +6785,26 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.book, color: Colors.orange.shade700, size: 24),
+                                Icon(Icons.book,
+                                    color: Colors.orange.shade700, size: 24),
                                 const SizedBox(width: 12),
                                 const Text(
                                   'LogBook Unit Standards',
-                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange),
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orange),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 16),
                             ..._logbookUnitStandards.map((us) {
-                              final controller = _logbookMarksControllers[us['unit_standard_id']];
-                              final specificOutcomes = us['specific_outcomes'] as List<dynamic>? ?? [];
-                              
+                              final controller = _logbookMarksControllers[
+                                  us['unit_standard_id']];
+                              final specificOutcomes =
+                                  us['specific_outcomes'] as List<dynamic>? ??
+                                      [];
+
                               return Card(
                                 margin: const EdgeInsets.only(bottom: 12),
                                 elevation: 2,
@@ -6717,13 +6812,16 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                                 child: Padding(
                                   padding: const EdgeInsets.all(16),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         us['unit_standard_name'] ?? 'N/A',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15),
                                       ),
-                                      
+
                                       // Specific Outcomes
                                       if (specificOutcomes.isNotEmpty) ...[
                                         const SizedBox(height: 12),
@@ -6731,11 +6829,14 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                                           padding: const EdgeInsets.all(12),
                                           decoration: BoxDecoration(
                                             color: Colors.blue.shade50,
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: Colors.blue.shade200),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            border: Border.all(
+                                                color: Colors.blue.shade200),
                                           ),
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               const Text(
                                                 'Specific Outcomes:',
@@ -6746,35 +6847,55 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                                                 ),
                                               ),
                                               const SizedBox(height: 8),
-                                              ...specificOutcomes.map((outcome) {
-                                                final outcomeText = outcome['outcome_text']?.toString() ?? '';
-                                                if (outcomeText.isEmpty) return const SizedBox.shrink();
-                                                
+                                              ...specificOutcomes
+                                                  .map((outcome) {
+                                                final outcomeText =
+                                                    outcome['outcome_text']
+                                                            ?.toString() ??
+                                                        '';
+                                                if (outcomeText.isEmpty)
+                                                  return const SizedBox
+                                                      .shrink();
+
                                                 return Padding(
-                                                  padding: const EdgeInsets.only(bottom: 6),
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                          bottom: 6),
                                                   child: Row(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
                                                     children: [
-                                                      const Text('• ', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                                                      const Text('• ',
+                                                          style: TextStyle(
+                                                              fontSize: 14,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold)),
                                                       Expanded(
                                                         child: Text(
                                                           outcomeText,
-                                                          style: const TextStyle(fontSize: 13, height: 1.3),
+                                                          style:
+                                                              const TextStyle(
+                                                                  fontSize: 13,
+                                                                  height: 1.3),
                                                         ),
                                                       ),
                                                     ],
                                                   ),
                                                 );
-                                              }).toList(),
+                                              }),
                                             ],
                                           ),
                                         ),
                                       ],
-                                      
+
                                       const SizedBox(height: 12),
                                       Row(
                                         children: [
-                                          Icon(Icons.star, color: Colors.orange.shade700, size: 20),
+                                          Icon(Icons.star,
+                                              color: Colors.orange.shade700,
+                                              size: 20),
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: TextFormField(
@@ -6782,10 +6903,15 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                                               decoration: const InputDecoration(
                                                 labelText: 'Mark (0-50)',
                                                 border: OutlineInputBorder(),
-                                                hintText: 'Enter mark out of 50',
-                                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                                hintText:
+                                                    'Enter mark out of 50',
+                                                contentPadding:
+                                                    EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 16),
                                               ),
-                                              keyboardType: TextInputType.number,
+                                              keyboardType:
+                                                  TextInputType.number,
                                             ),
                                           ),
                                         ],
@@ -6794,7 +6920,7 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                                   ),
                                 ),
                               );
-                            }).toList(),
+                            }),
                             const SizedBox(height: 16),
                             SizedBox(
                               width: double.infinity,
@@ -6804,15 +6930,22 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                                     ? const SizedBox(
                                         width: 20,
                                         height: 20,
-                                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white),
                                       )
                                     : const Icon(Icons.save),
-                                label: Text(_isSaving ? 'Saving...' : 'Save LogBook Marks'),
+                                label: Text(_isSaving
+                                    ? 'Saving...'
+                                    : 'Save LogBook Marks'),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.orange,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 16),
+                                  textStyle: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold),
                                 ),
                               ),
                             ),
@@ -6836,11 +6969,15 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.image, color: Colors.purple, size: 24),
+                                const Icon(Icons.image,
+                                    color: Colors.purple, size: 24),
                                 const SizedBox(width: 12),
                                 const Text(
                                   'Pothole Evidence Images',
-                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.purple),
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.purple),
                                 ),
                               ],
                             ),
@@ -6848,7 +6985,8 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                             GridView.builder(
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
                                 crossAxisCount: 2,
                                 crossAxisSpacing: 10,
                                 mainAxisSpacing: 10,
@@ -6858,8 +6996,9 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                               itemBuilder: (context, index) {
                                 final image = _potholeImages[index];
                                 // Use correct domain for images
-                                final imageUrl = 'https://rlms.rlms.co.za/mobile/${image['file_path']}';
-                                
+                                final imageUrl =
+                                    'https://rlms.rlms.co.za/mobile/${image['file_path']}';
+
                                 return GestureDetector(
                                   onTap: () {
                                     // Show full image with zoom capability
@@ -6867,24 +7006,41 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                                       context: context,
                                       builder: (context) => Dialog(
                                         backgroundColor: Colors.black,
-                                        child: Container(
-                                          width: MediaQuery.of(context).size.width * 0.9,
-                                          height: MediaQuery.of(context).size.height * 0.8,
+                                        child: SizedBox(
+                                          width: MediaQuery.of(context)
+                                                  .size
+                                                  .width *
+                                              0.9,
+                                          height: MediaQuery.of(context)
+                                                  .size
+                                                  .height *
+                                              0.8,
                                           child: Column(
                                             children: [
                                               // Header with close button
                                               Container(
-                                                padding: const EdgeInsets.all(8.0),
+                                                padding:
+                                                    const EdgeInsets.all(8.0),
                                                 child: Row(
-                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceBetween,
                                                   children: [
                                                     Text(
                                                       'Image ${index + 1}',
-                                                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                                      style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 16,
+                                                          fontWeight:
+                                                              FontWeight.bold),
                                                     ),
                                                     IconButton(
-                                                      onPressed: () => Navigator.pop(context),
-                                                      icon: const Icon(Icons.close, color: Colors.white),
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                              context),
+                                                      icon: const Icon(
+                                                          Icons.close,
+                                                          color: Colors.white),
                                                     ),
                                                   ],
                                                 ),
@@ -6893,22 +7049,35 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                                               Expanded(
                                                 child: InteractiveViewer(
                                                   panEnabled: true,
-                                                  boundaryMargin: const EdgeInsets.all(20),
+                                                  boundaryMargin:
+                                                      const EdgeInsets.all(20),
                                                   minScale: 0.5,
                                                   maxScale: 4.0,
                                                   child: Center(
                                                     child: Image.network(
-                                                      imageUrl, 
+                                                      imageUrl,
                                                       fit: BoxFit.contain,
-                                                      loadingBuilder: (context, child, loadingProgress) {
-                                                        if (loadingProgress == null) return child;
+                                                      loadingBuilder: (context,
+                                                          child,
+                                                          loadingProgress) {
+                                                        if (loadingProgress ==
+                                                            null) return child;
                                                         return const Center(
-                                                          child: CircularProgressIndicator(color: Colors.white),
+                                                          child:
+                                                              CircularProgressIndicator(
+                                                                  color: Colors
+                                                                      .white),
                                                         );
                                                       },
-                                                      errorBuilder: (context, error, stackTrace) {
+                                                      errorBuilder: (context,
+                                                          error, stackTrace) {
                                                         return const Center(
-                                                          child: Icon(Icons.broken_image, size: 50, color: Colors.white),
+                                                          child: Icon(
+                                                              Icons
+                                                                  .broken_image,
+                                                              size: 50,
+                                                              color:
+                                                                  Colors.white),
                                                         );
                                                       },
                                                     ),
@@ -6916,21 +7085,31 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                                                 ),
                                               ),
                                               // Description
-                                              if (image['description'] != null && image['description'].toString().isNotEmpty)
+                                              if (image['description'] !=
+                                                      null &&
+                                                  image['description']
+                                                      .toString()
+                                                      .isNotEmpty)
                                                 Container(
-                                                  padding: const EdgeInsets.all(12.0),
+                                                  padding: const EdgeInsets.all(
+                                                      12.0),
                                                   child: Text(
                                                     image['description'] ?? '',
-                                                    style: const TextStyle(fontSize: 12, color: Colors.white),
+                                                    style: const TextStyle(
+                                                        fontSize: 12,
+                                                        color: Colors.white),
                                                     textAlign: TextAlign.center,
                                                   ),
                                                 ),
                                               // Instructions
                                               Container(
-                                                padding: const EdgeInsets.all(8.0),
+                                                padding:
+                                                    const EdgeInsets.all(8.0),
                                                 child: const Text(
                                                   'Pinch to zoom • Drag to pan • Tap close to exit',
-                                                  style: TextStyle(fontSize: 10, color: Colors.grey),
+                                                  style: TextStyle(
+                                                      fontSize: 10,
+                                                      color: Colors.grey),
                                                   textAlign: TextAlign.center,
                                                 ),
                                               ),
@@ -6949,14 +7128,21 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                                             imageUrl,
                                             fit: BoxFit.cover,
                                             width: double.infinity,
-                                            errorBuilder: (context, error, stackTrace) {
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
                                               return const Center(
-                                                child: Icon(Icons.broken_image, size: 50, color: Colors.grey),
+                                                child: Icon(Icons.broken_image,
+                                                    size: 50,
+                                                    color: Colors.grey),
                                               );
                                             },
-                                            loadingBuilder: (context, child, loadingProgress) {
-                                              if (loadingProgress == null) return child;
-                                              return const Center(child: CircularProgressIndicator());
+                                            loadingBuilder: (context, child,
+                                                loadingProgress) {
+                                              if (loadingProgress == null)
+                                                return child;
+                                              return const Center(
+                                                  child:
+                                                      CircularProgressIndicator());
                                             },
                                           ),
                                         ),
@@ -6964,7 +7150,8 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                                           padding: const EdgeInsets.all(4.0),
                                           child: Text(
                                             'Image ${index + 1}',
-                                            style: const TextStyle(fontSize: 10),
+                                            style:
+                                                const TextStyle(fontSize: 10),
                                           ),
                                         ),
                                       ],
@@ -7028,7 +7215,10 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
             ),
             child: Text(
               sectionName,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue),
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Colors.blue),
             ),
           ),
           Padding(
@@ -7048,14 +7238,19 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                     children: [
                       Text(
                         item['label'] ?? '',
-                        style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w500, fontSize: 14),
                       ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
                           Icon(
-                            item['value'] == true ? Icons.check_circle : Icons.cancel,
-                            color: item['value'] == true ? Colors.green : Colors.red,
+                            item['value'] == true
+                                ? Icons.check_circle
+                                : Icons.cancel,
+                            color: item['value'] == true
+                                ? Colors.green
+                                : Colors.red,
                             size: 24,
                           ),
                           const SizedBox(width: 8),
@@ -7063,13 +7258,16 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                             item['value'] == true ? 'YES' : 'NO',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: item['value'] == true ? Colors.green : Colors.red,
+                              color: item['value'] == true
+                                  ? Colors.green
+                                  : Colors.red,
                               fontSize: 16,
                             ),
                           ),
                         ],
                       ),
-                      if (item['notes'] != null && item['notes'].toString().isNotEmpty) ...[
+                      if (item['notes'] != null &&
+                          item['notes'].toString().isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.all(8),
@@ -7080,12 +7278,15 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(Icons.note, size: 16, color: Colors.blue),
+                              const Icon(Icons.note,
+                                  size: 16, color: Colors.blue),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   item['notes'].toString(),
-                                  style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      fontStyle: FontStyle.italic),
                                 ),
                               ),
                             ],
@@ -7111,7 +7312,6 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
   }
 }
 
-
 // Pothole Checklist Scanned Document View Page for Marking
 class PotholeChecklistScannedViewPage extends StatefulWidget {
   final String documentPath;
@@ -7128,19 +7328,21 @@ class PotholeChecklistScannedViewPage extends StatefulWidget {
   });
 
   @override
-  State<PotholeChecklistScannedViewPage> createState() => _PotholeChecklistScannedViewPageState();
+  State<PotholeChecklistScannedViewPage> createState() =>
+      _PotholeChecklistScannedViewPageState();
 }
 
-class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScannedViewPage> {
+class _PotholeChecklistScannedViewPageState
+    extends State<PotholeChecklistScannedViewPage> {
   bool _isSaving = false;
-  
+
   // Pothole evidence images
   List<Map<String, dynamic>> _potholeImages = [];
   bool _isLoadingImages = false;
-  
+
   // LogBook unit standards
   List<Map<String, dynamic>> _logbookUnitStandards = [];
-  Map<String, TextEditingController> _logbookMarksControllers = {};
+  final Map<String, TextEditingController> _logbookMarksControllers = {};
   bool _isLoadingLogbook = false;
 
   @override
@@ -7149,22 +7351,23 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
     _loadPotholeImages();
     _loadLogbookUnitStandards();
   }
-  
+
   Future<void> _loadPotholeImages() async {
     setState(() => _isLoadingImages = true);
-    
+
     try {
       final response = await http.get(Uri.parse(
-        '${AppConfig.baseUrl}/get_pothole_images.php?learner_id=${widget.learnerId}'
-      ));
-      
+          '${AppConfig.baseUrl}/get_pothole_images.php?learner_id=${widget.learnerId}'));
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == 'success') {
           setState(() {
-            _potholeImages = List<Map<String, dynamic>>.from(data['data'] ?? []);
+            _potholeImages =
+                List<Map<String, dynamic>>.from(data['data'] ?? []);
           });
-          print('DEBUG Images: Loaded ${_potholeImages.length} images for scanned view');
+          print(
+              'DEBUG Images: Loaded ${_potholeImages.length} images for scanned view');
         }
       }
     } catch (e) {
@@ -7173,27 +7376,28 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
       setState(() => _isLoadingImages = false);
     }
   }
-  
+
   Future<void> _loadLogbookUnitStandards() async {
     setState(() => _isLoadingLogbook = true);
-    
+
     try {
       final response = await http.get(Uri.parse(
-        '${AppConfig.baseUrl}/get_logbook_unit_standards.php?learner_id=${widget.learnerId}'
-      ));
-      
+          '${AppConfig.baseUrl}/get_logbook_unit_standards.php?learner_id=${widget.learnerId}'));
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == 'success' && data['data'] != null) {
           setState(() {
-            _logbookUnitStandards = List<Map<String, dynamic>>.from(data['data']);
-            
+            _logbookUnitStandards =
+                List<Map<String, dynamic>>.from(data['data']);
+
             // Create controllers for each unit standard
             for (var us in _logbookUnitStandards) {
-              _logbookMarksControllers[us['unit_standard_id']] = TextEditingController();
+              _logbookMarksControllers[us['unit_standard_id']] =
+                  TextEditingController();
             }
           });
-          
+
           // Load existing marks
           await _loadLogbookMarks();
         }
@@ -7204,13 +7408,12 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
       setState(() => _isLoadingLogbook = false);
     }
   }
-  
+
   Future<void> _loadLogbookMarks() async {
     try {
       final response = await http.get(Uri.parse(
-        '${AppConfig.baseUrl}/get_logbook_marks.php?learner_id=${widget.learnerId}&assessor_id=${widget.assessorId}&assessment_date=${widget.assessmentDate}'
-      ));
-      
+          '${AppConfig.baseUrl}/get_logbook_marks.php?learner_id=${widget.learnerId}&assessor_id=${widget.assessorId}&assessment_date=${widget.assessmentDate}'));
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == 'success' && data['data'] != null) {
@@ -7218,7 +7421,8 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
           setState(() {
             marks.forEach((unitStandardId, mark) {
               if (_logbookMarksControllers.containsKey(unitStandardId)) {
-                _logbookMarksControllers[unitStandardId]!.text = mark.toString();
+                _logbookMarksControllers[unitStandardId]!.text =
+                    mark.toString();
               }
             });
           });
@@ -7228,16 +7432,16 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
       print('Error loading logbook marks: $e');
     }
   }
-  
+
   Future<void> _saveLogbookMarks() async {
     // Validate all marks
     Map<String, int> marksToSave = {};
-    
+
     for (var us in _logbookUnitStandards) {
       final unitStandardId = us['unit_standard_id'];
       final controller = _logbookMarksControllers[unitStandardId];
       final markText = controller?.text.trim() ?? '';
-      
+
       if (markText.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -7247,18 +7451,19 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
         );
         return;
       }
-      
+
       final mark = int.tryParse(markText);
       if (mark == null || mark < 0 || mark > 50) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Mark for ${us['unit_standard_name']} must be between 0 and 50'),
+            content: Text(
+                'Mark for ${us['unit_standard_name']} must be between 0 and 50'),
             backgroundColor: Colors.red,
           ),
         );
         return;
       }
-      
+
       marksToSave[unitStandardId] = mark;
     }
 
@@ -7280,7 +7485,9 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
         final data = jsonDecode(response.body);
         if (data['status'] == 'success') {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('LogBook marks saved successfully'), backgroundColor: Colors.green),
+            const SnackBar(
+                content: Text('LogBook marks saved successfully'),
+                backgroundColor: Colors.green),
           );
         } else {
           throw Exception(data['message']);
@@ -7290,20 +7497,20 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving marks: $e'), backgroundColor: Colors.red),
+        SnackBar(
+            content: Text('Error saving marks: $e'),
+            backgroundColor: Colors.red),
       );
     } finally {
       setState(() => _isSaving = false);
     }
   }
 
-
-
   Future<void> _openDocument() async {
     try {
       // Convert relative server path to full URL
       String documentUrl = widget.documentPath;
-      
+
       // If path starts with ../, convert to full URL
       if (documentUrl.startsWith('../')) {
         // Remove ../ and construct full URL
@@ -7315,27 +7522,27 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
         // If it's a relative path without ../, add base URL
         documentUrl = '${AppConfig.baseUrl}/$documentUrl';
       }
-      
+
       print('DEBUG: Opening document from URL: $documentUrl');
-      
+
       // Download the PDF to local storage
       final response = await http.get(Uri.parse(documentUrl));
-      
+
       if (response.statusCode == 200) {
         // Get temporary directory
         final dir = await getTemporaryDirectory();
         final fileName = widget.documentPath.split('/').last;
         final file = File('${dir.path}/$fileName');
-        
+
         // Write PDF to local file
         await file.writeAsBytes(response.bodyBytes);
-        
+
         print('DEBUG: PDF downloaded to: ${file.path}');
-        
+
         // Open the local file
         final result = await OpenFile.open(file.path);
         print('DEBUG: OpenFile result: ${result.message}');
-        
+
         if (result.type != ResultType.done) {
           throw Exception(result.message);
         }
@@ -7345,7 +7552,9 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
     } catch (e) {
       print('DEBUG: Error opening document: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error opening document: $e'), backgroundColor: Colors.red),
+        SnackBar(
+            content: Text('Error opening document: $e'),
+            backgroundColor: Colors.red),
       );
     }
   }
@@ -7375,7 +7584,10 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
                         children: [
                           const Text(
                             'Scanned Document',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+                            style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue),
                           ),
                           const SizedBox(height: 16),
                           Center(
@@ -7395,14 +7607,16 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.blue,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
                               ),
                             ),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             'File: ${widget.documentPath.split('/').last}',
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            style: const TextStyle(
+                                fontSize: 12, color: Colors.grey),
                             textAlign: TextAlign.center,
                           ),
                         ],
@@ -7425,11 +7639,15 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.image, color: Colors.purple, size: 24),
+                                const Icon(Icons.image,
+                                    color: Colors.purple, size: 24),
                                 const SizedBox(width: 12),
                                 const Text(
                                   'Pothole Evidence Images',
-                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.purple),
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.purple),
                                 ),
                               ],
                             ),
@@ -7437,7 +7655,8 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
                             GridView.builder(
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
                                 crossAxisCount: 2,
                                 crossAxisSpacing: 10,
                                 mainAxisSpacing: 10,
@@ -7447,8 +7666,9 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
                               itemBuilder: (context, index) {
                                 final image = _potholeImages[index];
                                 // Use correct domain for images
-                                final imageUrl = 'https://rlms.rlms.co.za/mobile/${image['file_path']}';
-                                
+                                final imageUrl =
+                                    'https://rlms.rlms.co.za/mobile/${image['file_path']}';
+
                                 return GestureDetector(
                                   onTap: () {
                                     // Show full image with zoom capability
@@ -7456,24 +7676,41 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
                                       context: context,
                                       builder: (context) => Dialog(
                                         backgroundColor: Colors.black,
-                                        child: Container(
-                                          width: MediaQuery.of(context).size.width * 0.9,
-                                          height: MediaQuery.of(context).size.height * 0.8,
+                                        child: SizedBox(
+                                          width: MediaQuery.of(context)
+                                                  .size
+                                                  .width *
+                                              0.9,
+                                          height: MediaQuery.of(context)
+                                                  .size
+                                                  .height *
+                                              0.8,
                                           child: Column(
                                             children: [
                                               // Header with close button
                                               Container(
-                                                padding: const EdgeInsets.all(8.0),
+                                                padding:
+                                                    const EdgeInsets.all(8.0),
                                                 child: Row(
-                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceBetween,
                                                   children: [
                                                     Text(
                                                       'Image ${index + 1}',
-                                                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                                      style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 16,
+                                                          fontWeight:
+                                                              FontWeight.bold),
                                                     ),
                                                     IconButton(
-                                                      onPressed: () => Navigator.pop(context),
-                                                      icon: const Icon(Icons.close, color: Colors.white),
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                              context),
+                                                      icon: const Icon(
+                                                          Icons.close,
+                                                          color: Colors.white),
                                                     ),
                                                   ],
                                                 ),
@@ -7482,22 +7719,35 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
                                               Expanded(
                                                 child: InteractiveViewer(
                                                   panEnabled: true,
-                                                  boundaryMargin: const EdgeInsets.all(20),
+                                                  boundaryMargin:
+                                                      const EdgeInsets.all(20),
                                                   minScale: 0.5,
                                                   maxScale: 4.0,
                                                   child: Center(
                                                     child: Image.network(
-                                                      imageUrl, 
+                                                      imageUrl,
                                                       fit: BoxFit.contain,
-                                                      loadingBuilder: (context, child, loadingProgress) {
-                                                        if (loadingProgress == null) return child;
+                                                      loadingBuilder: (context,
+                                                          child,
+                                                          loadingProgress) {
+                                                        if (loadingProgress ==
+                                                            null) return child;
                                                         return const Center(
-                                                          child: CircularProgressIndicator(color: Colors.white),
+                                                          child:
+                                                              CircularProgressIndicator(
+                                                                  color: Colors
+                                                                      .white),
                                                         );
                                                       },
-                                                      errorBuilder: (context, error, stackTrace) {
+                                                      errorBuilder: (context,
+                                                          error, stackTrace) {
                                                         return const Center(
-                                                          child: Icon(Icons.broken_image, size: 50, color: Colors.white),
+                                                          child: Icon(
+                                                              Icons
+                                                                  .broken_image,
+                                                              size: 50,
+                                                              color:
+                                                                  Colors.white),
                                                         );
                                                       },
                                                     ),
@@ -7505,21 +7755,31 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
                                                 ),
                                               ),
                                               // Description
-                                              if (image['description'] != null && image['description'].toString().isNotEmpty)
+                                              if (image['description'] !=
+                                                      null &&
+                                                  image['description']
+                                                      .toString()
+                                                      .isNotEmpty)
                                                 Container(
-                                                  padding: const EdgeInsets.all(12.0),
+                                                  padding: const EdgeInsets.all(
+                                                      12.0),
                                                   child: Text(
                                                     image['description'] ?? '',
-                                                    style: const TextStyle(fontSize: 12, color: Colors.white),
+                                                    style: const TextStyle(
+                                                        fontSize: 12,
+                                                        color: Colors.white),
                                                     textAlign: TextAlign.center,
                                                   ),
                                                 ),
                                               // Instructions
                                               Container(
-                                                padding: const EdgeInsets.all(8.0),
+                                                padding:
+                                                    const EdgeInsets.all(8.0),
                                                 child: const Text(
                                                   'Pinch to zoom • Drag to pan • Tap close to exit',
-                                                  style: TextStyle(fontSize: 10, color: Colors.grey),
+                                                  style: TextStyle(
+                                                      fontSize: 10,
+                                                      color: Colors.grey),
                                                   textAlign: TextAlign.center,
                                                 ),
                                               ),
@@ -7538,14 +7798,21 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
                                             imageUrl,
                                             fit: BoxFit.cover,
                                             width: double.infinity,
-                                            errorBuilder: (context, error, stackTrace) {
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
                                               return const Center(
-                                                child: Icon(Icons.broken_image, size: 50, color: Colors.grey),
+                                                child: Icon(Icons.broken_image,
+                                                    size: 50,
+                                                    color: Colors.grey),
                                               );
                                             },
-                                            loadingBuilder: (context, child, loadingProgress) {
-                                              if (loadingProgress == null) return child;
-                                              return const Center(child: CircularProgressIndicator());
+                                            loadingBuilder: (context, child,
+                                                loadingProgress) {
+                                              if (loadingProgress == null)
+                                                return child;
+                                              return const Center(
+                                                  child:
+                                                      CircularProgressIndicator());
                                             },
                                           ),
                                         ),
@@ -7553,7 +7820,8 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
                                           padding: const EdgeInsets.all(4.0),
                                           child: Text(
                                             'Image ${index + 1}',
-                                            style: const TextStyle(fontSize: 10),
+                                            style:
+                                                const TextStyle(fontSize: 10),
                                           ),
                                         ),
                                       ],
@@ -7583,19 +7851,26 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.book, color: Colors.orange.shade700, size: 24),
+                                Icon(Icons.book,
+                                    color: Colors.orange.shade700, size: 24),
                                 const SizedBox(width: 12),
                                 const Text(
                                   'LogBook Unit Standards',
-                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange),
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orange),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 16),
                             ..._logbookUnitStandards.map((us) {
-                              final controller = _logbookMarksControllers[us['unit_standard_id']];
-                              final specificOutcomes = us['specific_outcomes'] as List<dynamic>? ?? [];
-                              
+                              final controller = _logbookMarksControllers[
+                                  us['unit_standard_id']];
+                              final specificOutcomes =
+                                  us['specific_outcomes'] as List<dynamic>? ??
+                                      [];
+
                               return Card(
                                 margin: const EdgeInsets.only(bottom: 12),
                                 elevation: 2,
@@ -7603,13 +7878,16 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
                                 child: Padding(
                                   padding: const EdgeInsets.all(16),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         us['unit_standard_name'] ?? 'N/A',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15),
                                       ),
-                                      
+
                                       // Specific Outcomes
                                       if (specificOutcomes.isNotEmpty) ...[
                                         const SizedBox(height: 12),
@@ -7617,11 +7895,14 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
                                           padding: const EdgeInsets.all(12),
                                           decoration: BoxDecoration(
                                             color: Colors.blue.shade50,
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: Colors.blue.shade200),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            border: Border.all(
+                                                color: Colors.blue.shade200),
                                           ),
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               const Text(
                                                 'Specific Outcomes:',
@@ -7632,35 +7913,55 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
                                                 ),
                                               ),
                                               const SizedBox(height: 8),
-                                              ...specificOutcomes.map((outcome) {
-                                                final outcomeText = outcome['outcome_text']?.toString() ?? '';
-                                                if (outcomeText.isEmpty) return const SizedBox.shrink();
-                                                
+                                              ...specificOutcomes
+                                                  .map((outcome) {
+                                                final outcomeText =
+                                                    outcome['outcome_text']
+                                                            ?.toString() ??
+                                                        '';
+                                                if (outcomeText.isEmpty)
+                                                  return const SizedBox
+                                                      .shrink();
+
                                                 return Padding(
-                                                  padding: const EdgeInsets.only(bottom: 6),
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                          bottom: 6),
                                                   child: Row(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
                                                     children: [
-                                                      const Text('• ', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                                                      const Text('• ',
+                                                          style: TextStyle(
+                                                              fontSize: 14,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold)),
                                                       Expanded(
                                                         child: Text(
                                                           outcomeText,
-                                                          style: const TextStyle(fontSize: 13, height: 1.3),
+                                                          style:
+                                                              const TextStyle(
+                                                                  fontSize: 13,
+                                                                  height: 1.3),
                                                         ),
                                                       ),
                                                     ],
                                                   ),
                                                 );
-                                              }).toList(),
+                                              }),
                                             ],
                                           ),
                                         ),
                                       ],
-                                      
+
                                       const SizedBox(height: 12),
                                       Row(
                                         children: [
-                                          Icon(Icons.star, color: Colors.orange.shade700, size: 20),
+                                          Icon(Icons.star,
+                                              color: Colors.orange.shade700,
+                                              size: 20),
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: TextFormField(
@@ -7668,10 +7969,15 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
                                               decoration: const InputDecoration(
                                                 labelText: 'Mark (0-50)',
                                                 border: OutlineInputBorder(),
-                                                hintText: 'Enter mark out of 50',
-                                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                                hintText:
+                                                    'Enter mark out of 50',
+                                                contentPadding:
+                                                    EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 16),
                                               ),
-                                              keyboardType: TextInputType.number,
+                                              keyboardType:
+                                                  TextInputType.number,
                                             ),
                                           ),
                                         ],
@@ -7680,7 +7986,7 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
                                   ),
                                 ),
                               );
-                            }).toList(),
+                            }),
                             const SizedBox(height: 16),
                             SizedBox(
                               width: double.infinity,
@@ -7690,15 +7996,22 @@ class _PotholeChecklistScannedViewPageState extends State<PotholeChecklistScanne
                                     ? const SizedBox(
                                         width: 20,
                                         height: 20,
-                                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white),
                                       )
                                     : const Icon(Icons.save),
-                                label: Text(_isSaving ? 'Saving...' : 'Save LogBook Marks'),
+                                label: Text(_isSaving
+                                    ? 'Saving...'
+                                    : 'Save LogBook Marks'),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.orange,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 16),
+                                  textStyle: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold),
                                 ),
                               ),
                             ),

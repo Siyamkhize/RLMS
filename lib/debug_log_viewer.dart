@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'utils/clocking_logger.dart';
 
 class DebugLogViewer extends StatefulWidget {
-  const DebugLogViewer({Key? key}) : super(key: key);
+  const DebugLogViewer({super.key});
 
   @override
   State<DebugLogViewer> createState() => _DebugLogViewerState();
@@ -209,8 +209,8 @@ class _DebugLogViewerState extends State<DebugLogViewer> {
             curve: Curves.easeOut,
           );
         },
-        child: const Icon(Icons.keyboard_arrow_down),
         tooltip: 'Scroll to bottom',
+        child: const Icon(Icons.keyboard_arrow_down),
       ),
     );
   }
