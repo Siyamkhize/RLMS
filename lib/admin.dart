@@ -296,9 +296,8 @@ class _AdminPageState extends State<AdminPage> {
             '[ADMIN] Filtering by qualification_id: ${widget.qualificationId}');
       }
 
-      final uri = Uri.parse(AppConfig.getSdpSitesUrl).replace(
-        queryParameters: queryParams,
-      );
+      final uri = Uri.parse(
+          AppConfig.buildUrl('get_sdp_all_data.php', queryParams: queryParams));
       debugPrint('[ADMIN] Requesting URL: $uri');
 
       final response = await http.get(uri).timeout(
@@ -333,10 +332,10 @@ class _AdminPageState extends State<AdminPage> {
 
           final jsonData = json.decode(cleaned);
           debugPrint(
-              '[ADMIN] Parsed JSON - success: ${jsonData['success']}, data count: ${jsonData['data']?.length ?? 0}');
+              '[ADMIN] Parsed JSON - success: ${jsonData['success']}, sites count: ${jsonData['sites']?.length ?? 0}');
 
-          if (jsonData['success'] == true && jsonData['data'] != null) {
-            final sites = List<Map<String, dynamic>>.from(jsonData['data']);
+          if (jsonData['success'] == true && jsonData['sites'] != null) {
+            final sites = List<Map<String, dynamic>>.from(jsonData['sites']);
             debugPrint(
                 '[ADMIN] Successfully loaded ${sites.length} sites from API');
 
@@ -357,7 +356,7 @@ class _AdminPageState extends State<AdminPage> {
             return;
           } else {
             debugPrint(
-                '[ADMIN] API returned success=false or no data: ${jsonData['message'] ?? 'Unknown error'}');
+                '[ADMIN] API returned success=false or no sites: ${jsonData['message'] ?? 'Unknown error'}');
           }
         } catch (e) {
           debugPrint('[ADMIN] Error parsing JSON response: $e');

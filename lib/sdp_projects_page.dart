@@ -139,7 +139,7 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
 
     try {
       final url = AppConfig.buildUrl(
-        'get_sdp_projects.php',
+        'get_sdp_all_data.php',
         queryParams: {'sdp_identifier': widget.sdpIdentifier},
       );
 
