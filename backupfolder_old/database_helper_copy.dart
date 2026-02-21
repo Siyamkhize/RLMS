@@ -4563,7 +4563,8 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
             } else if (leftTemplate == null) {
               // If no specific hand specified, use as left template
               leftTemplate = valueStr;
-            } else rightTemplate ??= valueStr;
+            } else
+              rightTemplate ??= valueStr;
           }
         }
       });
@@ -5644,7 +5645,7 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
   // Start background fingerprint sync service
   Future<void> startFingerprintSyncService() async {
     // Check for unsynced fingerprints every 30 seconds when internet is available
-    Timer.periodic(Duration(seconds: 30), (timer) async {
+    Timer.periodic(const Duration(seconds: 30), (timer) async {
       try {
         final connectivityResult = await Connectivity().checkConnectivity();
         if (connectivityResult != ConnectivityResult.none) {

@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart'; // For opening URLs
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config.dart';
+
 class ModeratorPage extends StatefulWidget {
   final String facilitator_id;
 
@@ -31,7 +32,8 @@ class _ModeratorPageState extends State<ModeratorPage> {
   Future<List<dynamic>> fetchClasses(String facilitatorId) async {
     try {
       final response = await http.get(
-        Uri.parse(AppConfig.buildUrl('get_classes.php?facilitator_id=$facilitatorId')),
+        Uri.parse(AppConfig.buildUrl(
+            'get_classes.php?facilitator_id=$facilitatorId')),
       );
 
       print('Response Body (get_classes): ${response.body}');
@@ -39,7 +41,8 @@ class _ModeratorPageState extends State<ModeratorPage> {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception('Failed to load classes. Server error: ${response.statusCode}');
+        throw Exception(
+            'Failed to load classes. Server error: ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to load classes. Error: $e');
@@ -106,7 +109,8 @@ class _ModeratorPageState extends State<ModeratorPage> {
                         String projectId = classData['project_id'].toString();
                         String classId = classData['classID'].toString();
                         String className = classData['className'] ?? 'Unknown';
-                        String numberOfLearners = classData['numberOfLearners'].toString();
+                        String numberOfLearners =
+                            classData['numberOfLearners'].toString();
                         String siteId = classData['siteID'].toString();
 
                         return DataRow(cells: [
@@ -121,7 +125,8 @@ class _ModeratorPageState extends State<ModeratorPage> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => ClassDetailsPage(classId: classId),
+                                    builder: (context) =>
+                                        ClassDetailsPage(classId: classId),
                                   ),
                                 );
                               },
@@ -195,6 +200,7 @@ class _ModeratorPageState extends State<ModeratorPage> {
     );
   }
 }
+
 class ModerationFeedbackPage extends StatefulWidget {
   final String facilitatorId;
 
@@ -216,7 +222,8 @@ class _ModerationFeedbackPageState extends State<ModerationFeedbackPage> {
   Future<List<dynamic>> fetchClassList(String facilitatorId) async {
     try {
       final response = await http.get(
-        Uri.parse(AppConfig.buildUrl('get_classes_by_facilitator.php?facilitator_id=$facilitatorId')),
+        Uri.parse(AppConfig.buildUrl(
+            'get_classes_by_facilitator.php?facilitator_id=$facilitatorId')),
       );
 
       if (response.statusCode == 200) {
@@ -244,16 +251,22 @@ class _ModerationFeedbackPageState extends State<ModerationFeedbackPage> {
       }
 
       final response = await http.get(
-        Uri.parse(AppConfig.buildUrl('generate_moderation_report.php', queryParams: {'class_id': classId.toString()})),
+        Uri.parse(AppConfig.buildUrl('generate_moderation_report.php',
+            queryParams: {'class_id': classId.toString()})),
       );
 
-      print('Request URL: ${AppConfig.buildUrl("generate_moderation_report.php", queryParams: {"class_id": classId.toString()})}');
+      print(
+          'Request URL: ${AppConfig.buildUrl("generate_moderation_report.php", queryParams: {
+            "class_id": classId.toString()
+          })}');
       print('Response Status: ${response.statusCode}');
       print('Response Headers: ${response.headers}');
-      print('Response Body (first 100 chars): ${response.body.substring(0, response.body.length < 100 ? response.body.length : 100)}');
+      print(
+          'Response Body (first 100 chars): ${response.body.substring(0, response.body.length < 100 ? response.body.length : 100)}');
 
       if (response.statusCode == 200) {
-        if (response.headers['content-type']?.contains('application/pdf') == true) {
+        if (response.headers['content-type']?.contains('application/pdf') ==
+            true) {
           final dir = await getTemporaryDirectory();
           final file = File('${dir.path}/Class_${classId}_Report.pdf');
           await file.writeAsBytes(response.bodyBytes);
@@ -341,7 +354,8 @@ class _ModerationFeedbackPageState extends State<ModerationFeedbackPage> {
                         return Center(
                           child: Text(
                             'Error: ${snapshot.error}',
-                            style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                color: Colors.red, fontWeight: FontWeight.bold),
                           ),
                         );
                       } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -363,15 +377,20 @@ class _ModerationFeedbackPageState extends State<ModerationFeedbackPage> {
                                 leading: CircleAvatar(
                                   backgroundColor: Colors.blue,
                                   foregroundColor: Colors.white,
-                                  child: Text(classData['classID']?.toString() ?? 'N/A'),
+                                  child: Text(
+                                      classData['classID']?.toString() ??
+                                          'N/A'),
                                 ),
                                 title: Text(
                                   classData['className'] ?? 'Unknown Class',
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
                                 ),
-                                subtitle: Text(classData['classDescription'] ?? 'No description'),
+                                subtitle: Text(classData['classDescription'] ??
+                                    'No description'),
                                 onTap: () {
-                                  _generateAndDownloadReport(classData['classID']?.toString() ?? '');
+                                  _generateAndDownloadReport(
+                                      classData['classID']?.toString() ?? '');
                                 },
                               ),
                             );
@@ -421,6 +440,7 @@ class PdfViewerPage extends StatelessWidget {
     );
   }
 }
+
 class ModerationReportPage extends StatefulWidget {
   final String facilitatorId;
 
@@ -437,7 +457,8 @@ class _ModerationReportPageState extends State<ModerationReportPage> {
 
   Future<List<dynamic>> fetchModerationReport() async {
     final response = await http.get(
-      Uri.parse(AppConfig.buildUrl('get_classes.php?facilitator_id=${widget.facilitatorId}')),
+      Uri.parse(AppConfig.buildUrl(
+          'get_classes.php?facilitator_id=${widget.facilitatorId}')),
     );
 
     if (response.statusCode == 200) {
@@ -458,8 +479,10 @@ class _ModerationReportPageState extends State<ModerationReportPage> {
       throw Exception('Failed to load learners');
     }
   }
+
   Future<void> _generateAndViewReport(String learnerId) async {
-    final url = Uri.parse(AppConfig.buildUrl('moderationReport.php?learner_id=$learnerId'));
+    final url = Uri.parse(
+        AppConfig.buildUrl('moderationReport.php?learner_id=$learnerId'));
     // Alternative for emulator: final url = Uri.parse('http://10.0.2.2/New/Lito/mobile/moderationReport.php?learner_id=$learnerId');
 
     try {
@@ -509,11 +532,11 @@ class _ModerationReportPageState extends State<ModerationReportPage> {
         future: fetchModerationReport(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(child: Text('No data found'));
+            return const Center(child: Text('No data found'));
           } else {
             classes = snapshot.data!;
             return Column(
@@ -532,11 +555,16 @@ class _ModerationReportPageState extends State<ModerationReportPage> {
                         DataColumn(label: Text('Action')),
                       ],
                       rows: classes.map<DataRow>((classData) {
-                        String projectId = classData['project_id']?.toString() ?? 'N/A';
-                        String classId = classData['classID']?.toString() ?? 'N/A';
-                        String className = classData['className']?.toString() ?? 'Unknown';
-                        String numberOfLearners = classData['numberOfLearners']?.toString() ?? 'N/A';
-                        String siteId = classData['siteID']?.toString() ?? 'N/A';
+                        String projectId =
+                            classData['project_id']?.toString() ?? 'N/A';
+                        String classId =
+                            classData['classID']?.toString() ?? 'N/A';
+                        String className =
+                            classData['className']?.toString() ?? 'Unknown';
+                        String numberOfLearners =
+                            classData['numberOfLearners']?.toString() ?? 'N/A';
+                        String siteId =
+                            classData['siteID']?.toString() ?? 'N/A';
 
                         return DataRow(
                           cells: [
@@ -571,14 +599,19 @@ class _ModerationReportPageState extends State<ModerationReportPage> {
                           DataColumn(label: Text('Action')),
                         ],
                         rows: learners.map<DataRow>((learnerData) {
-                          String learnerId = learnerData['LearnerID']?.toString() ?? 'N/A';
-                          String firstName = learnerData['Name']?.toString() ?? 'Unknown';
-                          String lastName = learnerData['Surname']?.toString() ?? 'Unknown';
-                          String idNumber = learnerData['IDNumber']?.toString() ?? 'Unknown';
+                          String learnerId =
+                              learnerData['LearnerID']?.toString() ?? 'N/A';
+                          String firstName =
+                              learnerData['Name']?.toString() ?? 'Unknown';
+                          String lastName =
+                              learnerData['Surname']?.toString() ?? 'Unknown';
+                          String idNumber =
+                              learnerData['IDNumber']?.toString() ?? 'Unknown';
                           Color rowColor = _getRowColor(learnerData);
 
                           return DataRow(
-                            color: WidgetStateColor.resolveWith((states) => rowColor),
+                            color: WidgetStateColor.resolveWith(
+                                (states) => rowColor),
                             cells: [
                               DataCell(Text(learnerId)),
                               DataCell(Text(firstName)),
@@ -587,7 +620,8 @@ class _ModerationReportPageState extends State<ModerationReportPage> {
                               DataCell(
                                 IconButton(
                                   icon: const Icon(Icons.edit),
-                                  onPressed: () => _generateAndViewReport(learnerId),
+                                  onPressed: () =>
+                                      _generateAndViewReport(learnerId),
                                 ),
                               ),
                             ],
@@ -604,6 +638,7 @@ class _ModerationReportPageState extends State<ModerationReportPage> {
     );
   }
 }
+
 class ClassDetailsPage extends StatefulWidget {
   final String classId;
 
@@ -628,13 +663,15 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
 
   Future<void> _loadSelectionState() async {
     final prefs = await SharedPreferences.getInstance();
-    final selectedLearnerIds = prefs.getStringList('selectedLearners_${widget.classId}');
+    final selectedLearnerIds =
+        prefs.getStringList('selectedLearners_${widget.classId}');
 
     if (selectedLearnerIds != null && selectedLearnerIds.isNotEmpty) {
       setState(() {
         _isSelectionMade = true;
         _selectedLearners = _allLearners
-            .where((learner) => selectedLearnerIds.contains(learner['LearnerID'].toString()))
+            .where((learner) =>
+                selectedLearnerIds.contains(learner['LearnerID'].toString()))
             .toList();
       });
     }
@@ -642,8 +679,11 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
 
   Future<void> _saveSelectionState() async {
     final prefs = await SharedPreferences.getInstance();
-    final selectedLearnerIds = _selectedLearners.map((learner) => learner['LearnerID'].toString()).toList();
-    await prefs.setStringList('selectedLearners_${widget.classId}', selectedLearnerIds);
+    final selectedLearnerIds = _selectedLearners
+        .map((learner) => learner['LearnerID'].toString())
+        .toList();
+    await prefs.setStringList(
+        'selectedLearners_${widget.classId}', selectedLearnerIds);
   }
 
   Future<List<dynamic>> fetchLearners(String classId) async {
@@ -665,16 +705,19 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
         // After fetching learners, filter them if a selection was previously made
         if (_isSelectionMade) {
           final prefs = await SharedPreferences.getInstance();
-          final selectedLearnerIds = prefs.getStringList('selectedLearners_${widget.classId}');
+          final selectedLearnerIds =
+              prefs.getStringList('selectedLearners_${widget.classId}');
           if (selectedLearnerIds != null) {
             _selectedLearners = _allLearners
-                .where((learner) => selectedLearnerIds.contains(learner['LearnerID'].toString()))
+                .where((learner) => selectedLearnerIds
+                    .contains(learner['LearnerID'].toString()))
                 .toList();
           }
         }
         return learners;
       } else {
-        throw Exception('Failed to load learners. Server error: ${response.statusCode}');
+        throw Exception(
+            'Failed to load learners. Server error: ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to load learners. Error: $e');
@@ -690,7 +733,8 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
       _selectedLearners = tempList.take(selectionCount).toList();
       _isSelectionMade = true;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Selected $selectionCount learners for marking.')),
+        SnackBar(
+            content: Text('Selected $selectionCount learners for marking.')),
       );
     });
     _saveSelectionState(); // Save the selection
@@ -725,7 +769,8 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
                 } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
                   return const Center(child: Text('No learners found.'));
                 } else {
-                  List<dynamic> learners = _isSelectionMade ? _selectedLearners : _allLearners;
+                  List<dynamic> learners =
+                      _isSelectionMade ? _selectedLearners : _allLearners;
 
                   return SingleChildScrollView(
                     scrollDirection: Axis.vertical,
@@ -740,10 +785,12 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
                           DataColumn(label: Text('Action')),
                         ],
                         rows: learners.map<DataRow>((learnerData) {
-                          String learnerId = learnerData['LearnerID'].toString();
+                          String learnerId =
+                              learnerData['LearnerID'].toString();
                           String firstName = learnerData['Name'] ?? 'Unknown';
                           String lastName = learnerData['Surname'] ?? 'Unknown';
-                          String idNumber = learnerData['IDNumber'] ?? 'Unknown';
+                          String idNumber =
+                              learnerData['IDNumber'] ?? 'Unknown';
 
                           return DataRow(cells: [
                             DataCell(Text(learnerId)),
@@ -756,7 +803,8 @@ class _ClassDetailsPageState extends State<ClassDetailsPage> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => AssessorMarkingPage(learnerId: learnerId),
+                                      builder: (context) => AssessorMarkingPage(
+                                          learnerId: learnerId),
                                     ),
                                   );
                                 },
@@ -827,6 +875,7 @@ class LearnerInformationTab extends StatelessWidget {
     );
   }
 }
+
 class POETab extends StatefulWidget {
   final String learnerId;
 
@@ -835,6 +884,7 @@ class POETab extends StatefulWidget {
   @override
   _POETabState createState() => _POETabState();
 }
+
 class _POETabState extends State<POETab> {
   late Future<Map<String, dynamic>> _poeData;
   String _responseMessage = '';
@@ -856,7 +906,8 @@ class _POETabState extends State<POETab> {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception('Failed to load POE data. Server error: ${response.statusCode}');
+        throw Exception(
+            'Failed to load POE data. Server error: ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Failed to load POE data. Error: $e');
@@ -889,13 +940,16 @@ class _POETabState extends State<POETab> {
                   children: [
                     ...pathways.entries.map((entry) {
                       return ExpansionTile(
-                        title: Text(entry.key, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        title: Text(entry.key,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
                         children: _buildQualificationTiles(entry.value),
                       );
                     }),
                     if (logbook.isNotEmpty)
                       ExpansionTile(
-                        title: const Text('Logbook', style: TextStyle(fontWeight: FontWeight.bold)),
+                        title: const Text('Logbook',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                         children: _buildLogbookTiles(logbook),
                       ),
                   ],
@@ -908,7 +962,9 @@ class _POETabState extends State<POETab> {
             child: Text(
               _responseMessage,
               style: TextStyle(
-                color: _responseMessage.contains('success') ? Colors.green : Colors.red,
+                color: _responseMessage.contains('success')
+                    ? Colors.green
+                    : Colors.red,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
@@ -931,7 +987,8 @@ class _POETabState extends State<POETab> {
   }
 
   List<Widget> _buildUnitStandardTiles(Map<String, dynamic> qualificationData) {
-    Map<String, dynamic> unitStandards = qualificationData['unitstandards'] ?? {};
+    Map<String, dynamic> unitStandards =
+        qualificationData['unitstandards'] ?? {};
 
     return unitStandards.entries.map((entry) {
       return ExpansionTile(
@@ -941,7 +998,8 @@ class _POETabState extends State<POETab> {
     }).toList();
   }
 
-  List<Widget> _buildAssessmentTypeTiles(Map<String, dynamic> unitStandardData) {
+  List<Widget> _buildAssessmentTypeTiles(
+      Map<String, dynamic> unitStandardData) {
     List<dynamic> summative = unitStandardData['summative'] ?? [];
     List<dynamic> formative = unitStandardData['formative'] ?? [];
 
@@ -951,7 +1009,8 @@ class _POETabState extends State<POETab> {
       String existingModeratorComment = summative.first['comment'] ?? '';
       bool hasExistingComment = existingModeratorComment.isNotEmpty;
 
-      TextEditingController moderatorCommentController = TextEditingController(text: existingModeratorComment);
+      TextEditingController moderatorCommentController =
+          TextEditingController(text: existingModeratorComment);
 
       assessmentTiles.add(
         ExpansionTile(
@@ -960,7 +1019,8 @@ class _POETabState extends State<POETab> {
             ..._buildExerciseTiles(summative, 'formative'),
             if (!hasExistingComment)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: TextFormField(
                   controller: moderatorCommentController,
                   decoration: const InputDecoration(
@@ -973,9 +1033,11 @@ class _POETabState extends State<POETab> {
               ),
             if (!hasExistingComment)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: ElevatedButton(
-                  onPressed: () => saveModeratorComment('summative', moderatorCommentController.text),
+                  onPressed: () => saveModeratorComment(
+                      'summative', moderatorCommentController.text),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
@@ -985,7 +1047,8 @@ class _POETabState extends State<POETab> {
               ),
             if (hasExistingComment)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: Text(
                   'Moderator Comments: $existingModeratorComment',
                   style: const TextStyle(fontSize: 16),
@@ -1000,7 +1063,8 @@ class _POETabState extends State<POETab> {
       String existingModeratorComment = formative.first['comment'] ?? '';
       bool hasExistingComment = existingModeratorComment.isNotEmpty;
 
-      TextEditingController moderatorCommentController = TextEditingController(text: existingModeratorComment);
+      TextEditingController moderatorCommentController =
+          TextEditingController(text: existingModeratorComment);
 
       assessmentTiles.add(
         ExpansionTile(
@@ -1009,7 +1073,8 @@ class _POETabState extends State<POETab> {
             ..._buildExerciseTiles(formative, 'summative'),
             if (!hasExistingComment)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: TextFormField(
                   controller: moderatorCommentController,
                   decoration: const InputDecoration(
@@ -1022,9 +1087,11 @@ class _POETabState extends State<POETab> {
               ),
             if (!hasExistingComment)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: ElevatedButton(
-                  onPressed: () => saveModeratorComment('formative', moderatorCommentController.text),
+                  onPressed: () => saveModeratorComment(
+                      'formative', moderatorCommentController.text),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
@@ -1034,7 +1101,8 @@ class _POETabState extends State<POETab> {
               ),
             if (hasExistingComment)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: Text(
                   'Moderator Comments: $existingModeratorComment',
                   style: const TextStyle(fontSize: 16),
@@ -1060,7 +1128,8 @@ class _POETabState extends State<POETab> {
     }).toList();
   }
 
-  List<Widget> _buildExerciseTiles(List<dynamic> exercises, String assessmentType) {
+  List<Widget> _buildExerciseTiles(
+      List<dynamic> exercises, String assessmentType) {
     return exercises.map<Widget>((exercise) {
       return ExerciseTile(
         key: ValueKey(exercise['exercise_id'] ?? exercise['exercise']),
@@ -1074,7 +1143,9 @@ class _POETabState extends State<POETab> {
           });
         },
         onSaveApprovalStatus: (status) {
-          final exerciseId = exercise['exercise_id']?.toString() ?? exercise['exercise']?.toString() ?? '';
+          final exerciseId = exercise['exercise_id']?.toString() ??
+              exercise['exercise']?.toString() ??
+              '';
           print('Exercise data being sent for approval: $exercise');
           saveApprovalStatus(exerciseId, status);
         },
@@ -1082,7 +1153,8 @@ class _POETabState extends State<POETab> {
     }).toList();
   }
 
-  Future<void> saveModeratorComment(String assessmentType, String comment) async {
+  Future<void> saveModeratorComment(
+      String assessmentType, String comment) async {
     if (comment.trim().isEmpty) {
       setState(() {
         _responseMessage = 'Comment cannot be empty';
@@ -1147,7 +1219,8 @@ class _POETabState extends State<POETab> {
     }
   }
 
-  Future<void> saveApprovalStatus(String exerciseId, String approvalStatus) async {
+  Future<void> saveApprovalStatus(
+      String exerciseId, String approvalStatus) async {
     if (exerciseId.isEmpty) {
       setState(() {
         _responseMessage = 'Exercise ID is missing';
@@ -1179,8 +1252,8 @@ class _POETabState extends State<POETab> {
           _responseMessage = responseData['status'] == 'success'
               ? 'Success: Approval status saved!'
               : responseData['message'].contains('No record found')
-              ? 'Error: Exercise not found in database.'
-              : 'Failed to save approval: ${responseData['message']}';
+                  ? 'Error: Exercise not found in database.'
+                  : 'Failed to save approval: ${responseData['message']}';
         });
         if (responseData['status'] == 'success') {
           _poeData = fetchPOE(widget.learnerId);
@@ -1240,7 +1313,9 @@ class _POETabState extends State<POETab> {
           builder: (context) => FileViewerScreen(fileUrl: url, isPdf: true),
         ),
       );
-    } else if (fileExtension == 'jpg' || fileExtension == 'jpeg' || fileExtension == 'png') {
+    } else if (fileExtension == 'jpg' ||
+        fileExtension == 'jpeg' ||
+        fileExtension == 'png') {
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -1254,6 +1329,7 @@ class _POETabState extends State<POETab> {
     }
   }
 }
+
 class ExerciseTile extends StatefulWidget {
   final Map<String, dynamic> exercise;
   final String learnerId;
@@ -1288,17 +1364,22 @@ class _ExerciseTileState extends State<ExerciseTile> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.exercise['filePath'] == null || widget.exercise['filePath'].isEmpty) {
+    if (widget.exercise['filePath'] == null ||
+        widget.exercise['filePath'].isEmpty) {
       return const SizedBox.shrink();
     }
 
     String maxMarks = widget.exercise['marks']?.toString() ?? '0';
-    String marksScored = widget.exercise['marks_scored']?.toString() ?? 'Not Scored';
-    String specificOutcome = widget.exercise['specific_outcome']?.toString() ?? 'N/A';
+    String marksScored =
+        widget.exercise['marks_scored']?.toString() ?? 'Not Scored';
+    String specificOutcome =
+        widget.exercise['specific_outcome']?.toString() ?? 'N/A';
     String specificOutcomeLabel = 'SO: $specificOutcome';
     String displayTitle = 'Exercise: ${widget.exercise['exercise'] ?? 'N/A'}';
-    String? currentApprovalStatus = widget.exercise['approval_status']?.toString();
-    bool hasApprovalStatus = currentApprovalStatus != null && currentApprovalStatus.isNotEmpty;
+    String? currentApprovalStatus =
+        widget.exercise['approval_status']?.toString();
+    bool hasApprovalStatus =
+        currentApprovalStatus != null && currentApprovalStatus.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1314,32 +1395,33 @@ class _ExerciseTileState extends State<ExerciseTile> {
                 child: hasApprovalStatus
                     ? Text('Approval Status: $currentApprovalStatus')
                     : DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(
-                    labelText: 'Approval Status',
-                    border: OutlineInputBorder(),
-                  ),
-                  value: _selectedApprovalStatus,
-                  items: ['Uphold', 'Withdraw'].map((status) {
-                    return DropdownMenuItem<String>(
-                      value: status,
-                      child: Text(status),
-                    );
-                  }).toList(),
-                  onChanged: _isSubmitting
-                      ? null
-                      : (value) {
-                    setState(() {
-                      _selectedApprovalStatus = value;
-                    });
-                  },
-                  hint: const Text('Select approval status'),
-                ),
+                        decoration: const InputDecoration(
+                          labelText: 'Approval Status',
+                          border: OutlineInputBorder(),
+                        ),
+                        value: _selectedApprovalStatus,
+                        items: ['Uphold', 'Withdraw'].map((status) {
+                          return DropdownMenuItem<String>(
+                            value: status,
+                            child: Text(status),
+                          );
+                        }).toList(),
+                        onChanged: _isSubmitting
+                            ? null
+                            : (value) {
+                                setState(() {
+                                  _selectedApprovalStatus = value;
+                                });
+                              },
+                        hint: const Text('Select approval status'),
+                      ),
               ),
             ],
           ),
           trailing: ElevatedButton(
             onPressed: () {
-              String fileUrl = widget.exercise['fileUrl'] ?? widget.exercise['filePath'];
+              String fileUrl =
+                  widget.exercise['fileUrl'] ?? widget.exercise['filePath'];
               if (fileUrl.isNotEmpty) {
                 widget.onLaunch(fileUrl);
               } else {
@@ -1351,33 +1433,35 @@ class _ExerciseTileState extends State<ExerciseTile> {
         ),
         if (!hasApprovalStatus)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: ElevatedButton(
               onPressed: _isSubmitting || _selectedApprovalStatus == null
                   ? null
                   : () async {
-                setState(() {
-                  _isSubmitting = true;
-                });
-                await widget.onSaveApprovalStatus(_selectedApprovalStatus!);
-                setState(() {
-                  _isSubmitting = false;
-                  _selectedApprovalStatus = null; // Reset dropdown
-                });
-              },
+                      setState(() {
+                        _isSubmitting = true;
+                      });
+                      await widget
+                          .onSaveApprovalStatus(_selectedApprovalStatus!);
+                      setState(() {
+                        _isSubmitting = false;
+                        _selectedApprovalStatus = null; // Reset dropdown
+                      });
+                    },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
                 foregroundColor: Colors.white,
               ),
               child: _isSubmitting
                   ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
                   : const Text('Submit Approval Status'),
             ),
           ),
@@ -1390,7 +1474,8 @@ class FileViewerScreen extends StatefulWidget {
   final String fileUrl;
   final bool isPdf;
 
-  const FileViewerScreen({super.key, required this.fileUrl, required this.isPdf});
+  const FileViewerScreen(
+      {super.key, required this.fileUrl, required this.isPdf});
 
   @override
   _FileViewerScreenState createState() => _FileViewerScreenState();
@@ -1416,37 +1501,37 @@ class _FileViewerScreenState extends State<FileViewerScreen> {
       body: Center(
         child: widget.isPdf
             ? FutureBuilder<File>(
-          future: _loadPdfFromNetwork(widget.fileUrl),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const CircularProgressIndicator();
-            } else if (snapshot.hasError) {
-              return Text('Error loading PDF: ${snapshot.error}');
-            } else if (!snapshot.hasData) {
-              return const Text('No PDF data available');
-            }
-            _tempFile = snapshot.data;
-            return PDFView(
-              filePath: snapshot.data!.path,
-              enableSwipe: true,
-              swipeHorizontal: false,
-              autoSpacing: true,
-              pageSnap: true,
-              pageFling: true,
-            );
-          },
-        )
+                future: _loadPdfFromNetwork(widget.fileUrl),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const CircularProgressIndicator();
+                  } else if (snapshot.hasError) {
+                    return Text('Error loading PDF: ${snapshot.error}');
+                  } else if (!snapshot.hasData) {
+                    return const Text('No PDF data available');
+                  }
+                  _tempFile = snapshot.data;
+                  return PDFView(
+                    filePath: snapshot.data!.path,
+                    enableSwipe: true,
+                    swipeHorizontal: false,
+                    autoSpacing: true,
+                    pageSnap: true,
+                    pageFling: true,
+                  );
+                },
+              )
             : Image.network(
-          widget.fileUrl,
-          fit: BoxFit.contain,
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return const CircularProgressIndicator();
-          },
-          errorBuilder: (context, error, stackTrace) {
-            return const Text('Error loading image');
-          },
-        ),
+                widget.fileUrl,
+                fit: BoxFit.contain,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const CircularProgressIndicator();
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return const Text('Error loading image');
+                },
+              ),
       ),
     );
   }

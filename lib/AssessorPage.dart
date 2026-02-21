@@ -4431,7 +4431,7 @@ class _AssessmentReviewDetailPageState
                 ),
               ),
             ),
-            DataCell(
+            const DataCell(
               SizedBox(
                 height: 150,
                 child: VerticalDivider(thickness: 1, color: Colors.grey),
@@ -4481,7 +4481,7 @@ class _AssessmentReviewDetailPageState
                 ),
               ),
             ),
-            DataCell(
+            const DataCell(
               SizedBox(
                 height: 150,
                 child: VerticalDivider(thickness: 1, color: Colors.grey),
@@ -6286,9 +6286,9 @@ class _PotholeChecklistLearnerListPageState
                               // Default state while loading
                               if (snapshot.connectionState ==
                                   ConnectionState.waiting) {
-                                return ElevatedButton(
+                                return const ElevatedButton(
                                   onPressed: null,
-                                  child: const SizedBox(
+                                  child: SizedBox(
                                     width: 16,
                                     height: 16,
                                     child: CircularProgressIndicator(
@@ -6968,12 +6968,12 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            const Row(
                               children: [
-                                const Icon(Icons.image,
+                                Icon(Icons.image,
                                     color: Colors.purple, size: 24),
-                                const SizedBox(width: 12),
-                                const Text(
+                                SizedBox(width: 12),
+                                Text(
                                   'Pothole Evidence Images',
                                   style: TextStyle(
                                       fontSize: 18,
@@ -7641,12 +7641,12 @@ class _PotholeChecklistScannedViewPageState
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            const Row(
                               children: [
-                                const Icon(Icons.image,
+                                Icon(Icons.image,
                                     color: Colors.purple, size: 24),
-                                const SizedBox(width: 12),
-                                const Text(
+                                SizedBox(width: 12),
+                                Text(
                                   'Pothole Evidence Images',
                                   style: TextStyle(
                                       fontSize: 18,

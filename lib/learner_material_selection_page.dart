@@ -255,15 +255,15 @@ class _LearnerMaterialSelectionPageState
       bool? verified = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: const Row(
+        builder: (context) => const AlertDialog(
+          title: Row(
             children: [
               Icon(Icons.fingerprint, color: Colors.blue, size: 32),
               SizedBox(width: 12),
               Text('Fingerprint Verification'),
             ],
           ),
-          content: const Column(
+          content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               CircularProgressIndicator(),
@@ -324,15 +324,18 @@ class _LearnerMaterialSelectionPageState
 
     try {
       // Debug: Print learner object to verify fields
-      debugPrint('[MATERIAL-SAVE] Learner object: ${widget.learner.toString()}');
+      debugPrint(
+          '[MATERIAL-SAVE] Learner object: ${widget.learner.toString()}');
       debugPrint('[MATERIAL-SAVE] LearnerID: ${widget.learner['LearnerID']}');
       debugPrint('[MATERIAL-SAVE] IDNumber: ${widget.learner['IDNumber']}');
-      
+
       // Prepare submission data with quantities
       Map<String, dynamic> submissionData = {
         'classID': widget.classID,
-        'learnerID': widget.learner['LearnerID'], // Send internal LearnerID (e.g., 70)
-        'IDNumber': widget.learner['IDNumber'],   // Also send IDNumber for reference
+        'learnerID':
+            widget.learner['LearnerID'], // Send internal LearnerID (e.g., 70)
+        'IDNumber':
+            widget.learner['IDNumber'], // Also send IDNumber for reference
         'learnerName': widget.learner['FullName'],
         'materialType': selectedMaterialType,
         'selections': selections,
@@ -340,8 +343,9 @@ class _LearnerMaterialSelectionPageState
         'issuedBy': 'Facilitator', // TODO: Get from logged in user
         'timestamp': DateTime.now().toIso8601String(),
       };
-      
-      debugPrint('[MATERIAL-SAVE] Submission data: ${json.encode(submissionData)}');
+
+      debugPrint(
+          '[MATERIAL-SAVE] Submission data: ${json.encode(submissionData)}');
 
       final response = await http.post(
         Uri.parse(AppConfig.buildUrl('save_learner_materials.php')),
@@ -695,9 +699,7 @@ class _LearnerMaterialSelectionPageState
               ),
             ),
             const SizedBox(height: 16),
-            ...materials
-                .map((material) => _buildMaterialTile(material))
-                ,
+            ...materials.map((material) => _buildMaterialTile(material)),
           ],
         ),
       ),

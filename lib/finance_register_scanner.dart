@@ -240,7 +240,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
   Future<void> proceedToScanner() async {
     if (selectedDates.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Please select at least one attendance day'),
           backgroundColor: Colors.orange,
         ),
@@ -257,7 +257,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
 
       if (scannedImage == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No document scanned')),
+          const SnackBar(content: Text('No document scanned')),
         );
         return;
       }
@@ -292,7 +292,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
 
       if (imagePath == null || imagePath.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('Failed to get scanned document path'),
             duration: Duration(seconds: 3),
           ),
@@ -306,7 +306,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Document scanned! Click Save to complete.'),
           backgroundColor: Colors.green,
         ),
@@ -349,17 +349,17 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: Text('Select Month'),
+              title: const Text('Select Month'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Year: 2024',
+                  const Text('Year: 2024',
                       style:
                           TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
                   DropdownButtonFormField<int>(
                     value: selectedMonthValue,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       labelText: 'Month',
                       border: OutlineInputBorder(),
                     ),
@@ -382,7 +382,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: Text('Cancel'),
+                  child: const Text('Cancel'),
                 ),
                 ElevatedButton(
                   onPressed: () {
@@ -394,7 +394,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
                     backgroundColor: Colors.green[700],
                     foregroundColor: Colors.white,
                   ),
-                  child: Text('Continue'),
+                  child: const Text('Continue'),
                 ),
               ],
             );
@@ -444,7 +444,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
           title: Text('Mark Attendance - ${widget.learnerName}'),
           backgroundColor: Colors.green[700],
         ),
-        body: Center(child: CircularProgressIndicator()),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -459,12 +459,12 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
       body: Column(
         children: [
           Container(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             color: Colors.green[50],
             child: Row(
               children: [
                 Icon(Icons.calendar_month, color: Colors.green[700]),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     '${_getMonthName(selectedMonth!.month)} ${selectedMonth!.year}',
@@ -477,8 +477,8 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
                 ),
                 ElevatedButton.icon(
                   onPressed: selectMonth,
-                  icon: Icon(Icons.edit_calendar, size: 18),
-                  label: Text('Change Month'),
+                  icon: const Icon(Icons.edit_calendar, size: 18),
+                  label: const Text('Change Month'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green[700],
                     foregroundColor: Colors.white,
@@ -488,7 +488,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
             ),
           ),
           Container(
-            padding: EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
             color: scannedDocumentPath != null
                 ? Colors.green[50]
                 : Colors.blue[50],
@@ -503,7 +503,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
                       : Colors.blue[700],
                   size: 20,
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     scannedDocumentPath != null
@@ -524,16 +524,16 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
           ),
           Expanded(
             child: isLoading
-                ? Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator())
                 : SingleChildScrollView(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     child: _buildCalendar(daysInMonth, firstWeekday),
                   ),
           ),
           if (_hasChanges())
             Container(
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
@@ -552,7 +552,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
                           ElevatedButton.icon(
                             onPressed: isSaving ? null : saveAttendance,
                             icon: isSaving
-                                ? SizedBox(
+                                ? const SizedBox(
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(
@@ -560,27 +560,27 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : Icon(Icons.save),
+                                : const Icon(Icons.save),
                             label: Text(isSaving
                                 ? 'Saving...'
                                 : 'Save Attendance Changes'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green[700],
                               foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              textStyle: TextStyle(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              textStyle: const TextStyle(
                                   fontSize: 16, fontWeight: FontWeight.bold),
                             ),
                           ),
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
                           // Optional: Re-scan button
                           OutlinedButton.icon(
                             onPressed: proceedToScanner,
-                            icon: Icon(Icons.document_scanner),
-                            label: Text('Re-scan Register (Optional)'),
+                            icon: const Icon(Icons.document_scanner),
+                            label: const Text('Re-scan Register (Optional)'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.blue[700],
-                              padding: EdgeInsets.symmetric(vertical: 16),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
                               side: BorderSide(color: Colors.blue[700]!),
                             ),
                           ),
@@ -589,20 +589,20 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
                     : scannedDocumentPath == null
                         ? ElevatedButton.icon(
                             onPressed: proceedToScanner,
-                            icon: Icon(Icons.document_scanner),
-                            label: Text('Continue to Scan Register'),
+                            icon: const Icon(Icons.document_scanner),
+                            label: const Text('Continue to Scan Register'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.blue[700],
                               foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              textStyle: TextStyle(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              textStyle: const TextStyle(
                                   fontSize: 16, fontWeight: FontWeight.bold),
                             ),
                           )
                         : ElevatedButton.icon(
                             onPressed: isSaving ? null : saveAttendance,
                             icon: isSaving
-                                ? SizedBox(
+                                ? const SizedBox(
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(
@@ -610,15 +610,15 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : Icon(Icons.save),
+                                : const Icon(Icons.save),
                             label: Text(isSaving
                                 ? 'Saving...'
                                 : 'Save Attendance & Register'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green[700],
                               foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              textStyle: TextStyle(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              textStyle: const TextStyle(
                                   fontSize: 16, fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -647,7 +647,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
                   ))
               .toList(),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         _buildCalendarGrid(daysInMonth, firstWeekday),
       ],
     );
@@ -658,7 +658,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
     List<Widget> currentWeek = [];
 
     for (int i = 1; i < firstWeekday; i++) {
-      currentWeek.add(Expanded(child: SizedBox()));
+      currentWeek.add(const Expanded(child: SizedBox()));
     }
 
     for (int day = 1; day <= daysInMonth; day++) {
@@ -688,7 +688,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
                     });
                   },
             child: Container(
-              margin: EdgeInsets.all(2),
+              margin: const EdgeInsets.all(2),
               decoration: BoxDecoration(
                 color: isWeekend
                     ? Colors.grey[300]
@@ -719,7 +719,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
                   ),
                   if (holiday != null)
                     Padding(
-                      padding: EdgeInsets.only(top: 1),
+                      padding: const EdgeInsets.only(top: 1),
                       child: Text(
                         'Holiday',
                         style: TextStyle(
@@ -740,12 +740,12 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
 
       if ((firstWeekday + day - 1) % 7 == 0 || day == daysInMonth) {
         while (currentWeek.length < 7) {
-          currentWeek.add(Expanded(child: SizedBox()));
+          currentWeek.add(const Expanded(child: SizedBox()));
         }
 
         weeks.add(
           Padding(
-            padding: EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.symmetric(vertical: 4),
             child: SizedBox(
               height: 50,
               child: Row(children: currentWeek),

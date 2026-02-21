@@ -1169,10 +1169,9 @@ class _InductionPageState extends State<InductionPage> {
                       fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
-                Text(
+                const Text(
                   'Learner Actions: Clock In/Out',
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w600),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 learners.isEmpty

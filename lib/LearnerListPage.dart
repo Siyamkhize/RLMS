@@ -984,9 +984,9 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            Text(
+            const Text(
               'Learner Actions: Clock In/Out, Upload Sick Notes, View Details',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             widget.learners.isEmpty

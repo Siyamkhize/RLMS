@@ -49,7 +49,7 @@ class _LogisticsClassesPageState extends State<LogisticsClassesPage> {
   void _onSearchChanged() {
     // Cancel previous timer
     _debounceTimer?.cancel();
-    
+
     // Start new timer for debounced search
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
       setState(() {
@@ -67,16 +67,17 @@ class _LogisticsClassesPageState extends State<LogisticsClassesPage> {
 
     try {
       // Build URL with search parameter
-      String url = 'get_logistics_classes.php?siteID=${widget.siteId}&account_id=${widget.logisticsId}';
+      String url =
+          'get_logistics_classes.php?siteID=${widget.siteId}&account_id=${widget.logisticsId}';
       if (_searchQuery.isNotEmpty) {
         url += '&search=${Uri.encodeComponent(_searchQuery)}';
       }
-      
+
       final response = await http.get(Uri.parse(AppConfig.buildUrl(url)));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data['success'] == true && data['classes'] != null) {
           setState(() {
             classes = data['classes'];
@@ -177,7 +178,8 @@ class _LogisticsClassesPageState extends State<LogisticsClassesPage> {
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Search classes by name, facilitator, or learner count...',
+                    hintText:
+                        'Search classes by name, facilitator, or learner count...',
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
@@ -193,7 +195,8 @@ class _LogisticsClassesPageState extends State<LogisticsClassesPage> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.orange.shade600, width: 2),
+                      borderSide:
+                          BorderSide(color: Colors.orange.shade600, width: 2),
                     ),
                     filled: true,
                     fillColor: Colors.white,
@@ -210,7 +213,8 @@ class _LogisticsClassesPageState extends State<LogisticsClassesPage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.error, size: 64, color: Colors.red),
+                            const Icon(Icons.error,
+                                size: 64, color: Colors.red),
                             const SizedBox(height: 16),
                             Text(
                               errorMessage,
@@ -230,7 +234,8 @@ class _LogisticsClassesPageState extends State<LogisticsClassesPage> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.class_outlined, size: 64, color: Colors.grey[400]),
+                                Icon(Icons.class_outlined,
+                                    size: 64, color: Colors.grey[400]),
                                 const SizedBox(height: 16),
                                 Text(
                                   'No classes found at this site',
@@ -247,7 +252,8 @@ class _LogisticsClassesPageState extends State<LogisticsClassesPage> {
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                                    Icon(Icons.search_off,
+                                        size: 64, color: Colors.grey[400]),
                                     const SizedBox(height: 16),
                                     Text(
                                       'No classes match your search',
@@ -274,125 +280,173 @@ class _LogisticsClassesPageState extends State<LogisticsClassesPage> {
                                   itemCount: classes.length,
                                   itemBuilder: (context, index) {
                                     final classData = classes[index];
-                                return Card(
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  elevation: 4,
-                                  child: Column(
-                                    children: [
-                                      ListTile(
-                                        contentPadding: const EdgeInsets.all(16),
-                                        leading: CircleAvatar(
-                                          backgroundColor: Colors.orange,
-                                          child: const Icon(
-                                            Icons.class_,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                        title: Text(
-                                          classData['className'] ?? 'Unknown Class',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                          maxLines: 2,
-                                        ),
-                                        subtitle: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            const SizedBox(height: 4),
-                                            Row(
+                                    return Card(
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      elevation: 4,
+                                      child: Column(
+                                        children: [
+                                          ListTile(
+                                            contentPadding:
+                                                const EdgeInsets.all(16),
+                                            leading: const CircleAvatar(
+                                              backgroundColor: Colors.orange,
+                                              child: Icon(
+                                                Icons.class_,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                            title: Text(
+                                              classData['className'] ??
+                                                  'Unknown Class',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 2,
+                                            ),
+                                            subtitle: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
-                                                Icon(Icons.group, size: 16, color: Colors.grey[600]),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  '${classData['total_learners'] ?? '0'} learners',
-                                                  style: const TextStyle(fontSize: 14),
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  children: [
+                                                    Icon(Icons.group,
+                                                        size: 16,
+                                                        color:
+                                                            Colors.grey[600]),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      '${classData['total_learners'] ?? '0'} learners',
+                                                      style: const TextStyle(
+                                                          fontSize: 14),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  children: [
+                                                    Icon(
+                                                        classData['facilitator_name'] !=
+                                                                    null &&
+                                                                classData[
+                                                                        'facilitator_name'] !=
+                                                                    'No Facilitator Assigned'
+                                                            ? Icons.person
+                                                            : Icons.person_off,
+                                                        size: 16,
+                                                        color: classData[
+                                                                        'facilitator_name'] !=
+                                                                    null &&
+                                                                classData[
+                                                                        'facilitator_name'] !=
+                                                                    'No Facilitator Assigned'
+                                                            ? Colors.grey[600]
+                                                            : Colors.red[400]),
+                                                    const SizedBox(width: 4),
+                                                    Expanded(
+                                                      child: Text(
+                                                        classData['facilitator_name'] !=
+                                                                    null &&
+                                                                classData[
+                                                                        'facilitator_name'] !=
+                                                                    'No Facilitator Assigned'
+                                                            ? classData[
+                                                                'facilitator_name']
+                                                            : 'No Facilitator Assigned',
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: TextStyle(
+                                                          fontSize: 14,
+                                                          fontWeight: classData[
+                                                                          'facilitator_name'] !=
+                                                                      null &&
+                                                                  classData[
+                                                                          'facilitator_name'] !=
+                                                                      'No Facilitator Assigned'
+                                                              ? FontWeight.w500
+                                                              : FontWeight
+                                                                  .normal,
+                                                          color: classData[
+                                                                          'facilitator_name'] !=
+                                                                      null &&
+                                                                  classData[
+                                                                          'facilitator_name'] !=
+                                                                      'No Facilitator Assigned'
+                                                              ? Colors.black87
+                                                              : Colors.red[400],
+                                                          fontStyle: classData[
+                                                                          'facilitator_name'] !=
+                                                                      null &&
+                                                                  classData[
+                                                                          'facilitator_name'] !=
+                                                                      'No Facilitator Assigned'
+                                                              ? FontStyle.normal
+                                                              : FontStyle
+                                                                  .italic,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
                                               ],
                                             ),
-                                            const SizedBox(height: 4),
-                                            Row(
+                                            trailing: Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
                                               children: [
-                                                Icon(
-                                                  classData['facilitator_name'] != null && 
-                                                  classData['facilitator_name'] != 'No Facilitator Assigned'
-                                                    ? Icons.person 
-                                                    : Icons.person_off, 
-                                                  size: 16, 
-                                                  color: classData['facilitator_name'] != null && 
-                                                         classData['facilitator_name'] != 'No Facilitator Assigned'
-                                                    ? Colors.grey[600]
-                                                    : Colors.red[400]
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Expanded(
-                                                  child: Text(
-                                                    classData['facilitator_name'] != null && 
-                                                    classData['facilitator_name'] != 'No Facilitator Assigned'
-                                                      ? classData['facilitator_name']
-                                                      : 'No Facilitator Assigned',
-                                                    overflow: TextOverflow.ellipsis,
-                                                    style: TextStyle(
-                                                      fontSize: 14,
-                                                      fontWeight: classData['facilitator_name'] != null && 
-                                                                 classData['facilitator_name'] != 'No Facilitator Assigned'
-                                                        ? FontWeight.w500
-                                                        : FontWeight.normal,
-                                                      color: classData['facilitator_name'] != null && 
-                                                             classData['facilitator_name'] != 'No Facilitator Assigned'
-                                                        ? Colors.black87
-                                                        : Colors.red[400],
-                                                      fontStyle: classData['facilitator_name'] != null && 
-                                                                classData['facilitator_name'] != 'No Facilitator Assigned'
-                                                        ? FontStyle.normal
-                                                        : FontStyle.italic,
-                                                    ),
+                                                Icon(Icons.inventory,
+                                                    color: Colors.orange[600]),
+                                                Text(
+                                                  'Materials',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: Colors.orange[600],
+                                                    fontWeight: FontWeight.bold,
                                                   ),
                                                 ),
                                               ],
                                             ),
-                                          ],
-                                        ),
-                                        trailing: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Icon(Icons.inventory, color: Colors.orange[600]),
-                                            Text(
-                                              'Materials',
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                color: Colors.orange[600],
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => LogisticsLearningMaterialFormPage(
-                                                classID: classData['classID'].toString(),
-                                                logisticsId: widget.logisticsId,
-                                                logisticsName: widget.logisticsName,
-                                                siteId: widget.siteId,
-                                                siteName: widget.siteName,
-                                                classId: classData['classID'].toString(),
-                                                className: classData['className'] ?? 'Unknown Class',
-                                                facilitatorId: classData['facilitator_id']?.toString() ?? '',
-                                                facilitatorName: classData['facilitator_name'] ?? '',
-                                              ),
-                                            ),
-                                          );
-                                        },
+                                            onTap: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) =>
+                                                      LogisticsLearningMaterialFormPage(
+                                                    classID:
+                                                        classData['classID']
+                                                            .toString(),
+                                                    logisticsId:
+                                                        widget.logisticsId,
+                                                    logisticsName:
+                                                        widget.logisticsName,
+                                                    siteId: widget.siteId,
+                                                    siteName: widget.siteName,
+                                                    classId:
+                                                        classData['classID']
+                                                            .toString(),
+                                                    className: classData[
+                                                            'className'] ??
+                                                        'Unknown Class',
+                                                    facilitatorId: classData[
+                                                                'facilitator_id']
+                                                            ?.toString() ??
+                                                        '',
+                                                    facilitatorName: classData[
+                                                            'facilitator_name'] ??
+                                                        '',
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
+                                    );
+                                  },
+                                ),
+                              ),
           ),
         ],
       ),

@@ -33,13 +33,13 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
   bool isLoading = true;
   late TabController _tabController;
   final SignatureController _learnerSignatureController =
-  SignatureController(penStrokeWidth: 2, penColor: Colors.black);
+      SignatureController(penStrokeWidth: 2, penColor: Colors.black);
   final SignatureController _witnessSignatureController =
-  SignatureController(penStrokeWidth: 2, penColor: Colors.black);
+      SignatureController(penStrokeWidth: 2, penColor: Colors.black);
   final TextEditingController _learnerInitialsController =
-  TextEditingController();
+      TextEditingController();
   final TextEditingController _witnessInitialsController =
-  TextEditingController();
+      TextEditingController();
   CameraController? _cameraController;
   bool _isCameraInitialized = false;
   final bool _isWitnessSignatureCompleted = false;
@@ -197,7 +197,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       // Fallback to local database
       print('Fetching from local database...');
       final localLearnerData =
-      await DatabaseHelper().fetchLearnerByID(widget.learnerID);
+          await DatabaseHelper().fetchLearnerByID(widget.learnerID);
       if (localLearnerData != null) {
         setState(() {
           learnerData = localLearnerData;
@@ -317,7 +317,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
       // Handle learner signature
       final learnerSignatureBytes =
-      await _learnerSignatureController.toPngBytes();
+          await _learnerSignatureController.toPngBytes();
       if (learnerSignatureBytes != null) {
         final signaturePath = await _saveSignatureImage(
             learnerSignatureBytes, 'learner_signature');
@@ -335,7 +335,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
       // Handle witness signature
       final witnessSignatureBytes =
-      await _witnessSignatureController.toPngBytes();
+          await _witnessSignatureController.toPngBytes();
       if (witnessSignatureBytes != null) {
         final signaturePath = await _saveSignatureImage(
             witnessSignatureBytes, 'witness_signature');
@@ -668,7 +668,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
           width: 300,
           height: 200,
           child:
-          Signature(controller: controller, backgroundColor: Colors.white),
+              Signature(controller: controller, backgroundColor: Colors.white),
         ),
         actions: [
           TextButton(
@@ -679,7 +679,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                 final signatureBytes = await controller.toPngBytes();
                 if (signatureBytes != null) {
                   final signaturePath =
-                  await _saveSignatureImage(signatureBytes, fieldName);
+                      await _saveSignatureImage(signatureBytes, fieldName);
                   bool isConnected = await _checkConnectivity();
                   if (isConnected) {
                     await _uploadSignature(signaturePath, fieldName);
@@ -810,74 +810,74 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : TabBarView(
-        controller: _tabController,
-        children: [
-          _buildDetailsTab(),
-          if (_isMinor) _buildGuardianTab(),
-          _buildSignatureTab(),
-          _buildFingerprintTab(context),
-          _buildWorkExperienceTab(),
-          _buildAgreementTab(),
-        ],
-      ),
+              controller: _tabController,
+              children: [
+                _buildDetailsTab(),
+                if (_isMinor) _buildGuardianTab(),
+                _buildSignatureTab(),
+                _buildFingerprintTab(context),
+                _buildWorkExperienceTab(),
+                _buildAgreementTab(),
+              ],
+            ),
     );
   }
 
   Widget _buildDetailsTab() {
     return learnerData != null && !learnerData!.containsKey('message')
         ? Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Profile Image Section
-            GestureDetector(
-              onTap: () => _captureImage(true),
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.blue, width: 3),
-                ),
-                child: CircleAvatar(
-                  radius: 60,
-                  backgroundColor: Colors.grey[200],
-                  child: ClipOval(
-                    child: _buildProfileImage(),
+            padding: const EdgeInsets.all(16.0),
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  // Profile Image Section
+                  GestureDetector(
+                    onTap: () => _captureImage(true),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.blue, width: 3),
+                      ),
+                      child: CircleAvatar(
+                        radius: 60,
+                        backgroundColor: Colors.grey[200],
+                        child: ClipOval(
+                          child: _buildProfileImage(),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 8.0),
+                  Text(
+                    'Tap to update profile image',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 16.0),
+                  // Age Display
+                  _buildAgeDisplay(),
+                  const SizedBox(height: 16.0),
+                  // Bank Details
+                  _buildBankDetails(),
+                  const SizedBox(height: 16.0),
+                  _buildDataList(learnerData!.entries.toList()),
+                  const SizedBox(height: 16.0),
+                  ElevatedButton(
+                    onPressed: _updateData,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 32.0, vertical: 12.0),
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Update Learner Data'),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8.0),
-            Text(
-              'Tap to update profile image',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 12,
-              ),
-            ),
-            const SizedBox(height: 16.0),
-            // Age Display
-            _buildAgeDisplay(),
-            const SizedBox(height: 16.0),
-            // Bank Details
-            _buildBankDetails(),
-            const SizedBox(height: 16.0),
-            _buildDataList(learnerData!.entries.toList()),
-            const SizedBox(height: 16.0),
-            ElevatedButton(
-              onPressed: _updateData,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 32.0, vertical: 12.0),
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Update Learner Data'),
-            ),
-          ],
-        ),
-      ),
-    )
+          )
         : Center(child: Text(learnerData?['message'] ?? 'No data available'));
   }
 
@@ -914,7 +914,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
               child: CircularProgressIndicator(
                 value: loadingProgress.expectedTotalBytes != null
                     ? loadingProgress.cumulativeBytesLoaded /
-                    loadingProgress.expectedTotalBytes!
+                        loadingProgress.expectedTotalBytes!
                     : null,
               ),
             ),
@@ -1095,16 +1095,16 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       'futronic_right_template',
       'profile_image',
     ];
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: entries.map((entry) {
         // Skip profile_image from display (it's shown separately)
         if (entry.key == 'profile_image') return const SizedBox.shrink();
-        
+
         // Check if this field should be read-only
         final bool isReadOnly = readOnlyFields.contains(entry.key);
-        
+
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 4.0),
           child: Card(
@@ -1147,7 +1147,10 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                     controller: _controllers[entry.key],
                     enabled: !isReadOnly,
                     readOnly: isReadOnly,
-                    maxLines: isReadOnly && (entry.value?.toString().length ?? 0) > 50 ? 3 : 1,
+                    maxLines:
+                        isReadOnly && (entry.value?.toString().length ?? 0) > 50
+                            ? 3
+                            : 1,
                     decoration: InputDecoration(
                       labelText: entry.key,
                       border: const OutlineInputBorder(),
@@ -1260,7 +1263,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    const Row(
                       children: [
                         Icon(Icons.edit, color: Colors.blue),
                         SizedBox(width: 8),
@@ -1274,16 +1277,16 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                         ),
                       ],
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     _buildSignatureDisplay('signature', 'Learner Signature'),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () => _openSignaturePad(),
-                            icon: Icon(Icons.edit),
-                            label: Text('Capture New Signature'),
+                            icon: const Icon(Icons.edit),
+                            label: const Text('Capture New Signature'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.blue,
                               foregroundColor: Colors.white,
@@ -1297,7 +1300,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
               ),
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             // Witness Signature Section
             Card(
@@ -1307,7 +1310,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    const Row(
                       children: [
                         Icon(Icons.person_add, color: Colors.green),
                         SizedBox(width: 8),
@@ -1321,17 +1324,17 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                         ),
                       ],
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     _buildSignatureDisplay(
                         'witness_signature', 'Witness Signature'),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () => _openWitnessSignaturePad(),
-                            icon: Icon(Icons.person_add),
-                            label: Text('Capture Witness Signature'),
+                            icon: const Icon(Icons.person_add),
+                            label: const Text('Capture Witness Signature'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,
@@ -1345,7 +1348,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
               ),
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             // Initials Section
             Card(
@@ -1355,7 +1358,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    const Row(
                       children: [
                         Icon(Icons.text_fields, color: Colors.orange),
                         SizedBox(width: 8),
@@ -1369,26 +1372,26 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                         ),
                       ],
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Learner Initials:'),
-                              SizedBox(height: 8),
+                              const Text('Learner Initials:'),
+                              const SizedBox(height: 8),
                               Container(
-                                padding: EdgeInsets.all(12),
+                                padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   border: Border.all(color: Colors.grey),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
                                   learnerData?['learner_initials']
-                                      ?.toString() ??
+                                          ?.toString() ??
                                       'Not captured',
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -1397,24 +1400,24 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                             ],
                           ),
                         ),
-                        SizedBox(width: 16),
+                        const SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Witness Initials:'),
-                              SizedBox(height: 8),
+                              const Text('Witness Initials:'),
+                              const SizedBox(height: 8),
                               Container(
-                                padding: EdgeInsets.all(12),
+                                padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   border: Border.all(color: Colors.grey),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
                                   learnerData?['witness_initials']
-                                      ?.toString() ??
+                                          ?.toString() ??
                                       'Not captured',
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -1425,14 +1428,14 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                         ),
                       ],
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () => _openInitialsDialog(),
-                            icon: Icon(Icons.text_fields),
-                            label: Text('Update Initials'),
+                            icon: const Icon(Icons.text_fields),
+                            label: const Text('Update Initials'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.orange,
                               foregroundColor: Colors.white,
@@ -1472,7 +1475,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                 child: CircularProgressIndicator(
                   value: loadingProgress.expectedTotalBytes != null
                       ? loadingProgress.cumulativeBytesLoaded /
-                      loadingProgress.expectedTotalBytes!
+                          loadingProgress.expectedTotalBytes!
                       : null,
                 ),
               );
@@ -1486,7 +1489,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.error, color: Colors.grey[600], size: 40),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       Text(
                         'Signature not found',
                         style: TextStyle(color: Colors.grey[600]),
@@ -1511,7 +1514,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.edit, color: Colors.grey[600], size: 40),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
                 'No signature captured',
                 style: TextStyle(color: Colors.grey[600]),
@@ -1586,7 +1589,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
                 content:
-                Text('Failed to upload image: ${jsonResponse['message']}')),
+                    Text('Failed to upload image: ${jsonResponse['message']}')),
           );
           await saveImageLocally(imagePath);
         }
@@ -1623,7 +1626,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    const Row(
                       children: [
                         Icon(Icons.description, color: Colors.blue, size: 28),
                         SizedBox(width: 12),
@@ -1639,7 +1642,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                         ),
                       ],
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       'Complete all required signatures and initials to generate the agreement document',
                       style: TextStyle(
@@ -1652,7 +1655,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
               ),
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             // Agreement Status Section
             Card(
@@ -1670,25 +1673,25 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                         color: Colors.grey[800],
                       ),
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     _buildStatusIndicator('Learner Signature', 'signature'),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     _buildStatusIndicator(
                         'Learner Initials', 'learner_initials'),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     _buildStatusIndicator(
                         'Witness Signature', 'witness_signature'),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     _buildStatusIndicator(
                         'Witness Initials', 'witness_initials'),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     _buildOverallStatus(),
                   ],
                 ),
               ),
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             // Signatures Display Section
             Card(
@@ -1706,14 +1709,14 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                         color: Colors.grey[800],
                       ),
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Expanded(
                           child: _buildSignatureCard(
                               'Learner Signature', 'signature', Colors.blue),
                         ),
-                        SizedBox(width: 12),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: _buildSignatureCard('Witness Signature',
                               'witness_signature', Colors.green),
@@ -1725,7 +1728,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
               ),
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             // Action Buttons Section
             Card(
@@ -1743,7 +1746,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                         color: Colors.grey[800],
                       ),
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Expanded(
@@ -1751,48 +1754,48 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                             onPressed: _isAgreementComplete()
                                 ? _downloadAgreement
                                 : null,
-                            icon: Icon(Icons.download),
-                            label: Text('Download Agreement'),
+                            icon: const Icon(Icons.download),
+                            label: const Text('Download Agreement'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _isAgreementComplete()
                                   ? Colors.green
                                   : Colors.grey,
                               foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
                         ),
-                        SizedBox(width: 12),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: _openSignaturePad,
-                            icon: Icon(Icons.edit),
-                            label: Text('Capture Signatures'),
+                            icon: const Icon(Icons.edit),
+                            label: const Text('Capture Signatures'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.blue,
                               foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
                         ),
                       ],
                     ),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: _openInitialsDialog,
-                            icon: Icon(Icons.text_fields),
-                            label: Text('Update Initials'),
+                            icon: const Icon(Icons.text_fields),
+                            label: const Text('Update Initials'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.orange,
                               foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
                         ),
-                        SizedBox(width: 12),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () {
@@ -1801,12 +1804,12 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                               });
                               fetchLearnerDetails();
                             },
-                            icon: Icon(Icons.refresh),
-                            label: Text('Refresh Data'),
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Refresh Data'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.purple,
                               foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
                         ),
@@ -1831,7 +1834,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
           color: isCompleted ? Colors.green : Colors.grey,
           size: 24,
         ),
-        SizedBox(width: 12),
+        const SizedBox(width: 12),
         Expanded(
           child: Text(
             title,
@@ -1843,7 +1846,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
           ),
         ),
         Container(
-          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: isCompleted ? Colors.green[100] : Colors.grey[100],
             borderRadius: BorderRadius.circular(12),
@@ -1864,7 +1867,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
   Widget _buildOverallStatus() {
     bool isComplete = _isAgreementComplete();
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isComplete ? Colors.green[50] : Colors.orange[50],
         borderRadius: BorderRadius.circular(8),
@@ -1880,7 +1883,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
             color: isComplete ? Colors.green : Colors.orange,
             size: 32,
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1893,7 +1896,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                     color: isComplete ? Colors.green[800] : Colors.orange[800],
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   isComplete
                       ? 'All required signatures and initials have been captured. You can now download the agreement.'
@@ -1923,10 +1926,10 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       child: Column(
         children: [
           Container(
-            padding: EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: hasSignature ? color : Colors.grey[100],
-              borderRadius: BorderRadius.only(
+              borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(8),
                 topRight: Radius.circular(8),
               ),
@@ -1938,7 +1941,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                   color: hasSignature ? Colors.white : Colors.grey[600],
                   size: 16,
                 ),
-                SizedBox(width: 4),
+                const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     title,
@@ -1956,63 +1959,63 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
             height: 120,
             child: hasSignature
                 ? ClipRRect(
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(8),
-                bottomRight: Radius.circular(8),
-              ),
-              child: Image.network(
-                '${AppConfig.signaturesUrl}/$signaturePath',
-                fit: BoxFit.contain,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Center(
-                    child: CircularProgressIndicator(
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
-                          : null,
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(8),
+                      bottomRight: Radius.circular(8),
                     ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey[100],
+                    child: Image.network(
+                      '${AppConfig.signaturesUrl}/$signaturePath',
+                      fit: BoxFit.contain,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Center(
+                          child: CircularProgressIndicator(
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                                : null,
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey[100],
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.error,
+                                    color: Colors.grey[600], size: 24),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Not found',
+                                  style: TextStyle(
+                                      color: Colors.grey[600], fontSize: 10),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  )
+                : Container(
+                    color: Colors.grey[50],
                     child: Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.error,
-                              color: Colors.grey[600], size: 24),
-                          SizedBox(height: 4),
+                          Icon(Icons.edit, color: Colors.grey[400], size: 32),
+                          const SizedBox(height: 4),
                           Text(
-                            'Not found',
+                            'No signature',
                             style: TextStyle(
-                                color: Colors.grey[600], fontSize: 10),
+                                color: Colors.grey[400], fontSize: 12),
                           ),
                         ],
                       ),
                     ),
-                  );
-                },
-              ),
-            )
-                : Container(
-              color: Colors.grey[50],
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.edit, color: Colors.grey[400], size: 32),
-                    SizedBox(height: 4),
-                    Text(
-                      'No signature',
-                      style: TextStyle(
-                          color: Colors.grey[400], fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+                  ),
           ),
         ],
       ),
@@ -2114,8 +2117,8 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
     final relationships = document.findAllElements('Relationship');
     final ids = relationships
         .map((e) =>
-    int.tryParse(e.getAttribute('Id')?.replaceAll('rId', '') ?? '0') ??
-        0)
+            int.tryParse(e.getAttribute('Id')?.replaceAll('rId', '') ?? '0') ??
+            0)
         .toList();
     return (ids.isEmpty ? 0 : ids.reduce((a, b) => a > b ? a : b)) + 1;
   }
@@ -2225,26 +2228,26 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       // Load the template from assets
       if (!await templateFile.exists()) {
         final byteData =
-        await rootBundle.load('assets/Cleaned_Updated_Agreement_V4.docx');
+            await rootBundle.load('assets/Cleaned_Updated_Agreement_V4.docx');
         await templateFile.writeAsBytes(byteData.buffer.asUint8List());
       }
 
       final bytes = await templateFile.readAsBytes();
       final originalArchive = ZipDecoder().decodeBytes(bytes);
       final documentXmlFile = originalArchive.firstWhere(
-            (file) => file.name == 'word/document.xml',
+        (file) => file.name == 'word/document.xml',
         orElse: () => throw 'document.xml not found',
       );
       var documentXml =
-      String.fromCharCodes(documentXmlFile.content as List<int>);
+          String.fromCharCodes(documentXmlFile.content as List<int>);
       final relsFile = originalArchive.firstWhere(
-            (file) => file.name == 'word/_rels/document.xml.rels',
+        (file) => file.name == 'word/_rels/document.xml.rels',
         orElse: () => throw 'document.xml.rels not found',
       );
       var relsXml = String.fromCharCodes(relsFile.content as List<int>);
 
       final learnerData =
-      await DatabaseHelper().fetchLearnerByID(widget.learnerID);
+          await DatabaseHelper().fetchLearnerByID(widget.learnerID);
       if (learnerData == null) throw 'Learner data not found';
 
       final replacements = <String, String>{
@@ -2259,16 +2262,16 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         r'${sdp_name}': learnerData['sdp_name']?.toString() ?? 'N/A',
         r'${sdp_logo}': learnerData['sdp_logo']?.toString() ?? 'N/A',
         r'${learner_initials}':
-        learnerData['learner_initials']?.toString() ?? 'N/A',
+            learnerData['learner_initials']?.toString() ?? 'N/A',
         r'${witness_initials}':
-        learnerData['witness_initials']?.toString() ?? 'N/A',
+            learnerData['witness_initials']?.toString() ?? 'N/A',
         r'${qualification_name}':
-        learnerData['qualification_name']?.toString() ?? 'N/A',
+            learnerData['qualification_name']?.toString() ?? 'N/A',
         r'${qualification_id}':
-        learnerData['qualification_id']?.toString() ?? 'N/A',
+            learnerData['qualification_id']?.toString() ?? 'N/A',
         r'${pathway_name}': learnerData['pathway_name']?.toString() ?? 'N/A',
         r'${Project_pathway}':
-        learnerData['Project_pathway']?.toString() ?? 'N/A',
+            learnerData['Project_pathway']?.toString() ?? 'N/A',
       };
       documentXml = _updatePlaceholdersInDocument(documentXml, replacements);
 
@@ -2277,7 +2280,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       final imagePlaceholders = {
         r'${learner_signature}': learnerData['signature']?.toString() ?? 'N/A',
         r'${witness_signature}':
-        learnerData['witness_signature']?.toString() ?? 'N/A',
+            learnerData['witness_signature']?.toString() ?? 'N/A',
       };
 
       for (final entry in imagePlaceholders.entries) {
@@ -2285,13 +2288,13 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         var filePath = entry.value;
         if (filePath != 'N/A') {
           final fullImagePath =
-          filePath.startsWith('/') ? filePath : '${docDir.path}/$filePath';
+              filePath.startsWith('/') ? filePath : '${docDir.path}/$filePath';
           final imageFile = File(fullImagePath);
           if (await imageFile.exists()) {
             final imageBytes = await imageFile.readAsBytes();
             final imageRelId = 'rId$nextRelId';
             final imageName =
-            placeholder.replaceAll(r'${', '').replaceAll('}', '');
+                placeholder.replaceAll(r'${', '').replaceAll('}', '');
             newArchive.addFile(ArchiveFile(
                 'word/media/$imageName.png', imageBytes.length, imageBytes));
             relsXml =

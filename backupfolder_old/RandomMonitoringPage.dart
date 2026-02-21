@@ -82,7 +82,7 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
       final bool granted = await _futronicService.requestUsbPermission();
 
       // Wait a bit and check again (permission dialog takes time)
-      await Future.delayed(Duration(seconds: 1));
+      await Future.delayed(const Duration(seconds: 1));
       final bool finalStatus = await _futronicService.checkUsbPermission();
 
       setState(() {
@@ -93,14 +93,14 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
 
       if (finalStatus) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('USB permission granted for Futronic scanner'),
             backgroundColor: Colors.green,
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text(
                 'USB permission denied. Please allow access to use the fingerprint scanner.'),
             backgroundColor: Colors.orange,
@@ -128,7 +128,7 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
 
   void _startTimeChecking() {
     // Check time every minute
-    _monitoringTimer = Timer.periodic(Duration(minutes: 1), (timer) {
+    _monitoringTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
       _checkTimeAndStartMonitoring();
     });
   }
@@ -257,7 +257,7 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
   void _startCountdown() {
     _countdownTimer?.cancel();
 
-    _countdownTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
         _countdownSeconds--;
       });
@@ -312,7 +312,7 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
     // Decide next action based on session
     if (_isAfternoonSession) {
       // Afternoon: immediately call next person
-      Future.delayed(Duration(seconds: 2), () {
+      Future.delayed(const Duration(seconds: 2), () {
         if (_availableLearners.isNotEmpty) {
           _startRandomMonitoring();
         }
@@ -340,7 +340,7 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
     });
 
     // Immediately call next person (both morning and afternoon)
-    Future.delayed(Duration(seconds: 2), () {
+    Future.delayed(const Duration(seconds: 2), () {
       if (_availableLearners.isNotEmpty && !_isLunchBreak) {
         _startRandomMonitoring();
       }
@@ -472,11 +472,11 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
     if (!_isMonitoringActive || _currentLearner == null) {
       return Card(
         child: Padding(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              Icon(Icons.schedule, size: 48, color: Colors.grey),
-              SizedBox(height: 8),
+              const Icon(Icons.schedule, size: 48, color: Colors.grey),
+              const SizedBox(height: 8),
               Text(
                 _isLunchBreak
                     ? 'Lunch Break (12:00 - 13:00)'
@@ -495,14 +495,14 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
     return Card(
       color: Colors.blue[50],
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Text(
+            const Text(
               'Currently Monitoring',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
 
             // Learner info
             Row(
@@ -511,18 +511,18 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
                   backgroundColor: Colors.blue,
                   child: Text(
                     '${_currentLearner!['Name'][0]}${_currentLearner!['Surname'][0]}',
-                    style: TextStyle(
+                    style: const TextStyle(
                         color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         '${_currentLearner!['Name']} ${_currentLearner!['Surname']}',
-                        style: TextStyle(
+                        style: const TextStyle(
                             fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                       Text(
@@ -535,19 +535,19 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
               ],
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             // Attempt info
             Text(
               'Attempt $_currentAttempt of 3',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
 
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
 
             // Countdown
             Container(
-              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               decoration: BoxDecoration(
                 color: _countdownSeconds <= 60
                     ? Colors.red[100]
@@ -566,7 +566,7 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
               ),
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             // Action buttons
             Row(
@@ -574,25 +574,25 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: _markAsPresent,
-                    icon: Icon(Icons.check_circle),
-                    label: Text('PRESENT'),
+                    icon: const Icon(Icons.check_circle),
+                    label: const Text('PRESENT'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: _markAsAbsent,
-                    icon: Icon(Icons.cancel),
-                    label: Text('ABSENT'),
+                    icon: const Icon(Icons.cancel),
+                    label: const Text('ABSENT'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
                       foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
                 ),
@@ -608,7 +608,7 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
     return Card(
       color: _usbPermissionGranted ? Colors.green[50] : Colors.orange[50],
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Row(
           children: [
             Icon(
@@ -616,7 +616,7 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
               color: _usbPermissionGranted ? Colors.green : Colors.orange,
               size: 32,
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -633,7 +633,7 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
                           : Colors.orange[700],
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     _usbPermissionGranted
                         ? 'Fingerprint scanner is accessible'
@@ -653,7 +653,7 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
                   backgroundColor: Colors.orange,
                   foregroundColor: Colors.white,
                 ),
-                child: Text('Allow'),
+                child: const Text('Allow'),
               ),
           ],
         ),
@@ -684,7 +684,7 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
 
     return Card(
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Row(
           children: [
             Container(
@@ -695,14 +695,15 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
                 shape: BoxShape.circle,
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     sessionStatus,
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   Text(
                     'Current time: $timeStr',
@@ -713,7 +714,7 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
             ),
             Text(
               '${_availableLearners.length} remaining',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -728,7 +729,7 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => Dialog(
+        builder: (context) => const Dialog(
           child: Padding(
             padding: EdgeInsets.all(20),
             child: Row(
@@ -750,7 +751,7 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
       if (unsyncedRecords.isEmpty) {
         Navigator.of(context).pop(); // Close loading dialog
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('No records to sync'),
             backgroundColor: Colors.blue,
           ),
@@ -770,7 +771,7 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
             content: Text(
                 '✓ Successfully synced $syncedCount monitoring records to server'),
             backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
+            duration: const Duration(seconds: 3),
           ),
         );
 
@@ -782,7 +783,7 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
           SnackBar(
             content: Text('Sync failed: $error'),
             backgroundColor: Colors.red,
-            duration: Duration(seconds: 5),
+            duration: const Duration(seconds: 5),
           ),
         );
       }
@@ -793,7 +794,7 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
         SnackBar(
           content: Text('Sync error: $e'),
           backgroundColor: Colors.red,
-          duration: Duration(seconds: 5),
+          duration: const Duration(seconds: 5),
         ),
       );
     }
@@ -803,12 +804,12 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Random Monitoring System'),
+        title: const Text('Random Monitoring System'),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh),
             onPressed: () {
               _loadAvailableLearners();
               _loadTodaysHistory();
@@ -818,8 +819,8 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _manualSyncMonitoringRecords,
-        icon: Icon(Icons.cloud_upload),
-        label: Text('SYNC'),
+        icon: const Icon(Icons.cloud_upload),
+        label: const Text('SYNC'),
         backgroundColor: Colors.green,
         tooltip: 'Sync monitoring records to server',
       ),
@@ -829,28 +830,28 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
           await _loadTodaysHistory();
         },
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildUsbPermissionCard(),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               _buildStatusCard(),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               _buildCurrentMonitoringCard(),
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
 
               // Today's History
-              Text(
+              const Text(
                 'Today\'s Monitoring History',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
 
               if (_monitoringHistory.isEmpty)
                 Card(
                   child: Padding(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     child: Center(
                       child: Text(
                         'No monitoring records for today',
@@ -891,7 +892,8 @@ class _RandomMonitoringPageState extends State<RandomMonitoringPage> {
                             ),
                             trailing: Text(
                               'Attempts: ${_getAttemptCount(record)}',
-                              style: TextStyle(fontWeight: FontWeight.bold),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ),
                         ))

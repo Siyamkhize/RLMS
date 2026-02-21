@@ -519,11 +519,11 @@ class _ModerationReportPageState extends State<ModerationReportPage> {
         future: fetchModerationReport(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(child: Text('No data found'));
+            return const Center(child: Text('No data found'));
           } else {
             classes = snapshot.data!;
             return Column(
@@ -1943,9 +1943,9 @@ class _ModeratorPotholeChecklistLearnerListPageState extends State<ModeratorPoth
                             future: _checkPotholeChecklistMarks(learnerId),
                             builder: (context, snapshot) {
                               if (snapshot.connectionState == ConnectionState.waiting) {
-                                return ElevatedButton(
+                                return const ElevatedButton(
                                   onPressed: null,
-                                  child: const SizedBox(
+                                  child: SizedBox(
                                     width: 16,
                                     height: 16,
                                     child: CircularProgressIndicator(strokeWidth: 2),
@@ -2437,11 +2437,11 @@ class _ModeratorPotholeChecklistViewPageState extends State<ModeratorPotholeChec
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            const Row(
                               children: [
-                                const Icon(Icons.image, color: Colors.purple, size: 24),
-                                const SizedBox(width: 12),
-                                const Text(
+                                Icon(Icons.image, color: Colors.purple, size: 24),
+                                SizedBox(width: 12),
+                                Text(
                                   'Pothole Evidence Images',
                                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.purple),
                                 ),

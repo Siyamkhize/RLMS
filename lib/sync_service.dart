@@ -845,7 +845,7 @@ class SyncService extends ChangeNotifier {
 
             // Send request
             final response =
-                await request.send().timeout(Duration(seconds: 30));
+                await request.send().timeout(const Duration(seconds: 30));
             final responseString = await response.stream.bytesToString();
 
             print(
@@ -861,7 +861,7 @@ class SyncService extends ChangeNotifier {
                   syncMessage =
                       'Max retries reached for record $clockingId: Empty response';
                 }
-                await Future.delayed(Duration(seconds: 1));
+                await Future.delayed(const Duration(seconds: 1));
                 continue;
               }
 
@@ -884,7 +884,7 @@ class SyncService extends ChangeNotifier {
                     syncMessage =
                         'Max retries reached for record $clockingId: ${responseData['message']}';
                   }
-                  await Future.delayed(Duration(seconds: 1));
+                  await Future.delayed(const Duration(seconds: 1));
                   continue;
                 }
               } catch (e) {
@@ -896,7 +896,7 @@ class SyncService extends ChangeNotifier {
                   syncMessage =
                       'Max retries reached for record $clockingId: Invalid response';
                 }
-                await Future.delayed(Duration(seconds: 1));
+                await Future.delayed(const Duration(seconds: 1));
                 continue;
               }
             } else {
@@ -908,7 +908,7 @@ class SyncService extends ChangeNotifier {
                 syncMessage =
                     'Max retries reached for record $clockingId: Status ${response.statusCode}';
               }
-              await Future.delayed(Duration(seconds: 1));
+              await Future.delayed(const Duration(seconds: 1));
               continue;
             }
           } catch (e) {
@@ -917,7 +917,7 @@ class SyncService extends ChangeNotifier {
             if (attempt == maxRetries) {
               syncMessage = 'Max retries reached for record $clockingId: $e';
             }
-            await Future.delayed(Duration(seconds: 1));
+            await Future.delayed(const Duration(seconds: 1));
             continue;
           }
         }
@@ -1250,7 +1250,7 @@ class SyncService extends ChangeNotifier {
               showSyncError(
                   "Failed to sync record ${localData['clocking_id']}");
             }
-            await Future.delayed(Duration(seconds: 2));
+            await Future.delayed(const Duration(seconds: 2));
           }
         }
       }
@@ -2262,7 +2262,8 @@ class SyncService extends ChangeNotifier {
       int retryCount = 0;
       while (retryCount < maxRetries) {
         try {
-          final response = await request.send().timeout(Duration(seconds: 30));
+          final response =
+              await request.send().timeout(const Duration(seconds: 30));
           final responseBody = await http.Response.fromStream(response);
 
           print("Server Response: ${responseBody.body}");
@@ -2286,7 +2287,7 @@ class SyncService extends ChangeNotifier {
           if (retryCount == maxRetries) {
             print("Max retries reached for LearnerID: $learnerId");
           }
-          await Future.delayed(Duration(seconds: 5));
+          await Future.delayed(const Duration(seconds: 5));
         }
       }
     } catch (e) {
@@ -2524,7 +2525,7 @@ class SyncService extends ChangeNotifier {
             onTimeout: () {
               errors.add('Request timed out for LearnerID $learnerID');
               print('DEBUG: ${errors.last}');
-              return http.StreamedResponse(Stream.empty(), 408);
+              return http.StreamedResponse(const Stream.empty(), 408);
             },
           );
 
@@ -2853,7 +2854,7 @@ class SyncService extends ChangeNotifier {
 
             // Send request
             final response =
-                await request.send().timeout(Duration(seconds: 30));
+                await request.send().timeout(const Duration(seconds: 30));
             final responseString = await response.stream.bytesToString();
 
             print(
@@ -2869,7 +2870,7 @@ class SyncService extends ChangeNotifier {
                   syncMessage =
                       'Max retries reached for record $clockingId: Empty response';
                 }
-                await Future.delayed(Duration(seconds: 1));
+                await Future.delayed(const Duration(seconds: 1));
                 continue;
               }
 
@@ -2892,7 +2893,7 @@ class SyncService extends ChangeNotifier {
                     syncMessage =
                         'Max retries reached for record $clockingId: ${responseData['message']}';
                   }
-                  await Future.delayed(Duration(seconds: 1));
+                  await Future.delayed(const Duration(seconds: 1));
                   continue;
                 }
               } catch (e) {
@@ -2904,7 +2905,7 @@ class SyncService extends ChangeNotifier {
                   syncMessage =
                       'Max retries reached for record $clockingId: Invalid response';
                 }
-                await Future.delayed(Duration(seconds: 1));
+                await Future.delayed(const Duration(seconds: 1));
                 continue;
               }
             } else {
@@ -2916,7 +2917,7 @@ class SyncService extends ChangeNotifier {
                 syncMessage =
                     'Max retries reached for record $clockingId: Status ${response.statusCode}';
               }
-              await Future.delayed(Duration(seconds: 1));
+              await Future.delayed(const Duration(seconds: 1));
               continue;
             }
           } catch (e) {
@@ -2925,7 +2926,7 @@ class SyncService extends ChangeNotifier {
             if (attempt == maxRetries) {
               syncMessage = 'Max retries reached for record $clockingId: $e';
             }
-            await Future.delayed(Duration(seconds: 1));
+            await Future.delayed(const Duration(seconds: 1));
             continue;
           }
         }

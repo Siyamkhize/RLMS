@@ -274,7 +274,7 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage>
                   const SizedBox(height: 32),
 
                   // Title
-                  Text(
+                  const Text(
                     'Biometric Verification Required',
                     style: TextStyle(
                       fontSize: 24,
@@ -296,7 +296,7 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage>
                     ),
                     child: Text(
                       _formatTime(_timeRemaining),
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 64,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -309,7 +309,7 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage>
                   // Status Message
                   Text(
                     _statusMessage,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 18,
                       color: Colors.white,
                     ),
@@ -348,11 +348,11 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage>
                               ),
                             )
                           else
-                            Icon(Icons.fingerprint, size: 28),
+                            const Icon(Icons.fingerprint, size: 28),
                           const SizedBox(width: 12),
                           Text(
                             _isVerifying ? 'Verifying...' : 'Verify Now',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                             ),
@@ -371,10 +371,10 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage>
                         color: Colors.white.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Row(
+                      child: const Row(
                         children: [
                           Icon(Icons.info_outline, color: Colors.white),
-                          const SizedBox(width: 12),
+                          SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               'You must verify your fingerprint before time expires.',

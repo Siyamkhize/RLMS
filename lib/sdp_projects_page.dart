@@ -203,7 +203,7 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Projects'),
+        title: const Text('Projects'),
         backgroundColor: Colors.blue,
         actions: [
           if (!isLoading && errorMessage.isEmpty && projects.isNotEmpty)
@@ -212,7 +212,7 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
               child: Center(
                 child: Text(
                   '${_sortedProjects.length} of ${projects.length}',
-                  style: TextStyle(fontSize: 14, color: Colors.white70),
+                  style: const TextStyle(fontSize: 14, color: Colors.white70),
                 ),
               ),
             ),
@@ -228,11 +228,11 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
                 controller: _searchController,
                 decoration: InputDecoration(
                   hintText: 'Search by name or ID...',
-                  prefixIcon: Icon(Icons.search),
+                  prefixIcon: const Icon(Icons.search),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
             ),
@@ -241,8 +241,9 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  Text('Sort: ', style: TextStyle(fontWeight: FontWeight.w500)),
-                  SizedBox(width: 8),
+                  const Text('Sort: ',
+                      style: TextStyle(fontWeight: FontWeight.w500)),
+                  const SizedBox(width: 8),
                   ...ProjectSortOption.values.map((opt) {
                     final isSelected = _sortOption == opt;
                     return Padding(
@@ -257,35 +258,35 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
                         },
                       ),
                     );
-                  }).toList(),
+                  }),
                 ],
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
           ],
           Expanded(
             child: isLoading
-                ? Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator())
                 : errorMessage.isNotEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.error_outline,
+                            const Icon(Icons.error_outline,
                                 size: 60, color: Colors.red),
-                            SizedBox(height: 16),
+                            const SizedBox(height: 16),
                             Text(errorMessage,
-                                style: TextStyle(color: Colors.red)),
-                            SizedBox(height: 16),
+                                style: const TextStyle(color: Colors.red)),
+                            const SizedBox(height: 16),
                             ElevatedButton(
                               onPressed: _loadProjects,
-                              child: Text('Retry'),
+                              child: const Text('Retry'),
                             ),
                           ],
                         ),
                       )
                     : projects.isEmpty
-                        ? Center(
+                        ? const Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -300,15 +301,15 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
                         : RefreshIndicator(
                             onRefresh: _loadProjects,
                             child: ListView.builder(
-                              padding: EdgeInsets.all(16),
+                              padding: const EdgeInsets.all(16),
                               itemCount: _sortedProjects.length,
                               itemBuilder: (context, index) {
                                 final project = _sortedProjects[index];
                                 return Card(
                                   elevation: 3,
-                                  margin: EdgeInsets.only(bottom: 12),
+                                  margin: const EdgeInsets.only(bottom: 12),
                                   child: ListTile(
-                                    leading: CircleAvatar(
+                                    leading: const CircleAvatar(
                                       backgroundColor: Colors.blue,
                                       child: Icon(Icons.folder,
                                           color: Colors.white),
@@ -317,7 +318,7 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
                                       project['Project_name'] ??
                                           project['project_name'] ??
                                           'Unknown Project',
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                           fontWeight: FontWeight.bold),
                                     ),
                                     subtitle: Column(
@@ -330,42 +331,46 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
                                               fontSize: 11,
                                               color: Colors.grey[600]),
                                         ),
-                                        SizedBox(height: 4),
+                                        const SizedBox(height: 4),
                                         Row(
                                           children: [
-                                            Icon(Icons.route,
+                                            const Icon(Icons.route,
                                                 size: 14, color: Colors.blue),
-                                            SizedBox(width: 4),
+                                            const SizedBox(width: 4),
                                             Text(
                                               '${project['pathway_count'] ?? 0} pathways',
-                                              style: TextStyle(fontSize: 12),
+                                              style:
+                                                  const TextStyle(fontSize: 12),
                                             ),
-                                            SizedBox(width: 12),
-                                            Icon(Icons.location_on,
+                                            const SizedBox(width: 12),
+                                            const Icon(Icons.location_on,
                                                 size: 14, color: Colors.green),
-                                            SizedBox(width: 4),
+                                            const SizedBox(width: 4),
                                             Text(
                                               '${project['active_sites'] ?? 0} sites',
-                                              style: TextStyle(fontSize: 12),
+                                              style:
+                                                  const TextStyle(fontSize: 12),
                                             ),
                                           ],
                                         ),
-                                        SizedBox(height: 2),
+                                        const SizedBox(height: 2),
                                         Row(
                                           children: [
-                                            Icon(Icons.people,
+                                            const Icon(Icons.people,
                                                 size: 14, color: Colors.orange),
-                                            SizedBox(width: 4),
+                                            const SizedBox(width: 4),
                                             Text(
                                               '${project['total_learners'] ?? 0} learners',
-                                              style: TextStyle(fontSize: 12),
+                                              style:
+                                                  const TextStyle(fontSize: 12),
                                             ),
                                           ],
                                         ),
                                       ],
                                     ),
-                                    trailing:
-                                        Icon(Icons.arrow_forward_ios, size: 16),
+                                    trailing: const Icon(
+                                        Icons.arrow_forward_ios,
+                                        size: 16),
                                     onTap: () {
                                       // Parse pathways from Project_pathway JSON string
                                       List<Map<String, dynamic>>

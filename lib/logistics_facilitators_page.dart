@@ -19,7 +19,8 @@ class LogisticsFacilitatorsPage extends StatefulWidget {
   });
 
   @override
-  _LogisticsFacilitatorsPageState createState() => _LogisticsFacilitatorsPageState();
+  _LogisticsFacilitatorsPageState createState() =>
+      _LogisticsFacilitatorsPageState();
 }
 
 class _LogisticsFacilitatorsPageState extends State<LogisticsFacilitatorsPage> {
@@ -40,12 +41,13 @@ class _LogisticsFacilitatorsPageState extends State<LogisticsFacilitatorsPage> {
     });
 
     try {
-      final url = AppConfig.buildUrl('get_logistics_facilitators.php?siteID=${widget.siteId}&account_id=${widget.logisticsId}');
+      final url = AppConfig.buildUrl(
+          'get_logistics_facilitators.php?siteID=${widget.siteId}&account_id=${widget.logisticsId}');
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data['success'] == true && data['facilitators'] != null) {
           setState(() {
             facilitators = data['facilitators'];
@@ -115,7 +117,8 @@ class _LogisticsFacilitatorsPageState extends State<LogisticsFacilitatorsPage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.error, size: 64, color: Colors.red),
+                            const Icon(Icons.error,
+                                size: 64, color: Colors.red),
                             const SizedBox(height: 16),
                             Text(
                               errorMessage,
@@ -135,7 +138,8 @@ class _LogisticsFacilitatorsPageState extends State<LogisticsFacilitatorsPage> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.person_outline, size: 64, color: Colors.grey[400]),
+                                Icon(Icons.person_outline,
+                                    size: 64, color: Colors.grey[400]),
                                 const SizedBox(height: 16),
                                 Text(
                                   'No facilitators found at this site',
@@ -159,65 +163,86 @@ class _LogisticsFacilitatorsPageState extends State<LogisticsFacilitatorsPage> {
                                   elevation: 4,
                                   child: ListTile(
                                     contentPadding: const EdgeInsets.all(16),
-                                    leading: CircleAvatar(
+                                    leading: const CircleAvatar(
                                       backgroundColor: Colors.orange,
-                                      child: const Icon(
+                                      child: Icon(
                                         Icons.person,
                                         color: Colors.white,
                                       ),
                                     ),
                                     title: Text(
-                                      facilitator['facilitator_name'] ?? 'Unknown Facilitator',
+                                      facilitator['facilitator_name'] ??
+                                          'Unknown Facilitator',
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 16,
                                       ),
                                     ),
                                     subtitle: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         const SizedBox(height: 4),
-                                        if (facilitator['class_names'] != null) ...[
+                                        if (facilitator['class_names'] !=
+                                            null) ...[
                                           Row(
                                             children: [
-                                              Icon(Icons.class_, size: 16, color: Colors.grey[600]),
+                                              Icon(Icons.class_,
+                                                  size: 16,
+                                                  color: Colors.grey[600]),
                                               const SizedBox(width: 4),
                                               Expanded(
                                                 child: Text(
                                                   'Classes: ${facilitator['class_names']}',
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
                                               ),
                                             ],
                                           ),
                                         ],
-                                        if (facilitator['total_learners'] != null) ...[
+                                        if (facilitator['total_learners'] !=
+                                            null) ...[
                                           const SizedBox(height: 2),
                                           Row(
                                             children: [
-                                              Icon(Icons.group, size: 16, color: Colors.grey[600]),
+                                              Icon(Icons.group,
+                                                  size: 16,
+                                                  color: Colors.grey[600]),
                                               const SizedBox(width: 4),
-                                              Text('${facilitator['total_learners']} learners'),
+                                              Text(
+                                                  '${facilitator['total_learners']} learners'),
                                             ],
                                           ),
                                         ],
                                       ],
                                     ),
-                                    trailing: const Icon(Icons.send, color: Colors.orange),
+                                    trailing: const Icon(Icons.send,
+                                        color: Colors.orange),
                                     onTap: () {
                                       // Navigate directly to material issuance page
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => FacilitatorMaterialIssuancePage(
+                                          builder: (context) =>
+                                              FacilitatorMaterialIssuancePage(
                                             logisticsId: widget.logisticsId,
                                             logisticsName: widget.logisticsName,
                                             siteId: widget.siteId,
                                             siteName: widget.siteName,
-                                            classId: facilitator['class_id']?.toString() ?? '0',
-                                            className: facilitator['class_names'] ?? 'Unknown Class',
-                                            facilitatorId: facilitator['facilitator_id']?.toString() ?? '0',
-                                            facilitatorName: facilitator['facilitator_name'] ?? 'Unknown Facilitator',
+                                            classId: facilitator['class_id']
+                                                    ?.toString() ??
+                                                '0',
+                                            className:
+                                                facilitator['class_names'] ??
+                                                    'Unknown Class',
+                                            facilitatorId:
+                                                facilitator['facilitator_id']
+                                                        ?.toString() ??
+                                                    '0',
+                                            facilitatorName: facilitator[
+                                                    'facilitator_name'] ??
+                                                'Unknown Facilitator',
                                           ),
                                         ),
                                       );

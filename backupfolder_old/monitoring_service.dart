@@ -42,7 +42,7 @@ class MonitoringService {
         '[MONITORING_SERVICE] Starting background monitoring service for class: $classID');
 
     // Check every 30 seconds for monitoring triggers
-    _backgroundTimer = Timer.periodic(Duration(seconds: 30), (timer) {
+    _backgroundTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       _checkAndTriggerMonitoring();
     });
 
@@ -231,11 +231,11 @@ class MonitoringService {
     try {
       // Vibrate pattern: short-long-short-long
       await HapticFeedback.heavyImpact();
-      await Future.delayed(Duration(milliseconds: 200));
+      await Future.delayed(const Duration(milliseconds: 200));
       await HapticFeedback.heavyImpact();
-      await Future.delayed(Duration(milliseconds: 500));
+      await Future.delayed(const Duration(milliseconds: 500));
       await HapticFeedback.heavyImpact();
-      await Future.delayed(Duration(milliseconds: 200));
+      await Future.delayed(const Duration(milliseconds: 200));
       await HapticFeedback.heavyImpact();
     } catch (e) {
       debugPrint('[MONITORING_SERVICE] Error with vibration: $e');
@@ -293,7 +293,7 @@ class MonitoringService {
 
       // Continue in both morning and afternoon until 30% is reached
       if (isMorningSession || isAfternoonSession) {
-        Timer(Duration(seconds: 3), () {
+        Timer(const Duration(seconds: 3), () {
           debugPrint(
               '[MONITORING_SERVICE] Triggering next person - need ${requiredVerifications - _verifiedToday.length} more verifications');
           _triggerMonitoringPopup();
@@ -345,7 +345,7 @@ class MonitoringService {
 
       // Continue in both morning and afternoon until 30% is reached
       if (isMorningSession || isAfternoonSession) {
-        Timer(Duration(seconds: 2), () {
+        Timer(const Duration(seconds: 2), () {
           debugPrint(
               '[MONITORING_SERVICE] Triggering next person after ABSENT - need ${requiredVerifications - _verifiedToday.length} more verifications');
           _triggerMonitoringPopup();
@@ -529,7 +529,7 @@ class MonitoringService {
               headers: {'Content-Type': 'application/json'},
               body: json.encode(recordData),
             )
-            .timeout(Duration(seconds: 10));
+            .timeout(const Duration(seconds: 10));
 
         if (response.statusCode == 200) {
           final serverResult = json.decode(response.body);

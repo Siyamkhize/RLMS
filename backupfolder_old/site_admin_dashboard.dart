@@ -57,28 +57,28 @@ class _SiteAdminDashboardState extends State<SiteAdminDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Site Admin Dashboard'),
+        title: const Text('Site Admin Dashboard'),
         backgroundColor: Colors.blue,
       ),
       body: isLoading
-          ? Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _loadWorkplaces,
               child: Column(
                 children: [
                   Container(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     color: Colors.blue.shade50,
                     child: Row(
                       children: [
-                        Icon(Icons.person, size: 40, color: Colors.blue),
-                        SizedBox(width: 12),
+                        const Icon(Icons.person, size: 40, color: Colors.blue),
+                        const SizedBox(width: 12),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Welcome, ${widget.username}',
-                              style: TextStyle(
+                              style: const TextStyle(
                                   fontSize: 18, fontWeight: FontWeight.bold),
                             ),
                             Text(
@@ -92,11 +92,11 @@ class _SiteAdminDashboardState extends State<SiteAdminDashboard> {
                   ),
                   Expanded(
                     child: workplaces.isEmpty
-                        ? Center(
+                        ? const Center(
                             child: Text('No workplaces assigned'),
                           )
                         : ListView.builder(
-                            padding: EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(16),
                             itemCount: workplaces.length,
                             itemBuilder: (context, index) {
                               final workplace = workplaces[index];
@@ -110,23 +110,23 @@ class _SiteAdminDashboardState extends State<SiteAdminDashboard> {
                                   : '0';
 
                               return Card(
-                                margin: EdgeInsets.only(bottom: 16),
+                                margin: const EdgeInsets.only(bottom: 16),
                                 elevation: 3,
                                 child: Padding(
-                                  padding: EdgeInsets.all(16),
+                                  padding: const EdgeInsets.all(16),
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
-                                          Icon(Icons.location_on,
+                                          const Icon(Icons.location_on,
                                               color: Colors.blue),
-                                          SizedBox(width: 8),
+                                          const SizedBox(width: 8),
                                           Expanded(
                                             child: Text(
                                               workplace['workplace_name'],
-                                              style: TextStyle(
+                                              style: const TextStyle(
                                                 fontSize: 18,
                                                 fontWeight: FontWeight.bold,
                                               ),
@@ -134,9 +134,9 @@ class _SiteAdminDashboardState extends State<SiteAdminDashboard> {
                                           ),
                                         ],
                                       ),
-                                      SizedBox(height: 12),
+                                      const SizedBox(height: 12),
                                       Container(
-                                        padding: EdgeInsets.all(12),
+                                        padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
                                           color: Colors.grey[100],
                                           borderRadius:
@@ -159,7 +159,7 @@ class _SiteAdminDashboardState extends State<SiteAdminDashboard> {
                                           ],
                                         ),
                                       ),
-                                      SizedBox(height: 12),
+                                      const SizedBox(height: 12),
                                       Row(
                                         children: [
                                           Expanded(
@@ -187,14 +187,16 @@ class _SiteAdminDashboardState extends State<SiteAdminDashboard> {
                                                 ).then(
                                                     (_) => _loadWorkplaces());
                                               },
-                                              icon: Icon(Icons.fingerprint),
-                                              label: Text('Clock Learners'),
+                                              icon:
+                                                  const Icon(Icons.fingerprint),
+                                              label:
+                                                  const Text('Clock Learners'),
                                               style: ElevatedButton.styleFrom(
                                                 backgroundColor: Colors.blue,
                                               ),
                                             ),
                                           ),
-                                          SizedBox(width: 8),
+                                          const SizedBox(width: 8),
                                           Expanded(
                                             child: ElevatedButton.icon(
                                               onPressed: () {
@@ -211,8 +213,8 @@ class _SiteAdminDashboardState extends State<SiteAdminDashboard> {
                                                   ),
                                                 );
                                               },
-                                              icon: Icon(Icons.list_alt),
-                                              label: Text('Attendance'),
+                                              icon: const Icon(Icons.list_alt),
+                                              label: const Text('Attendance'),
                                               style: ElevatedButton.styleFrom(
                                                 backgroundColor: Colors.green,
                                               ),

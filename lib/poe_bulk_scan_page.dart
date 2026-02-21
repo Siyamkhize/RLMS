@@ -503,9 +503,9 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
                   const SizedBox(height: 16),
 
                   // Questions List (Read-only display)
-                  Text(
+                  const Text(
                     'Questions to be tagged:',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -528,7 +528,7 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           child: Row(
                             children: [
-                              Icon(Icons.check_circle,
+                              const Icon(Icons.check_circle,
                                   color: Colors.green, size: 20),
                               const SizedBox(width: 8),
                               Expanded(

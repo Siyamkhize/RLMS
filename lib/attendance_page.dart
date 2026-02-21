@@ -101,7 +101,7 @@ class _AttendancePageState extends State<AttendancePage> {
           current.weekday != DateTime.sunday) {
         workingDays++;
       }
-      current = current.add(Duration(days: 1));
+      current = current.add(const Duration(days: 1));
     }
 
     return workingDays;
@@ -181,7 +181,7 @@ class _AttendancePageState extends State<AttendancePage> {
         print('[ATTENDANCE] No internet connection - skipping server sync');
         if (showMessage && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
                 content: Text('No internet connection'),
                 backgroundColor: Colors.orange),
           );
@@ -207,7 +207,7 @@ class _AttendancePageState extends State<AttendancePage> {
           'Pragma': 'no-cache',
           'Expires': '0',
         },
-      ).timeout(Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -365,7 +365,7 @@ class _AttendancePageState extends State<AttendancePage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Unable to load attendance data from server'),
+              content: const Text('Unable to load attendance data from server'),
               backgroundColor: Colors.orange,
               action: SnackBarAction(
                 label: 'Retry',
@@ -433,12 +433,12 @@ class _AttendancePageState extends State<AttendancePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Monthly Attendance'),
+        title: const Text('Monthly Attendance'),
         backgroundColor: Colors.white,
         elevation: 1,
         actions: [
           if (isSyncing)
-            Padding(
+            const Padding(
               padding: EdgeInsets.all(16),
               child: SizedBox(
                 width: 20,
@@ -449,7 +449,7 @@ class _AttendancePageState extends State<AttendancePage> {
             )
           else
             IconButton(
-              icon: Icon(Icons.cloud_download),
+              icon: const Icon(Icons.cloud_download),
               onPressed: () async {
                 await _syncAttendanceFromServer(showMessage: true);
                 await _loadMonthlyAttendance();
@@ -457,7 +457,7 @@ class _AttendancePageState extends State<AttendancePage> {
               tooltip: 'Sync from Server',
             ),
           IconButton(
-            icon: Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh),
             onPressed: _loadMonthlyAttendance,
             tooltip: 'Refresh',
           ),
@@ -467,7 +467,7 @@ class _AttendancePageState extends State<AttendancePage> {
         children: [
           // Month and stipend info
           Container(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             color: Colors.blue.shade50,
             child: Column(
               children: [
@@ -476,7 +476,7 @@ class _AttendancePageState extends State<AttendancePage> {
                   children: [
                     Text(
                       '$monthName ${selectedMonth.year}',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -490,13 +490,13 @@ class _AttendancePageState extends State<AttendancePage> {
                     ),
                   ],
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       'Expected Days: $expectedDays',
-                      style: TextStyle(fontSize: 14),
+                      style: const TextStyle(fontSize: 14),
                     ),
                     Text(
                       'Daily Rate: R ${dailyRate.toStringAsFixed(2)}',
@@ -508,7 +508,7 @@ class _AttendancePageState extends State<AttendancePage> {
                     ),
                   ],
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   'Holidays in month: $holidaysInMonth day(s)',
                   style: TextStyle(
@@ -523,7 +523,7 @@ class _AttendancePageState extends State<AttendancePage> {
 
           // Summary
           Container(
-            padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             color: Colors.grey.shade100,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -539,7 +539,7 @@ class _AttendancePageState extends State<AttendancePage> {
 
           // Table Header
           Container(
-            padding: EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
             color: Colors.grey.shade200,
             child: Row(
               children: [
@@ -555,26 +555,27 @@ class _AttendancePageState extends State<AttendancePage> {
           // Attendance table
           Expanded(
             child: isLoading
-                ? Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator())
                 : learnerAttendance.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.inbox, size: 64, color: Colors.grey),
-                            SizedBox(height: 16),
-                            Text(
+                            const Icon(Icons.inbox,
+                                size: 64, color: Colors.grey),
+                            const SizedBox(height: 16),
+                            const Text(
                               'No learners found for this class',
                               style:
                                   TextStyle(color: Colors.grey, fontSize: 16),
                             ),
-                            SizedBox(height: 8),
+                            const SizedBox(height: 8),
                             Text(
                               'Class ID: ${widget.classID}',
                               style: TextStyle(
                                   color: Colors.grey.shade600, fontSize: 12),
                             ),
-                            SizedBox(height: 16),
+                            const SizedBox(height: 16),
                             ElevatedButton.icon(
                               onPressed: () async {
                                 // Show debug info
@@ -590,7 +591,7 @@ class _AttendancePageState extends State<AttendancePage> {
                                 showDialog(
                                   context: context,
                                   builder: (context) => AlertDialog(
-                                    title: Text('Debug Info'),
+                                    title: const Text('Debug Info'),
                                     content: SingleChildScrollView(
                                       child: Column(
                                         crossAxisAlignment:
@@ -599,14 +600,14 @@ class _AttendancePageState extends State<AttendancePage> {
                                         children: [
                                           Text(
                                               'Current Class ID: ${widget.classID}'),
-                                          SizedBox(height: 16),
-                                          Text('Available Classes:',
+                                          const SizedBox(height: 16),
+                                          const Text('Available Classes:',
                                               style: TextStyle(
                                                   fontWeight: FontWeight.bold)),
-                                          SizedBox(height: 8),
+                                          const SizedBox(height: 8),
                                           ...allClasses.map((c) => Padding(
-                                                padding:
-                                                    EdgeInsets.only(bottom: 4),
+                                                padding: const EdgeInsets.only(
+                                                    bottom: 4),
                                                 child: Text(
                                                     '• ${c['classID']}: ${c['count']} learners'),
                                               )),
@@ -616,14 +617,14 @@ class _AttendancePageState extends State<AttendancePage> {
                                     actions: [
                                       TextButton(
                                         onPressed: () => Navigator.pop(context),
-                                        child: Text('Close'),
+                                        child: const Text('Close'),
                                       ),
                                     ],
                                   ),
                                 );
                               },
-                              icon: Icon(Icons.bug_report),
-                              label: Text('Show Debug Info'),
+                              icon: const Icon(Icons.bug_report),
+                              label: const Text('Show Debug Info'),
                             ),
                           ],
                         ),
@@ -667,7 +668,7 @@ class _AttendancePageState extends State<AttendancePage> {
     return Text(
       text,
       textAlign: TextAlign.center,
-      style: TextStyle(
+      style: const TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.bold,
         color: Colors.black87,
@@ -692,7 +693,7 @@ class _AttendancePageState extends State<AttendancePage> {
         'Regular: $daysClocked\nManual: $manualDaysClocked\nSick Notes: $sickNoteDays\nHolidays: $holidays\nTotal: $daysAttended';
 
     return Container(
-      padding: EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       decoration: BoxDecoration(
         color: bgColor,
         border: Border(

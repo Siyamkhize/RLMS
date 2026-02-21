@@ -1890,7 +1890,7 @@ class _POETabContentState extends State<POETabContent> {
       } catch (e) {
         print('[DETECT] Futronic attempt $attempt failed: $e');
         if (attempt < maxAttempts) {
-          await Future.delayed(Duration(milliseconds: 1000));
+          await Future.delayed(const Duration(milliseconds: 1000));
         }
       }
     }
@@ -3665,7 +3665,8 @@ class _POETabContentState extends State<POETabContent> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.person, color: Colors.blue, size: 32),
+                          const Icon(Icons.person,
+                              color: Colors.blue, size: 32),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
@@ -3921,13 +3922,13 @@ class _POETabContentState extends State<POETabContent> {
                                             border:
                                                 Border.all(color: Colors.green),
                                           ),
-                                          child: Row(
+                                          child: const Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Icon(Icons.check_circle,
                                                   color: Colors.green,
                                                   size: 16),
-                                              const SizedBox(width: 4),
+                                              SizedBox(width: 4),
                                               Text(
                                                 'COMPLETED',
                                                 style: TextStyle(
@@ -4090,10 +4091,10 @@ class _POETabContentState extends State<POETabContent> {
                             ],
                           )
                         else
-                          ListTile(
-                            leading: const Icon(Icons.info_outline,
-                                color: Colors.grey),
-                            title: const Text('No formative data available'),
+                          const ListTile(
+                            leading:
+                                Icon(Icons.info_outline, color: Colors.grey),
+                            title: Text('No formative data available'),
                             subtitle: Text(
                                 'This unit standard may only have logbook entries'),
                           ),
@@ -4193,13 +4194,13 @@ class _POETabContentState extends State<POETabContent> {
                                             border:
                                                 Border.all(color: Colors.green),
                                           ),
-                                          child: Row(
+                                          child: const Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Icon(Icons.check_circle,
                                                   color: Colors.green,
                                                   size: 16),
-                                              const SizedBox(width: 4),
+                                              SizedBox(width: 4),
                                               Text(
                                                 'COMPLETED',
                                                 style: TextStyle(
@@ -4362,10 +4363,10 @@ class _POETabContentState extends State<POETabContent> {
                             ],
                           )
                         else
-                          ListTile(
-                            leading: const Icon(Icons.info_outline,
-                                color: Colors.grey),
-                            title: const Text('No summative data available'),
+                          const ListTile(
+                            leading:
+                                Icon(Icons.info_outline, color: Colors.grey),
+                            title: Text('No summative data available'),
                             subtitle: Text(
                                 'This unit standard may only have logbook entries'),
                           ),
@@ -4618,12 +4619,12 @@ class _POETabContentState extends State<POETabContent> {
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(color: Colors.green),
                               ),
-                              child: Row(
+                              child: const Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(Icons.check_circle,
                                       color: Colors.green, size: 14),
-                                  const SizedBox(width: 4),
+                                  SizedBox(width: 4),
                                   Text(
                                     'DONE',
                                     style: TextStyle(

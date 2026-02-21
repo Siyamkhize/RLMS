@@ -131,12 +131,32 @@ class _AdminPageState extends State<AdminPage> {
     });
 
     try {
-      // Use global search autocomplete endpoint (no SDP filter)
+      // Get SDP identifier
+      String sdpIdentifier = widget.sdp.trim();
+      if (sdpIdentifier.isEmpty) {
+        final resolved = _resolveSdpIdentifier();
+        if (resolved != null && resolved.isNotEmpty) {
+          sdpIdentifier = resolved;
+        }
+      }
+
+      // Build query params with SDP and Project filters
+      final queryParams = <String, String>{
+        'q': query,
+        'limit': '8',
+      };
+
+      if (sdpIdentifier.isNotEmpty) {
+        queryParams['sdp_id'] = sdpIdentifier;
+      }
+
+      if (widget.projectId != null && widget.projectId!.isNotEmpty) {
+        queryParams['project_id'] = widget.projectId!;
+      }
+
+      // Use global search autocomplete endpoint with SDP and Project filters
       final url = AppConfig.buildUrl('search_learner_autocomplete_global.php',
-          queryParams: {
-            'q': query,
-            'limit': '8',
-          });
+          queryParams: queryParams);
 
       final response = await http.get(Uri.parse(url)).timeout(
             const Duration(seconds: 5),
@@ -382,7 +402,7 @@ class _AdminPageState extends State<AdminPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error loading sites: $e'),
-            duration: Duration(seconds: 5),
+            duration: const Duration(seconds: 5),
           ),
         );
       }
@@ -522,9 +542,9 @@ class _AdminPageState extends State<AdminPage> {
         } else if (learnerId.isNotEmpty) {
           // Fallback: if no class_id, show error
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Text('Learner found but class information is missing'),
-              duration: const Duration(seconds: 3),
+              duration: Duration(seconds: 3),
               backgroundColor: Colors.orange,
             ),
           );
@@ -557,12 +577,32 @@ class _AdminPageState extends State<AdminPage> {
 
   Future<Map<String, dynamic>?> _searchLearnerOnline(String idNumber) async {
     try {
-      // Use global search endpoint (no SDP filter) with 5s timeout for faster feedback
+      // Get SDP identifier
+      String sdpIdentifier = widget.sdp.trim();
+      if (sdpIdentifier.isEmpty) {
+        final resolved = _resolveSdpIdentifier();
+        if (resolved != null && resolved.isNotEmpty) {
+          sdpIdentifier = resolved;
+        }
+      }
+
+      // Build query parameters with SDP and Project filters
+      final queryParams = <String, String>{
+        'id_number': idNumber,
+      };
+
+      if (sdpIdentifier.isNotEmpty) {
+        queryParams['sdp_id'] = sdpIdentifier;
+      }
+
+      if (widget.projectId != null && widget.projectId!.isNotEmpty) {
+        queryParams['project_id'] = widget.projectId!;
+      }
+
+      // Use global search endpoint with SDP and Project filters
       final uri =
           Uri.parse(AppConfig.buildUrl('search_learner_global.php')).replace(
-        queryParameters: {
-          'id_number': idNumber,
-        },
+        queryParameters: queryParams,
       );
 
       print('[ADMIN] Searching learner online (global): $uri');
@@ -889,7 +929,7 @@ class _AdminPageState extends State<AdminPage> {
                                   pathways.length > 30
                                       ? '${pathways.substring(0, 30)}...'
                                       : pathways,
-                                  style: TextStyle(fontSize: 12),
+                                  style: const TextStyle(fontSize: 12),
                                 ),
                               ),
                             ),
@@ -900,7 +940,7 @@ class _AdminPageState extends State<AdminPage> {
                                   qualifications.length > 30
                                       ? '${qualifications.substring(0, 30)}...'
                                       : qualifications,
-                                  style: TextStyle(fontSize: 12),
+                                  style: const TextStyle(fontSize: 12),
                                 ),
                               ),
                             ),

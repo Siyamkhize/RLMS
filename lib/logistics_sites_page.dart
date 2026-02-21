@@ -45,7 +45,7 @@ class _LogisticsSitesPageState extends State<LogisticsSitesPage> {
   void _onSearchChanged() {
     // Cancel previous timer
     _debounceTimer?.cancel();
-    
+
     // Start new timer for debounced search
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
       setState(() {
@@ -67,12 +67,12 @@ class _LogisticsSitesPageState extends State<LogisticsSitesPage> {
       if (_searchQuery.isNotEmpty) {
         url += '&search=${Uri.encodeComponent(_searchQuery)}';
       }
-      
+
       final response = await http.get(Uri.parse(AppConfig.buildUrl(url)));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data['success'] == true && data['sites'] != null) {
           setState(() {
             sites = data['sites'];
@@ -137,7 +137,8 @@ class _LogisticsSitesPageState extends State<LogisticsSitesPage> {
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Search sites by name, province, category, or pathway...',
+                    hintText:
+                        'Search sites by name, province, category, or pathway...',
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
@@ -153,7 +154,8 @@ class _LogisticsSitesPageState extends State<LogisticsSitesPage> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.orange.shade600, width: 2),
+                      borderSide:
+                          BorderSide(color: Colors.orange.shade600, width: 2),
                     ),
                     filled: true,
                     fillColor: Colors.white,
@@ -170,7 +172,8 @@ class _LogisticsSitesPageState extends State<LogisticsSitesPage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.error, size: 64, color: Colors.red),
+                            const Icon(Icons.error,
+                                size: 64, color: Colors.red),
                             const SizedBox(height: 16),
                             Text(
                               errorMessage,
@@ -190,7 +193,8 @@ class _LogisticsSitesPageState extends State<LogisticsSitesPage> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.location_off, size: 64, color: Colors.grey[400]),
+                                Icon(Icons.location_off,
+                                    size: 64, color: Colors.grey[400]),
                                 const SizedBox(height: 16),
                                 Text(
                                   'No sites found',
@@ -207,7 +211,8 @@ class _LogisticsSitesPageState extends State<LogisticsSitesPage> {
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                                    Icon(Icons.search_off,
+                                        size: 64, color: Colors.grey[400]),
                                     const SizedBox(height: 16),
                                     Text(
                                       'No sites match your search',
@@ -234,93 +239,116 @@ class _LogisticsSitesPageState extends State<LogisticsSitesPage> {
                                   itemCount: sites.length,
                                   itemBuilder: (context, index) {
                                     final site = sites[index];
-                                return Card(
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  elevation: 4,
-                                  child: ListTile(
-                                    contentPadding: const EdgeInsets.all(16),
-                                    leading: CircleAvatar(
-                                      backgroundColor: Colors.orange,
-                                      child: const Icon(
-                                        Icons.location_city,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    title: Text(
-                                      site['siteName'] ?? 'Unknown Site',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    subtitle: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          children: [
-                                            Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
-                                            const SizedBox(width: 4),
-                                            Expanded(
-                                              child: Text(
-                                                '${site['province'] ?? 'Unknown Province'} • ${site['category'] ?? 'Unknown Category'}',
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
+                                    return Card(
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      elevation: 4,
+                                      child: ListTile(
+                                        contentPadding:
+                                            const EdgeInsets.all(16),
+                                        leading: const CircleAvatar(
+                                          backgroundColor: Colors.orange,
+                                          child: Icon(
+                                            Icons.location_city,
+                                            color: Colors.white,
+                                          ),
                                         ),
-                                        const SizedBox(height: 2),
-                                        Row(
-                                          children: [
-                                            Icon(Icons.group, size: 16, color: Colors.grey[600]),
-                                            const SizedBox(width: 4),
-                                            Text('${site['total_learners'] ?? '0'} learners'),
-                                            const SizedBox(width: 16),
-                                            Icon(Icons.class_, size: 16, color: Colors.grey[600]),
-                                            const SizedBox(width: 4),
-                                            Text('${site['total_classes'] ?? '0'} classes'),
-                                          ],
+                                        title: Text(
+                                          site['siteName'] ?? 'Unknown Site',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
                                         ),
-                                        if (site['learningPathway'] != null && site['learningPathway'].toString().isNotEmpty) ...[
-                                          const SizedBox(height: 2),
-                                          Row(
-                                            children: [
-                                              Icon(Icons.school, size: 16, color: Colors.grey[600]),
-                                              const SizedBox(width: 4),
-                                              Expanded(
-                                                child: Text(
-                                                  site['learningPathway'],
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: Colors.grey[600],
+                                        subtitle: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const SizedBox(height: 4),
+                                            Row(
+                                              children: [
+                                                Icon(Icons.location_on,
+                                                    size: 16,
+                                                    color: Colors.grey[600]),
+                                                const SizedBox(width: 4),
+                                                Expanded(
+                                                  child: Text(
+                                                    '${site['province'] ?? 'Unknown Province'} • ${site['category'] ?? 'Unknown Category'}',
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                   ),
-                                                  overflow: TextOverflow.ellipsis,
                                                 ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Row(
+                                              children: [
+                                                Icon(Icons.group,
+                                                    size: 16,
+                                                    color: Colors.grey[600]),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                    '${site['total_learners'] ?? '0'} learners'),
+                                                const SizedBox(width: 16),
+                                                Icon(Icons.class_,
+                                                    size: 16,
+                                                    color: Colors.grey[600]),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                    '${site['total_classes'] ?? '0'} classes'),
+                                              ],
+                                            ),
+                                            if (site['learningPathway'] !=
+                                                    null &&
+                                                site['learningPathway']
+                                                    .toString()
+                                                    .isNotEmpty) ...[
+                                              const SizedBox(height: 2),
+                                              Row(
+                                                children: [
+                                                  Icon(Icons.school,
+                                                      size: 16,
+                                                      color: Colors.grey[600]),
+                                                  const SizedBox(width: 4),
+                                                  Expanded(
+                                                    child: Text(
+                                                      site['learningPathway'],
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: Colors.grey[600],
+                                                      ),
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ],
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                    trailing: const Icon(Icons.arrow_forward_ios),
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => LogisticsClassesPage(
-                                            logisticsId: widget.logisticsId,
-                                            logisticsName: widget.logisticsName,
-                                            siteId: site['siteID'].toString(),
-                                            siteName: site['siteName'] ?? 'Unknown Site',
-                                          ),
+                                          ],
                                         ),
-                                      );
-                                    },
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
+                                        trailing:
+                                            const Icon(Icons.arrow_forward_ios),
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  LogisticsClassesPage(
+                                                logisticsId: widget.logisticsId,
+                                                logisticsName:
+                                                    widget.logisticsName,
+                                                siteId:
+                                                    site['siteID'].toString(),
+                                                siteName: site['siteName'] ??
+                                                    'Unknown Site',
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
           ),
         ],
       ),

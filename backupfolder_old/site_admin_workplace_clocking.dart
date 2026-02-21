@@ -178,7 +178,7 @@ class _SiteAdminWorkplaceClockingState
         children: [
           // Status bar
           Container(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             color:
                 isSensorConnected ? Colors.green.shade50 : Colors.red.shade50,
             child: Row(
@@ -187,7 +187,7 @@ class _SiteAdminWorkplaceClockingState
                   isSensorConnected ? Icons.check_circle : Icons.error,
                   color: isSensorConnected ? Colors.green : Colors.red,
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     statusMessage,
@@ -203,9 +203,9 @@ class _SiteAdminWorkplaceClockingState
           // Learners list
           Expanded(
             child: isLoading
-                ? Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator())
                 : learners.isEmpty
-                    ? Center(child: Text('No learners assigned'))
+                    ? const Center(child: Text('No learners assigned'))
                     : ListView.builder(
                         itemCount: learners.length,
                         itemBuilder: (context, index) {
@@ -214,7 +214,7 @@ class _SiteAdminWorkplaceClockingState
                           final hasClockOut = learner['clock_out_time'] != null;
 
                           return Card(
-                            margin: EdgeInsets.symmetric(
+                            margin: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 8),
                             child: ListTile(
                               leading: CircleAvatar(
@@ -225,7 +225,7 @@ class _SiteAdminWorkplaceClockingState
                                         : Colors.grey,
                                 child: Text(
                                   learner['Name'][0].toUpperCase(),
-                                  style: TextStyle(color: Colors.white),
+                                  style: const TextStyle(color: Colors.white),
                                 ),
                               ),
                               title: Text(
@@ -247,17 +247,17 @@ class _SiteAdminWorkplaceClockingState
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.green,
                                       ),
-                                      child: Text('Clock In'),
+                                      child: const Text('Clock In'),
                                     ),
                                   if (hasClockIn && !hasClockOut) ...[
-                                    SizedBox(width: 8),
+                                    const SizedBox(width: 8),
                                     ElevatedButton(
                                       onPressed: () =>
                                           _clockLearner(learner, false),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.red,
                                       ),
-                                      child: Text('Clock Out'),
+                                      child: const Text('Clock Out'),
                                     ),
                                   ],
                                 ],

@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
-import 'dart:convert';
-import 'package:intl/intl.dart';
-import 'package:http/http.dart' as http;
 import 'database_helper.dart';
 import 'services/fingerprint_service.dart';
 import 'services/futronic_service.dart' as futronic;
 import 'utils/fingerprint_error_handler.dart';
-import 'config.dart';
 
 class MonitoringPopupDialog extends StatefulWidget {
   final Map<String, dynamic> person;
@@ -71,7 +67,7 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
     // Strong initial vibration pattern
     for (int i = 0; i < 3; i++) {
       await HapticFeedback.heavyImpact();
-      await Future.delayed(Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds: 300));
     }
   }
 
@@ -251,7 +247,7 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
           });
 
           // Auto-proceed after successful verification
-          Future.delayed(Duration(seconds: 1), () {
+          Future.delayed(const Duration(seconds: 1), () {
             if (mounted) {
               _handlePresent();
             }
@@ -282,7 +278,7 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
   }
 
   void _startCountdown() {
-    _countdownTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
         _countdownSeconds--;
       });
@@ -340,7 +336,7 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
     } else {
       // This shouldn't happen, but just in case
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Please verify fingerprint first'),
           backgroundColor: Colors.orange,
         ),
@@ -363,177 +359,11 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
     Navigator.of(context).pop();
   }
 
-  // Save monitoring record (ONLINE-FIRST: save to server first, then local)
-  Future<void> _saveMonitoringClockin(String status) async {
-    try {
-      final now = DateTime.now();
-      final date = DateFormat('yyyy-MM-dd').format(now);
-      final time = DateFormat('HH:mm:ss').format(now);
-      final datetime = DateFormat('yyyy-MM-dd HH:mm:ss').format(now);
-
-      // Determine session type
-      final hour = now.hour;
-      String sessionType = 'morning';
-      if (hour >= 13 && hour < 16) {
-        sessionType = 'afternoon';
-      }
-
-      final record = {
-        'learner_id': widget.person['person_id'].toString(),
-        'learner_name': widget.person['person_name'] ?? 'Unknown',
-        'person_type': widget.person['person_type'] ?? 'learner',
-        'class_id': widget.classID,
-        'monitoring_date': date,
-        'verification_time': datetime,
-        'verification_method': _activeScanner == 'futronic'
-            ? 'fingerprint_futronic'
-            : 'fingerprint_zkteco',
-        'final_status': status,
-        'attempt_1_time': _currentAttempt == 1 ? datetime : null,
-        'attempt_1_status': _currentAttempt == 1 ? status : null,
-        'session_type': sessionType,
-        'fingerprint_matched': !_fingerprintRequired ? 1 : 0,
-        'scanner_type': _activeScanner,
-        'created_at': datetime,
-        'synced': 0,
-      };
-
-      debugPrint('[MONITORING_RECORD] Saving record: $record');
-
-      // ONLINE-FIRST APPROACH: Try to save to server first
-      bool savedOnline = false;
-      try {
-        debugPrint(
-            '[MONITORING_RECORD] 🌐 Attempting to save to server first (ONLINE-FIRST)...');
-
-        final response = await http
-            .post(
-              Uri.parse(AppConfig.saveMonitoringRecordsUrl),
-              headers: {'Content-Type': 'application/json'},
-              body: json.encode(record),
-            )
-            .timeout(Duration(seconds: 10));
-
-        debugPrint(
-            '[MONITORING_RECORD] Server response status: ${response.statusCode}');
-        debugPrint(
-            '[MONITORING_RECORD] Server response body: ${response.body}');
-
-        if (response.statusCode == 200) {
-          final result = json.decode(response.body);
-          if (result['success'] == true) {
-            savedOnline = true;
-            debugPrint(
-                '[MONITORING_RECORD] ✅ SAVED TO SERVER SUCCESSFULLY (ONLINE)');
-
-            // Save to local database with synced=1 (already on server)
-            final recordWithSynced = Map<String, dynamic>.from(record);
-            recordWithSynced['synced'] = 1;
-            final recordId =
-                await _dbHelper.insertMonitoringClockin(recordWithSynced);
-            debugPrint(
-                '[MONITORING_RECORD] ✅ Saved to local database with ID: $recordId (synced=1)');
-
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content:
-                      Text('✓ Attendance saved to server and synced locally'),
-                  backgroundColor: Colors.green,
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            }
-          } else {
-            debugPrint(
-                '[MONITORING_RECORD] ❌ Server save failed: ${result['error']}');
-          }
-        } else {
-          debugPrint(
-              '[MONITORING_RECORD] ❌ Server returned status ${response.statusCode}');
-        }
-      } catch (e) {
-        debugPrint('[MONITORING_RECORD] ❌ Failed to save to server: $e');
-        savedOnline = false;
-      }
-
-      // OFFLINE FALLBACK: If online save failed, save locally with synced=0
-      if (!savedOnline) {
-        debugPrint(
-            '[MONITORING_RECORD] 💾 Saving to local database (OFFLINE MODE)...');
-
-        final recordId = await _dbHelper.insertMonitoringClockin(record);
-        debugPrint(
-            '[MONITORING_RECORD] ✅ Saved to local database with ID: $recordId (synced=0)');
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content:
-                  Text('📱 Attendance saved locally (will sync when online)'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-
-        // Trigger background sync to retry
-        debugPrint('[MONITORING_RECORD] Scheduling background sync retry...');
-        _triggerBackgroundSync();
-      }
-    } catch (e) {
-      debugPrint('[MONITORING_RECORD] ❌ Error saving monitoring record: $e');
-      // Don't throw error - allow monitoring to continue even if save fails
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving attendance: $e'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
-    }
-  }
-
-  // Trigger background sync for unsynced records
-  void _triggerBackgroundSync() {
-    // Schedule sync after a short delay
-    Future.delayed(Duration(seconds: 2), () async {
-      try {
-        debugPrint('[MONITORING_RECORD] Running background sync...');
-        final result = await _dbHelper.syncMonitoringClockinToServer();
-
-        if (result['success'] == true) {
-          final syncedCount = result['synced_count'] ?? 0;
-          debugPrint(
-              '[MONITORING_RECORD] Background sync completed: $syncedCount records synced');
-
-          if (mounted && syncedCount > 0) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                    '$syncedCount attendance record(s) synced to server ✓'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 2),
-              ),
-            );
-          }
-        } else {
-          debugPrint(
-              '[MONITORING_RECORD] Background sync failed: ${result['error']}');
-        }
-      } catch (e) {
-        debugPrint('[MONITORING_RECORD] Background sync error: $e');
-      }
-    });
-  }
-
   // EXACT SAME FINGERPRINT VERIFICATION WORKFLOW AS CLOCKING
   Future<void> _startFingerprintVerification() async {
     if (_isVerifying) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Verification already in progress...')),
+        const SnackBar(content: Text('Verification already in progress...')),
       );
       return;
     }
@@ -545,7 +375,7 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
     if (_currentPersonIdForVerification != null &&
         _currentPersonIdForVerification != personId) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Another verification is in progress. Please wait.'),
           backgroundColor: Colors.orange,
         ),
@@ -743,7 +573,7 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
         });
 
         // Auto-proceed after successful verification
-        Future.delayed(Duration(seconds: 1), () {
+        Future.delayed(const Duration(seconds: 1), () {
           if (mounted) {
             _handlePresent();
           }
@@ -810,7 +640,7 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
       } catch (e) {
         debugPrint('[MONITORING] Futronic attempt $attempt failed: $e');
         if (attempt < maxAttempts) {
-          await Future.delayed(Duration(milliseconds: 1000));
+          await Future.delayed(const Duration(milliseconds: 1000));
         }
       }
     }
@@ -863,22 +693,22 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
       canPop: false,
       child: Dialog(
         child: Container(
-          padding: EdgeInsets.all(20),
+          padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // Header
               Container(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.blue[600],
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.fingerprint, color: Colors.white),
-                    SizedBox(width: 8),
-                    Expanded(
+                    const Icon(Icons.fingerprint, color: Colors.white),
+                    const SizedBox(width: 8),
+                    const Expanded(
                       child: Text(
                         'ATTENDANCE MONITORING',
                         style: TextStyle(
@@ -889,7 +719,7 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
                     ),
                     Text(
                       'Attempt $_currentAttempt/3',
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
                       ),
@@ -898,11 +728,11 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
                 ),
               ),
 
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
 
               // Person Info
               Container(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.grey[100],
                   borderRadius: BorderRadius.circular(8),
@@ -911,36 +741,36 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
                   children: [
                     Text(
                       widget.person['person_name'] ?? 'Unknown',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       '$personType ID: ${widget.person['person_id']}',
-                      style: TextStyle(fontSize: 14),
+                      style: const TextStyle(fontSize: 14),
                     ),
                     Text(
                       'Class: ${widget.classID}',
-                      style: TextStyle(fontSize: 14),
+                      style: const TextStyle(fontSize: 14),
                     ),
                   ],
                 ),
               ),
 
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
 
               // Countdown
               Container(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: isLowTime ? Colors.red[100] : Colors.green[100],
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
                   children: [
-                    Text(
+                    const Text(
                       'Time Remaining',
                       style: TextStyle(fontSize: 14),
                     ),
@@ -953,7 +783,7 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
                       ),
                     ),
                     if (isLowTime)
-                      Text(
+                      const Text(
                         '⚠️ TIME RUNNING OUT!',
                         style: TextStyle(
                           color: Colors.red,
@@ -964,7 +794,7 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
                 ),
               ),
 
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               // Buttons
               Row(
@@ -977,7 +807,7 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
                             ? Colors.blue[600]
                             : Colors.green[600],
                         foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -989,7 +819,7 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
                                 : Icons.check_circle,
                             size: 16,
                           ),
-                          SizedBox(width: 4),
+                          const SizedBox(width: 4),
                           Flexible(
                             child: Text(
                               _fingerprintRequired ? 'VERIFY' : 'PRESENT',
@@ -1000,16 +830,16 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
                       ),
                     ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: _isVerifying ? null : _handleAbsent,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.red,
                         foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      child: Row(
+                      child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -1028,11 +858,11 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
                 ],
               ),
 
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
 
               // Instructions
               Container(
-                padding: EdgeInsets.all(12),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.grey[100],
                   borderRadius: BorderRadius.circular(8),
@@ -1045,7 +875,7 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
                       color: isLowTime ? Colors.orange : Colors.blue,
                       size: 16,
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         isLowTime

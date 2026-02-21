@@ -1248,10 +1248,10 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
   // Build Pothole Evidence Images section
   Widget _buildPotholeImagesSection() {
     if (_isLoadingImages) {
-      return Card(
-        margin: const EdgeInsets.all(8.0),
+      return const Card(
+        margin: EdgeInsets.all(8.0),
         elevation: 4,
-        child: const Padding(
+        child: Padding(
           padding: EdgeInsets.all(16.0),
           child: Center(child: CircularProgressIndicator()),
         ),
@@ -1270,11 +1270,11 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               children: [
-                const Icon(Icons.image, color: Colors.purple, size: 24),
-                const SizedBox(width: 12),
-                const Text(
+                Icon(Icons.image, color: Colors.purple, size: 24),
+                SizedBox(width: 12),
+                Text(
                   'Pothole Evidence Images',
                   style: TextStyle(
                       fontSize: 18,
@@ -2628,9 +2628,9 @@ class _ModerationFeedbackPageState extends State<ModerationFeedbackPage> {
               ],
             ),
             const SizedBox(height: 8),
-            Text(
+            const Text(
               'Select a class to generate feedback report',
-              style: const TextStyle(fontSize: 14, color: Colors.grey),
+              style: TextStyle(fontSize: 14, color: Colors.grey),
             ),
             const SizedBox(height: 16),
             Expanded(
@@ -3667,11 +3667,11 @@ class _PotholeChecklistPDFViewerState extends State<PotholeChecklistPDFViewer> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  const Row(
                     children: [
-                      const Icon(Icons.picture_as_pdf, color: Colors.red),
-                      const SizedBox(width: 8),
-                      const Text(
+                      Icon(Icons.picture_as_pdf, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text(
                         'Scanned Document',
                         style: TextStyle(
                           fontSize: 16,

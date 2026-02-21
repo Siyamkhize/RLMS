@@ -6,11 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 class CroppingPage extends StatefulWidget {
   final String imagePath;
-  const CroppingPage(
-      {super.key,
-      required this.imagePath,
-      required String type,
-      required String exercise});
+  const CroppingPage({super.key, required this.imagePath});
 
   @override
   _CroppingPageState createState() => _CroppingPageState();
@@ -69,13 +65,13 @@ class _CroppingPageState extends State<CroppingPage> {
       // Handle image submission logic
       print("Cropped image path: ${croppedImage!.path}");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Cropped image submitted successfully!')),
+        const SnackBar(content: Text('Cropped image submitted successfully!')),
       );
 
       // Navigate or perform further actions
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No image to submit!')),
+        const SnackBar(content: Text('No image to submit!')),
       );
     }
   }

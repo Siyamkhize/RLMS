@@ -702,8 +702,8 @@ class _MaterialFormState extends State<MaterialForm> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(label, style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 5),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 5),
             Text(value, textAlign: TextAlign.center),
           ],
         ),
@@ -718,7 +718,7 @@ class _MaterialFormState extends State<MaterialForm> {
 
     if (existingQuantity > 0) {
       return Container(
-        padding: EdgeInsets.all(12),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.blue.shade50,
           borderRadius: BorderRadius.circular(8),
@@ -734,7 +734,7 @@ class _MaterialFormState extends State<MaterialForm> {
                   color: Colors.blue.shade700,
                   size: 18,
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Text(
                   'Previous Submissions Found',
                   style: TextStyle(
@@ -745,7 +745,7 @@ class _MaterialFormState extends State<MaterialForm> {
                 ),
               ],
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
@@ -761,7 +761,7 @@ class _MaterialFormState extends State<MaterialForm> {
               ],
             ),
             if (existingRepresentative.isNotEmpty) ...[
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Row(
                 children: [
                   Icon(
@@ -769,7 +769,7 @@ class _MaterialFormState extends State<MaterialForm> {
                     color: Colors.blue.shade600,
                     size: 16,
                   ),
-                  SizedBox(width: 4),
+                  const SizedBox(width: 4),
                   Text(
                     'Last by: $existingRepresentative',
                     style: TextStyle(
@@ -781,9 +781,9 @@ class _MaterialFormState extends State<MaterialForm> {
                 ],
               ),
             ],
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Container(
-              padding: EdgeInsets.all(8),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.green.shade50,
                 borderRadius: BorderRadius.circular(6),
@@ -796,7 +796,7 @@ class _MaterialFormState extends State<MaterialForm> {
                     color: Colors.green.shade700,
                     size: 16,
                   ),
-                  SizedBox(width: 6),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       'Adding $quantity more units. New total will be: ${existingQuantity + quantity}',
@@ -810,9 +810,9 @@ class _MaterialFormState extends State<MaterialForm> {
                 ],
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Container(
-              padding: EdgeInsets.all(6),
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: Colors.orange.shade50,
                 borderRadius: BorderRadius.circular(4),
@@ -825,7 +825,7 @@ class _MaterialFormState extends State<MaterialForm> {
                     color: Colors.orange.shade700,
                     size: 14,
                   ),
-                  SizedBox(width: 4),
+                  const SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       'You can issue $materialType multiple times. Each submission adds to the total.',
@@ -844,7 +844,7 @@ class _MaterialFormState extends State<MaterialForm> {
       );
     } else {
       return Container(
-        padding: EdgeInsets.all(12),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.grey.shade100,
           borderRadius: BorderRadius.circular(8),
@@ -857,7 +857,7 @@ class _MaterialFormState extends State<MaterialForm> {
               color: Colors.grey.shade600,
               size: 18,
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 'No previous submissions found for $materialType. This will be the first submission.',
@@ -882,7 +882,7 @@ class _MaterialFormState extends State<MaterialForm> {
 
     if (totalPreviouslySubmitted == 0) {
       return Container(
-        padding: EdgeInsets.all(12),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.grey.shade100,
           borderRadius: BorderRadius.circular(8),
@@ -895,7 +895,7 @@ class _MaterialFormState extends State<MaterialForm> {
               color: Colors.grey.shade600,
               size: 18,
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Text(
               'No previous submissions found for this class',
               style: TextStyle(
@@ -909,7 +909,7 @@ class _MaterialFormState extends State<MaterialForm> {
     }
 
     return Container(
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.blue.shade50,
         borderRadius: BorderRadius.circular(8),
@@ -925,7 +925,7 @@ class _MaterialFormState extends State<MaterialForm> {
                 color: Colors.blue.shade700,
                 size: 18,
               ),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Text(
                 'Previous Submissions Summary',
                 style: TextStyle(
@@ -936,7 +936,7 @@ class _MaterialFormState extends State<MaterialForm> {
               ),
             ],
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
@@ -949,7 +949,7 @@ class _MaterialFormState extends State<MaterialForm> {
                 ),
               ),
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.blue.shade100,
                   borderRadius: BorderRadius.circular(12),
@@ -983,7 +983,7 @@ class _MaterialFormState extends State<MaterialForm> {
                 color: Colors.orange.shade700,
                 size: 48,
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Text(
                 'No Unit Standards Found',
                 style: TextStyle(
@@ -992,7 +992,7 @@ class _MaterialFormState extends State<MaterialForm> {
                   fontSize: 16,
                 ),
               ),
-              SizedBox(height: 5),
+              const SizedBox(height: 5),
               Text(
                 'No unit standards are available for this qualification. Please ensure the qualification has associated unit standards in the system.',
                 style: TextStyle(
@@ -1020,7 +1020,7 @@ class _MaterialFormState extends State<MaterialForm> {
                   Icons.checklist,
                   color: Colors.green.shade700,
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Text(
                   'Select Unit Standards (${unitStandards.length} available)',
                   style: TextStyle(
@@ -1031,15 +1031,15 @@ class _MaterialFormState extends State<MaterialForm> {
                 ),
               ],
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             Text(
               'Tick the unit standards you want to submit and specify quantities:',
               style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             // Previous submissions summary
             _buildPreviousSubmissionsSummary(),
-            SizedBox(height: 15),
+            const SizedBox(height: 15),
             SizedBox(
               height: 300, // Fixed height for scrollable list
               child: ListView.builder(
@@ -1091,7 +1091,7 @@ class _MaterialFormState extends State<MaterialForm> {
                       unitStandardQuantities['${usId}_SUM'] ?? 1;
 
                   return Card(
-                    margin: EdgeInsets.symmetric(vertical: 4),
+                    margin: const EdgeInsets.symmetric(vertical: 4),
                     child: Padding(
                       padding: const EdgeInsets.all(12.0),
                       child: Column(
@@ -1109,12 +1109,12 @@ class _MaterialFormState extends State<MaterialForm> {
                                 existingUnitStandardRepresentatives[usId] ?? '',
                           ),
 
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
 
                           // Learner Guide Section
                           Container(
-                            margin: EdgeInsets.only(left: 20),
-                            padding: EdgeInsets.all(8),
+                            margin: const EdgeInsets.only(left: 20),
+                            padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: Colors.purple.shade50,
                               borderRadius: BorderRadius.circular(8),
@@ -1135,12 +1135,12 @@ class _MaterialFormState extends State<MaterialForm> {
                             ),
                           ),
 
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
 
                           // Formative Section
                           Container(
-                            margin: EdgeInsets.only(left: 20),
-                            padding: EdgeInsets.all(8),
+                            margin: const EdgeInsets.only(left: 20),
+                            padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: Colors.orange.shade50,
                               borderRadius: BorderRadius.circular(8),
@@ -1161,12 +1161,12 @@ class _MaterialFormState extends State<MaterialForm> {
                             ),
                           ),
 
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
 
                           // Summative Section
                           Container(
-                            margin: EdgeInsets.only(left: 20),
-                            padding: EdgeInsets.all(8),
+                            margin: const EdgeInsets.only(left: 20),
+                            padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: Colors.teal.shade50,
                               borderRadius: BorderRadius.circular(8),
@@ -1226,7 +1226,7 @@ class _MaterialFormState extends State<MaterialForm> {
                   if (value == false && existing > 0) {
                     // Show a message that items with previous submissions cannot be unchecked
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
+                      const SnackBar(
                         content: Text(
                             'Cannot uncheck items with previous submissions'),
                         duration: Duration(seconds: 2),
@@ -1278,9 +1278,9 @@ class _MaterialFormState extends State<MaterialForm> {
 
         // Previous submission info (if any)
         if (existing > 0) ...[
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Container(
-            padding: EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: Colors.blue.shade50,
               borderRadius: BorderRadius.circular(6),
@@ -1296,7 +1296,7 @@ class _MaterialFormState extends State<MaterialForm> {
                       color: Colors.blue.shade700,
                       size: 16,
                     ),
-                    SizedBox(width: 6),
+                    const SizedBox(width: 6),
                     Text(
                       'Previously submitted: $existing units',
                       style: TextStyle(
@@ -1308,7 +1308,7 @@ class _MaterialFormState extends State<MaterialForm> {
                   ],
                 ),
                 if (representativeName.isNotEmpty) ...[
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Row(
                     children: [
                       Icon(
@@ -1316,7 +1316,7 @@ class _MaterialFormState extends State<MaterialForm> {
                         color: Colors.blue.shade600,
                         size: 14,
                       ),
-                      SizedBox(width: 4),
+                      const SizedBox(width: 4),
                       Text(
                         'By: $representativeName',
                         style: TextStyle(
@@ -1335,17 +1335,17 @@ class _MaterialFormState extends State<MaterialForm> {
 
         // Quantity selection (ONLY show if manually selected by user)
         if (isSelected) ...[
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Row(
             children: [
-              Text(
+              const Text(
                 'Quantity:',
                 style: TextStyle(
                   fontWeight: FontWeight.w500,
                   fontSize: 13,
                 ),
               ),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               SizedBox(
                 width: 80,
                 child: DropdownButton<int>(
@@ -1367,10 +1367,10 @@ class _MaterialFormState extends State<MaterialForm> {
                 ),
               ),
               if (existing > 0) ...[
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Container(
-                    padding: EdgeInsets.all(6),
+                    padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       color: Colors.amber.shade50,
                       borderRadius: BorderRadius.circular(4),
@@ -1404,9 +1404,9 @@ class _MaterialFormState extends State<MaterialForm> {
           children: [
             Row(
               children: [
-                Text('Description',
+                const Text('Description',
                     style: TextStyle(fontWeight: FontWeight.bold)),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: DropdownButton<String>(
                     isExpanded: true,
@@ -1440,17 +1440,17 @@ class _MaterialFormState extends State<MaterialForm> {
             // Show previous submission info for regular materials (not Learning Material)
             if (selectedDescription != 'Select' &&
                 selectedDescription != 'Learning Material') ...[
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               _buildRegularMaterialPreviousSubmission(selectedDescription),
             ],
             // Show Learning Material sub-options when Learning Material is selected
             if (selectedDescription == 'Learning Material') ...[
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Row(
                 children: [
-                  Text('Learning Material Type',
+                  const Text('Learning Material Type',
                       style: TextStyle(fontWeight: FontWeight.bold)),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: DropdownButton<String>(
                       isExpanded: true,
@@ -1478,25 +1478,25 @@ class _MaterialFormState extends State<MaterialForm> {
               // Show previous submission info for Learning Material sub-types (except Unit Standards)
               if (selectedLearningMaterialType != 'Select' &&
                   selectedLearningMaterialType != 'Unit Standards') ...[
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 _buildRegularMaterialPreviousSubmission(
                     selectedLearningMaterialType),
               ],
               // Show Unit Standards selection when Unit Standards is selected
               if (selectedLearningMaterialType == 'Unit Standards') ...[
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 _buildUnitStandardsSelection(),
               ],
             ],
             // Hide quantity dropdown when Unit Standards is selected (each unit standard has its own quantity)
             if (!(selectedDescription == 'Learning Material' &&
                 selectedLearningMaterialType == 'Unit Standards')) ...[
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Row(
                 children: [
-                  Text('Quantity',
+                  const Text('Quantity',
                       style: TextStyle(fontWeight: FontWeight.bold)),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: DropdownButton<int>(
                       isExpanded: true,
@@ -1519,16 +1519,16 @@ class _MaterialFormState extends State<MaterialForm> {
                 ],
               ),
             ],
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             Row(
               children: [
-                Text('Qualification',
+                const Text('Qualification',
                     style: TextStyle(fontWeight: FontWeight.bold)),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     qualification_name,
-                    style: TextStyle(fontSize: 14),
+                    style: const TextStyle(fontSize: 14),
                   ),
                 ),
               ],
@@ -1577,7 +1577,7 @@ class _MaterialFormState extends State<MaterialForm> {
         selectedDescription == 'Select' ||
         representativeName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
             "Please capture both facilitator and representative signatures and fill all required fields.",
           ),
@@ -1590,7 +1590,7 @@ class _MaterialFormState extends State<MaterialForm> {
     if (selectedDescription == 'Learning Material' &&
         selectedLearningMaterialType == 'Select') {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text("Please select a Learning Material type."),
         ),
       );
@@ -1604,7 +1604,7 @@ class _MaterialFormState extends State<MaterialForm> {
           selectedUnitStandards.values.any((selected) => selected);
       if (!hasSelectedUnitStandards) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text("Please select at least one unit standard."),
           ),
         );
@@ -1615,7 +1615,7 @@ class _MaterialFormState extends State<MaterialForm> {
     // Validate quantity
     if (quantity < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Please enter a valid quantity.")),
+        const SnackBar(content: Text("Please enter a valid quantity.")),
       );
       return;
     }
@@ -1624,7 +1624,7 @@ class _MaterialFormState extends State<MaterialForm> {
     final connectivityResult = await Connectivity().checkConnectivity();
     if (connectivityResult == ConnectivityResult.none) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
             content: Text("No internet connection. Please try again later.")),
       );
       return;
@@ -1680,7 +1680,7 @@ class _MaterialFormState extends State<MaterialForm> {
                     headers: {'Content-Type': 'application/json'},
                     body: json.encode(formData),
                   )
-                  .timeout(Duration(seconds: 30));
+                  .timeout(const Duration(seconds: 30));
 
               print('📥 [SUBMISSION] Response Status: ${response.statusCode}');
               print('📥 [SUBMISSION] Response Body: ${response.body}');
@@ -1743,7 +1743,7 @@ class _MaterialFormState extends State<MaterialForm> {
                     headers: {'Content-Type': 'application/json'},
                     body: json.encode(formDataLG),
                   )
-                  .timeout(Duration(seconds: 30));
+                  .timeout(const Duration(seconds: 30));
 
               print(
                   '📥 [SUBMISSION] LG Response Status: ${response.statusCode}');
@@ -1807,7 +1807,7 @@ class _MaterialFormState extends State<MaterialForm> {
                     headers: {'Content-Type': 'application/json'},
                     body: json.encode(formDataFORM),
                   )
-                  .timeout(Duration(seconds: 30));
+                  .timeout(const Duration(seconds: 30));
 
               print(
                   '📥 [SUBMISSION] FORM Response Status: ${response.statusCode}');
@@ -1871,7 +1871,7 @@ class _MaterialFormState extends State<MaterialForm> {
                     headers: {'Content-Type': 'application/json'},
                     body: json.encode(formDataSUM),
                   )
-                  .timeout(Duration(seconds: 30));
+                  .timeout(const Duration(seconds: 30));
 
               print(
                   '📥 [SUBMISSION] SUM Response Status: ${response.statusCode}');
@@ -1901,7 +1901,7 @@ class _MaterialFormState extends State<MaterialForm> {
 
         if (allSuccessful) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
                 content: Text('All unit standards submitted successfully!')),
           );
         } else {
@@ -1971,7 +1971,7 @@ class _MaterialFormState extends State<MaterialForm> {
             headers: {'Content-Type': 'application/json'},
             body: json.encode(formData),
           )
-          .timeout(Duration(seconds: 30));
+          .timeout(const Duration(seconds: 30));
 
       // Log response details
       print('Response Status: ${response.statusCode}');
@@ -1984,7 +1984,7 @@ class _MaterialFormState extends State<MaterialForm> {
 
         if (responseBody['success']) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Form submitted successfully!')),
+            const SnackBar(content: Text('Form submitted successfully!')),
           );
 
           // Reset form fields
@@ -2039,7 +2039,7 @@ class _MaterialFormState extends State<MaterialForm> {
   Future<void> saveMaterialFormOffline() async {
     // Implementation for offline saving would go here
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Offline saving not implemented yet')),
+      const SnackBar(content: Text('Offline saving not implemented yet')),
     );
   }
 
@@ -2051,19 +2051,19 @@ class _MaterialFormState extends State<MaterialForm> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Facilitator and Representative Details',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Table(
               border: TableBorder.all(
                   color: Colors.grey,
                   width: 1,
                   borderRadius: BorderRadius.circular(12)),
               columnWidths: {
-                0: FixedColumnWidth(150),
-                1: FixedColumnWidth(150),
+                0: const FixedColumnWidth(150),
+                1: const FixedColumnWidth(150),
               },
               children: [
                 TableRow(
@@ -2099,7 +2099,8 @@ class _MaterialFormState extends State<MaterialForm> {
           padding: const EdgeInsets.symmetric(vertical: 8.0),
           child: TableCell(
             child: Text(name,
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
           ),
         ),
         Padding(
@@ -2134,7 +2135,7 @@ class _MaterialFormState extends State<MaterialForm> {
                   representativeName = value;
                 });
               },
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Representative Name',
                 border: OutlineInputBorder(),
               ),
@@ -2151,7 +2152,7 @@ class _MaterialFormState extends State<MaterialForm> {
                         representativeSignature = signature;
                       });
                     }),
-                    child: Text('Representative Signature'),
+                    child: const Text('Representative Signature'),
                   )
                 : Image.memory(
                     representativeSignature!,
@@ -2170,7 +2171,7 @@ class _MaterialFormState extends State<MaterialForm> {
       padding: const EdgeInsets.all(8.0),
       child: Text(
         text,
-        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
       ),
     );
   }
@@ -2188,7 +2189,7 @@ class _MaterialFormState extends State<MaterialForm> {
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Capture Signature'),
+          title: const Text('Capture Signature'),
           content: SizedBox(
             width: 300,
             child: Column(
@@ -2203,12 +2204,12 @@ class _MaterialFormState extends State<MaterialForm> {
                     backgroundColor: Colors.white,
                   ),
                 ),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 ElevatedButton(
                   onPressed: () {
                     controller.clear();
                   },
-                  child: Text('Clear'),
+                  child: const Text('Clear'),
                 ),
               ],
             ),
@@ -2218,7 +2219,7 @@ class _MaterialFormState extends State<MaterialForm> {
               onPressed: () {
                 Navigator.pop(context);
               },
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -2229,7 +2230,7 @@ class _MaterialFormState extends State<MaterialForm> {
                 Navigator.pop(context);
                 setState(() {});
               },
-              child: Text('OK'),
+              child: const Text('OK'),
             ),
           ],
         );
@@ -2241,20 +2242,20 @@ class _MaterialFormState extends State<MaterialForm> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Material Form'),
+        title: const Text('Material Form'),
       ),
       body: SingleChildScrollView(
         child: Column(
           children: [
             buildPractitionerDetailsCard(),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             _buildClassDetailsCard(),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             buildFacilitatorSignatureTable(),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             ElevatedButton(
               onPressed: checkAndSaveMaterialForm,
-              child: Text('Submit Form'),
+              child: const Text('Submit Form'),
             ),
           ],
         ),

@@ -782,7 +782,7 @@ class _POESubmitPageState extends State<POESubmitPage> {
       } catch (e) {
         print('[POE_SUBMIT] Futronic attempt $attempt failed: $e');
         if (attempt < maxAttempts) {
-          await Future.delayed(Duration(milliseconds: 1000));
+          await Future.delayed(const Duration(milliseconds: 1000));
         }
       }
     }

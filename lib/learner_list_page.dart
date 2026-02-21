@@ -7,7 +7,6 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'database_helper.dart';
 import 'LearnerDetailsPage.dart';
-import 'AddLearnerPage.dart';
 import 'finance_register_history.dart';
 import 'package:intl/intl.dart';
 

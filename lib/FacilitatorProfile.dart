@@ -307,16 +307,16 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(Icons.camera_alt),
-              title: Text('Take Photo'),
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Take Photo'),
               onTap: () {
                 Navigator.pop(context);
                 _getImage(ImageSource.camera);
               },
             ),
             ListTile(
-              leading: Icon(Icons.photo_library),
-              title: Text('Choose from Gallery'),
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
               onTap: () {
                 Navigator.pop(context);
                 _getImage(ImageSource.gallery);
@@ -371,7 +371,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text('Add Signature'),
+              title: const Text('Add Signature'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -388,8 +388,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                         backgroundColor: Colors.white,
                       ),
                     ),
-                    SizedBox(height: 16),
-                    Text('Pen Settings',
+                    const SizedBox(height: 16),
+                    const Text('Pen Settings',
                         style: TextStyle(fontWeight: FontWeight.bold)),
                     Slider(
                       value: strokeWidth,
@@ -417,11 +417,11 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
               actions: [
                 TextButton(
                   onPressed: () => _signatureController.clear(),
-                  child: Text('Clear'),
+                  child: const Text('Clear'),
                 ),
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: Text('Cancel'),
+                  child: const Text('Cancel'),
                 ),
                 ElevatedButton(
                   onPressed: () async {
@@ -430,14 +430,14 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                       Navigator.pop(context);
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
+                        const SnackBar(
                           content: Text('Please provide a signature'),
                           backgroundColor: Colors.red,
                         ),
                       );
                     }
                   },
-                  child: Text('Save'),
+                  child: const Text('Save'),
                 ),
               ],
             );
@@ -481,7 +481,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
     try {
       // Show loading indicator
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Row(
             children: [
               SizedBox(
@@ -501,7 +501,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
 
       if (!_formKey.currentState!.validate()) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
               content: Text('Please fix validation errors'),
               backgroundColor: Colors.red),
         );
@@ -529,7 +529,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
             content: Text('Changes saved successfully'),
             backgroundColor: Colors.green),
       );
@@ -538,7 +538,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
         SnackBar(
           content: Text('Error saving changes: ${e.toString()}'),
           backgroundColor: Colors.red,
-          duration: Duration(seconds: 4),
+          duration: const Duration(seconds: 4),
         ),
       );
     }
@@ -574,7 +574,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                   : null;
             });
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              const SnackBar(
                   content: Text('Profile image uploaded successfully'),
                   backgroundColor: Colors.green),
             );
@@ -592,7 +592,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                 backgroundColor: Colors.red),
           );
         }
-        await Future.delayed(Duration(seconds: 2));
+        await Future.delayed(const Duration(seconds: 2));
       }
     }
   }
@@ -603,7 +603,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
         .checkConnectivity()
         .then((r) => r != ConnectivityResult.none)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
             content: Text('No internet connection'),
             backgroundColor: Colors.orange),
       );
@@ -640,7 +640,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
           final responseData = json.decode(response.body);
           if (responseData['success']) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              const SnackBar(
                   content: Text('Data synced successfully'),
                   backgroundColor: Colors.green),
             );
@@ -658,7 +658,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                 backgroundColor: Colors.red),
           );
         }
-        await Future.delayed(Duration(seconds: 2));
+        await Future.delayed(const Duration(seconds: 2));
       }
     }
   }
@@ -733,20 +733,21 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                 color: Colors.black.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(70),
               ),
-              child:
-                  Center(child: CircularProgressIndicator(color: Colors.white)),
+              child: const Center(
+                  child: CircularProgressIndicator(color: Colors.white)),
             ),
           Positioned(
             bottom: 0,
             right: 0,
             child: Container(
-              padding: EdgeInsets.all(6),
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: Colors.blue,
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 2),
               ),
-              child: Icon(Icons.camera_alt, color: Colors.white, size: 20),
+              child:
+                  const Icon(Icons.camera_alt, color: Colors.white, size: 20),
             ),
           ),
         ],
@@ -769,13 +770,13 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
           width: 140,
           height: 140,
           color: Colors.grey[300],
-          child: Center(child: CircularProgressIndicator()),
+          child: const Center(child: CircularProgressIndicator()),
         ),
         errorWidget: (context, url, error) => Container(
           width: 140,
           height: 140,
           color: Colors.grey[300],
-          child: Icon(Icons.person, size: 60, color: Colors.white),
+          child: const Icon(Icons.person, size: 60, color: Colors.white),
         ),
       );
     }
@@ -783,7 +784,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
       width: 140,
       height: 140,
       color: Colors.grey[300],
-      child: Icon(Icons.camera_alt, size: 40, color: Colors.white),
+      child: const Icon(Icons.camera_alt, size: 40, color: Colors.white),
     );
   }
 
@@ -791,7 +792,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
   Widget _getSignatureWidget() {
     if (_isSignatureFileValid) {
       return Container(
-        constraints: BoxConstraints(maxHeight: 150, minHeight: 80),
+        constraints: const BoxConstraints(maxHeight: 150, minHeight: 80),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: Image.file(File(signaturePath!),
@@ -800,14 +801,14 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
       );
     } else if (onlineSignatureUrl != null) {
       return Container(
-        constraints: BoxConstraints(maxHeight: 150, minHeight: 80),
+        constraints: const BoxConstraints(maxHeight: 150, minHeight: 80),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: CachedNetworkImage(
             imageUrl: onlineSignatureUrl!,
             fit: BoxFit.contain,
             width: double.infinity,
-            placeholder: (context, url) => SizedBox(
+            placeholder: (context, url) => const SizedBox(
               height: 100,
               child: Center(child: CircularProgressIndicator()),
             ),
@@ -819,7 +820,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                   children: [
                     Icon(Icons.error_outline,
                         size: 30, color: Colors.red.shade400),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text('Failed to load signature',
                         style: TextStyle(
                             color: Colors.red.shade600, fontSize: 12)),
@@ -833,13 +834,13 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
     }
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.symmetric(vertical: 20),
+      padding: const EdgeInsets.symmetric(vertical: 20),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.draw, size: 30, color: Colors.grey.shade400),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'No signature added yet',
               style: TextStyle(
@@ -857,8 +858,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Color(0xFF7EC8E3),
-        title: Text("Facilitator Profile"),
+        backgroundColor: const Color(0xFF7EC8E3),
+        title: const Text("Facilitator Profile"),
         actions: [
           IconButton(
             icon: Icon(isEditing ? Icons.save : Icons.edit),
@@ -872,7 +873,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                   },
           ),
           IconButton(
-            icon: Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh),
             onPressed: () {
               _loadOnlineProfileImage();
               setState(() => facilitatorData = _fetchFacilitatorData());
@@ -884,7 +885,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
         future: facilitatorData,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           } else if (snapshot.hasData) {
@@ -897,22 +898,22 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     _buildProfileImage(),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     Text(
                       data['fullName'] ?? 'N/A',
-                      style: TextStyle(
+                      style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
                           color: Colors.black),
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       'Email: ${data['email'] ?? 'N/A'}',
                       style: TextStyle(fontSize: 18, color: Colors.grey[700]),
                     ),
-                    SizedBox(height: 20),
-                    Divider(thickness: 2, color: Colors.lightBlueAccent),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
+                    const Divider(thickness: 2, color: Colors.lightBlueAccent),
+                    const SizedBox(height: 20),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
@@ -921,7 +922,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                         _buildInfoCard('Role', data['role'] ?? 'N/A'),
                       ],
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
@@ -931,7 +932,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                             'Certificate Expiry', data['assessorExpiryDate']),
                       ],
                     ),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     _buildEditableSection('Contact Information', [
                       _buildEditableField(
                         'Phone Number',
@@ -971,16 +972,16 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                         validator: _validateAssessorExpiryDate,
                       ),
                     ]),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     _buildFingerprintSection(data),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     _buildSignatureSection(),
                   ],
                 ),
               ),
             );
           }
-          return Center(child: Text('No data available'));
+          return const Center(child: Text('No data available'));
         },
       ),
     );
@@ -996,7 +997,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
             elevation: 4,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: Padding(
+            child: const Padding(
               padding: EdgeInsets.all(16),
               child: Center(child: CircularProgressIndicator()),
             ),
@@ -1012,14 +1013,14 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: Padding(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Flexible(
+                    const Flexible(
                       child: Text(
                         'Fingerprint Security',
                         style: TextStyle(
@@ -1035,8 +1036,8 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                             ? () => _navigateToFingerprintPage(
                                 facilitatorId, fullName ?? 'Facilitator')
                             : null,
-                        icon: Icon(Icons.fingerprint, size: 18),
-                        label: Text(
+                        icon: const Icon(Icons.fingerprint, size: 18),
+                        label: const Text(
                           'Manage',
                           style: TextStyle(fontSize: 14),
                         ),
@@ -1045,29 +1046,29 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8)),
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          minimumSize: Size(0, 36),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          minimumSize: const Size(0, 36),
                         ),
                       ),
                     ),
                   ],
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 if (facilitatorId != null)
                   FutureBuilder<bool>(
                     future: DatabaseHelper()
                         .facilitatorHasFingerprints(facilitatorId),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Center(child: CircularProgressIndicator());
+                        return const Center(child: CircularProgressIndicator());
                       }
 
                       final hasFingerprints = snapshot.data ?? false;
 
                       return Container(
                         width: double.infinity,
-                        padding: EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: hasFingerprints
                               ? Colors.green.withOpacity(0.1)
@@ -1090,7 +1091,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                                   : Colors.orange,
                               size: 32,
                             ),
-                            SizedBox(width: 12),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1107,7 +1108,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                                           : Colors.orange,
                                     ),
                                   ),
-                                  SizedBox(height: 4),
+                                  const SizedBox(height: 4),
                                   Text(
                                     hasFingerprints
                                         ? 'Your fingerprints are enrolled. Tap "Manage" to update or clock in/out.'
@@ -1128,7 +1129,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                 else
                   Container(
                     width: double.infinity,
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.grey.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
@@ -1208,7 +1209,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
   Widget _buildInfoCard(String title, String content) {
     return Container(
       width: 150,
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -1224,15 +1225,15 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
         children: [
           Text(
             title,
-            style: TextStyle(
+            style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: Colors.blueAccent),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
             content,
-            style: TextStyle(fontSize: 14, color: Colors.black),
+            style: const TextStyle(fontSize: 14, color: Colors.black),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -1294,7 +1295,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
 
     return Container(
       width: 150,
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(12),
@@ -1313,7 +1314,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
             style: TextStyle(
                 fontSize: 16, fontWeight: FontWeight.bold, color: titleColor),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
             displayText,
             style: TextStyle(
@@ -1322,7 +1323,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
             overflow: TextOverflow.ellipsis,
           ),
           if (statusText.isNotEmpty) ...[
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             Text(
               statusText,
               style: TextStyle(
@@ -1344,18 +1345,18 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               title,
-              style: TextStyle(
+              style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: Colors.blueAccent),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             ...fields,
           ],
         ),
@@ -1374,7 +1375,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
     String? hintText,
   }) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
         controller: controller,
         enabled: isEditing,
@@ -1393,15 +1394,15 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.blueAccent),
+            borderSide: const BorderSide(color: Colors.blueAccent),
           ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.red),
+            borderSide: const BorderSide(color: Colors.red),
           ),
           focusedErrorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.red),
+            borderSide: const BorderSide(color: Colors.red),
           ),
           disabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
@@ -1422,7 +1423,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
     String? Function(String?)? validator,
   }) {
     return Container(
-      margin: EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
         controller: controller,
         enabled: isEditing,
@@ -1433,9 +1434,10 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
         decoration: InputDecoration(
           labelText: label,
           hintText: 'Tap to select date',
-          prefixIcon: Icon(Icons.calendar_today, color: Colors.blueAccent),
+          prefixIcon:
+              const Icon(Icons.calendar_today, color: Colors.blueAccent),
           suffixIcon: isEditing
-              ? Icon(Icons.arrow_drop_down, color: Colors.blueAccent)
+              ? const Icon(Icons.arrow_drop_down, color: Colors.blueAccent)
               : null,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
           enabledBorder: OutlineInputBorder(
@@ -1444,15 +1446,15 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.blueAccent),
+            borderSide: const BorderSide(color: Colors.blueAccent),
           ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.red),
+            borderSide: const BorderSide(color: Colors.red),
           ),
           focusedErrorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.red),
+            borderSide: const BorderSide(color: Colors.red),
           ),
           disabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
@@ -1500,7 +1502,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
+            colorScheme: const ColorScheme.light(
               primary: Colors.blueAccent,
               onPrimary: Colors.white,
               surface: Colors.white,
@@ -1525,7 +1527,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
 
       if (daysUntilExpiry < 0) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text(
                 '⚠️ Certificate has expired! Please renew your assessor certificate.'),
             backgroundColor: Colors.red,
@@ -1538,7 +1540,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
             content: Text(
                 '⚠️ Certificate expires in $daysUntilExpiry days. Consider renewing soon.'),
             backgroundColor: Colors.orange,
-            duration: Duration(seconds: 4),
+            duration: const Duration(seconds: 4),
           ),
         );
       }
@@ -1552,14 +1554,14 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Flexible(
+                const Flexible(
                   child: Text(
                     'Digital Signature',
                     style: TextStyle(
@@ -1572,24 +1574,25 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                 Flexible(
                   child: ElevatedButton.icon(
                     onPressed: _showSignaturePad,
-                    icon: Icon(Icons.draw, size: 18),
+                    icon: const Icon(Icons.draw, size: 18),
                     label: Text(
                       hasSignature ? 'Update' : 'Add',
-                      style: TextStyle(fontSize: 14),
+                      style: const TextStyle(fontSize: 14),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blueAccent,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      minimumSize: Size(0, 36),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      minimumSize: const Size(0, 36),
                     ),
                   ),
                 ),
               ],
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Container(
               width: double.infinity,
               decoration: BoxDecoration(
@@ -1599,12 +1602,13 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
               ),
               child: hasSignature
                   ? Padding(
-                      padding: EdgeInsets.all(8), child: _getSignatureWidget())
+                      padding: const EdgeInsets.all(8),
+                      child: _getSignatureWidget())
                   : _getSignatureWidget(),
             ),
             if (hasSignature)
               Padding(
-                padding: EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.only(top: 8),
                 child: Row(
                   children: [
                     Icon(
@@ -1614,7 +1618,7 @@ class _FacilitatorProfileState extends State<FacilitatorProfile> {
                       size: 16,
                       color: Colors.grey.shade600,
                     ),
-                    SizedBox(width: 4),
+                    const SizedBox(width: 4),
                     Text(
                       _isSignatureFileValid
                           ? 'Local signature'

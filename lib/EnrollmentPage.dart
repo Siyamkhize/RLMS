@@ -1001,7 +1001,7 @@ class _EnrollmentPageState extends State<EnrollmentPage> {
 
         // Wait before retry on error (except on last attempt)
         if (attempt < maxAttempts) {
-          await Future.delayed(Duration(milliseconds: 1000));
+          await Future.delayed(const Duration(milliseconds: 1000));
         }
       }
     }
@@ -1384,21 +1384,21 @@ class _EnrollmentPageState extends State<EnrollmentPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Debug Info:',
+                      const Text('Debug Info:',
                           style: TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 12)),
                       Text('Scanner: $_activeScanner',
-                          style: TextStyle(fontSize: 10)),
+                          style: const TextStyle(fontSize: 10)),
                       Text('Connected: $_isSensorConnected',
-                          style: TextStyle(fontSize: 10)),
+                          style: const TextStyle(fontSize: 10)),
                       Text('Left Enrolled: $_leftThumbEnrolled',
-                          style: TextStyle(fontSize: 10)),
+                          style: const TextStyle(fontSize: 10)),
                       Text('Right Enrolled: $_rightThumbEnrolled',
-                          style: TextStyle(fontSize: 10)),
+                          style: const TextStyle(fontSize: 10)),
                       Text('Is Enrolling: $_isEnrolling',
-                          style: TextStyle(fontSize: 10)),
+                          style: const TextStyle(fontSize: 10)),
                       Text('Is Initializing: $_isInitializing',
-                          style: TextStyle(fontSize: 10)),
+                          style: const TextStyle(fontSize: 10)),
                       const SizedBox(height: 8),
                       Row(
                         children: [

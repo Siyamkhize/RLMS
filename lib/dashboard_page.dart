@@ -12,6 +12,7 @@ import 'sync_service.dart' show syncSingleClockIn, syncSingleClockOut;
 import 'EnrollmentPage.dart';
 import 'facilitator_fingerprint_page.dart';
 import 'attendance_page.dart';
+import 'monitoring_service.dart';
 // import 'random_prompt_service.dart';
 // import 'random_biometric_prompt_page.dart';
 // import 'package:geolocator/geolocator.dart';  // Temporarily commented out
@@ -69,10 +70,15 @@ class _DashboardPageState extends State<DashboardPage> {
     // Initialize fingerprint services
     _initializeFingerprintServices();
 
+    // Start monitoring service for random biometric verification
+    MonitoringService().startService(context, widget.classID);
+    print(
+        "[DASHBOARD] ✅ Monitoring service started for class: ${widget.classID}");
+
     reloadClassData();
 
     // Reload after 5 seconds
-    Future.delayed(Duration(seconds: 5), () {
+    Future.delayed(const Duration(seconds: 5), () {
       if (mounted) {
         reloadClassData();
       }
@@ -86,6 +92,11 @@ class _DashboardPageState extends State<DashboardPage> {
     print('[DASHBOARD] Stack trace during dispose: ${StackTrace.current}');
     print('[DASHBOARD] Current mounted state: $mounted');
     print('[DASHBOARD] Is scanning: $_isScanning');
+
+    // Stop monitoring service
+    MonitoringService().stopService();
+    print('[DASHBOARD] ✅ Monitoring service stopped');
+
     _enrollSuccessSubscription?.cancel();
     super.dispose();
   }
@@ -1002,7 +1013,7 @@ class _DashboardPageState extends State<DashboardPage> {
         }
 
         // Add a longer delay to ensure the scanning dialog is fully closed
-        Future.delayed(Duration(milliseconds: 500), () {
+        Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted) {
             print(
                 '[HANDLE_MATCHED] Showing delayed error dialog - widget still mounted');
@@ -1037,7 +1048,7 @@ class _DashboardPageState extends State<DashboardPage> {
       }
 
       // Add delay before showing error dialog to prevent navigation conflicts
-      Future.delayed(Duration(milliseconds: 300), () {
+      Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) {
           print('[HANDLE_MATCHED] Showing error dialog after delay');
           _showErrorDialog(
@@ -1557,7 +1568,7 @@ class _DashboardPageState extends State<DashboardPage> {
             children: [
               Icon(isUpdate ? Icons.update : Icons.refresh,
                   color: Colors.blue, size: 30),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Text(isUpdate ? 'Update Fingerprints' : 'Re-enroll Fingerprints'),
             ],
           ),
@@ -1570,9 +1581,9 @@ class _DashboardPageState extends State<DashboardPage> {
                   isUpdate
                       ? 'Select a learner to update their fingerprints:'
                       : 'Select a learner to completely re-enroll their fingerprints:',
-                  style: TextStyle(fontSize: 14),
+                  style: const TextStyle(fontSize: 14),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Expanded(
                   child: ListView.builder(
                     itemCount: currentLearners.length,
@@ -1584,7 +1595,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             backgroundColor: Colors.blue,
                             child: Text(
                               '${learner['Name']?[0] ?? ''}${learner['Surname']?[0] ?? ''}',
-                              style: TextStyle(
+                              style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold),
                             ),
@@ -1592,7 +1603,8 @@ class _DashboardPageState extends State<DashboardPage> {
                           title:
                               Text('${learner['Name']} ${learner['Surname']}'),
                           subtitle: Text('ID: ${learner['LearnerID']}'),
-                          trailing: Icon(Icons.fingerprint, color: Colors.blue),
+                          trailing:
+                              const Icon(Icons.fingerprint, color: Colors.blue),
                           onTap: () {
                             Navigator.of(context).pop();
                             _processFingerprintUpdate(learner, isUpdate);
@@ -1608,7 +1620,7 @@ class _DashboardPageState extends State<DashboardPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
             ),
           ],
         );
@@ -1655,7 +1667,7 @@ class _DashboardPageState extends State<DashboardPage> {
             children: [
               Icon(isUpdate ? Icons.update : Icons.refresh,
                   color: Colors.orange, size: 30),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Text(isUpdate ? 'Update Fingerprints' : 'Re-enroll Fingerprints'),
             ],
           ),
@@ -1663,7 +1675,7 @@ class _DashboardPageState extends State<DashboardPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.orange.shade50,
                   borderRadius: BorderRadius.circular(8),
@@ -1671,8 +1683,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
                 child: Column(
                   children: [
-                    Icon(Icons.person, size: 48, color: Colors.orange),
-                    SizedBox(height: 12),
+                    const Icon(Icons.person, size: 48, color: Colors.orange),
+                    const SizedBox(height: 12),
                     Text(
                       learnerName,
                       style: TextStyle(
@@ -1682,7 +1694,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       isUpdate
                           ? 'This will update existing fingerprint templates'
@@ -1693,7 +1705,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       'Scanner: ${scanner.toUpperCase()}',
                       style: TextStyle(
@@ -1709,15 +1721,15 @@ class _DashboardPageState extends State<DashboardPage> {
           actions: [
             TextButton.icon(
               onPressed: () => Navigator.of(context).pop(),
-              icon: Icon(Icons.cancel, color: Colors.grey),
-              label: Text('Cancel', style: TextStyle(color: Colors.grey)),
+              icon: const Icon(Icons.cancel, color: Colors.grey),
+              label: const Text('Cancel', style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton.icon(
               onPressed: () {
                 Navigator.of(context).pop();
                 _startFingerprintEnrollmentProcess(learner, scanner, isUpdate);
               },
-              icon: Icon(Icons.fingerprint),
+              icon: const Icon(Icons.fingerprint),
               label: Text('Start ${isUpdate ? 'Update' : 'Re-enrollment'}'),
               style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
             ),
@@ -1763,7 +1775,7 @@ class _DashboardPageState extends State<DashboardPage> {
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Row(
+          title: const Row(
             children: [
               Icon(Icons.fingerprint, color: Colors.blue, size: 30),
               SizedBox(width: 12),
@@ -1781,7 +1793,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.blue, width: 2),
                 ),
-                child: Center(
+                child: const Center(
                   child: Icon(
                     Icons.fingerprint,
                     size: 40,
@@ -1789,15 +1801,17 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 ),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               Text(
                 'Place your thumb on the ${scanner.toUpperCase()} scanner',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(8),
@@ -1808,8 +1822,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   textAlign: TextAlign.center,
                 ),
               ),
-              SizedBox(height: 16),
-              LinearProgressIndicator(),
+              const SizedBox(height: 16),
+              const LinearProgressIndicator(),
             ],
           ),
           actions: [
@@ -1820,8 +1834,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 });
                 Navigator.of(context).pop();
               },
-              icon: Icon(Icons.cancel, color: Colors.red),
-              label: Text('Cancel', style: TextStyle(color: Colors.red)),
+              icon: const Icon(Icons.cancel, color: Colors.red),
+              label: const Text('Cancel', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -1846,7 +1860,7 @@ class _DashboardPageState extends State<DashboardPage> {
         barrierDismissible: false,
         builder: (BuildContext context) {
           return AlertDialog(
-            title: Row(
+            title: const Row(
               children: [
                 Icon(Icons.check_circle, color: Colors.green, size: 30),
                 SizedBox(width: 12),
@@ -1857,7 +1871,7 @@ class _DashboardPageState extends State<DashboardPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: Colors.green.shade50,
                     borderRadius: BorderRadius.circular(12),
@@ -1870,7 +1884,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         size: 48,
                         color: Colors.green,
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       Text(
                         learnerName,
                         style: TextStyle(
@@ -1880,7 +1894,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       Text(
                         '$action successful!',
                         style: TextStyle(
@@ -1889,7 +1903,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
                         DateTime.now().toString().substring(0, 19),
                         style: TextStyle(
@@ -1917,7 +1931,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       print(
                           '[SUCCESS_DIALOG] Widget is mounted, scheduling data reload');
                       // Schedule the reload after the dialog is fully dismissed
-                      Future.delayed(Duration(milliseconds: 200), () {
+                      Future.delayed(const Duration(milliseconds: 200), () {
                         if (mounted) {
                           print(
                               '[SUCCESS_DIALOG] Starting delayed data reload');
@@ -1943,8 +1957,8 @@ class _DashboardPageState extends State<DashboardPage> {
                         '[SUCCESS_DIALOG] Stack trace: ${StackTrace.current}');
                   }
                 },
-                icon: Icon(Icons.check, color: Colors.green),
-                label: Text('OK', style: TextStyle(color: Colors.green)),
+                icon: const Icon(Icons.check, color: Colors.green),
+                label: const Text('OK', style: TextStyle(color: Colors.green)),
               ),
             ],
           );
@@ -1974,8 +1988,8 @@ class _DashboardPageState extends State<DashboardPage> {
         return AlertDialog(
           title: Row(
             children: [
-              Icon(Icons.error, color: Colors.red, size: 30),
-              SizedBox(width: 12),
+              const Icon(Icons.error, color: Colors.red, size: 30),
+              const SizedBox(width: 12),
               Text(title),
             ],
           ),
@@ -1983,7 +1997,7 @@ class _DashboardPageState extends State<DashboardPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.red.shade50,
                   borderRadius: BorderRadius.circular(8),
@@ -1991,8 +2005,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.warning, color: Colors.red),
-                    SizedBox(width: 12),
+                    const Icon(Icons.warning, color: Colors.red),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         message,
@@ -2022,8 +2036,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   print('[ERROR_DIALOG] Stack trace: ${StackTrace.current}');
                 }
               },
-              icon: Icon(Icons.close, color: Colors.red),
-              label: Text('Close', style: TextStyle(color: Colors.red)),
+              icon: const Icon(Icons.close, color: Colors.red),
+              label: const Text('Close', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -2039,7 +2053,7 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: Row(
+          title: const Row(
             children: [
               Icon(Icons.person_search, color: Colors.orange, size: 30),
               SizedBox(width: 12),
@@ -2050,7 +2064,7 @@ class _DashboardPageState extends State<DashboardPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.orange.shade50,
                   borderRadius: BorderRadius.circular(8),
@@ -2058,9 +2072,9 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
                 child: Column(
                   children: [
-                    Icon(Icons.fingerprint_outlined,
+                    const Icon(Icons.fingerprint_outlined,
                         size: 48, color: Colors.orange),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     Text(
                       'Fingerprint not recognized',
                       style: TextStyle(
@@ -2070,7 +2084,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       'Searched: $learnersChecked learners in this class\nScanner: ${scannerType.toUpperCase()}',
                       style: TextStyle(
@@ -2082,7 +2096,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   ],
                 ),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Text(
                 'Possible reasons:\n• Learner not enrolled in this class\n• Fingerprint not registered\n• Try different finger position',
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
@@ -2099,8 +2113,9 @@ class _DashboardPageState extends State<DashboardPage> {
                   print('[VERIFICATION_DIALOG] Error closing dialog: $e');
                 }
               },
-              icon: Icon(Icons.refresh, color: Colors.blue),
-              label: Text('Try Again', style: TextStyle(color: Colors.blue)),
+              icon: const Icon(Icons.refresh, color: Colors.blue),
+              label:
+                  const Text('Try Again', style: TextStyle(color: Colors.blue)),
             ),
             TextButton.icon(
               onPressed: () {
@@ -2110,8 +2125,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   print('[VERIFICATION_DIALOG] Error closing dialog: $e');
                 }
               },
-              icon: Icon(Icons.close, color: Colors.grey),
-              label: Text('Close', style: TextStyle(color: Colors.grey)),
+              icon: const Icon(Icons.close, color: Colors.grey),
+              label: const Text('Close', style: TextStyle(color: Colors.grey)),
             ),
           ],
         );
@@ -2125,7 +2140,7 @@ class _DashboardPageState extends State<DashboardPage> {
         SnackBar(
           content: Text(message),
           backgroundColor: color,
-          duration: Duration(seconds: 4),
+          duration: const Duration(seconds: 4),
         ),
       );
     }
@@ -2135,15 +2150,15 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Dashboard'),
+        title: const Text('Dashboard'),
         backgroundColor: Colors.white,
         elevation: 1,
         leading: IconButton(
-          icon: Icon(Icons.menu, color: Colors.black),
+          icon: const Icon(Icons.menu, color: Colors.black),
           onPressed: () {
             showMenu(
               context: context,
-              position: RelativeRect.fromLTRB(100.0, 100.0, 0.0, 0.0),
+              position: const RelativeRect.fromLTRB(100.0, 100.0, 0.0, 0.0),
               items: [
                 _buildMenuItem(Icons.dashboard, 'Dashboard', 1),
                 _buildMenuItem(Icons.account_circle, 'Profile', 2),
@@ -2166,28 +2181,28 @@ class _DashboardPageState extends State<DashboardPage> {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: Icon(Icons.bug_report, color: Colors.red, size: 20),
+            icon: const Icon(Icons.bug_report, color: Colors.red, size: 20),
             tooltip: 'Debug Fingerprints',
             onPressed: _debugFingerprintDatabase,
           ),
           IconButton(
-            icon: Icon(Icons.settings_backup_restore,
+            icon: const Icon(Icons.settings_backup_restore,
                 color: Colors.purple, size: 20),
             tooltip: 'Fix ClassID',
             onPressed: _forceClassIDFix,
           ),
           IconButton(
-            icon:
-                Icon(Icons.fingerprint_outlined, color: Colors.blue, size: 20),
+            icon: const Icon(Icons.fingerprint_outlined,
+                color: Colors.blue, size: 20),
             tooltip: 'Update Fingerprints',
             onPressed: _startFingerprintUpdate,
           ),
           IconButton(
-            icon: Icon(Icons.refresh, color: Colors.orange, size: 20),
+            icon: const Icon(Icons.refresh, color: Colors.orange, size: 20),
             tooltip: 'Re-enroll Fingerprints',
             onPressed: _startFingerprintReEnrollment,
           ),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
         ],
       ),
       body: FutureBuilder<Map<String, dynamic>>(
@@ -2197,7 +2212,7 @@ class _DashboardPageState extends State<DashboardPage> {
               "[DASHBOARD] FutureBuilder state - Connection: ${snapshot.connectionState}, hasData: ${snapshot.hasData}, data: ${snapshot.data}");
 
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
             print("[DASHBOARD] FutureBuilder error: ${snapshot.error}");
             return Center(child: Text('Error: ${snapshot.error}'));
@@ -2210,10 +2225,10 @@ class _DashboardPageState extends State<DashboardPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('No class data found'),
-                  SizedBox(height: 16),
+                  const Text('No class data found'),
+                  const SizedBox(height: 16),
                   Text('Class ID: ${widget.classID}'),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () {
                       print("[DASHBOARD] Manual reload triggered");
@@ -2221,7 +2236,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         reloadClassData();
                       }
                     },
-                    child: Text('Retry Loading'),
+                    child: const Text('Retry Loading'),
                   ),
                 ],
               ),
@@ -2239,15 +2254,15 @@ class _DashboardPageState extends State<DashboardPage> {
           final siteName = classInfo['site_name'] ?? 'N/A';
 
           return SingleChildScrollView(
-            padding: EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
                 // Site Information
                 Text(
                   'Site: $siteName',
-                  style: TextStyle(color: Colors.black, fontSize: 30),
+                  style: const TextStyle(color: Colors.black, fontSize: 30),
                 ),
-                SizedBox(height: 30),
+                const SizedBox(height: 30),
                 // Class Information Card
                 _buildInfoCard(
                   context,
@@ -2261,7 +2276,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     'Absent: $absent',
                   ],
                 ),
-                SizedBox(height: 30),
+                const SizedBox(height: 30),
                 // Biometric Section
                 _buildBiometricSection(context),
               ],
@@ -2278,7 +2293,7 @@ class _DashboardPageState extends State<DashboardPage> {
       child: Row(
         children: [
           Icon(icon),
-          SizedBox(width: 15),
+          const SizedBox(width: 15),
           Text(label),
         ],
       ),
@@ -2531,7 +2546,7 @@ class _DashboardPageState extends State<DashboardPage> {
               content: Text(
                   'No facilitator found for class ${widget.classID}. Available classes: $availableClassIDs'),
               backgroundColor: Colors.orange,
-              duration: Duration(seconds: 5),
+              duration: const Duration(seconds: 5),
             ),
           );
         } else {
@@ -2550,7 +2565,7 @@ class _DashboardPageState extends State<DashboardPage> {
         SnackBar(
           content: Text('Error: $e'),
           backgroundColor: Colors.red,
-          duration: Duration(seconds: 5),
+          duration: const Duration(seconds: 5),
         ),
       );
     }
@@ -2569,7 +2584,8 @@ class _DashboardPageState extends State<DashboardPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title,
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ...details.map((detail) => Text(detail)),
           ],
         ),
@@ -2592,18 +2608,18 @@ class _DashboardPageState extends State<DashboardPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 _buildTab(context, 'Fingerprint', true),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 _buildTab(context, 'Facial', false),
               ],
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             // Biometric Options
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _buildBiometricOption(
                     context, Icons.fingerprint, 'Fingerprint'),
-                SizedBox(width: 16),
+                const SizedBox(width: 16),
                 _buildBiometricOption(context, Icons.face, 'Facial'),
               ],
             ),
@@ -2616,7 +2632,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildTab(BuildContext context, String label, bool isSelected) {
     return Expanded(
       child: Container(
-        padding: EdgeInsets.symmetric(vertical: 8.0),
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
         decoration: BoxDecoration(
           color: isSelected ? Colors.black : Colors.grey[300],
           borderRadius: BorderRadius.circular(8.0),
@@ -2649,7 +2665,7 @@ class _DashboardPageState extends State<DashboardPage> {
         }
       },
       child: Container(
-        padding: EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16.0),
         decoration: BoxDecoration(
           border: Border.all(color: Colors.grey, width: 2.0),
           borderRadius: BorderRadius.circular(16.0),
@@ -2657,7 +2673,7 @@ class _DashboardPageState extends State<DashboardPage> {
         child: Column(
           children: [
             Icon(icon, size: 80, color: Colors.black),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(label),
           ],
         ),

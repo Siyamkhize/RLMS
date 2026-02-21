@@ -154,7 +154,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
       body: Column(
         children: [
           Container(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             color: Colors.white,
             child: TextField(
               controller: searchController,
@@ -163,7 +163,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                 prefixIcon: Icon(Icons.search, color: Colors.green[700]),
                 suffixIcon: searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: Icon(Icons.clear),
+                        icon: const Icon(Icons.clear),
                         onPressed: () {
                           searchController.clear();
                           setState(() {
@@ -197,21 +197,21 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
           ),
           Expanded(
             child: isLoading
-                ? Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator())
                 : errorMessage.isNotEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.error_outline,
+                            const Icon(Icons.error_outline,
                                 size: 60, color: Colors.red),
-                            SizedBox(height: 16),
+                            const SizedBox(height: 16),
                             Text(errorMessage,
-                                style: TextStyle(color: Colors.red)),
-                            SizedBox(height: 16),
+                                style: const TextStyle(color: Colors.red)),
+                            const SizedBox(height: 16),
                             ElevatedButton(
                               onPressed: fetchClasses,
-                              child: Text('Retry'),
+                              child: const Text('Retry'),
                             ),
                           ],
                         ),
@@ -219,7 +219,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                     : showSearchResults
                         ? _buildSearchResults()
                         : classesBySite.isEmpty
-                            ? Center(
+                            ? const Center(
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
@@ -233,7 +233,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                             : RefreshIndicator(
                                 onRefresh: fetchClasses,
                                 child: ListView.builder(
-                                  padding: EdgeInsets.all(16),
+                                  padding: const EdgeInsets.all(16),
                                   itemCount: classesBySite.keys.length,
                                   itemBuilder: (context, index) {
                                     final siteName =
@@ -253,7 +253,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
 
   Widget _buildSearchResults() {
     if (isSearching) {
-      return Center(child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (searchResults.isEmpty) {
@@ -261,13 +261,13 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off, size: 60, color: Colors.grey),
-            SizedBox(height: 16),
+            const Icon(Icons.search_off, size: 60, color: Colors.grey),
+            const SizedBox(height: 16),
             Text(
               'No learner found with ID: ${searchController.text}',
               style: TextStyle(color: Colors.grey[600]),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
                 setState(() {
@@ -275,7 +275,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                   searchController.clear();
                 });
               },
-              child: Text('Back to Classes'),
+              child: const Text('Back to Classes'),
             ),
           ],
         ),
@@ -285,12 +285,12 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
     return Column(
       children: [
         Container(
-          padding: EdgeInsets.all(12),
+          padding: const EdgeInsets.all(12),
           color: Colors.green[50],
           child: Row(
             children: [
               Icon(Icons.info_outline, color: Colors.green[700]),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Found ${searchResults.length} learner(s)',
@@ -305,14 +305,14 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                     searchController.clear();
                   });
                 },
-                child: Text('Back to Classes'),
+                child: const Text('Back to Classes'),
               ),
             ],
           ),
         ),
         Expanded(
           child: ListView.builder(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             itemCount: searchResults.length,
             itemBuilder: (context, index) {
               final learner = searchResults[index];
@@ -334,7 +334,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
     final registerCount = learner['register_count']?.toString() ?? '0';
 
     return Card(
-      margin: EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
       child: InkWell(
         onTap: () {
@@ -352,7 +352,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
           );
         },
         child: Padding(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -369,7 +369,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                           fontWeight: FontWeight.bold),
                     ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -378,12 +378,12 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                           learnerName.isNotEmpty
                               ? learnerName
                               : 'Unknown Learner',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
                           'ID: $idNumber',
                           style: TextStyle(
@@ -394,12 +394,13 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                       ],
                     ),
                   ),
-                  Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 18),
+                  const Icon(Icons.arrow_forward_ios,
+                      color: Colors.grey, size: 18),
                 ],
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Container(
-                padding: EdgeInsets.all(8),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: Colors.blue[50],
                   borderRadius: BorderRadius.circular(8),
@@ -407,7 +408,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                 child: Row(
                   children: [
                     Icon(Icons.class_, size: 18, color: Colors.blue[700]),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         className,
@@ -439,20 +440,20 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-          margin: EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          margin: const EdgeInsets.only(bottom: 8),
           decoration: BoxDecoration(
             color: Colors.green[700],
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
             children: [
-              Icon(Icons.location_on, color: Colors.white, size: 20),
-              SizedBox(width: 8),
+              const Icon(Icons.location_on, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   siteName,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -460,14 +461,14 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                 ),
               ),
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   '${siteClasses.length} ${siteClasses.length == 1 ? 'class' : 'classes'}',
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -478,7 +479,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
           ),
         ),
         ...siteClasses.map((classData) => _buildClassCard(classData)),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
       ],
     );
   }
@@ -489,7 +490,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
     final learnerCount = classData['learner_count']?.toString() ?? '0';
 
     return Card(
-      margin: EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
       child: InkWell(
         onTap: () {
@@ -506,7 +507,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
           );
         },
         child: Padding(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Row(
             children: [
               Container(
@@ -518,19 +519,19 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                 ),
                 child: Icon(Icons.class_, color: Colors.green[700], size: 30),
               ),
-              SizedBox(width: 16),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       className,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       '$learnerCount learners',
                       style: TextStyle(
@@ -541,7 +542,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                   ],
                 ),
               ),
-              Icon(Icons.arrow_forward_ios, color: Colors.grey),
+              const Icon(Icons.arrow_forward_ios, color: Colors.grey),
             ],
           ),
         ),

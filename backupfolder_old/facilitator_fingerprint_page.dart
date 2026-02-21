@@ -1014,7 +1014,7 @@ class _FacilitatorFingerprintPageState
           debugPrint('[FAC_CLOCK] ❌ Error getting GPS position: $e');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              const SnackBar(
                 content: Text(
                     'Cannot get GPS location. Please enable GPS and try again.'),
                 backgroundColor: Colors.red,
@@ -1323,7 +1323,8 @@ class _FacilitatorFingerprintPageState
       final siteLat = double.tryParse(result.first['latitude'].toString());
       final siteLon = double.tryParse(result.first['longitude'].toString());
 
-      debugPrint('[FAC_GEOFENCE] Site coordinates from DB: lat=$siteLat, lon=$siteLon');
+      debugPrint(
+          '[FAC_GEOFENCE] Site coordinates from DB: lat=$siteLat, lon=$siteLon');
 
       if (siteLat == null || siteLon == null) {
         debugPrint(

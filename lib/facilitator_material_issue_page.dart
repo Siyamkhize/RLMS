@@ -374,7 +374,7 @@ class _FacilitatorMaterialIssuePageState
                           leading: CircleAvatar(
                             backgroundColor:
                                 isOutOfStock ? Colors.red : Colors.green,
-                            child: Icon(
+                            child: const Icon(
                               Icons.inventory_2,
                               color: Colors.white,
                               size: 20,

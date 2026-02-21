@@ -712,8 +712,8 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(label, style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 5),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 5),
             Text(value, textAlign: TextAlign.center),
           ],
         ),
@@ -728,7 +728,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
 
     if (existingQuantity > 0) {
       return Container(
-        padding: EdgeInsets.all(12),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.blue.shade50,
           borderRadius: BorderRadius.circular(8),
@@ -740,7 +740,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
             Row(
               children: [
                 Icon(Icons.history, color: Colors.blue.shade700, size: 18),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Text(
                   'Previous Submissions Found',
                   style: TextStyle(
@@ -751,7 +751,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                 ),
               ],
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'Current total: $existingQuantity units',
               style: TextStyle(
@@ -761,7 +761,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
               ),
             ),
             if (existingRepresentative.isNotEmpty) ...[
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
                 'Last by: $existingRepresentative',
                 style: TextStyle(
@@ -771,9 +771,9 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                 ),
               ),
             ],
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Container(
-              padding: EdgeInsets.all(8),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.green.shade50,
                 borderRadius: BorderRadius.circular(6),
@@ -793,7 +793,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
       );
     } else {
       return Container(
-        padding: EdgeInsets.all(12),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.grey.shade100,
           borderRadius: BorderRadius.circular(8),
@@ -802,7 +802,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
         child: Row(
           children: [
             Icon(Icons.new_releases, color: Colors.grey.shade600, size: 18),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 'No previous submissions found for $materialType. This will be the first issuance.',
@@ -831,7 +831,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                 color: Colors.orange.shade700,
                 size: 48,
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Text(
                 'No Unit Standards Found',
                 style: TextStyle(
@@ -840,7 +840,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                   fontSize: 16,
                 ),
               ),
-              SizedBox(height: 5),
+              const SizedBox(height: 5),
               Text(
                 'No unit standards are available for this qualification. Please ensure the qualification has associated unit standards in the system.',
                 style: TextStyle(
@@ -868,7 +868,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                   Icons.checklist,
                   color: Colors.orange.shade700,
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Text(
                   'Select Unit Standards (${unitStandards.length} available)',
                   style: TextStyle(
@@ -879,12 +879,12 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                 ),
               ],
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             Text(
               'Tick the unit standards you want to issue to facilitator and specify quantities:',
               style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
             ),
-            SizedBox(height: 15),
+            const SizedBox(height: 15),
             SizedBox(
               height: 300, // Fixed height for scrollable list
               child: ListView.builder(
@@ -936,7 +936,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                       unitStandardQuantities['${usId}_SUM'] ?? 0;
 
                   return Card(
-                    margin: EdgeInsets.symmetric(vertical: 4),
+                    margin: const EdgeInsets.symmetric(vertical: 4),
                     child: Padding(
                       padding: const EdgeInsets.all(12.0),
                       child: Column(
@@ -954,12 +954,12 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                                 existingUnitStandardRepresentatives[usId] ?? '',
                           ),
 
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
 
                           // Learner Guide Section
                           Container(
-                            margin: EdgeInsets.only(left: 20),
-                            padding: EdgeInsets.all(8),
+                            margin: const EdgeInsets.only(left: 20),
+                            padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: Colors.purple.shade50,
                               borderRadius: BorderRadius.circular(8),
@@ -980,12 +980,12 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                             ),
                           ),
 
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
 
                           // Formative Section
                           Container(
-                            margin: EdgeInsets.only(left: 20),
-                            padding: EdgeInsets.all(8),
+                            margin: const EdgeInsets.only(left: 20),
+                            padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: Colors.orange.shade50,
                               borderRadius: BorderRadius.circular(8),
@@ -1006,12 +1006,12 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                             ),
                           ),
 
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
 
                           // Summative Section
                           Container(
-                            margin: EdgeInsets.only(left: 20),
-                            padding: EdgeInsets.all(8),
+                            margin: const EdgeInsets.only(left: 20),
+                            padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: Colors.teal.shade50,
                               borderRadius: BorderRadius.circular(8),
@@ -1074,7 +1074,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                       SnackBar(
                         content: Text(
                             'Cannot uncheck items with previous submissions ($existing units already issued)'),
-                        duration: Duration(seconds: 3),
+                        duration: const Duration(seconds: 3),
                         backgroundColor: Colors.orange,
                       ),
                     );
@@ -1145,9 +1145,9 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
 
         // Previous submission info (if any)
         if (existing > 0) ...[
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Container(
-            padding: EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: Colors.blue.shade50,
               borderRadius: BorderRadius.circular(6),
@@ -1163,7 +1163,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                       color: Colors.blue.shade700,
                       size: 16,
                     ),
-                    SizedBox(width: 6),
+                    const SizedBox(width: 6),
                     Text(
                       'Previously issued: $existing units',
                       style: TextStyle(
@@ -1175,7 +1175,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                   ],
                 ),
                 if (representativeName.isNotEmpty) ...[
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Row(
                     children: [
                       Icon(
@@ -1183,7 +1183,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                         color: Colors.blue.shade600,
                         size: 14,
                       ),
-                      SizedBox(width: 4),
+                      const SizedBox(width: 4),
                       Text(
                         'By: $representativeName',
                         style: TextStyle(
@@ -1202,17 +1202,17 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
 
         // Quantity selection (ONLY show if manually selected by user)
         if (isSelected) ...[
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Row(
             children: [
-              Text(
+              const Text(
                 'Quantity:',
                 style: TextStyle(
                   fontWeight: FontWeight.w500,
                   fontSize: 13,
                 ),
               ),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               SizedBox(
                 width: 80,
                 child: DropdownButton<int>(
@@ -1234,10 +1234,10 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                 ),
               ),
               if (existing > 0) ...[
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Container(
-                    padding: EdgeInsets.all(6),
+                    padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       color: Colors.amber.shade50,
                       borderRadius: BorderRadius.circular(4),
@@ -1271,9 +1271,9 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
           children: [
             Row(
               children: [
-                Text('Description',
+                const Text('Description',
                     style: TextStyle(fontWeight: FontWeight.bold)),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: DropdownButton<String>(
                     isExpanded: true,
@@ -1305,16 +1305,16 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
             ),
             if (selectedDescription != 'Select' &&
                 selectedDescription != 'Learning Material') ...[
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               _buildRegularMaterialPreviousSubmission(selectedDescription),
             ],
             if (selectedDescription == 'Learning Material') ...[
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Row(
                 children: [
-                  Text('Learning Material Type',
+                  const Text('Learning Material Type',
                       style: TextStyle(fontWeight: FontWeight.bold)),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: DropdownButton<String>(
                       isExpanded: true,
@@ -1341,24 +1341,24 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
               ),
               if (selectedLearningMaterialType != 'Select' &&
                   selectedLearningMaterialType != 'Unit Standards') ...[
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 _buildRegularMaterialPreviousSubmission(
                     selectedLearningMaterialType),
               ],
               // Show Unit Standards selection when Unit Standards is selected
               if (selectedLearningMaterialType == 'Unit Standards') ...[
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 _buildUnitStandardsSelection(),
               ],
             ],
             if (!(selectedDescription == 'Learning Material' &&
                 selectedLearningMaterialType == 'Unit Standards')) ...[
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Row(
                 children: [
-                  Text('Quantity',
+                  const Text('Quantity',
                       style: TextStyle(fontWeight: FontWeight.bold)),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: DropdownButton<int>(
                       isExpanded: true,
@@ -1381,16 +1381,16 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                 ],
               ),
             ],
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             Row(
               children: [
-                Text('Qualification',
+                const Text('Qualification',
                     style: TextStyle(fontWeight: FontWeight.bold)),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     qualification_name,
-                    style: TextStyle(fontSize: 14),
+                    style: const TextStyle(fontSize: 14),
                   ),
                 ),
               ],
@@ -1409,19 +1409,19 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Facilitator and Representative Details',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Table(
               border: TableBorder.all(
                   color: Colors.grey,
                   width: 1,
                   borderRadius: BorderRadius.circular(12)),
               columnWidths: {
-                0: FixedColumnWidth(150),
-                1: FixedColumnWidth(150),
+                0: const FixedColumnWidth(150),
+                1: const FixedColumnWidth(150),
               },
               children: [
                 TableRow(
@@ -1457,7 +1457,8 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
           padding: const EdgeInsets.symmetric(vertical: 8.0),
           child: TableCell(
             child: Text(name,
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
           ),
         ),
         Padding(
@@ -1492,7 +1493,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                   representativeName = value;
                 });
               },
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Representative Name',
                 border: OutlineInputBorder(),
               ),
@@ -1509,7 +1510,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                         representativeSignature = signature;
                       });
                     }),
-                    child: Text('Representative Signature'),
+                    child: const Text('Representative Signature'),
                   )
                 : Image.memory(
                     representativeSignature!,
@@ -1528,7 +1529,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
       padding: const EdgeInsets.all(8.0),
       child: Text(
         text,
-        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
       ),
     );
   }
@@ -1546,7 +1547,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Capture Signature'),
+          title: const Text('Capture Signature'),
           content: SizedBox(
             width: 300,
             child: Column(
@@ -1561,12 +1562,12 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                     backgroundColor: Colors.white,
                   ),
                 ),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 ElevatedButton(
                   onPressed: () {
                     controller.clear();
                   },
-                  child: Text('Clear'),
+                  child: const Text('Clear'),
                 ),
               ],
             ),
@@ -1576,7 +1577,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
               onPressed: () {
                 Navigator.pop(context);
               },
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -1587,7 +1588,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                 Navigator.pop(context);
                 setState(() {});
               },
-              child: Text('OK'),
+              child: const Text('OK'),
             ),
           ],
         );
@@ -1664,7 +1665,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: Row(
+        title: const Row(
           children: [
             Icon(Icons.preview, color: Colors.orange),
             SizedBox(width: 8),
@@ -1689,9 +1690,9 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
 
               if (selectedDescription == 'Learning Material' &&
                   selectedLearningMaterialType == 'Unit Standards') ...[
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Container(
-                  padding: EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.orange.shade50,
                     borderRadius: BorderRadius.circular(8),
@@ -1704,7 +1705,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                         children: [
                           Icon(Icons.checklist,
                               color: Colors.orange.shade700, size: 18),
-                          SizedBox(width: 8),
+                          const SizedBox(width: 8),
                           Text(
                             'Unit Standards Summary',
                             style: TextStyle(
@@ -1714,7 +1715,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                           ),
                         ],
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       Text(
                         'Selected Items: $selectedUnitStandardsCount',
                         style: TextStyle(
@@ -1730,7 +1731,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                           color: Colors.orange.shade700,
                         ),
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       Text(
                         'Note: This includes Unit Standards, Learner Guides, Formative and Summative materials across ${unitStandards.length} unit standards.',
                         style: TextStyle(
@@ -1749,9 +1750,9 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
 
               _buildPreviewRow('Qualification:', qualification_name),
 
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Container(
-                padding: EdgeInsets.all(8),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(6),
@@ -1760,7 +1761,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                   children: [
                     Icon(Icons.info_outline,
                         color: Colors.blue.shade700, size: 16),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Please review the details above before submitting.',
@@ -1779,7 +1780,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
@@ -1787,7 +1788,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
               backgroundColor: Colors.orange,
               foregroundColor: Colors.white,
             ),
-            child: Text('Confirm & Submit'),
+            child: const Text('Confirm & Submit'),
           ),
         ],
       ),
@@ -1805,7 +1806,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
 
   Widget _buildPreviewRow(String label, String value) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1822,7 +1823,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
+              style: const TextStyle(
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1854,7 +1855,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
         selectedDescription == 'Select' ||
         representativeName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
             "Please capture both facilitator and representative signatures and fill all required fields.",
           ),
@@ -1887,7 +1888,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
 
       if (!hasSelectedUnitStandards) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text("Please select at least one unit standard."),
           ),
         );
@@ -1898,7 +1899,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
     // Validate quantity
     if (quantity < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Please enter a valid quantity.")),
+        const SnackBar(content: Text("Please enter a valid quantity.")),
       );
       return;
     }
@@ -1907,7 +1908,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
     final connectivityResult = await Connectivity().checkConnectivity();
     if (connectivityResult == ConnectivityResult.none) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
             content: Text("No internet connection. Please try again later.")),
       );
       return;
@@ -1978,7 +1979,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                     headers: {'Content-Type': 'application/json'},
                     body: json.encode(formData),
                   )
-                  .timeout(Duration(seconds: 30));
+                  .timeout(const Duration(seconds: 30));
 
               print(
                   '📥 [FACILITATOR SUBMISSION] Response Status: ${response.statusCode}');
@@ -2046,7 +2047,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                     headers: {'Content-Type': 'application/json'},
                     body: json.encode(formDataLG),
                   )
-                  .timeout(Duration(seconds: 30));
+                  .timeout(const Duration(seconds: 30));
 
               print(
                   '📥 [FACILITATOR SUBMISSION] LG Response Status: ${response.statusCode}');
@@ -2120,7 +2121,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                     headers: {'Content-Type': 'application/json'},
                     body: json.encode(formDataFORM),
                   )
-                  .timeout(Duration(seconds: 30));
+                  .timeout(const Duration(seconds: 30));
 
               print(
                   '📥 [FACILITATOR SUBMISSION] FORM Response Status: ${response.statusCode}');
@@ -2194,7 +2195,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                     headers: {'Content-Type': 'application/json'},
                     body: json.encode(formDataSUM),
                   )
-                  .timeout(Duration(seconds: 30));
+                  .timeout(const Duration(seconds: 30));
 
               print(
                   '📥 [FACILITATOR SUBMISSION] SUM Response Status: ${response.statusCode}');
@@ -2225,7 +2226,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
 
         if (allSuccessful) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
                 content: Text(
                     'All unit standards issued to facilitator successfully!')),
           );
@@ -2294,7 +2295,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
             headers: {'Content-Type': 'application/json'},
             body: json.encode(formData),
           )
-          .timeout(Duration(seconds: 30));
+          .timeout(const Duration(seconds: 30));
 
       print('Response Status: ${response.statusCode}');
       print('Response Body: ${response.body}');
@@ -2306,7 +2307,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
 
         if (responseBody['success']) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
                 content: Text('Material issued to facilitator successfully!')),
           );
 
@@ -2353,7 +2354,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
   // Save form offline (simplified version)
   Future<void> saveMaterialFormOffline() async {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Offline saving not implemented yet')),
+      const SnackBar(content: Text('Offline saving not implemented yet')),
     );
   }
 
@@ -2361,7 +2362,7 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Issue Materials to Facilitator'),
+        title: const Text('Issue Materials to Facilitator'),
         backgroundColor: Colors.orange,
         foregroundColor: Colors.white,
       ),
@@ -2369,18 +2370,18 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
         child: Column(
           children: [
             buildPractitionerDetailsCard(),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             _buildClassDetailsCard(),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             buildFacilitatorSignatureTable(),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             ElevatedButton(
               onPressed: checkAndSaveMaterialForm,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
                 foregroundColor: Colors.white,
               ),
-              child: Text('Issue Materials to Facilitator'),
+              child: const Text('Issue Materials to Facilitator'),
             ),
           ],
         ),

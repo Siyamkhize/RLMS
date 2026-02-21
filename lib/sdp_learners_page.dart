@@ -909,12 +909,12 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
                         child: TextField(
                           controller: _searchController,
                           focusNode: _searchFocusNode,
-                          decoration: InputDecoration(
+                          decoration: const InputDecoration(
                             labelText: 'Smart Search by ID Number or Name',
                             hintText: 'Start typing for suggestions...',
-                            prefixIcon: const Icon(Icons.search),
+                            prefixIcon: Icon(Icons.search),
                             border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(
+                            contentPadding: EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 12,
                             ),

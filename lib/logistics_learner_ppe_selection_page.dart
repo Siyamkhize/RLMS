@@ -330,7 +330,7 @@ class _LogisticsLearnerPPESelectionPageState
                             ],
                           ),
                         ),
-                        Icon(
+                        const Icon(
                           Icons.verified_user,
                           color: Colors.green,
                           size: 32,

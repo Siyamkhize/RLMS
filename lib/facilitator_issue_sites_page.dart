@@ -240,9 +240,9 @@ class _FacilitatorIssueSitesPageState extends State<FacilitatorIssueSitesPage> {
                                   elevation: 4,
                                   child: ListTile(
                                     contentPadding: const EdgeInsets.all(16),
-                                    leading: CircleAvatar(
+                                    leading: const CircleAvatar(
                                       backgroundColor: Colors.orange,
-                                      child: const Icon(
+                                      child: Icon(
                                         Icons.location_city,
                                         color: Colors.white,
                                       ),

@@ -1470,7 +1470,7 @@ class _ClockInPageState extends State<ClockInPage> {
       } catch (e) {
         print('[DETECT] Futronic attempt $attempt failed: $e');
         if (attempt < maxAttempts) {
-          await Future.delayed(Duration(milliseconds: 1000));
+          await Future.delayed(const Duration(milliseconds: 1000));
         }
       }
     }
@@ -1494,7 +1494,7 @@ class _ClockInPageState extends State<ClockInPage> {
     if (_currentLearnerIdForClocking != null &&
         _currentLearnerIdForClocking != learnerId) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Another learner is currently clocking. Please wait.'),
           backgroundColor: Colors.orange,
         ),
@@ -1859,7 +1859,7 @@ class _ClockInPageState extends State<ClockInPage> {
     if (_currentLearnerIdForClocking != null &&
         _currentLearnerIdForClocking != learnerId) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Another learner is currently clocking. Please wait.'),
           backgroundColor: Colors.orange,
         ),
@@ -3041,9 +3041,9 @@ class _ClockInPageState extends State<ClockInPage> {
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            Text(
+            const Text(
               'Learner Actions: Clock In/Out, Upload Sick Notes, View Details',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             FutureBuilder<int>(
@@ -3059,11 +3059,13 @@ class _ClockInPageState extends State<ClockInPage> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.warning, color: Colors.orange, size: 16),
+                        const Icon(Icons.warning,
+                            color: Colors.orange, size: 16),
                         const SizedBox(width: 8),
                         Text(
                           '${snapshot.data} offline record(s) waiting to sync',
-                          style: TextStyle(color: Colors.orange, fontSize: 14),
+                          style: const TextStyle(
+                              color: Colors.orange, fontSize: 14),
                         ),
                       ],
                     ),
@@ -3258,7 +3260,7 @@ class _ClockInPageState extends State<ClockInPage> {
                                         return Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(Icons.fingerprint,
+                                            const Icon(Icons.fingerprint,
                                                 color: Colors.green, size: 16),
                                             Text(
                                                 hasLeft && hasRight
@@ -3266,13 +3268,13 @@ class _ClockInPageState extends State<ClockInPage> {
                                                     : hasLeft
                                                         ? 'Left'
                                                         : 'Right',
-                                                style: TextStyle(
+                                                style: const TextStyle(
                                                     fontSize: 12,
                                                     color: Colors.green)),
                                           ],
                                         );
                                       } else {
-                                        return Row(
+                                        return const Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Icon(Icons.fingerprint,

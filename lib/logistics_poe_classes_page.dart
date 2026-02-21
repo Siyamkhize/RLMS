@@ -20,7 +20,8 @@ class LogisticsPOEClassesPage extends StatefulWidget {
   });
 
   @override
-  _LogisticsPOEClassesPageState createState() => _LogisticsPOEClassesPageState();
+  _LogisticsPOEClassesPageState createState() =>
+      _LogisticsPOEClassesPageState();
 }
 
 class _LogisticsPOEClassesPageState extends State<LogisticsPOEClassesPage> {
@@ -49,7 +50,7 @@ class _LogisticsPOEClassesPageState extends State<LogisticsPOEClassesPage> {
   void _onSearchChanged() {
     // Cancel previous timer
     _debounceTimer?.cancel();
-    
+
     // Start new timer for debounced search
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
       setState(() {
@@ -67,16 +68,17 @@ class _LogisticsPOEClassesPageState extends State<LogisticsPOEClassesPage> {
 
     try {
       // Build URL with search parameter
-      String url = 'get_logistics_classes.php?siteID=${widget.siteId}&account_id=${widget.logisticsId}';
+      String url =
+          'get_logistics_classes.php?siteID=${widget.siteId}&account_id=${widget.logisticsId}';
       if (_searchQuery.isNotEmpty) {
         url += '&search=${Uri.encodeComponent(_searchQuery)}';
       }
-      
+
       final response = await http.get(Uri.parse(AppConfig.buildUrl(url)));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data['success'] == true && data['classes'] != null) {
           setState(() {
             classes = data['classes'];
@@ -143,7 +145,8 @@ class _LogisticsPOEClassesPageState extends State<LogisticsPOEClassesPage> {
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Search classes by name, facilitator, or learner count...',
+                    hintText:
+                        'Search classes by name, facilitator, or learner count...',
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
@@ -159,7 +162,8 @@ class _LogisticsPOEClassesPageState extends State<LogisticsPOEClassesPage> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.orange.shade600, width: 2),
+                      borderSide:
+                          BorderSide(color: Colors.orange.shade600, width: 2),
                     ),
                     filled: true,
                     fillColor: Colors.white,
@@ -176,7 +180,8 @@ class _LogisticsPOEClassesPageState extends State<LogisticsPOEClassesPage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.error, size: 64, color: Colors.red),
+                            const Icon(Icons.error,
+                                size: 64, color: Colors.red),
                             const SizedBox(height: 16),
                             Text(
                               errorMessage,
@@ -197,15 +202,16 @@ class _LogisticsPOEClassesPageState extends State<LogisticsPOEClassesPage> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  _searchQuery.isNotEmpty ? Icons.search_off : Icons.class_outlined, 
-                                  size: 64, 
-                                  color: Colors.grey[400]
-                                ),
+                                    _searchQuery.isNotEmpty
+                                        ? Icons.search_off
+                                        : Icons.class_outlined,
+                                    size: 64,
+                                    color: Colors.grey[400]),
                                 const SizedBox(height: 16),
                                 Text(
-                                  _searchQuery.isNotEmpty 
-                                    ? 'No classes match your search'
-                                    : 'No classes found at this site',
+                                  _searchQuery.isNotEmpty
+                                      ? 'No classes match your search'
+                                      : 'No classes found at this site',
                                   style: TextStyle(
                                     fontSize: 18,
                                     color: Colors.grey[600],
@@ -236,9 +242,9 @@ class _LogisticsPOEClassesPageState extends State<LogisticsPOEClassesPage> {
                                   elevation: 4,
                                   child: ListTile(
                                     contentPadding: const EdgeInsets.all(16),
-                                    leading: CircleAvatar(
+                                    leading: const CircleAvatar(
                                       backgroundColor: Colors.orange,
-                                      child: const Icon(
+                                      child: Icon(
                                         Icons.class_,
                                         color: Colors.white,
                                       ),
@@ -251,28 +257,39 @@ class _LogisticsPOEClassesPageState extends State<LogisticsPOEClassesPage> {
                                       ),
                                     ),
                                     subtitle: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         const SizedBox(height: 4),
                                         Row(
                                           children: [
-                                            Icon(Icons.group, size: 16, color: Colors.grey[600]),
+                                            Icon(Icons.group,
+                                                size: 16,
+                                                color: Colors.grey[600]),
                                             const SizedBox(width: 4),
-                                            Text('${classData['total_learners'] ?? '0'} learners'),
+                                            Text(
+                                                '${classData['total_learners'] ?? '0'} learners'),
                                           ],
                                         ),
-                                        if (classData['facilitator_name'] != null && 
-                                            classData['facilitator_name'] != 'No Facilitator Assigned') ...[
+                                        if (classData['facilitator_name'] !=
+                                                null &&
+                                            classData['facilitator_name'] !=
+                                                'No Facilitator Assigned') ...[
                                           const SizedBox(height: 2),
                                           Row(
                                             children: [
-                                              Icon(Icons.person, size: 16, color: Colors.grey[600]),
+                                              Icon(Icons.person,
+                                                  size: 16,
+                                                  color: Colors.grey[600]),
                                               const SizedBox(width: 4),
                                               Expanded(
                                                 child: Text(
                                                   classData['facilitator_name'],
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: const TextStyle(fontWeight: FontWeight.w500),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w500),
                                                 ),
                                               ),
                                             ],
@@ -281,7 +298,9 @@ class _LogisticsPOEClassesPageState extends State<LogisticsPOEClassesPage> {
                                           const SizedBox(height: 2),
                                           Row(
                                             children: [
-                                              Icon(Icons.person_off, size: 16, color: Colors.red[400]),
+                                              Icon(Icons.person_off,
+                                                  size: 16,
+                                                  color: Colors.red[400]),
                                               const SizedBox(width: 4),
                                               Text(
                                                 'No Facilitator Assigned',
@@ -296,27 +315,36 @@ class _LogisticsPOEClassesPageState extends State<LogisticsPOEClassesPage> {
                                         ],
                                       ],
                                     ),
-                                    trailing: Row(
+                                    trailing: const Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(Icons.assignment, color: Colors.orange),
-                                        const SizedBox(width: 4),
-                                        const Icon(Icons.arrow_forward_ios),
+                                        Icon(Icons.assignment,
+                                            color: Colors.orange),
+                                        SizedBox(width: 4),
+                                        Icon(Icons.arrow_forward_ios),
                                       ],
                                     ),
                                     onTap: () {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => LogisticsPOELearnersPage(
+                                          builder: (context) =>
+                                              LogisticsPOELearnersPage(
                                             logisticsId: widget.logisticsId,
                                             logisticsName: widget.logisticsName,
                                             siteId: widget.siteId,
                                             siteName: widget.siteName,
-                                            classId: classData['classID'].toString(),
-                                            className: classData['className'] ?? 'Unknown Class',
-                                            facilitatorId: classData['facilitator_id']?.toString() ?? '',
-                                            facilitatorName: classData['facilitator_name'] ?? '',
+                                            classId:
+                                                classData['classID'].toString(),
+                                            className: classData['className'] ??
+                                                'Unknown Class',
+                                            facilitatorId:
+                                                classData['facilitator_id']
+                                                        ?.toString() ??
+                                                    '',
+                                            facilitatorName:
+                                                classData['facilitator_name'] ??
+                                                    '',
                                           ),
                                         ),
                                       );

@@ -272,18 +272,18 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
         context: context,
         barrierDismissible: false,
         builder: (context) => AlertDialog(
-          title: Row(
-            children: const [
+          title: const Row(
+            children: [
               Icon(Icons.warning, color: Colors.red, size: 32),
               SizedBox(width: 8),
               Expanded(child: Text('CRITICAL: Scanner Limits')),
             ],
           ),
-          content: SingleChildScrollView(
+          content: const SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
                   '🔴 MAXIMUM: 100 pages per batch',
                   style: TextStyle(

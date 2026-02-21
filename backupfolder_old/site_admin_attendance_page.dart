@@ -82,19 +82,20 @@ class _SiteAdminAttendancePageState extends State<SiteAdminAttendancePage> {
         children: [
           // Date picker
           Container(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             color: Colors.green.shade50,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   DateFormat('EEEE, MMM d, yyyy').format(selectedDate),
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 ElevatedButton.icon(
                   onPressed: _selectDate,
-                  icon: Icon(Icons.calendar_today),
-                  label: Text('Change Date'),
+                  icon: const Icon(Icons.calendar_today),
+                  label: const Text('Change Date'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                   ),
@@ -106,7 +107,7 @@ class _SiteAdminAttendancePageState extends State<SiteAdminAttendancePage> {
           // Summary
           if (summary.isNotEmpty)
             Container(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
@@ -123,9 +124,9 @@ class _SiteAdminAttendancePageState extends State<SiteAdminAttendancePage> {
           // Attendance list
           Expanded(
             child: isLoading
-                ? Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator())
                 : attendance.isEmpty
-                    ? Center(child: Text('No learners assigned'))
+                    ? const Center(child: Text('No learners assigned'))
                     : ListView.builder(
                         itemCount: attendance.length,
                         itemBuilder: (context, index) {
@@ -166,7 +167,7 @@ class _SiteAdminAttendancePageState extends State<SiteAdminAttendancePage> {
   Widget _buildSummaryCard(String label, String value, Color color) {
     return Card(
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             Text(

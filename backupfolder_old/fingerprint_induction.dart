@@ -13,6 +13,7 @@ import 'services/fingerprint_service.dart';
 import 'utils/fingerprint_error_handler.dart';
 
 import 'config.dart';
+
 class InductionPage extends StatefulWidget {
   final String classID;
 
@@ -68,7 +69,8 @@ class _InductionPageState extends State<InductionPage> {
     // First try to sync learners from server to local database
     try {
       await dbHelper.syncLearnersFromServer(widget.classID);
-      print('Successfully synced learners from server for classID: ${widget.classID}');
+      print(
+          'Successfully synced learners from server for classID: ${widget.classID}');
     } catch (e) {
       print('Failed to sync learners from server: $e');
       // Continue with local data even if sync fails
@@ -82,7 +84,7 @@ class _InductionPageState extends State<InductionPage> {
 
   Future<void> _checkAllLearnersClockingStatus() async {
     final db = await DatabaseHelper().database;
-    
+
     // Check all learners' clocking status from database
     for (var learner in learners) {
       String learnerId = learner['LearnerID']?.toString() ?? '';
@@ -94,7 +96,7 @@ class _InductionPageState extends State<InductionPage> {
 
   Future<void> _checkLearnerClockingStatus(String learnerId) async {
     final db = await DatabaseHelper().database;
-    
+
     // Check if learner has any previous induction clocking records
     final existingInduction = await db.query(
       'induction_clocking',
@@ -102,18 +104,22 @@ class _InductionPageState extends State<InductionPage> {
       whereArgs: [learnerId],
       limit: 1,
     );
-    
+
     if (existingInduction.isNotEmpty) {
       final record = existingInduction.first;
       final clockInTime = record['clock_in_time']?.toString();
       final clockOutTime = record['clock_out_time']?.toString();
-      
+
       setState(() {
         // Mark as having clocked in if there's a clock_in_time
-        _hasClockIn[learnerId] = clockInTime != null && clockInTime.isNotEmpty && clockInTime != 'null';
-        
+        _hasClockIn[learnerId] = clockInTime != null &&
+            clockInTime.isNotEmpty &&
+            clockInTime != 'null';
+
         // Mark as having clocked out if there's a clock_out_time
-        _hasClockOut[learnerId] = clockOutTime != null && clockOutTime.isNotEmpty && clockOutTime != 'null';
+        _hasClockOut[learnerId] = clockOutTime != null &&
+            clockOutTime.isNotEmpty &&
+            clockOutTime != 'null';
       });
     } else {
       setState(() {
@@ -136,10 +142,11 @@ class _InductionPageState extends State<InductionPage> {
     if (!(await _checkConnectivity())) return;
 
     await _syncOfflineClockIns();
-    
+
     // Individual server fetches disabled - induction data is only clocked once in entire program
     // This prevents FormatException errors from broken get_indaction_data.php endpoint
-    print('[INDUCTION] Individual server fetches disabled - induction is one-time only');
+    print(
+        '[INDUCTION] Individual server fetches disabled - induction is one-time only');
   }
 
   Future<void> _syncOfflineClockIns() async {
@@ -155,7 +162,8 @@ class _InductionPageState extends State<InductionPage> {
     for (var record in offlineRecords) {
       try {
         // Convert all values to String, using empty string for nulls
-        final stringRecord = record.map((k, v) => MapEntry(k, v?.toString() ?? ''));
+        final stringRecord =
+            record.map((k, v) => MapEntry(k, v?.toString() ?? ''));
         final learnerID = stringRecord['LearnerID'] ?? '';
         // Mark as synced - cleanup will delete it later
         await db.update(
@@ -169,7 +177,7 @@ class _InductionPageState extends State<InductionPage> {
         print('Failed to sync offline clock-in: $e');
       }
     }
-    
+
     // Clean up synced records after sync
     try {
       final dbHelper = DatabaseHelper();
@@ -183,7 +191,8 @@ class _InductionPageState extends State<InductionPage> {
   Future<void> _refreshDataWithoutClearingState() async {
     try {
       final dbHelper = DatabaseHelper();
-      final learnersWithClockingData = await dbHelper.getLearnersWithInductionClockingData(widget.classID);
+      final learnersWithClockingData =
+          await dbHelper.getLearnersWithInductionClockingData(widget.classID);
 
       setState(() {
         for (var learner in learnersWithClockingData) {
@@ -192,13 +201,19 @@ class _InductionPageState extends State<InductionPage> {
           String clockOutTime = learner['clock_out_time']?.toString() ?? '';
           String contactTime = learner['contact_time']?.toString() ?? '';
 
-          if (clockInTime.isNotEmpty && clockInTime != 'N/A' && clockInTime != 'null') {
+          if (clockInTime.isNotEmpty &&
+              clockInTime != 'N/A' &&
+              clockInTime != 'null') {
             clockInTimes[learnerId] = clockInTime;
           }
-          if (clockOutTime.isNotEmpty && clockOutTime != 'N/A' && clockOutTime != 'null') {
+          if (clockOutTime.isNotEmpty &&
+              clockOutTime != 'N/A' &&
+              clockOutTime != 'null') {
             clockOutTimes[learnerId] = clockOutTime;
           }
-          if (contactTime.isNotEmpty && contactTime != 'N/A' && contactTime != 'null') {
+          if (contactTime.isNotEmpty &&
+              contactTime != 'N/A' &&
+              contactTime != 'null') {
             contactTimes[learnerId] = contactTime;
           }
         }
@@ -206,7 +221,8 @@ class _InductionPageState extends State<InductionPage> {
         learners.clear();
         learners.addAll(learnersWithClockingData.map((learner) {
           // Ensure all values are strings before creating the map
-          return Map<String, String>.from(learner.map((key, value) => MapEntry(key, value?.toString() ?? '')));
+          return Map<String, String>.from(learner
+              .map((key, value) => MapEntry(key, value?.toString() ?? '')));
         }));
       });
 
@@ -221,7 +237,8 @@ class _InductionPageState extends State<InductionPage> {
   Future<void> _loadLearnersFromLocalDatabase() async {
     try {
       final dbHelper = DatabaseHelper();
-      final learnersWithClockingData = await dbHelper.getLearnersWithInductionClockingData(widget.classID);
+      final learnersWithClockingData =
+          await dbHelper.getLearnersWithInductionClockingData(widget.classID);
 
       setState(() {
         learners.clear();
@@ -231,13 +248,19 @@ class _InductionPageState extends State<InductionPage> {
           String clockOutTime = learner['clock_out_time']?.toString() ?? '';
           String contactTime = learner['contact_time']?.toString() ?? '';
 
-          if (clockInTime.isNotEmpty && clockInTime != 'N/A' && clockInTime != 'null') {
+          if (clockInTime.isNotEmpty &&
+              clockInTime != 'N/A' &&
+              clockInTime != 'null') {
             clockInTimes[learnerId] = clockInTime;
           }
-          if (clockOutTime.isNotEmpty && clockOutTime != 'N/A' && clockOutTime != 'null') {
+          if (clockOutTime.isNotEmpty &&
+              clockOutTime != 'N/A' &&
+              clockOutTime != 'null') {
             clockOutTimes[learnerId] = clockOutTime;
           }
-          if (contactTime.isNotEmpty && contactTime != 'N/A' && contactTime != 'null') {
+          if (contactTime.isNotEmpty &&
+              contactTime != 'N/A' &&
+              contactTime != 'null') {
             contactTimes[learnerId] = contactTime;
           }
 
@@ -259,7 +282,8 @@ class _InductionPageState extends State<InductionPage> {
     }
   }
 
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+      double lat1, double lon1, double lat2, double lon2) {
     const double R = 6371e3; // Earth radius in meters
     final double phi1 = lat1 * pi / 180;
     final double phi2 = lat2 * pi / 180;
@@ -273,11 +297,13 @@ class _InductionPageState extends State<InductionPage> {
     return R * c; // Distance in meters
   }
 
-  Future<bool> _isWithinSiteRadius(String classID, double userLat, double userLon, double userAccuracy) async {
+  Future<bool> _isWithinSiteRadius(String classID, double userLat,
+      double userLon, double userAccuracy) async {
     if (userAccuracy > 50) {
       print('Geolocation accuracy too low: $userAccuracy meters');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Geolocation accuracy too low. Please enable GPS.')),
+        const SnackBar(
+            content: Text('Geolocation accuracy too low. Please enable GPS.')),
       );
       return false;
     }
@@ -290,7 +316,8 @@ class _InductionPageState extends State<InductionPage> {
       final sites = await db.query('sites');
       print('Class table contents: $classes');
       print('Sites table contents: $sites');
-      print('Querying coordinates for classID: $classID (type: ${classID.runtimeType})');
+      print(
+          'Querying coordinates for classID: $classID (type: ${classID.runtimeType})');
 
       final result = await db.rawQuery(
         'SELECT s.latitude, s.longitude FROM class c JOIN sites s ON c.siteID = s.siteID WHERE c.classID = ?',
@@ -301,17 +328,20 @@ class _InductionPageState extends State<InductionPage> {
         if (classes.isEmpty) {
           print('Class table is empty');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No class data available in local database.')),
+            const SnackBar(
+                content: Text('No class data available in local database.')),
           );
         } else if (sites.isEmpty) {
           print('Sites table is empty');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No site data available in local database.')),
+            const SnackBar(
+                content: Text('No site data available in local database.')),
           );
         } else {
           print('No matching class or site found for classID: $classID');
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('No site coordinates found for class $classID.')),
+            SnackBar(
+                content: Text('No site coordinates found for class $classID.')),
           );
         }
         return false;
@@ -321,9 +351,11 @@ class _InductionPageState extends State<InductionPage> {
       final siteLon = double.tryParse(result.first['longitude'].toString());
 
       if (siteLat == null || siteLon == null) {
-        print('Invalid site coordinates for classID: $classID, lat: ${result.first['latitude']}, lon: ${result.first['longitude']}');
+        print(
+            'Invalid site coordinates for classID: $classID, lat: ${result.first['latitude']}, lon: ${result.first['longitude']}');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid site coordinates in database.')),
+          const SnackBar(
+              content: Text('Invalid site coordinates in database.')),
         );
         return false;
       }
@@ -333,13 +365,16 @@ class _InductionPageState extends State<InductionPage> {
       print('Distance to site for classID $classID: $distance meters');
       if (distance > 100) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Outside 100-meter radius (Distance: ${distance.toStringAsFixed(2)} meters)')),
+          SnackBar(
+              content: Text(
+                  'Outside 100-meter radius (Distance: ${distance.toStringAsFixed(2)} meters)')),
         );
         return false;
       }
       return true;
     } catch (e, stackTrace) {
-      print('Error checking site radius for classID $classID: $e\nStack trace: $stackTrace');
+      print(
+          'Error checking site radius for classID $classID: $e\nStack trace: $stackTrace');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error checking location: $e')),
       );
@@ -371,7 +406,10 @@ class _InductionPageState extends State<InductionPage> {
   Future<void> _verifyAndClockIn(String learnerId) async {
     if (_isClockingIn[learnerId] == true || _isInitializing) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_isInitializing ? 'Sensor is initializing...' : 'Sensor not ready.')),
+        SnackBar(
+            content: Text(_isInitializing
+                ? 'Sensor is initializing...'
+                : 'Sensor not ready.')),
       );
       return;
     }
@@ -379,7 +417,10 @@ class _InductionPageState extends State<InductionPage> {
     // Check if learner has already clocked in using our state tracking
     if (_hasClockIn[learnerId] == true) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This learner has already been inducted and cannot clock in again.'), backgroundColor: Colors.orange),
+        const SnackBar(
+            content: Text(
+                'This learner has already been inducted and cannot clock in again.'),
+            backgroundColor: Colors.orange),
       );
       return;
     }
@@ -392,34 +433,43 @@ class _InductionPageState extends State<InductionPage> {
       whereArgs: [learnerId],
       limit: 1,
     );
-    if (existingInduction.isNotEmpty && existingInduction.first['clock_in_time'] != null) {
+    if (existingInduction.isNotEmpty &&
+        existingInduction.first['clock_in_time'] != null) {
       // Update our state to match database
       setState(() {
         _hasClockIn[learnerId] = true;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This learner has already been inducted and cannot clock in again.'), backgroundColor: Colors.orange),
+        const SnackBar(
+            content: Text(
+                'This learner has already been inducted and cannot clock in again.'),
+            backgroundColor: Colors.orange),
       );
       return;
     }
 
-    final templates = await DatabaseHelper().getAllTemplates(int.parse(learnerId));
+    final templates =
+        await DatabaseHelper().getAllTemplates(int.parse(learnerId));
     final scanner = await _detectScanner();
     String? template;
     if (scanner == 'zkteco') {
-      template = templates['zkteco_left_template'] ?? templates['zkteco_right_template'];
+      template = templates['zkteco_left_template'] ??
+          templates['zkteco_right_template'];
     } else if (scanner == 'futronic') {
-      template = templates['futronic_left_template'] ?? templates['futronic_right_template'];
+      template = templates['futronic_left_template'] ??
+          templates['futronic_right_template'];
     }
     if (template == null || template.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No fingerprints enrolled for learner $learnerId. Please enroll fingerprints first.'),
+          content: Text(
+              'No fingerprints enrolled for learner $learnerId. Please enroll fingerprints first.'),
           backgroundColor: Colors.orange,
           action: SnackBarAction(
             label: 'Enroll',
             onPressed: () {
-              Navigator.pushNamed(context, '/enrollment', arguments: {'learnerId': learnerId});
+              Navigator.pushNamed(context, '/enrollment',
+                  arguments: {'learnerId': learnerId});
             },
           ),
         ),
@@ -438,37 +488,46 @@ class _InductionPageState extends State<InductionPage> {
     try {
       bool match = false;
       if (scanner == 'zkteco') {
-        match = await _fingerprintService.verify('left', template) || await _fingerprintService.verify('right', template);
+        match = await _fingerprintService.verify('left', template) ||
+            await _fingerprintService.verify('right', template);
       } else if (scanner == 'futronic') {
         try {
-          debugPrint('[INDUCTION_CLOCK_IN] Attempting Futronic verification for learner $learnerId');
+          debugPrint(
+              '[INDUCTION_CLOCK_IN] Attempting Futronic verification for learner $learnerId');
           final leftTemplate = templates['futronic_left_template'];
           final rightTemplate = templates['futronic_right_template'];
-          final hint = (leftTemplate != null && leftTemplate.isNotEmpty) ? 'left' : 'right';
+          final hint = (leftTemplate != null && leftTemplate.isNotEmpty)
+              ? 'left'
+              : 'right';
           match = await _futronicService.verifyBoth(
             hintFinger: hint,
             leftTemplate: leftTemplate,
             rightTemplate: rightTemplate,
           );
         } catch (futronicError) {
-          debugPrint('[INDUCTION_CLOCK_IN] Futronic verification error: $futronicError');
+          debugPrint(
+              '[INDUCTION_CLOCK_IN] Futronic verification error: $futronicError');
           _hideProgressDialog();
           setState(() {
             _isClockingIn[learnerId] = false;
             _currentLearnerIdForClocking = null;
             _currentClockingAction = null;
           });
-          
+
           // Provide specific error messages for common Futronic issues
           String errorMessage = 'Fingerprint verification failed';
-          if (futronicError.toString().contains('USB_OPEN_FAILED') || futronicError.toString().contains('DEVICE_OPEN_FAILED')) {
-            errorMessage = 'Scanner connection failed. Please check USB connection and try again.';
+          if (futronicError.toString().contains('USB_OPEN_FAILED') ||
+              futronicError.toString().contains('DEVICE_OPEN_FAILED')) {
+            errorMessage =
+                'Scanner connection failed. Please check USB connection and try again.';
           } else if (futronicError.toString().contains('CAPTURE_FAILED')) {
-            errorMessage = 'Could not capture fingerprint. Please place finger firmly on scanner and try again.';
-          } else if (futronicError.toString().contains('TIMEOUT') || futronicError.toString().contains('Timeout')) {
+            errorMessage =
+                'Could not capture fingerprint. Please place finger firmly on scanner and try again.';
+          } else if (futronicError.toString().contains('TIMEOUT') ||
+              futronicError.toString().contains('Timeout')) {
             errorMessage = 'Timeout waiting for fingerprint. Please try again.';
           }
-          
+
           FingerprintErrorHandler.showError(context, futronicError.toString());
           return;
         }
@@ -481,13 +540,14 @@ class _InductionPageState extends State<InductionPage> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No fingerprint scanner detected. Please connect a scanner.'),
+            content: Text(
+                'No fingerprint scanner detected. Please connect a scanner.'),
             backgroundColor: Colors.orange,
           ),
         );
         return;
       }
-      
+
       _hideProgressDialog();
       if (match) {
         final now = DateFormat('HH:mm:ss').format(DateTime.now());
@@ -502,7 +562,7 @@ class _InductionPageState extends State<InductionPage> {
           'user_longitude': '0.0', // Default coordinates
           'user_accuracy': '10.0',
         };
-        
+
         debugPrint('[INDUCTION_CLOCK_IN] Starting sync for clock-in...');
         bool synced = false;
         try {
@@ -511,21 +571,25 @@ class _InductionPageState extends State<InductionPage> {
         } catch (e) {
           debugPrint('[INDUCTION_CLOCK_IN] Sync error: $e');
         }
-        
+
         if (synced) {
           attendance['synced'] = 1;
           debugPrint('[INDUCTION_CLOCK_IN] Showing clock-in success SnackBar.');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Induction clock-in successful (synced)'), backgroundColor: Colors.green),
+            const SnackBar(
+                content: Text('Induction clock-in successful (synced)'),
+                backgroundColor: Colors.green),
           );
         } else {
           debugPrint('[INDUCTION_CLOCK_IN] Showing clock-in offline SnackBar.');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Induction clock-in saved locally (offline)'), backgroundColor: Colors.orange),
+            const SnackBar(
+                content: Text('Induction clock-in saved locally (offline)'),
+                backgroundColor: Colors.orange),
           );
         }
         await DatabaseHelper().insertInductionClocking(attendance);
-        
+
         // Update UI and status
         setState(() {
           clockInTimes[learnerId] = now;
@@ -549,7 +613,10 @@ class _InductionPageState extends State<InductionPage> {
   Future<void> _verifyAndClockOut(String learnerId) async {
     if (_isClockingIn[learnerId] == true || _isInitializing) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_isInitializing ? 'Sensor is initializing...' : 'Sensor not ready.')),
+        SnackBar(
+            content: Text(_isInitializing
+                ? 'Sensor is initializing...'
+                : 'Sensor not ready.')),
       );
       return;
     }
@@ -557,7 +624,10 @@ class _InductionPageState extends State<InductionPage> {
     // Check if learner has already clocked out using our state tracking
     if (_hasClockOut[learnerId] == true) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This learner has already clocked out and cannot clock out again.'), backgroundColor: Colors.orange),
+        const SnackBar(
+            content: Text(
+                'This learner has already clocked out and cannot clock out again.'),
+            backgroundColor: Colors.orange),
       );
       return;
     }
@@ -565,15 +635,22 @@ class _InductionPageState extends State<InductionPage> {
     // Check if learner has clocked in first
     if (_hasClockIn[learnerId] != true) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please clock in first before clocking out.'), backgroundColor: Colors.orange),
+        const SnackBar(
+            content: Text('Please clock in first before clocking out.'),
+            backgroundColor: Colors.orange),
       );
       return;
     }
 
-    final existingAttendance = await DatabaseHelper().getInductionAttendanceForDay(learnerId, DateFormat('yyyy-MM-dd').format(DateTime.now()));
-    if (existingAttendance == null || existingAttendance['clock_in_time'] == null) {
+    final existingAttendance = await DatabaseHelper()
+        .getInductionAttendanceForDay(
+            learnerId, DateFormat('yyyy-MM-dd').format(DateTime.now()));
+    if (existingAttendance == null ||
+        existingAttendance['clock_in_time'] == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please clock in first'), backgroundColor: Colors.orange),
+        const SnackBar(
+            content: Text('Please clock in first'),
+            backgroundColor: Colors.orange),
       );
       return;
     }
@@ -585,28 +662,35 @@ class _InductionPageState extends State<InductionPage> {
         _hasClockOut[learnerId] = true;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This learner has already clocked out.'), backgroundColor: Colors.orange),
+        const SnackBar(
+            content: Text('This learner has already clocked out.'),
+            backgroundColor: Colors.orange),
       );
       return;
     }
 
-    final templates = await DatabaseHelper().getAllTemplates(int.parse(learnerId));
+    final templates =
+        await DatabaseHelper().getAllTemplates(int.parse(learnerId));
     final scanner = await _detectScanner();
     String? template;
     if (scanner == 'zkteco') {
-      template = templates['zkteco_left_template'] ?? templates['zkteco_right_template'];
+      template = templates['zkteco_left_template'] ??
+          templates['zkteco_right_template'];
     } else if (scanner == 'futronic') {
-      template = templates['futronic_left_template'] ?? templates['futronic_right_template'];
+      template = templates['futronic_left_template'] ??
+          templates['futronic_right_template'];
     }
     if (template == null || template.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No fingerprints enrolled for learner $learnerId. Please enroll fingerprints first.'),
+          content: Text(
+              'No fingerprints enrolled for learner $learnerId. Please enroll fingerprints first.'),
           backgroundColor: Colors.orange,
           action: SnackBarAction(
             label: 'Enroll',
             onPressed: () {
-              Navigator.pushNamed(context, '/enrollment', arguments: {'learnerId': learnerId});
+              Navigator.pushNamed(context, '/enrollment',
+                  arguments: {'learnerId': learnerId});
             },
           ),
         ),
@@ -625,37 +709,46 @@ class _InductionPageState extends State<InductionPage> {
     try {
       bool match = false;
       if (scanner == 'zkteco') {
-        match = await _fingerprintService.verify('left', template) || await _fingerprintService.verify('right', template);
+        match = await _fingerprintService.verify('left', template) ||
+            await _fingerprintService.verify('right', template);
       } else if (scanner == 'futronic') {
         try {
-          debugPrint('[INDUCTION_CLOCK_OUT] Attempting Futronic verification for learner $learnerId');
+          debugPrint(
+              '[INDUCTION_CLOCK_OUT] Attempting Futronic verification for learner $learnerId');
           final leftTemplate = templates['futronic_left_template'];
           final rightTemplate = templates['futronic_right_template'];
-          final hint = (leftTemplate != null && leftTemplate.isNotEmpty) ? 'left' : 'right';
+          final hint = (leftTemplate != null && leftTemplate.isNotEmpty)
+              ? 'left'
+              : 'right';
           match = await _futronicService.verifyBoth(
             hintFinger: hint,
             leftTemplate: leftTemplate,
             rightTemplate: rightTemplate,
           );
         } catch (futronicError) {
-          debugPrint('[INDUCTION_CLOCK_OUT] Futronic verification error: $futronicError');
+          debugPrint(
+              '[INDUCTION_CLOCK_OUT] Futronic verification error: $futronicError');
           _hideProgressDialog();
           setState(() {
             _isClockingIn[learnerId] = false;
             _currentLearnerIdForClocking = null;
             _currentClockingAction = null;
           });
-          
+
           // Provide specific error messages for common Futronic issues
           String errorMessage = 'Fingerprint verification failed';
-          if (futronicError.toString().contains('USB_OPEN_FAILED') || futronicError.toString().contains('DEVICE_OPEN_FAILED')) {
-            errorMessage = 'Scanner connection failed. Please check USB connection and try again.';
+          if (futronicError.toString().contains('USB_OPEN_FAILED') ||
+              futronicError.toString().contains('DEVICE_OPEN_FAILED')) {
+            errorMessage =
+                'Scanner connection failed. Please check USB connection and try again.';
           } else if (futronicError.toString().contains('CAPTURE_FAILED')) {
-            errorMessage = 'Could not capture fingerprint. Please place finger firmly on scanner and try again.';
-          } else if (futronicError.toString().contains('TIMEOUT') || futronicError.toString().contains('Timeout')) {
+            errorMessage =
+                'Could not capture fingerprint. Please place finger firmly on scanner and try again.';
+          } else if (futronicError.toString().contains('TIMEOUT') ||
+              futronicError.toString().contains('Timeout')) {
             errorMessage = 'Timeout waiting for fingerprint. Please try again.';
           }
-          
+
           FingerprintErrorHandler.showError(context, futronicError.toString());
           return;
         }
@@ -668,20 +761,21 @@ class _InductionPageState extends State<InductionPage> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No fingerprint scanner detected. Please connect a scanner.'),
+            content: Text(
+                'No fingerprint scanner detected. Please connect a scanner.'),
             backgroundColor: Colors.orange,
           ),
         );
         return;
       }
-      
+
       _hideProgressDialog();
       if (match) {
         final now = DateFormat('HH:mm:ss').format(DateTime.now());
         final date = DateFormat('yyyy-MM-dd').format(DateTime.now());
         final clockInTime = existingAttendance['clock_in_time'].toString();
         final contactTime = _calculateContactTime(clockInTime, now);
-        
+
         // Prepare complete attendance data for sync
         final attendance = {
           'LearnerID': int.tryParse(learnerId) ?? learnerId,
@@ -695,7 +789,7 @@ class _InductionPageState extends State<InductionPage> {
           'user_longitude': '0.0', // Default coordinates
           'user_accuracy': '10.0',
         };
-        
+
         debugPrint('[INDUCTION_CLOCK_OUT] Starting sync for clock-out...');
         bool synced = false;
         try {
@@ -704,7 +798,7 @@ class _InductionPageState extends State<InductionPage> {
         } catch (e) {
           debugPrint('[INDUCTION_CLOCK_OUT] Sync error: $e');
         }
-        
+
         if (synced) {
           // Update local database with synced=1
           final updatedAttendance = {
@@ -712,9 +806,12 @@ class _InductionPageState extends State<InductionPage> {
             'contact_time': contactTime,
             'synced': 1, // Mark as synced
           };
-          await DatabaseHelper().updateInductionClocking(learnerId, date, updatedAttendance);
+          await DatabaseHelper()
+              .updateInductionClocking(learnerId, date, updatedAttendance);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Induction clock-out successful (synced)'), backgroundColor: Colors.green),
+            const SnackBar(
+                content: Text('Induction clock-out successful (synced)'),
+                backgroundColor: Colors.green),
           );
         } else {
           // Update local database with synced=0
@@ -723,12 +820,15 @@ class _InductionPageState extends State<InductionPage> {
             'contact_time': contactTime,
             'synced': 0, // Mark as not synced
           };
-          await DatabaseHelper().updateInductionClocking(learnerId, date, updatedAttendance);
+          await DatabaseHelper()
+              .updateInductionClocking(learnerId, date, updatedAttendance);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Induction clock-out saved locally (offline)'), backgroundColor: Colors.orange),
+            const SnackBar(
+                content: Text('Induction clock-out saved locally (offline)'),
+                backgroundColor: Colors.orange),
           );
         }
-        
+
         // Update UI and status
         setState(() {
           clockOutTimes[learnerId] = now;
@@ -752,7 +852,8 @@ class _InductionPageState extends State<InductionPage> {
 
   Future<void> _clockInOffline(String learnerID, String clockInTime) async {
     try {
-      print('Starting offline clock-in for learnerID: $learnerID at $clockInTime');
+      print(
+          'Starting offline clock-in for learnerID: $learnerID at $clockInTime');
       final dbHelper = DatabaseHelper();
       final clockDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
@@ -764,9 +865,12 @@ class _InductionPageState extends State<InductionPage> {
         whereArgs: [learnerID],
         limit: 1,
       );
-      if (existingInduction.isNotEmpty && existingInduction.first['clock_in_time'] != null) {
+      if (existingInduction.isNotEmpty &&
+          existingInduction.first['clock_in_time'] != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('This learner is already inducted.'), backgroundColor: Colors.orange),
+          const SnackBar(
+              content: Text('This learner is already inducted.'),
+              backgroundColor: Colors.orange),
         );
         return;
       }
@@ -792,10 +896,12 @@ class _InductionPageState extends State<InductionPage> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Clock-in saved locally. Will sync when online.')),
+        const SnackBar(
+            content: Text('Clock-in saved locally. Will sync when online.')),
       );
     } catch (e, stackTrace) {
-      print('Offline clock-in error for learnerID: $learnerID: $e\nStack trace: $stackTrace');
+      print(
+          'Offline clock-in error for learnerID: $learnerID: $e\nStack trace: $stackTrace');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error saving offline clock-in: $e')),
       );
@@ -803,7 +909,8 @@ class _InductionPageState extends State<InductionPage> {
     }
   }
 
-  Future<void> updateClockOut(String learnerID, String clockOutTime, String clockDate) async {
+  Future<void> updateClockOut(
+      String learnerID, String clockOutTime, String clockDate) async {
     try {
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
@@ -827,7 +934,8 @@ class _InductionPageState extends State<InductionPage> {
           final timeFormat = DateFormat('HH:mm:ss');
           final clockInDateTime = timeFormat.parse(clockInTime);
           final clockOutDateTime = timeFormat.parse(clockOutTime);
-          final contactTimeDuration = clockOutDateTime.difference(clockInDateTime);
+          final contactTimeDuration =
+              clockOutDateTime.difference(clockInDateTime);
           contactTime = formatDuration(contactTimeDuration);
         } catch (e) {
           print('Error calculating contact time: $e');
@@ -849,7 +957,8 @@ class _InductionPageState extends State<InductionPage> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Clock-out saved locally. Will sync when online.')),
+        const SnackBar(
+            content: Text('Clock-out saved locally. Will sync when online.')),
       );
     } catch (e) {
       print('Offline clock-out error: $e');
@@ -887,24 +996,31 @@ class _InductionPageState extends State<InductionPage> {
       // Add required server parameters
       final payload = Map<String, dynamic>.from(attendance);
       payload['clock_in'] = '1'; // Required by server
-      payload['signature'] = ''; // Empty signature for fingerprint authentication
+      payload['signature'] =
+          ''; // Empty signature for fingerprint authentication
       payload['classID'] = widget.classID; // Add classID
-      payload['user_latitude'] = '0.0'; // Default location since using fingerprint
-      payload['user_longitude'] = '0.0'; // Default location since using fingerprint
-      payload['user_accuracy'] = '0.0'; // Default accuracy since using fingerprint
-      
+      payload['user_latitude'] =
+          '0.0'; // Default location since using fingerprint
+      payload['user_longitude'] =
+          '0.0'; // Default location since using fingerprint
+      payload['user_accuracy'] =
+          '0.0'; // Default accuracy since using fingerprint
+
       final stringPayload = payload.map((k, v) => MapEntry(k, v.toString()));
-      
+
       debugPrint('[INDUCTION] Sending clock-in payload: $stringPayload');
-      
-      final response = await http.post(
-        Uri.parse(AppConfig.buildUrl('induction_clocking.php')),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: stringPayload,
-      ).timeout(const Duration(seconds: 10));
-      
-      debugPrint('[INDUCTION] Clock-in server response (${response.statusCode}): ${response.body}');
-      
+
+      final response = await http
+          .post(
+            Uri.parse(AppConfig.buildUrl('induction_clocking.php')),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: stringPayload,
+          )
+          .timeout(const Duration(seconds: 10));
+
+      debugPrint(
+          '[INDUCTION] Clock-in server response (${response.statusCode}): ${response.body}');
+
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
         return result['success'] == true;
@@ -928,19 +1044,22 @@ class _InductionPageState extends State<InductionPage> {
         'user_accuracy': '0.0', // Default accuracy since using fingerprint
         'classID': widget.classID,
       };
-      
+
       final stringPayload = payload.map((k, v) => MapEntry(k, v.toString()));
-      
+
       debugPrint('[INDUCTION] Sending clock-out payload: $stringPayload');
-      
-      final response = await http.post(
-        Uri.parse(AppConfig.buildUrl('induction_clockout.php')),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: stringPayload,
-      ).timeout(const Duration(seconds: 10));
-      
-      debugPrint('[INDUCTION] Clock-out server response (${response.statusCode}): ${response.body}');
-      
+
+      final response = await http
+          .post(
+            Uri.parse(AppConfig.buildUrl('induction_clockout.php')),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: stringPayload,
+          )
+          .timeout(const Duration(seconds: 10));
+
+      debugPrint(
+          '[INDUCTION] Clock-out server response (${response.statusCode}): ${response.body}');
+
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
         return result['success'] == true;
@@ -1030,7 +1149,8 @@ class _InductionPageState extends State<InductionPage> {
                     }
                   } catch (e) {
                     if (mounted) {
-                      FingerprintErrorHandler.showError(context, 'Sync failed. Check your internet connection.');
+                      FingerprintErrorHandler.showError(context,
+                          'Sync failed. Check your internet connection.');
                     }
                   }
                 },
@@ -1045,16 +1165,18 @@ class _InductionPageState extends State<InductionPage> {
               children: [
                 Text(
                   'Class Information for ${widget.classID}',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
-                Text(
+                const Text(
                   'Learner Actions: Clock In/Out',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 learners.isEmpty
-                    ? const Center(child: Text('No data available for this class'))
+                    ? const Center(
+                        child: Text('No data available for this class'))
                     : Expanded(
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
@@ -1070,20 +1192,27 @@ class _InductionPageState extends State<InductionPage> {
                                 DataColumn(label: Text('Contact Time')),
                               ],
                               rows: learners.map((item) {
-                                String learnerID = item['LearnerID']?.toString() ?? '';
+                                String learnerID =
+                                    item['LearnerID']?.toString() ?? '';
                                 String? clockInTime = clockInTimes[learnerID];
                                 String? clockOutTime = clockOutTimes[learnerID];
                                 String? contactTime = contactTimes[learnerID];
 
                                 return DataRow(
                                   cells: [
-                                    DataCell(Text(item['Name']?.toString() ?? 'N/A')),
-                                    DataCell(Text(item['Surname']?.toString() ?? 'N/A')),
-                                    DataCell(Text(item['IDNumber']?.toString() ?? 'N/A')),
+                                    DataCell(Text(
+                                        item['Name']?.toString() ?? 'N/A')),
+                                    DataCell(Text(
+                                        item['Surname']?.toString() ?? 'N/A')),
+                                    DataCell(Text(
+                                        item['IDNumber']?.toString() ?? 'N/A')),
                                     DataCell(
-                                      (_hasClockIn[learnerID] == true) || (clockInTime != null && clockInTime.isNotEmpty)
+                                      (_hasClockIn[learnerID] == true) ||
+                                              (clockInTime != null &&
+                                                  clockInTime.isNotEmpty)
                                           ? Column(
-                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
                                               children: [
                                                 Text(
                                                   clockInTime ?? 'Clocked In',
@@ -1104,7 +1233,10 @@ class _InductionPageState extends State<InductionPage> {
                                           : ElevatedButton(
                                               onPressed: _isVerifying
                                                   ? null
-                                                  : () async { await clockInLearner(learnerID); },
+                                                  : () async {
+                                                      await clockInLearner(
+                                                          learnerID);
+                                                    },
                                               style: ElevatedButton.styleFrom(
                                                 backgroundColor: Colors.blue,
                                                 foregroundColor: Colors.white,
@@ -1113,9 +1245,12 @@ class _InductionPageState extends State<InductionPage> {
                                             ),
                                     ),
                                     DataCell(
-                                      (_hasClockOut[learnerID] == true) || (clockOutTime != null && clockOutTime.isNotEmpty)
+                                      (_hasClockOut[learnerID] == true) ||
+                                              (clockOutTime != null &&
+                                                  clockOutTime.isNotEmpty)
                                           ? Column(
-                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
                                               children: [
                                                 Text(
                                                   clockOutTime ?? 'Clocked Out',
@@ -1133,27 +1268,40 @@ class _InductionPageState extends State<InductionPage> {
                                                 ),
                                               ],
                                             )
-                                          : (_hasClockIn[learnerID] != true && (clockInTime == null || clockInTime.isEmpty))
-                                              ? const Text('--', style: TextStyle(color: Colors.grey))
+                                          : (_hasClockIn[learnerID] != true &&
+                                                  (clockInTime == null ||
+                                                      clockInTime.isEmpty))
+                                              ? const Text('--',
+                                                  style: TextStyle(
+                                                      color: Colors.grey))
                                               : ElevatedButton(
                                                   onPressed: _isVerifying
                                                       ? null
-                                                      : () async { await clockOutLearner(learnerID); },
-                                                  style: ElevatedButton.styleFrom(
-                                                    backgroundColor: Colors.orange,
-                                                    foregroundColor: Colors.white,
+                                                      : () async {
+                                                          await clockOutLearner(
+                                                              learnerID);
+                                                        },
+                                                  style:
+                                                      ElevatedButton.styleFrom(
+                                                    backgroundColor:
+                                                        Colors.orange,
+                                                    foregroundColor:
+                                                        Colors.white,
                                                   ),
-                                                  child: const Text('Clock Out'),
+                                                  child:
+                                                      const Text('Clock Out'),
                                                 ),
                                     ),
                                     DataCell(
                                       Text(
                                         contactTime ?? '--',
                                         style: TextStyle(
-                                          color: (contactTime != null && contactTime.isNotEmpty)
+                                          color: (contactTime != null &&
+                                                  contactTime.isNotEmpty)
                                               ? Colors.blue[800]
                                               : Colors.grey,
-                                          fontWeight: (contactTime != null && contactTime.isNotEmpty)
+                                          fontWeight: (contactTime != null &&
+                                                  contactTime.isNotEmpty)
                                               ? FontWeight.w600
                                               : FontWeight.normal,
                                         ),

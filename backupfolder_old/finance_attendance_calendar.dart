@@ -20,7 +20,8 @@ class FinanceAttendanceCalendar extends StatefulWidget {
   });
 
   @override
-  _FinanceAttendanceCalendarState createState() => _FinanceAttendanceCalendarState();
+  _FinanceAttendanceCalendarState createState() =>
+      _FinanceAttendanceCalendarState();
 }
 
 class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
@@ -40,20 +41,19 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
 
   Future<void> fetchAttendance() async {
     if (selectedMonth == null) return;
-    
+
     setState(() {
       isLoading = true;
     });
 
     try {
       final url = AppConfig.buildUrl(
-        'get_learner_attendance.php?learner_id=${widget.learnerId}&month=${selectedMonth!.month}&year=${selectedMonth!.year}'
-      );
+          'get_learner_attendance.php?learner_id=${widget.learnerId}&month=${selectedMonth!.month}&year=${selectedMonth!.year}');
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data is List) {
           setState(() {
             savedDates = data.map((item) {
@@ -84,17 +84,19 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
 
   Future<void> saveAttendance() async {
     if (selectedMonth == null) return;
-    
+
     setState(() {
       isSaving = true;
     });
 
     try {
       final url = AppConfig.buildUrl('save_learner_attendance.php');
-      
+
       // Convert selected dates to list of date strings
-      final dates = selectedDates.map((date) => date.toIso8601String().split('T')[0]).toList();
-      
+      final dates = selectedDates
+          .map((date) => date.toIso8601String().split('T')[0])
+          .toList();
+
       final response = await http.post(
         Uri.parse(url),
         body: {
@@ -113,10 +115,10 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Text('Attendance saved successfully!'),
               backgroundColor: Colors.green,
             ),
@@ -137,7 +139,7 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
       setState(() {
         isSaving = false;
       });
-      
+
       print('Error saving attendance: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -162,7 +164,7 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
 
   Future<DateTime?> showMonthYearPicker(BuildContext context) async {
     DateTime? selectedDate;
-    
+
     await showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -172,15 +174,17 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: Text('Select Month'),
+              title: const Text('Select Month'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Year: 2024', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 20),
+                  const Text('Year: 2024',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 20),
                   DropdownButtonFormField<int>(
                     value: selectedMonthValue,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       labelText: 'Month',
                       border: OutlineInputBorder(),
                     ),
@@ -203,18 +207,19 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: Text('Cancel'),
+                  child: const Text('Cancel'),
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    selectedDate = DateTime(selectedYear, selectedMonthValue, 1);
+                    selectedDate =
+                        DateTime(selectedYear, selectedMonthValue, 1);
                     Navigator.pop(context);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green[700],
                     foregroundColor: Colors.white,
                   ),
-                  child: Text('Select'),
+                  child: const Text('Select'),
                 ),
               ],
             );
@@ -228,8 +233,18 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
 
   String _getMonthName(int month) {
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
     ];
     return months[month - 1];
   }
@@ -255,13 +270,13 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
           title: Text('Attendance - ${widget.learnerName}'),
           backgroundColor: Colors.green[700],
         ),
-        body: Center(child: CircularProgressIndicator()),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     final daysInMonth = _getDaysInMonth(selectedMonth!);
     final firstWeekday = _getFirstWeekdayOfMonth(selectedMonth!);
-    
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Attendance - ${widget.learnerName}'),
@@ -269,7 +284,7 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
         actions: [
           if (_hasChanges())
             IconButton(
-              icon: Icon(Icons.save),
+              icon: const Icon(Icons.save),
               onPressed: isSaving ? null : saveAttendance,
               tooltip: 'Save Changes',
             ),
@@ -279,12 +294,12 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
         children: [
           // Month selector
           Container(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             color: Colors.green[50],
             child: Row(
               children: [
                 Icon(Icons.calendar_month, color: Colors.green[700]),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     '${_getMonthName(selectedMonth!.month)} ${selectedMonth!.year}',
@@ -297,8 +312,8 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
                 ),
                 ElevatedButton.icon(
                   onPressed: selectMonth,
-                  icon: Icon(Icons.edit_calendar, size: 18),
-                  label: Text('Change Month'),
+                  icon: const Icon(Icons.edit_calendar, size: 18),
+                  label: const Text('Change Month'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green[700],
                     foregroundColor: Colors.white,
@@ -307,15 +322,15 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
               ],
             ),
           ),
-          
+
           // Info banner
           Container(
-            padding: EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
             color: Colors.blue[50],
             child: Row(
               children: [
                 Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Tap on dates to mark attendance. Selected: ${selectedDates.length} days',
@@ -325,22 +340,22 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
               ],
             ),
           ),
-          
+
           // Calendar
           Expanded(
             child: isLoading
-                ? Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator())
                 : SingleChildScrollView(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     child: _buildCalendar(daysInMonth, firstWeekday),
                   ),
           ),
-          
+
           // Save button
           if (_hasChanges())
             Container(
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
@@ -355,7 +370,7 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
                 child: ElevatedButton.icon(
                   onPressed: isSaving ? null : saveAttendance,
                   icon: isSaving
-                      ? SizedBox(
+                      ? const SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
@@ -363,13 +378,14 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
                             strokeWidth: 2,
                           ),
                         )
-                      : Icon(Icons.save),
+                      : const Icon(Icons.save),
                   label: Text(isSaving ? 'Saving...' : 'Save Attendance'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green[700],
                     foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    textStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    textStyle: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -398,8 +414,8 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
                   ))
               .toList(),
         ),
-        SizedBox(height: 8),
-        
+        const SizedBox(height: 8),
+
         // Calendar grid
         _buildCalendarGrid(daysInMonth, firstWeekday),
       ],
@@ -409,18 +425,18 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
   Widget _buildCalendarGrid(int daysInMonth, int firstWeekday) {
     List<Widget> weeks = [];
     List<Widget> currentWeek = [];
-    
+
     // Add empty cells for days before the first day of month
     for (int i = 1; i < firstWeekday; i++) {
-      currentWeek.add(Expanded(child: SizedBox()));
+      currentWeek.add(const Expanded(child: SizedBox()));
     }
-    
+
     // Add day cells
     for (int day = 1; day <= daysInMonth; day++) {
       final date = DateTime(selectedMonth!.year, selectedMonth!.month, day);
       final isSelected = selectedDates.contains(date);
       final isSaved = savedDates.contains(date);
-      
+
       currentWeek.add(
         Expanded(
           child: GestureDetector(
@@ -434,7 +450,7 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
               });
             },
             child: Container(
-              margin: EdgeInsets.all(2),
+              margin: const EdgeInsets.all(2),
               decoration: BoxDecoration(
                 color: isSelected
                     ? Colors.green[700]
@@ -450,7 +466,8 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
                   day.toString(),
                   style: TextStyle(
                     color: isSelected ? Colors.white : Colors.black87,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
               ),
@@ -458,17 +475,17 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
           ),
         ),
       );
-      
+
       // Start new week on Sunday
       if ((firstWeekday + day - 1) % 7 == 0 || day == daysInMonth) {
         // Fill remaining cells in the week
         while (currentWeek.length < 7) {
-          currentWeek.add(Expanded(child: SizedBox()));
+          currentWeek.add(const Expanded(child: SizedBox()));
         }
-        
+
         weeks.add(
           Padding(
-            padding: EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.symmetric(vertical: 4),
             child: SizedBox(
               height: 50,
               child: Row(children: currentWeek),
@@ -478,7 +495,7 @@ class _FinanceAttendanceCalendarState extends State<FinanceAttendanceCalendar> {
         currentWeek = [];
       }
     }
-    
+
     return Column(children: weeks);
   }
 }

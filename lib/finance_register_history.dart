@@ -110,12 +110,12 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
       body: Column(
         children: [
           Container(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             color: Colors.green[50],
             child: Row(
               children: [
                 Icon(Icons.info_outline, color: Colors.green[700]),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     'View scanned registers or mark new attendance',
@@ -127,22 +127,22 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
           ),
           Expanded(
             child: isLoading
-                ? Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator())
                 : registers.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.description_outlined,
+                            const Icon(Icons.description_outlined,
                                 size: 80, color: Colors.grey),
-                            SizedBox(height: 16),
+                            const SizedBox(height: 16),
                             Text(
                               'No registers scanned yet',
                               style: TextStyle(
                                   fontSize: 16, color: Colors.grey[600]),
                             ),
-                            SizedBox(height: 8),
-                            Text(
+                            const SizedBox(height: 8),
+                            const Text(
                               'Tap the button below to mark attendance',
                               style:
                                   TextStyle(fontSize: 14, color: Colors.grey),
@@ -153,7 +153,7 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
                     : RefreshIndicator(
                         onRefresh: fetchRegisters,
                         child: ListView.builder(
-                          padding: EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(16),
                           itemCount: registers.length,
                           itemBuilder: (context, index) {
                             final register = registers[index];
@@ -180,8 +180,8 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
           ).then((_) => fetchRegisters());
         },
         backgroundColor: Colors.green[700],
-        icon: Icon(Icons.add),
-        label: Text('Mark Attendance'),
+        icon: const Icon(Icons.add),
+        label: const Text('Mark Attendance'),
       ),
     );
   }
@@ -197,7 +197,7 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
     final yearInt = year.isNotEmpty ? int.parse(year) : 0;
 
     return Card(
-      margin: EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
       child: InkWell(
         onTap: () {
@@ -220,7 +220,7 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
           }
         },
         child: Padding(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Row(
             children: [
               Container(
@@ -233,17 +233,17 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
                 child:
                     Icon(Icons.description, color: Colors.blue[700], size: 30),
               ),
-              SizedBox(width: 16),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       '$monthName $year',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       'Uploaded: ${_formatDate(uploadedAt)}',
                       style: TextStyle(color: Colors.grey[600], fontSize: 13),
@@ -251,7 +251,8 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
                     if (fileName.isNotEmpty)
                       Text(
                         fileName,
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.grey),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -261,11 +262,11 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
               Column(
                 children: [
                   Icon(Icons.edit, color: Colors.blue[700], size: 20),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   IconButton(
-                    icon: Icon(Icons.delete, color: Colors.red, size: 20),
+                    icon: const Icon(Icons.delete, color: Colors.red, size: 20),
                     padding: EdgeInsets.zero,
-                    constraints: BoxConstraints(),
+                    constraints: const BoxConstraints(),
                     onPressed: () =>
                         _confirmDelete(monthName, year, monthInt, yearInt),
                   ),
@@ -283,13 +284,13 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Delete Register'),
+        title: const Text('Delete Register'),
         content: Text(
             'Are you sure you want to delete the register for $monthName $year?\n\nThis will also delete all attendance records for this month.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -297,7 +298,7 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
             ),
-            child: Text('Delete'),
+            child: const Text('Delete'),
           ),
         ],
       ),
@@ -325,7 +326,7 @@ class _FinanceRegisterHistoryState extends State<FinanceRegisterHistory> {
 
         if (data['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Text('Register deleted successfully'),
               backgroundColor: Colors.green,
             ),

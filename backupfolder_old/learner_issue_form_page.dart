@@ -673,11 +673,11 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                 color: Colors.blue.shade700,
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             // Show message if no learners found
             if (learners.isEmpty) ...[
               Container(
-                padding: EdgeInsets.all(20),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.orange.shade50,
                   borderRadius: BorderRadius.circular(8),
@@ -687,7 +687,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                   children: [
                     Icon(Icons.people_outline,
                         size: 60, color: Colors.orange.shade300),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     Text(
                       'No learners found in this class',
                       style: TextStyle(
@@ -696,7 +696,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                         color: Colors.orange.shade700,
                       ),
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       'ClassID: ${widget.classID}',
                       style: TextStyle(
@@ -704,14 +704,14 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                         color: Colors.grey.shade600,
                       ),
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     ElevatedButton.icon(
                       onPressed: () async {
                         // Try to fetch learners again
                         await _checkConnectivity();
                         if (learners.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
+                            const SnackBar(
                               content: Text(
                                   'Still no learners found. Please sync data from the main menu.'),
                               backgroundColor: Colors.orange,
@@ -720,14 +720,14 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                           );
                         }
                       },
-                      icon: Icon(Icons.refresh),
-                      label: Text('Retry'),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orange,
                         foregroundColor: Colors.white,
                       ),
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       'Tip: Go to Dashboard → Sync to download learner data',
                       style: TextStyle(
@@ -743,7 +743,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
             ],
             // Show learner selection UI only if learners exist
             if (learners.isNotEmpty) ...[
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
@@ -755,9 +755,9 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text('Full Name',
+                            const Text('Full Name',
                                 style: TextStyle(fontWeight: FontWeight.bold)),
-                            SizedBox(height: 5),
+                            const SizedBox(height: 5),
                             Text(
                                 learnerFullName.isEmpty
                                     ? 'Unknown Learner'
@@ -768,7 +768,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                       ),
                     ),
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Expanded(
                     flex: 2,
                     child: Card(
@@ -778,9 +778,9 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text('Selection',
+                            const Text('Selection',
                                 style: TextStyle(fontWeight: FontWeight.bold)),
-                            SizedBox(height: 5),
+                            const SizedBox(height: 5),
                             DropdownButton<String>(
                               isExpanded: true,
                               value: selectedLearnerID,
@@ -806,7 +806,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                                 });
                               },
                               items: [
-                                DropdownMenuItem(
+                                const DropdownMenuItem(
                                     value: 'Select', child: Text('Select')),
                                 ...learners.map((learner) {
                                   return DropdownMenuItem(
@@ -824,7 +824,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                   ),
                 ],
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               // Learner table header
               Container(
                 decoration: BoxDecoration(
@@ -834,20 +834,20 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                 child: Table(
                   border: TableBorder.all(color: Colors.blue.shade300),
                   children: [
-                    TableRow(
+                    const TableRow(
                       children: [
                         Padding(
-                          padding: const EdgeInsets.all(8.0),
+                          padding: EdgeInsets.all(8.0),
                           child: Text('Name',
                               style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                         Padding(
-                          padding: const EdgeInsets.all(8.0),
+                          padding: EdgeInsets.all(8.0),
                           child: Text('ID Number',
                               style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                         Padding(
-                          padding: const EdgeInsets.all(8.0),
+                          padding: EdgeInsets.all(8.0),
                           child: Text('Class Name',
                               style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
@@ -871,8 +871,8 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(label, style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 5),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 5),
             Text(value, textAlign: TextAlign.center),
           ],
         ),
@@ -887,7 +887,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
 
     if (existingQuantity > 0) {
       return Container(
-        padding: EdgeInsets.all(12),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.blue.shade50,
           borderRadius: BorderRadius.circular(8),
@@ -899,7 +899,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
             Row(
               children: [
                 Icon(Icons.history, color: Colors.blue.shade700, size: 18),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Text(
                   'Previous Submissions Found',
                   style: TextStyle(
@@ -910,7 +910,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                 ),
               ],
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'Current total: $existingQuantity units',
               style: TextStyle(
@@ -920,7 +920,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
               ),
             ),
             if (existingRepresentative.isNotEmpty) ...[
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
                 'Last by: $existingRepresentative',
                 style: TextStyle(
@@ -930,9 +930,9 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                 ),
               ),
             ],
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Container(
-              padding: EdgeInsets.all(8),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.green.shade50,
                 borderRadius: BorderRadius.circular(6),
@@ -952,7 +952,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
       );
     } else {
       return Container(
-        padding: EdgeInsets.all(12),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.grey.shade100,
           borderRadius: BorderRadius.circular(8),
@@ -961,7 +961,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
         child: Row(
           children: [
             Icon(Icons.new_releases, color: Colors.grey.shade600, size: 18),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 'No previous submissions found for $materialType. This will be the first issuance.',
@@ -990,7 +990,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                 color: Colors.orange.shade700,
                 size: 48,
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Text(
                 'No Unit Standards Found',
                 style: TextStyle(
@@ -999,7 +999,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                   fontSize: 16,
                 ),
               ),
-              SizedBox(height: 5),
+              const SizedBox(height: 5),
               Text(
                 'No unit standards are available for this qualification. Please ensure the qualification has associated unit standards in the system.',
                 style: TextStyle(
@@ -1027,7 +1027,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                   Icons.checklist,
                   color: Colors.orange.shade700,
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Text(
                   'Select Unit Standards (${unitStandards.length} available)',
                   style: TextStyle(
@@ -1038,12 +1038,12 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                 ),
               ],
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             Text(
               'Tick the unit standards you want to issue to learner and specify quantities:',
               style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
             ),
-            SizedBox(height: 15),
+            const SizedBox(height: 15),
             SizedBox(
               height: 300, // Fixed height for scrollable list
               child: ListView.builder(
@@ -1080,7 +1080,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                       unitStandardQuantities['${usId}_SUM'] ?? 1;
 
                   return Card(
-                    margin: EdgeInsets.symmetric(vertical: 4),
+                    margin: const EdgeInsets.symmetric(vertical: 4),
                     child: Padding(
                       padding: const EdgeInsets.all(12.0),
                       child: Column(
@@ -1098,12 +1098,12 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                                 existingUnitStandardRepresentatives[usId] ?? '',
                           ),
 
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
 
                           // Learner Guide Section
                           Container(
-                            margin: EdgeInsets.only(left: 20),
-                            padding: EdgeInsets.all(8),
+                            margin: const EdgeInsets.only(left: 20),
+                            padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: Colors.purple.shade50,
                               borderRadius: BorderRadius.circular(8),
@@ -1124,12 +1124,12 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                             ),
                           ),
 
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
 
                           // Formative Section
                           Container(
-                            margin: EdgeInsets.only(left: 20),
-                            padding: EdgeInsets.all(8),
+                            margin: const EdgeInsets.only(left: 20),
+                            padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: Colors.orange.shade50,
                               borderRadius: BorderRadius.circular(8),
@@ -1150,12 +1150,12 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                             ),
                           ),
 
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
 
                           // Summative Section
                           Container(
-                            margin: EdgeInsets.only(left: 20),
-                            padding: EdgeInsets.all(8),
+                            margin: const EdgeInsets.only(left: 20),
+                            padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: Colors.teal.shade50,
                               borderRadius: BorderRadius.circular(8),
@@ -1218,7 +1218,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                       SnackBar(
                         content: Text(
                             'Cannot uncheck items with previous submissions ($existing units already issued)'),
-                        duration: Duration(seconds: 3),
+                        duration: const Duration(seconds: 3),
                         backgroundColor: Colors.orange,
                       ),
                     );
@@ -1268,9 +1268,9 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
 
         // Previous submission info (if any)
         if (existing > 0) ...[
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Container(
-            padding: EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: Colors.blue.shade50,
               borderRadius: BorderRadius.circular(6),
@@ -1286,7 +1286,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                       color: Colors.blue.shade700,
                       size: 16,
                     ),
-                    SizedBox(width: 6),
+                    const SizedBox(width: 6),
                     Text(
                       'Previously issued: $existing units',
                       style: TextStyle(
@@ -1298,7 +1298,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                   ],
                 ),
                 if (representativeName.isNotEmpty) ...[
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Row(
                     children: [
                       Icon(
@@ -1306,7 +1306,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                         color: Colors.blue.shade600,
                         size: 14,
                       ),
-                      SizedBox(width: 4),
+                      const SizedBox(width: 4),
                       Text(
                         'By: $representativeName',
                         style: TextStyle(
@@ -1325,17 +1325,17 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
 
         // Quantity selection (ONLY show if manually selected by user)
         if (isSelected) ...[
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Row(
             children: [
-              Text(
+              const Text(
                 'Quantity:',
                 style: TextStyle(
                   fontWeight: FontWeight.w500,
                   fontSize: 13,
                 ),
               ),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               SizedBox(
                 width: 80,
                 child: DropdownButton<int>(
@@ -1348,8 +1348,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                       });
                     }
                   },
-                  items:
-                      List.generate(51, (index) => index).map((int value) {
+                  items: List.generate(51, (index) => index).map((int value) {
                     return DropdownMenuItem<int>(
                       value: value,
                       child: Text(value.toString()),
@@ -1358,10 +1357,10 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                 ),
               ),
               if (existing > 0) ...[
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Container(
-                    padding: EdgeInsets.all(6),
+                    padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       color: Colors.amber.shade50,
                       borderRadius: BorderRadius.circular(4),
@@ -1395,9 +1394,9 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
           children: [
             Row(
               children: [
-                Text('Description',
+                const Text('Description',
                     style: TextStyle(fontWeight: FontWeight.bold)),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: DropdownButton<String>(
                     isExpanded: true,
@@ -1429,16 +1428,16 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
             ),
             if (selectedDescription != 'Select' &&
                 selectedDescription != 'Learning Material') ...[
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               _buildRegularMaterialPreviousSubmission(selectedDescription),
             ],
             if (selectedDescription == 'Learning Material') ...[
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Row(
                 children: [
-                  Text('Learning Material Type',
+                  const Text('Learning Material Type',
                       style: TextStyle(fontWeight: FontWeight.bold)),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: DropdownButton<String>(
                       isExpanded: true,
@@ -1465,24 +1464,24 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
               ),
               if (selectedLearningMaterialType != 'Select' &&
                   selectedLearningMaterialType != 'Unit Standards') ...[
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 _buildRegularMaterialPreviousSubmission(
                     selectedLearningMaterialType),
               ],
               // Show Unit Standards selection when Unit Standards is selected
               if (selectedLearningMaterialType == 'Unit Standards') ...[
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 _buildUnitStandardsSelection(),
               ],
             ],
             if (!(selectedDescription == 'Learning Material' &&
                 selectedLearningMaterialType == 'Unit Standards')) ...[
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Row(
                 children: [
-                  Text('Quantity',
+                  const Text('Quantity',
                       style: TextStyle(fontWeight: FontWeight.bold)),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: DropdownButton<int>(
                       isExpanded: true,
@@ -1505,8 +1504,8 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                 ],
               ),
             ],
-            SizedBox(height: 10),
-            Row(
+            const SizedBox(height: 10),
+            const Row(
               children: [
                 Text('Qualification',
                     style: TextStyle(fontWeight: FontWeight.bold)),
@@ -1533,19 +1532,19 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Learner and Representative Details',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Table(
               border: TableBorder.all(
                   color: Colors.grey,
                   width: 1,
                   borderRadius: BorderRadius.circular(12)),
               columnWidths: {
-                0: FixedColumnWidth(150),
-                1: FixedColumnWidth(150),
+                0: const FixedColumnWidth(150),
+                1: const FixedColumnWidth(150),
               },
               children: [
                 TableRow(
@@ -1581,7 +1580,8 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
           padding: const EdgeInsets.symmetric(vertical: 8.0),
           child: TableCell(
             child: Text(name,
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
           ),
         ),
         Padding(
@@ -1616,7 +1616,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                   representativeName = value;
                 });
               },
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Representative Name',
                 border: OutlineInputBorder(),
               ),
@@ -1633,7 +1633,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                         representativeSignature = signature;
                       });
                     }),
-                    child: Text('Representative Signature'),
+                    child: const Text('Representative Signature'),
                   )
                 : Image.memory(
                     representativeSignature!,
@@ -1652,7 +1652,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
       padding: const EdgeInsets.all(8.0),
       child: Text(
         text,
-        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
       ),
     );
   }
@@ -1670,7 +1670,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Capture Signature'),
+          title: const Text('Capture Signature'),
           content: SizedBox(
             width: 300,
             child: Column(
@@ -1685,12 +1685,12 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                     backgroundColor: Colors.white,
                   ),
                 ),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 ElevatedButton(
                   onPressed: () {
                     controller.clear();
                   },
-                  child: Text('Clear'),
+                  child: const Text('Clear'),
                 ),
               ],
             ),
@@ -1700,7 +1700,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
               onPressed: () {
                 Navigator.pop(context);
               },
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -1711,7 +1711,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                 Navigator.pop(context);
                 setState(() {});
               },
-              child: Text('OK'),
+              child: const Text('OK'),
             ),
           ],
         );
@@ -1724,7 +1724,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
     // Validate learner selection first
     if (selectedLearnerID == 'Select' || learnerFullName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Please select a learner first.'),
           backgroundColor: Colors.red,
         ),
@@ -1803,7 +1803,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: Row(
+        title: const Row(
           children: [
             Icon(Icons.preview, color: Colors.orange),
             SizedBox(width: 8),
@@ -1829,9 +1829,9 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
 
               if (selectedDescription == 'Learning Material' &&
                   selectedLearningMaterialType == 'Unit Standards') ...[
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Container(
-                  padding: EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.orange.shade50,
                     borderRadius: BorderRadius.circular(8),
@@ -1844,7 +1844,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                         children: [
                           Icon(Icons.checklist,
                               color: Colors.orange.shade700, size: 18),
-                          SizedBox(width: 8),
+                          const SizedBox(width: 8),
                           Text(
                             'Unit Standards Summary',
                             style: TextStyle(
@@ -1854,7 +1854,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                           ),
                         ],
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       Text(
                         'Selected Items: $selectedUnitStandardsCount',
                         style: TextStyle(
@@ -1870,7 +1870,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                           color: Colors.orange.shade700,
                         ),
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       Text(
                         'Note: This includes Unit Standards, Learner Guides, Formative and Summative materials across ${unitStandards.length} unit standards.',
                         style: TextStyle(
@@ -1887,9 +1887,9 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                 _buildPreviewRow('Quantity:', quantity.toString()),
               ],
 
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Container(
-                padding: EdgeInsets.all(8),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(6),
@@ -1898,7 +1898,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                   children: [
                     Icon(Icons.info_outline,
                         color: Colors.blue.shade700, size: 16),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Please review the details above before submitting.',
@@ -1917,7 +1917,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
@@ -1925,7 +1925,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
               backgroundColor: Colors.orange,
               foregroundColor: Colors.white,
             ),
-            child: Text('Confirm & Submit'),
+            child: const Text('Confirm & Submit'),
           ),
         ],
       ),
@@ -1943,7 +1943,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
 
   Widget _buildPreviewRow(String label, String value) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1960,7 +1960,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
+              style: const TextStyle(
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1993,7 +1993,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
         representativeName.isEmpty ||
         selectedLearnerID == 'Select') {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
             "Please select a learner, capture both learner and representative signatures, and fill all required fields.",
           ),
@@ -2020,7 +2020,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
 
       if (!hasSelectedUnitStandards) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text("Please select at least one unit standard."),
           ),
         );
@@ -2031,7 +2031,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
     // Validate quantity
     if (quantity < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Please enter a valid quantity.")),
+        const SnackBar(content: Text("Please enter a valid quantity.")),
       );
       return;
     }
@@ -2040,7 +2040,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
     final connectivityResult = await Connectivity().checkConnectivity();
     if (connectivityResult == ConnectivityResult.none) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
             content: Text("No internet connection. Please try again later.")),
       );
       return;
@@ -2063,7 +2063,6 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
           int quantityUS = unitStandardQuantities[usId] ?? 0;
           // ⚠️ VALIDATION: Skip if quantity is 0
           if ((isSelectedUS || existingUS > 0) && quantityUS > 0) {
-
             print('🔄 [LEARNER SUBMISSION] Starting Unit Standard submission:');
             print('   - ID: $usId');
             print('   - Name: $usName');
@@ -2099,7 +2098,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                     headers: {'Content-Type': 'application/json'},
                     body: json.encode(formData),
                   )
-                  .timeout(Duration(seconds: 30));
+                  .timeout(const Duration(seconds: 30));
 
               print(
                   '📥 [LEARNER SUBMISSION] Response Status: ${response.statusCode}');
@@ -2150,7 +2149,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                     headers: {'Content-Type': 'application/json'},
                     body: json.encode(formDataLG),
                   )
-                  .timeout(Duration(seconds: 30));
+                  .timeout(const Duration(seconds: 30));
 
               final responseBody = json.decode(response.body);
               if (!responseBody['success']) {
@@ -2192,7 +2191,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                     headers: {'Content-Type': 'application/json'},
                     body: json.encode(formDataFORM),
                   )
-                  .timeout(Duration(seconds: 30));
+                  .timeout(const Duration(seconds: 30));
 
               final responseBody = json.decode(response.body);
               if (!responseBody['success']) {
@@ -2234,7 +2233,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                     headers: {'Content-Type': 'application/json'},
                     body: json.encode(formDataSUM),
                   )
-                  .timeout(Duration(seconds: 30));
+                  .timeout(const Duration(seconds: 30));
 
               final responseBody = json.decode(response.body);
               if (!responseBody['success']) {
@@ -2250,7 +2249,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
 
         if (allSuccessful) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
                 content:
                     Text('All unit standards issued to learner successfully!')),
           );
@@ -2319,7 +2318,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
             headers: {'Content-Type': 'application/json'},
             body: json.encode(formData),
           )
-          .timeout(Duration(seconds: 30));
+          .timeout(const Duration(seconds: 30));
 
       print('Response status: ${response.statusCode}');
       print('Response body: ${response.body}');
@@ -2328,7 +2327,8 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
         final responseBody = json.decode(response.body);
         if (responseBody['success']) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Material issued to learner successfully!')),
+            const SnackBar(
+                content: Text('Material issued to learner successfully!')),
           );
 
           // Reset form fields
@@ -2364,7 +2364,8 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
 
   Future<void> saveMaterialFormOffline() async {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Offline functionality not implemented yet')),
+      const SnackBar(
+          content: Text('Offline functionality not implemented yet')),
     );
   }
 
@@ -2372,7 +2373,7 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Issue Materials to Learner'),
+        title: const Text('Issue Materials to Learner'),
         backgroundColor: Colors.orange,
         foregroundColor: Colors.white,
       ),
@@ -2380,18 +2381,18 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
         child: Column(
           children: [
             buildLearnerDetailsCard(),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             _buildClassDetailsCard(),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             buildLearnerSignatureTable(),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             ElevatedButton(
               onPressed: checkAndSaveMaterialForm,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
                 foregroundColor: Colors.white,
               ),
-              child: Text('Issue Materials to Learner'),
+              child: const Text('Issue Materials to Learner'),
             ),
           ],
         ),

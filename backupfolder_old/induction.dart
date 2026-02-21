@@ -14,6 +14,7 @@ import 'dart:math';
 import 'database_helper.dart';
 
 import 'config.dart';
+
 class InductionPage extends StatefulWidget {
   final String classID;
 
@@ -164,10 +165,11 @@ class _InductionPageState extends State<InductionPage> {
     if (!(await _checkConnectivity())) return;
 
     await _syncOfflineClockIns();
-    
+
     // Individual server fetches disabled - induction data is only clocked once in entire program
     // This prevents FormatException errors from broken get_indaction_data.php endpoint
-    print('[INDUCTION] Individual server fetches disabled - induction is one-time only');
+    print(
+        '[INDUCTION] Individual server fetches disabled - induction is one-time only');
   }
 
   Future<void> _syncOfflineClockIns() async {
@@ -200,7 +202,8 @@ class _InductionPageState extends State<InductionPage> {
   Future<void> _refreshDataWithoutClearingState() async {
     try {
       final dbHelper = DatabaseHelper();
-      final learnersWithClockingData = await dbHelper.getLearnersWithInductionClockingData(widget.classID);
+      final learnersWithClockingData =
+          await dbHelper.getLearnersWithInductionClockingData(widget.classID);
 
       setState(() {
         for (var learner in learnersWithClockingData) {
@@ -209,13 +212,19 @@ class _InductionPageState extends State<InductionPage> {
           String clockOutTime = learner['clock_out_time']?.toString() ?? '';
           String contactTime = learner['contact_time']?.toString() ?? '';
 
-          if (clockInTime.isNotEmpty && clockInTime != 'N/A' && clockInTime != 'null') {
+          if (clockInTime.isNotEmpty &&
+              clockInTime != 'N/A' &&
+              clockInTime != 'null') {
             clockInTimes[learnerId] = clockInTime;
           }
-          if (clockOutTime.isNotEmpty && clockOutTime != 'N/A' && clockOutTime != 'null') {
+          if (clockOutTime.isNotEmpty &&
+              clockOutTime != 'N/A' &&
+              clockOutTime != 'null') {
             clockOutTimes[learnerId] = clockOutTime;
           }
-          if (contactTime.isNotEmpty && contactTime != 'N/A' && contactTime != 'null') {
+          if (contactTime.isNotEmpty &&
+              contactTime != 'N/A' &&
+              contactTime != 'null') {
             contactTimes[learnerId] = contactTime;
           }
         }
@@ -223,7 +232,8 @@ class _InductionPageState extends State<InductionPage> {
         learners.clear();
         learners.addAll(learnersWithClockingData.map((learner) {
           // Ensure all values are strings before creating the map
-          return Map<String, String>.from(learner.map((key, value) => MapEntry(key, value?.toString() ?? '')));
+          return Map<String, String>.from(learner
+              .map((key, value) => MapEntry(key, value?.toString() ?? '')));
         }));
       });
 
@@ -236,7 +246,8 @@ class _InductionPageState extends State<InductionPage> {
   Future<void> _loadLearnersFromLocalDatabase() async {
     try {
       final dbHelper = DatabaseHelper();
-      final learnersWithClockingData = await dbHelper.getLearnersWithInductionClockingData(widget.classID);
+      final learnersWithClockingData =
+          await dbHelper.getLearnersWithInductionClockingData(widget.classID);
 
       setState(() {
         learners.clear();
@@ -246,13 +257,19 @@ class _InductionPageState extends State<InductionPage> {
           String clockOutTime = learner['clock_out_time']?.toString() ?? '';
           String contactTime = learner['contact_time']?.toString() ?? '';
 
-          if (clockInTime.isNotEmpty && clockInTime != 'N/A' && clockInTime != 'null') {
+          if (clockInTime.isNotEmpty &&
+              clockInTime != 'N/A' &&
+              clockInTime != 'null') {
             clockInTimes[learnerId] = clockInTime;
           }
-          if (clockOutTime.isNotEmpty && clockOutTime != 'N/A' && clockOutTime != 'null') {
+          if (clockOutTime.isNotEmpty &&
+              clockOutTime != 'N/A' &&
+              clockOutTime != 'null') {
             clockOutTimes[learnerId] = clockOutTime;
           }
-          if (contactTime.isNotEmpty && contactTime != 'N/A' && contactTime != 'null') {
+          if (contactTime.isNotEmpty &&
+              contactTime != 'N/A' &&
+              contactTime != 'null') {
             contactTimes[learnerId] = contactTime;
           }
 
@@ -273,7 +290,8 @@ class _InductionPageState extends State<InductionPage> {
     }
   }
 
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+      double lat1, double lon1, double lat2, double lon2) {
     const double R = 6371e3; // Earth radius in meters
     final double phi1 = lat1 * pi / 180;
     final double phi2 = lat2 * pi / 180;
@@ -287,11 +305,13 @@ class _InductionPageState extends State<InductionPage> {
     return R * c; // Distance in meters
   }
 
-  Future<bool> _isWithinSiteRadius(String classID, double userLat, double userLon, double userAccuracy) async {
+  Future<bool> _isWithinSiteRadius(String classID, double userLat,
+      double userLon, double userAccuracy) async {
     if (userAccuracy > 50) {
       print('Geolocation accuracy too low: $userAccuracy meters');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Geolocation accuracy too low. Please enable GPS.')),
+        const SnackBar(
+            content: Text('Geolocation accuracy too low. Please enable GPS.')),
       );
       return false;
     }
@@ -304,7 +324,8 @@ class _InductionPageState extends State<InductionPage> {
       final sites = await db.query('sites');
       print('Class table contents: $classes');
       print('Sites table contents: $sites');
-      print('Querying coordinates for classID: $classID (type: ${classID.runtimeType})');
+      print(
+          'Querying coordinates for classID: $classID (type: ${classID.runtimeType})');
 
       final result = await db.rawQuery(
         'SELECT s.latitude, s.longitude FROM class c JOIN sites s ON c.siteID = s.siteID WHERE c.classID = ?',
@@ -315,17 +336,20 @@ class _InductionPageState extends State<InductionPage> {
         if (classes.isEmpty) {
           print('Class table is empty');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No class data available in local database.')),
+            const SnackBar(
+                content: Text('No class data available in local database.')),
           );
         } else if (sites.isEmpty) {
           print('Sites table is empty');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No site data available in local database.')),
+            const SnackBar(
+                content: Text('No site data available in local database.')),
           );
         } else {
           print('No matching class or site found for classID: $classID');
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('No site coordinates found for class $classID.')),
+            SnackBar(
+                content: Text('No site coordinates found for class $classID.')),
           );
         }
         return false;
@@ -335,9 +359,11 @@ class _InductionPageState extends State<InductionPage> {
       final siteLon = double.tryParse(result.first['longitude'].toString());
 
       if (siteLat == null || siteLon == null) {
-        print('Invalid site coordinates for classID: $classID, lat: ${result.first['latitude']}, lon: ${result.first['longitude']}');
+        print(
+            'Invalid site coordinates for classID: $classID, lat: ${result.first['latitude']}, lon: ${result.first['longitude']}');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid site coordinates in database.')),
+          const SnackBar(
+              content: Text('Invalid site coordinates in database.')),
         );
         return false;
       }
@@ -347,13 +373,16 @@ class _InductionPageState extends State<InductionPage> {
       print('Distance to site for classID $classID: $distance meters');
       if (distance > 100) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Outside 100-meter radius (Distance: ${distance.toStringAsFixed(2)} meters)')),
+          SnackBar(
+              content: Text(
+                  'Outside 100-meter radius (Distance: ${distance.toStringAsFixed(2)} meters)')),
         );
         return false;
       }
       return true;
     } catch (e, stackTrace) {
-      print('Error checking site radius for classID $classID: $e\nStack trace: $stackTrace');
+      print(
+          'Error checking site radius for classID $classID: $e\nStack trace: $stackTrace');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error checking location: $e')),
       );
@@ -375,49 +404,52 @@ class _InductionPageState extends State<InductionPage> {
     });
 
     bool confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Capture Image'),
-        content: SizedBox(
-          height: 400,
-          width: 300,
-          child: Column(
-            children: [
-              Expanded(
-                child: _isCameraReady
-                    ? CameraPreview(_cameraController!)
-                    : const Center(child: Text('Camera not available')),
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Capture Image'),
+            content: SizedBox(
+              height: 400,
+              width: 300,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: _isCameraReady
+                        ? CameraPreview(_cameraController!)
+                        : const Center(child: Text('Camera not available')),
+                  ),
+                  const SizedBox(height: 10),
+                  _isCapturing
+                      ? const CircularProgressIndicator()
+                      : ElevatedButton(
+                          onPressed: _captureImageAndOpenSignature,
+                          child: const Text('Capture'),
+                        ),
+                ],
               ),
-              const SizedBox(height: 10),
-              _isCapturing
-                  ? const CircularProgressIndicator()
-                  : ElevatedButton(
-                onPressed: _captureImageAndOpenSignature,
-                child: const Text('Capture'),
+            ),
+            actions: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  ElevatedButton(
+                    onPressed: _switchCamera,
+                    child: Text(_selectedCameraIndex == 0
+                        ? 'Switch to Back'
+                        : 'Switch to Front'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(false);
+                    },
+                    child: const Text('Cancel'),
+                  ),
+                ],
               ),
             ],
           ),
-        ),
-        actions: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              ElevatedButton(
-                onPressed: _switchCamera,
-                child: Text(_selectedCameraIndex == 0 ? 'Switch to Back' : 'Switch to Front'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop(false);
-                },
-                child: const Text('Cancel'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
 
     return confirmed;
   }
@@ -483,13 +515,16 @@ class _InductionPageState extends State<InductionPage> {
 
       print('Sending online clock-in request: $payload');
 
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: payload,
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: payload,
+          )
+          .timeout(const Duration(seconds: 10));
 
-      print('Raw server response (status ${response.statusCode}): "${response.body}"');
+      print(
+          'Raw server response (status ${response.statusCode}): "${response.body}"');
 
       dynamic result;
       try {
@@ -508,7 +543,8 @@ class _InductionPageState extends State<InductionPage> {
           SnackBar(content: Text(result['message'])),
         );
       } else {
-        throw Exception('Server error: ${response.statusCode} - ${result['message'] ?? response.body}');
+        throw Exception(
+            'Server error: ${response.statusCode} - ${result['message'] ?? response.body}');
       }
     } catch (e) {
       print('Online clock-in failed for learnerID: $learnerID: $e');
@@ -516,7 +552,8 @@ class _InductionPageState extends State<InductionPage> {
     }
   }
 
-  Future<void> _clockOutOnline(String learnerID, String signaturePath, {bool synced = false}) async {
+  Future<void> _clockOutOnline(String learnerID, String signaturePath,
+      {bool synced = false}) async {
     final url = Uri.parse(AppConfig.buildUrl('induction_clockout.php'));
     final currentDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
     try {
@@ -532,10 +569,12 @@ class _InductionPageState extends State<InductionPage> {
         if (signatureImage != null) {
           signatureBase64 = base64Encode(signatureImage);
         } else {
-          print('Warning: Failed to generate signature image, sending empty signature.');
+          print(
+              'Warning: Failed to generate signature image, sending empty signature.');
         }
       } catch (e) {
-        print('Warning: Signature generation failed: $e, sending empty signature.');
+        print(
+            'Warning: Signature generation failed: $e, sending empty signature.');
       }
 
       // Validate location services
@@ -585,13 +624,16 @@ class _InductionPageState extends State<InductionPage> {
 
       print('Sending online clock-out request: $payload');
 
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: payload,
-      ).timeout(const Duration(seconds: 30));
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: payload,
+          )
+          .timeout(const Duration(seconds: 30));
 
-      print('Raw server response (status ${response.statusCode}): "${response.body}"');
+      print(
+          'Raw server response (status ${response.statusCode}): "${response.body}"');
 
       dynamic result;
       try {
@@ -601,7 +643,9 @@ class _InductionPageState extends State<InductionPage> {
         throw Exception('Failed to parse server response: ${response.body}');
       }
 
-      if (response.statusCode == 200 && result is Map<String, dynamic> && result['success'] == true) {
+      if (response.statusCode == 200 &&
+          result is Map<String, dynamic> &&
+          result['success'] == true) {
         String? contactTime = result['contact_time'];
         if (contactTime == null || contactTime.isEmpty) {
           final clockInTime = result['clock_in_time']?.toString();
@@ -609,11 +653,15 @@ class _InductionPageState extends State<InductionPage> {
           if (clockInTime != null && clockOutTime != null) {
             try {
               final timeFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
-              final clockInDateTime = timeFormat.parse('$currentDate $clockInTime');
-              final clockOutDateTime = timeFormat.parse('$currentDate $clockOutTime');
-              final contactTimeDuration = clockOutDateTime.difference(clockInDateTime);
+              final clockInDateTime =
+                  timeFormat.parse('$currentDate $clockInTime');
+              final clockOutDateTime =
+                  timeFormat.parse('$currentDate $clockOutTime');
+              final contactTimeDuration =
+                  clockOutDateTime.difference(clockInDateTime);
               contactTime = formatDuration(contactTimeDuration);
-              print('Calculated contact time: $contactTime for learnerID=$learnerID');
+              print(
+                  'Calculated contact time: $contactTime for learnerID=$learnerID');
             } catch (e) {
               print('Error calculating contact time: $e');
             }
@@ -628,7 +676,8 @@ class _InductionPageState extends State<InductionPage> {
           SnackBar(content: Text(result['message'])),
         );
       } else {
-        throw Exception('Server error: ${response.statusCode} - ${result['message'] ?? response.body}');
+        throw Exception(
+            'Server error: ${response.statusCode} - ${result['message'] ?? response.body}');
       }
     } catch (e) {
       print('Online clock-out failed: $e');
@@ -638,7 +687,8 @@ class _InductionPageState extends State<InductionPage> {
 
   Future<void> _clockInOffline(String learnerID, String clockInTime) async {
     try {
-      print('Starting offline clock-in for learnerID: $learnerID at $clockInTime');
+      print(
+          'Starting offline clock-in for learnerID: $learnerID at $clockInTime');
       final dbHelper = DatabaseHelper();
       final clockDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
@@ -664,7 +714,8 @@ class _InductionPageState extends State<InductionPage> {
 
       if (permission == LocationPermission.deniedForever) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location permissions are permanently denied.')),
+          const SnackBar(
+              content: Text('Location permissions are permanently denied.')),
         );
         return;
       }
@@ -674,14 +725,16 @@ class _InductionPageState extends State<InductionPage> {
       );
 
       // Validate site radius
-      bool isWithinRadius = await _isWithinSiteRadius(widget.classID, position.latitude, position.longitude, position.accuracy);
+      bool isWithinRadius = await _isWithinSiteRadius(widget.classID,
+          position.latitude, position.longitude, position.accuracy);
       if (!isWithinRadius) {
         return; // Error messages handled in _isWithinSiteRadius
       }
 
       // Save signature
       final appDir = await getApplicationDocumentsDirectory();
-      final signaturePath = '${appDir.path}/signature_${learnerID}_$clockDate.png';
+      final signaturePath =
+          '${appDir.path}/signature_${learnerID}_$clockDate.png';
       final signatureFile = File(signaturePath);
 
       final signatureImage = await _signatureController.toPngBytes();
@@ -692,7 +745,8 @@ class _InductionPageState extends State<InductionPage> {
         return;
       }
       await signatureFile.writeAsBytes(signatureImage);
-      print('Signature saved at: $signaturePath, file exists: ${await signatureFile.exists()}');
+      print(
+          'Signature saved at: $signaturePath, file exists: ${await signatureFile.exists()}');
 
       // Store clock-in data
       final clockInData = {
@@ -715,10 +769,12 @@ class _InductionPageState extends State<InductionPage> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Clock-in saved locally. Will sync when online.')),
+        const SnackBar(
+            content: Text('Clock-in saved locally. Will sync when online.')),
       );
     } catch (e, stackTrace) {
-      print('Offline clock-in error for learnerID: $learnerID: $e\nStack trace: $stackTrace');
+      print(
+          'Offline clock-in error for learnerID: $learnerID: $e\nStack trace: $stackTrace');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error saving offline clock-in: $e')),
       );
@@ -726,7 +782,8 @@ class _InductionPageState extends State<InductionPage> {
     }
   }
 
-  Future<void> updateClockOut(String learnerID, String clockOutTime, String clockDate) async {
+  Future<void> updateClockOut(
+      String learnerID, String clockOutTime, String clockDate) async {
     try {
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
@@ -750,7 +807,8 @@ class _InductionPageState extends State<InductionPage> {
           final timeFormat = DateFormat('HH:mm:ss');
           final clockInDateTime = timeFormat.parse(clockInTime);
           final clockOutDateTime = timeFormat.parse(clockOutTime);
-          final contactTimeDuration = clockOutDateTime.difference(clockInDateTime);
+          final contactTimeDuration =
+              clockOutDateTime.difference(clockInDateTime);
           contactTime = formatDuration(contactTimeDuration);
         } catch (e) {
           print('Error calculating contact time: $e');
@@ -772,7 +830,8 @@ class _InductionPageState extends State<InductionPage> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Clock-out saved locally. Will sync when online.')),
+        const SnackBar(
+            content: Text('Clock-out saved locally. Will sync when online.')),
       );
     } catch (e) {
       print('Offline clock-out error: $e');
@@ -833,7 +892,8 @@ class _InductionPageState extends State<InductionPage> {
                           Navigator.of(context).pop(true);
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please provide a signature')),
+                            const SnackBar(
+                                content: Text('Please provide a signature')),
                           );
                         }
                       },
@@ -902,7 +962,8 @@ class _InductionPageState extends State<InductionPage> {
                         Navigator.of(context).pop(true);
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Please provide a signature')),
+                          const SnackBar(
+                              content: Text('Please provide a signature')),
                         );
                       }
                     },
@@ -925,7 +986,8 @@ class _InductionPageState extends State<InductionPage> {
       if (await _checkConnectivity()) {
         await _clockOutOnline(learnerID, signaturePath);
       } else {
-        await updateClockOut(learnerID, clockOutTime, DateFormat('yyyy-MM-dd').format(DateTime.now()));
+        await updateClockOut(learnerID, clockOutTime,
+            DateFormat('yyyy-MM-dd').format(DateTime.now()));
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -959,123 +1021,137 @@ class _InductionPageState extends State<InductionPage> {
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            Text(
+            const Text(
               'Learner Actions: Clock In/Out',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             learners.isEmpty
                 ? const Center(child: Text('No data available for this class'))
                 : Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.vertical,
-                  child: DataTable(
-                    columns: const [
-                      DataColumn(label: Text('Name')),
-                      DataColumn(label: Text('Surname')),
-                      DataColumn(label: Text('Clock In Time')),
-                      DataColumn(label: Text('Clock Out Time')),
-                      DataColumn(label: Text('Contact Time')),
-                    ],
-                    rows: learners.map((item) {
-                      String learnerID = item['LearnerID']?.toString() ?? '';
-                      String? clockInTime = clockInTimes[learnerID];
-                      String? clockOutTime = clockOutTimes[learnerID];
-                      String? contactTime = contactTimes[learnerID];
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.vertical,
+                        child: DataTable(
+                          columns: const [
+                            DataColumn(label: Text('Name')),
+                            DataColumn(label: Text('Surname')),
+                            DataColumn(label: Text('Clock In Time')),
+                            DataColumn(label: Text('Clock Out Time')),
+                            DataColumn(label: Text('Contact Time')),
+                          ],
+                          rows: learners.map((item) {
+                            String learnerID =
+                                item['LearnerID']?.toString() ?? '';
+                            String? clockInTime = clockInTimes[learnerID];
+                            String? clockOutTime = clockOutTimes[learnerID];
+                            String? contactTime = contactTimes[learnerID];
 
-                      return DataRow(
-                        cells: [
-                          DataCell(Text(item['Name']?.toString() ?? 'N/A')),
-                          DataCell(Text(item['Surname']?.toString() ?? 'N/A')),
-                          DataCell(
-                            clockInTime != null && clockInTime.isNotEmpty
-                                ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  clockInTime,
-                                  style: const TextStyle(
-                                    color: Colors.green,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                            return DataRow(
+                              cells: [
+                                DataCell(
+                                    Text(item['Name']?.toString() ?? 'N/A')),
+                                DataCell(
+                                    Text(item['Surname']?.toString() ?? 'N/A')),
+                                DataCell(
+                                  clockInTime != null && clockInTime.isNotEmpty
+                                      ? Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              clockInTime,
+                                              style: const TextStyle(
+                                                color: Colors.green,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            Text(
+                                              'Clocked In',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.green[800],
+                                              ),
+                                            ),
+                                          ],
+                                        )
+                                      : ElevatedButton(
+                                          onPressed: () async {
+                                            final success =
+                                                await clockInLearner(learnerID);
+                                            if (!success) {
+                                              print(
+                                                  'Clock-in failed for learnerID: $learnerID');
+                                            }
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.blue,
+                                            foregroundColor: Colors.white,
+                                          ),
+                                          child: const Text('Clock In'),
+                                        ),
                                 ),
-                                Text(
-                                  'Clocked In',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.green[800],
+                                DataCell(
+                                  clockOutTime != null &&
+                                          clockOutTime.isNotEmpty
+                                      ? Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              clockOutTime,
+                                              style: const TextStyle(
+                                                color: Colors.red,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            Text(
+                                              'Clocked Out',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.red[800],
+                                              ),
+                                            ),
+                                          ],
+                                        )
+                                      : (clockInTime == null ||
+                                              clockInTime.isEmpty)
+                                          ? const Text('--',
+                                              style:
+                                                  TextStyle(color: Colors.grey))
+                                          : ElevatedButton(
+                                              onPressed: () =>
+                                                  clockOutLearner(learnerID),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.orange,
+                                                foregroundColor: Colors.white,
+                                              ),
+                                              child: const Text('Clock Out'),
+                                            ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    contactTime ?? '--',
+                                    style: TextStyle(
+                                      color: (contactTime != null &&
+                                              contactTime.isNotEmpty)
+                                          ? Colors.blue[800]
+                                          : Colors.grey,
+                                      fontWeight: (contactTime != null &&
+                                              contactTime.isNotEmpty)
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                    ),
                                   ),
                                 ),
                               ],
-                            )
-                                : ElevatedButton(
-                              onPressed: () async {
-                                final success = await clockInLearner(learnerID);
-                                if (!success) {
-                                  print('Clock-in failed for learnerID: $learnerID');
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                foregroundColor: Colors.white,
-                              ),
-                              child: const Text('Clock In'),
-                            ),
-                          ),
-                          DataCell(
-                            clockOutTime != null && clockOutTime.isNotEmpty
-                                ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  clockOutTime,
-                                  style: const TextStyle(
-                                    color: Colors.red,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text(
-                                  'Clocked Out',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.red[800],
-                                  ),
-                                ),
-                              ],
-                            )
-                                : (clockInTime == null || clockInTime.isEmpty)
-                                ? const Text('--', style: TextStyle(color: Colors.grey))
-                                : ElevatedButton(
-                              onPressed: () => clockOutLearner(learnerID),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange,
-                                foregroundColor: Colors.white,
-                              ),
-                              child: const Text('Clock Out'),
-                            ),
-                          ),
-                          DataCell(
-                            Text(
-                              contactTime ?? '--',
-                              style: TextStyle(
-                                color: (contactTime != null && contactTime.isNotEmpty)
-                                    ? Colors.blue[800]
-                                    : Colors.grey,
-                                fontWeight: (contactTime != null && contactTime.isNotEmpty)
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ),
           ],
         ),
       ),

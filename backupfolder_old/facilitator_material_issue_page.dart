@@ -26,15 +26,17 @@ class FacilitatorMaterialIssuePage extends StatefulWidget {
   });
 
   @override
-  _FacilitatorMaterialIssuePageState createState() => _FacilitatorMaterialIssuePageState();
+  _FacilitatorMaterialIssuePageState createState() =>
+      _FacilitatorMaterialIssuePageState();
 }
 
-class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssuePage> {
+class _FacilitatorMaterialIssuePageState
+    extends State<FacilitatorMaterialIssuePage> {
   List<Map<String, dynamic>> learners = [];
   List<Map<String, dynamic>> availableMaterials = [];
   List<Map<String, dynamic>> selectedMaterials = [];
   Map<String, List<Map<String, dynamic>>> learnerMaterials = {};
-  
+
   bool isLoadingLearners = true;
   bool isLoadingMaterials = true;
   bool isSaving = false;
@@ -44,7 +46,7 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
   String selectedIssueType = 'Learning Materials';
   String? selectedLearnerId;
   String? selectedLearnerName;
-  
+
   final _notesController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
@@ -86,7 +88,8 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
       });
 
       final response = await http.get(
-        Uri.parse(AppConfig.buildUrl('get_logistics_learners.php?classID=${widget.classId}&siteID=${widget.siteId}&account_id=${widget.logisticsId}')),
+        Uri.parse(AppConfig.buildUrl(
+            'get_logistics_learners.php?classID=${widget.classId}&siteID=${widget.siteId}&account_id=${widget.logisticsId}')),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -132,7 +135,8 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
         final data = json.decode(response.body);
         if (data['success'] == true) {
           setState(() {
-            availableMaterials = List<Map<String, dynamic>>.from(data['materials'] ?? []);
+            availableMaterials =
+                List<Map<String, dynamic>>.from(data['materials'] ?? []);
             isLoadingMaterials = false;
           });
         } else {
@@ -167,7 +171,7 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
       if (!learnerMaterials.containsKey(selectedLearnerId)) {
         learnerMaterials[selectedLearnerId!] = [];
       }
-      
+
       learnerMaterials[selectedLearnerId!]!.add({
         'material_id': material['inventory_id'],
         'material_name': material['material_name'],
@@ -188,11 +192,13 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
     });
   }
 
-  void _updateMaterialQuantity(String learnerId, int materialIndex, int quantity) {
+  void _updateMaterialQuantity(
+      String learnerId, int materialIndex, int quantity) {
     setState(() {
-      if (learnerMaterials[learnerId] != null && 
+      if (learnerMaterials[learnerId] != null &&
           materialIndex < learnerMaterials[learnerId]!.length) {
-        learnerMaterials[learnerId]![materialIndex]['quantity_issued'] = quantity;
+        learnerMaterials[learnerId]![materialIndex]['quantity_issued'] =
+            quantity;
       }
     });
   }
@@ -200,7 +206,9 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
   Future<void> _submitMaterialIssue() async {
     if (!_formKey.currentState!.validate() || learnerMaterials.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please assign materials to learners and fill all required fields')),
+        const SnackBar(
+            content: Text(
+                'Please assign materials to learners and fill all required fields')),
       );
       return;
     }
@@ -213,10 +221,11 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
     try {
       // Prepare data for each learner
       List<Map<String, dynamic>> issuanceRecords = [];
-      
+
       learnerMaterials.forEach((learnerId, materials) {
-        final learner = learners.firstWhere((l) => l['learnerID'].toString() == learnerId);
-        
+        final learner =
+            learners.firstWhere((l) => l['learnerID'].toString() == learnerId);
+
         issuanceRecords.add({
           'classID': widget.classId,
           'siteID': widget.siteId,
@@ -247,7 +256,8 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
         if (data['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Materials issued successfully to ${learnerMaterials.length} learner(s)'),
+              content: Text(
+                  'Materials issued successfully to ${learnerMaterials.length} learner(s)'),
               backgroundColor: Colors.green,
             ),
           );
@@ -310,8 +320,8 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
               onChanged: (value) {
                 setState(() {
                   selectedLearnerId = value;
-                  selectedLearnerName = learners
-                      .firstWhere((l) => l['learnerID'].toString() == value)['learnerName'];
+                  selectedLearnerName = learners.firstWhere(
+                      (l) => l['learnerID'].toString() == value)['learnerName'];
                 });
               },
               validator: (value) {
@@ -359,11 +369,12 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
                         final material = availableMaterials[index];
                         final stock = material['current_stock'] ?? 0;
                         final isOutOfStock = stock <= 0;
-                        
+
                         return ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: isOutOfStock ? Colors.red : Colors.green,
-                            child: Icon(
+                            backgroundColor:
+                                isOutOfStock ? Colors.red : Colors.green,
+                            child: const Icon(
                               Icons.inventory_2,
                               color: Colors.white,
                               size: 20,
@@ -379,13 +390,16 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
                           subtitle: Text(
                             'Code: ${material['material_code']} | Stock: $stock ${material['unit_of_measure']}',
                             style: TextStyle(
-                              color: isOutOfStock ? Colors.red : Colors.grey[600],
+                              color:
+                                  isOutOfStock ? Colors.red : Colors.grey[600],
                             ),
                           ),
                           trailing: IconButton(
                             icon: const Icon(Icons.add_circle),
                             color: isOutOfStock ? Colors.grey : Colors.blue,
-                            onPressed: isOutOfStock ? null : () => _addMaterialToLearner(material),
+                            onPressed: isOutOfStock
+                                ? null
+                                : () => _addMaterialToLearner(material),
                           ),
                           enabled: !isOutOfStock,
                         );
@@ -405,7 +419,8 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
           padding: const EdgeInsets.all(32),
           child: Column(
             children: [
-              Icon(Icons.assignment_outlined, size: 64, color: Colors.grey[400]),
+              Icon(Icons.assignment_outlined,
+                  size: 64, color: Colors.grey[400]),
               const SizedBox(height: 16),
               Text(
                 'No materials assigned yet',
@@ -433,8 +448,9 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
       children: learnerMaterials.entries.map((entry) {
         final learnerId = entry.key;
         final materials = entry.value;
-        final learner = learners.firstWhere((l) => l['learnerID'].toString() == learnerId);
-        
+        final learner =
+            learners.firstWhere((l) => l['learnerID'].toString() == learnerId);
+
         return Card(
           margin: const EdgeInsets.only(bottom: 16),
           child: ExpansionTile(
@@ -442,7 +458,8 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
               backgroundColor: Colors.orange,
               child: Text(
                 learner['learnerName'][0].toUpperCase(),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold),
               ),
             ),
             title: Text(
@@ -454,9 +471,10 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
               ...materials.asMap().entries.map((materialEntry) {
                 final materialIndex = materialEntry.key;
                 final material = materialEntry.value;
-                
+
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
                     children: [
                       Expanded(
@@ -466,11 +484,13 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
                           children: [
                             Text(
                               material['material_name'],
-                              style: const TextStyle(fontWeight: FontWeight.w500),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w500),
                             ),
                             Text(
                               'Code: ${material['material_code']}',
-                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey[600]),
                             ),
                           ],
                         ),
@@ -483,15 +503,18 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
                             SizedBox(
                               width: 60,
                               child: TextFormField(
-                                initialValue: material['quantity_issued'].toString(),
+                                initialValue:
+                                    material['quantity_issued'].toString(),
                                 keyboardType: TextInputType.number,
                                 decoration: const InputDecoration(
                                   border: OutlineInputBorder(),
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
                                 ),
                                 onChanged: (value) {
                                   final quantity = int.tryParse(value) ?? 1;
-                                  _updateMaterialQuantity(learnerId, materialIndex, quantity);
+                                  _updateMaterialQuantity(
+                                      learnerId, materialIndex, quantity);
                                 },
                               ),
                             ),
@@ -499,8 +522,10 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.remove_circle, color: Colors.red),
-                        onPressed: () => _removeMaterialFromLearner(learnerId, materialIndex),
+                        icon:
+                            const Icon(Icons.remove_circle, color: Colors.red),
+                        onPressed: () => _removeMaterialFromLearner(
+                            learnerId, materialIndex),
                       ),
                     ],
                   ),
@@ -550,7 +575,8 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
                             const SizedBox(width: 8),
                             const Text(
                               'Issue Details',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 16),
                             ),
                           ],
                         ),
@@ -562,7 +588,7 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
                       ],
                     ),
                   ),
-                  
+
                   // Error Message
                   if (errorMessage.isNotEmpty)
                     Container(
@@ -597,20 +623,25 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
                                 children: [
                                   Row(
                                     children: [
-                                      Icon(Icons.settings, color: Colors.purple[800]),
+                                      Icon(Icons.settings,
+                                          color: Colors.purple[800]),
                                       const SizedBox(width: 8),
                                       const Text(
                                         'Issue Configuration',
-                                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                        style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 16),
-                                  
+
                                   // Date Selection
                                   Row(
                                     children: [
-                                      const Text('Issue Date: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      const Text('Issue Date: ',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold)),
                                       TextButton.icon(
                                         icon: const Icon(Icons.calendar_today),
                                         label: Text(
@@ -620,8 +651,10 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
                                           final date = await showDatePicker(
                                             context: context,
                                             initialDate: selectedDate,
-                                            firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                                            lastDate: DateTime.now().add(const Duration(days: 30)),
+                                            firstDate: DateTime.now().subtract(
+                                                const Duration(days: 30)),
+                                            lastDate: DateTime.now()
+                                                .add(const Duration(days: 30)),
                                           );
                                           if (date != null) {
                                             setState(() {
@@ -632,9 +665,9 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
                                       ),
                                     ],
                                   ),
-                                  
+
                                   const SizedBox(height: 16),
-                                  
+
                                   // Issue Type
                                   DropdownButtonFormField<String>(
                                     value: selectedIssueType,
@@ -655,9 +688,9 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
                                       });
                                     },
                                   ),
-                                  
+
                                   const SizedBox(height: 16),
-                                  
+
                                   // Unit Standard
                                   DropdownButtonFormField<String>(
                                     value: selectedUnitStandard,
@@ -669,7 +702,8 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
                                     items: unitStandards.map((us) {
                                       return DropdownMenuItem<String>(
                                         value: us['id'],
-                                        child: Text('${us['id']} - ${us['name']}'),
+                                        child:
+                                            Text('${us['id']} - ${us['name']}'),
                                       );
                                     }).toList(),
                                     onChanged: (value) {
@@ -682,19 +716,19 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
                               ),
                             ),
                           ),
-                          
+
                           const SizedBox(height: 16),
-                          
+
                           // Learner Selector
                           _buildLearnerSelector(),
-                          
+
                           const SizedBox(height: 16),
-                          
+
                           // Material Selector
                           _buildMaterialSelector(),
-                          
+
                           const SizedBox(height: 16),
-                          
+
                           // Assigned Materials
                           Row(
                             children: [
@@ -702,16 +736,17 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
                               const SizedBox(width: 8),
                               const Text(
                                 'Materials Assigned to Learners',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.bold),
                               ),
                             ],
                           ),
                           const SizedBox(height: 12),
-                          
+
                           _buildLearnerMaterialsList(),
-                          
+
                           const SizedBox(height: 16),
-                          
+
                           // Notes
                           TextFormField(
                             controller: _notesController,
@@ -722,15 +757,15 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
                             ),
                             maxLines: 3,
                           ),
-                          
+
                           const SizedBox(height: 24),
-                          
+
                           // Submit Button
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
                               onPressed: isSaving ? null : _submitMaterialIssue,
-                              icon: isSaving 
+                              icon: isSaving
                                   ? const SizedBox(
                                       width: 20,
                                       height: 20,
@@ -741,15 +776,16 @@ class _FacilitatorMaterialIssuePageState extends State<FacilitatorMaterialIssueP
                                     )
                                   : const Icon(Icons.send),
                               label: Text(
-                                isSaving 
-                                    ? 'Issuing Materials...' 
+                                isSaving
+                                    ? 'Issuing Materials...'
                                     : 'Issue Materials to ${learnerMaterials.length} Learner(s)',
                                 style: const TextStyle(fontSize: 16),
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.blue[800],
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
                               ),
                             ),
                           ),

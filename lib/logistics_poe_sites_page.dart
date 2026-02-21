@@ -45,7 +45,7 @@ class _LogisticsPOESitesPageState extends State<LogisticsPOESitesPage> {
   void _onSearchChanged() {
     // Cancel previous timer
     _debounceTimer?.cancel();
-    
+
     // Start new timer for debounced search
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
       setState(() {
@@ -67,12 +67,12 @@ class _LogisticsPOESitesPageState extends State<LogisticsPOESitesPage> {
       if (_searchQuery.isNotEmpty) {
         url += '&search=${Uri.encodeComponent(_searchQuery)}';
       }
-      
+
       final response = await http.get(Uri.parse(AppConfig.buildUrl(url)));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data['success'] == true && data['sites'] != null) {
           setState(() {
             sites = data['sites'];
@@ -139,7 +139,8 @@ class _LogisticsPOESitesPageState extends State<LogisticsPOESitesPage> {
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Search sites by name, province, category, or pathway...',
+                    hintText:
+                        'Search sites by name, province, category, or pathway...',
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
@@ -155,7 +156,8 @@ class _LogisticsPOESitesPageState extends State<LogisticsPOESitesPage> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.orange.shade600, width: 2),
+                      borderSide:
+                          BorderSide(color: Colors.orange.shade600, width: 2),
                     ),
                     filled: true,
                     fillColor: Colors.white,
@@ -172,7 +174,8 @@ class _LogisticsPOESitesPageState extends State<LogisticsPOESitesPage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.error, size: 64, color: Colors.red),
+                            const Icon(Icons.error,
+                                size: 64, color: Colors.red),
                             const SizedBox(height: 16),
                             Text(
                               errorMessage,
@@ -193,15 +196,16 @@ class _LogisticsPOESitesPageState extends State<LogisticsPOESitesPage> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  _searchQuery.isNotEmpty ? Icons.search_off : Icons.location_off, 
-                                  size: 64, 
-                                  color: Colors.grey[400]
-                                ),
+                                    _searchQuery.isNotEmpty
+                                        ? Icons.search_off
+                                        : Icons.location_off,
+                                    size: 64,
+                                    color: Colors.grey[400]),
                                 const SizedBox(height: 16),
                                 Text(
-                                  _searchQuery.isNotEmpty 
-                                    ? 'No sites match your search'
-                                    : 'No sites found',
+                                  _searchQuery.isNotEmpty
+                                      ? 'No sites match your search'
+                                      : 'No sites found',
                                   style: TextStyle(
                                     fontSize: 18,
                                     color: Colors.grey[600],
@@ -232,9 +236,9 @@ class _LogisticsPOESitesPageState extends State<LogisticsPOESitesPage> {
                                   elevation: 4,
                                   child: ListTile(
                                     contentPadding: const EdgeInsets.all(16),
-                                    leading: CircleAvatar(
+                                    leading: const CircleAvatar(
                                       backgroundColor: Colors.orange,
-                                      child: const Icon(
+                                      child: Icon(
                                         Icons.location_city,
                                         color: Colors.white,
                                       ),
@@ -247,13 +251,16 @@ class _LogisticsPOESitesPageState extends State<LogisticsPOESitesPage> {
                                       ),
                                     ),
                                     subtitle: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         const SizedBox(height: 4),
                                         if (site['province'] != null) ...[
                                           Row(
                                             children: [
-                                              Icon(Icons.map, size: 16, color: Colors.grey[600]),
+                                              Icon(Icons.map,
+                                                  size: 16,
+                                                  color: Colors.grey[600]),
                                               const SizedBox(width: 4),
                                               Text(site['province']),
                                             ],
@@ -262,48 +269,62 @@ class _LogisticsPOESitesPageState extends State<LogisticsPOESitesPage> {
                                         const SizedBox(height: 2),
                                         Row(
                                           children: [
-                                            Icon(Icons.class_, size: 16, color: Colors.grey[600]),
+                                            Icon(Icons.class_,
+                                                size: 16,
+                                                color: Colors.grey[600]),
                                             const SizedBox(width: 4),
-                                            Text('${site['total_classes'] ?? '0'} classes'),
+                                            Text(
+                                                '${site['total_classes'] ?? '0'} classes'),
                                           ],
                                         ),
                                         const SizedBox(height: 2),
                                         Row(
                                           children: [
-                                            Icon(Icons.group, size: 16, color: Colors.grey[600]),
+                                            Icon(Icons.group,
+                                                size: 16,
+                                                color: Colors.grey[600]),
                                             const SizedBox(width: 4),
-                                            Text('${site['total_learners'] ?? '0'} learners'),
+                                            Text(
+                                                '${site['total_learners'] ?? '0'} learners'),
                                           ],
                                         ),
-                                        if (site['total_facilitators'] != null && site['total_facilitators'] > 0) ...[
+                                        if (site['total_facilitators'] !=
+                                                null &&
+                                            site['total_facilitators'] > 0) ...[
                                           const SizedBox(height: 2),
                                           Row(
                                             children: [
-                                              Icon(Icons.person, size: 16, color: Colors.grey[600]),
+                                              Icon(Icons.person,
+                                                  size: 16,
+                                                  color: Colors.grey[600]),
                                               const SizedBox(width: 4),
-                                              Text('${site['total_facilitators']} facilitators'),
+                                              Text(
+                                                  '${site['total_facilitators']} facilitators'),
                                             ],
                                           ),
                                         ],
                                       ],
                                     ),
-                                    trailing: Row(
+                                    trailing: const Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(Icons.assignment, color: Colors.orange),
-                                        const SizedBox(width: 4),
-                                        const Icon(Icons.arrow_forward_ios),
+                                        Icon(Icons.assignment,
+                                            color: Colors.orange),
+                                        SizedBox(width: 4),
+                                        Icon(Icons.arrow_forward_ios),
                                       ],
                                     ),
                                     onTap: () {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => LogisticsPOEClassesPage(
+                                          builder: (context) =>
+                                              LogisticsPOEClassesPage(
                                             logisticsId: widget.logisticsId,
                                             logisticsName: widget.logisticsName,
                                             siteId: site['siteID'].toString(),
-                                            siteName: site['siteName'] ?? 'Unknown Site',
+                                            siteName: site['siteName'] ??
+                                                'Unknown Site',
                                           ),
                                         ),
                                       );

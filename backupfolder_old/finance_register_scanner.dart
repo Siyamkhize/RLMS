@@ -60,9 +60,11 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
   @override
   void initState() {
     super.initState();
-    
+
     // If in edit mode, set the month directly and load attendance
-    if (widget.editMode && widget.editMonth != null && widget.editYear != null) {
+    if (widget.editMode &&
+        widget.editMonth != null &&
+        widget.editYear != null) {
       selectedMonth = DateTime(widget.editYear!, widget.editMonth!, 1);
       fetchAttendance();
     } else {
@@ -83,22 +85,21 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
 
   Future<void> fetchAttendance() async {
     if (selectedMonth == null) return;
-    
+
     setState(() {
       isLoading = true;
     });
 
     try {
       final url = AppConfig.buildUrl(
-        'get_learner_attendance.php?learner_id=${widget.learnerId}&month=${selectedMonth!.month}&year=${selectedMonth!.year}'
-      );
+          'get_learner_attendance.php?learner_id=${widget.learnerId}&month=${selectedMonth!.month}&year=${selectedMonth!.year}');
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         print('Fetched attendance data: $data');
-        
+
         if (data is List) {
           setState(() {
             savedDates = data.map((item) {
@@ -106,11 +107,12 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
               final dateStr = item['attendance_date'];
               final parsedDate = DateTime.parse(dateStr);
               // Normalize to midnight to ensure proper comparison
-              return DateTime(parsedDate.year, parsedDate.month, parsedDate.day);
+              return DateTime(
+                  parsedDate.year, parsedDate.month, parsedDate.day);
             }).toSet();
             selectedDates = Set.from(savedDates);
             isLoading = false;
-            
+
             print('Loaded ${savedDates.length} attendance dates');
             print('Selected dates: $selectedDates');
           });
@@ -136,16 +138,18 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
 
   Future<void> saveAttendance() async {
     if (selectedMonth == null) return;
-    
+
     setState(() {
       isSaving = true;
     });
 
     try {
       final url = AppConfig.buildUrl('save_learner_attendance.php');
-      
-      final dates = selectedDates.map((date) => date.toIso8601String().split('T')[0]).toList();
-      
+
+      final dates = selectedDates
+          .map((date) => date.toIso8601String().split('T')[0])
+          .toList();
+
       final response = await http.post(
         Uri.parse(url),
         body: {
@@ -160,34 +164,32 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data['success'] == true) {
           // Save attendance successful, now upload scanned document if available
           if (scannedDocumentPath != null) {
             await uploadRegister(scannedDocumentPath!);
           }
-          
+
           setState(() {
             isSaving = false;
           });
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                scannedDocumentPath != null 
+              content: Text(scannedDocumentPath != null
                   ? 'Attendance and register saved successfully!'
-                  : 'Attendance updated successfully!'
-              ),
+                  : 'Attendance updated successfully!'),
               backgroundColor: Colors.green,
             ),
           );
-          
+
           Navigator.pop(context);
         } else {
           setState(() {
             isSaving = false;
           });
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(data['message'] ?? 'Failed to save attendance'),
@@ -200,7 +202,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
       setState(() {
         isSaving = false;
       });
-      
+
       print('Error saving attendance: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -238,7 +240,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
   Future<void> proceedToScanner() async {
     if (selectedDates.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Please select at least one attendance day'),
           backgroundColor: Colors.orange,
         ),
@@ -255,25 +257,25 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
 
       if (scannedImage == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No document scanned')),
+          const SnackBar(content: Text('No document scanned')),
         );
         return;
       }
 
       String? imagePath;
-      
+
       if (scannedImage is String) {
         imagePath = scannedImage;
       } else if (scannedImage is List && scannedImage.isNotEmpty) {
         imagePath = scannedImage.first.toString();
       } else if (scannedImage is Map) {
-        imagePath = scannedImage['pdfUri']?.toString() ?? 
-                   scannedImage['path']?.toString() ?? 
-                   scannedImage['scanned_path']?.toString() ??
-                   scannedImage['file_path']?.toString() ??
-                   scannedImage['scannedPath']?.toString() ??
-                   scannedImage['filePath']?.toString();
-        
+        imagePath = scannedImage['pdfUri']?.toString() ??
+            scannedImage['path']?.toString() ??
+            scannedImage['scanned_path']?.toString() ??
+            scannedImage['file_path']?.toString() ??
+            scannedImage['scannedPath']?.toString() ??
+            scannedImage['filePath']?.toString();
+
         if (imagePath == null) {
           for (var value in scannedImage.values) {
             if (value != null && value.toString().contains('/')) {
@@ -290,7 +292,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
 
       if (imagePath == null || imagePath.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('Failed to get scanned document path'),
             duration: Duration(seconds: 3),
           ),
@@ -304,12 +306,11 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Document scanned! Click Save to complete.'),
           backgroundColor: Colors.green,
         ),
       );
-      
     } catch (e) {
       print('Error scanning: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -337,7 +338,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
 
   Future<DateTime?> showMonthYearPicker(BuildContext context) async {
     DateTime? selectedDate;
-    
+
     await showDialog(
       context: context,
       barrierDismissible: false,
@@ -348,15 +349,17 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: Text('Select Month'),
+              title: const Text('Select Month'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Year: 2024', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 20),
+                  const Text('Year: 2024',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 20),
                   DropdownButtonFormField<int>(
                     value: selectedMonthValue,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       labelText: 'Month',
                       border: OutlineInputBorder(),
                     ),
@@ -379,18 +382,19 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: Text('Cancel'),
+                  child: const Text('Cancel'),
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    selectedDate = DateTime(selectedYear, selectedMonthValue, 1);
+                    selectedDate =
+                        DateTime(selectedYear, selectedMonthValue, 1);
                     Navigator.pop(context);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green[700],
                     foregroundColor: Colors.white,
                   ),
-                  child: Text('Continue'),
+                  child: const Text('Continue'),
                 ),
               ],
             );
@@ -404,8 +408,18 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
 
   String _getMonthName(int month) {
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
     ];
     return months[month - 1];
   }
@@ -430,13 +444,13 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
           title: Text('Mark Attendance - ${widget.learnerName}'),
           backgroundColor: Colors.green[700],
         ),
-        body: Center(child: CircularProgressIndicator()),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     final daysInMonth = _getDaysInMonth(selectedMonth!);
     final firstWeekday = _getFirstWeekdayOfMonth(selectedMonth!);
-    
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Mark Attendance - ${widget.learnerName}'),
@@ -445,12 +459,12 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
       body: Column(
         children: [
           Container(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             color: Colors.green[50],
             child: Row(
               children: [
                 Icon(Icons.calendar_month, color: Colors.green[700]),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     '${_getMonthName(selectedMonth!.month)} ${selectedMonth!.year}',
@@ -463,8 +477,8 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
                 ),
                 ElevatedButton.icon(
                   onPressed: selectMonth,
-                  icon: Icon(Icons.edit_calendar, size: 18),
-                  label: Text('Change Month'),
+                  icon: const Icon(Icons.edit_calendar, size: 18),
+                  label: const Text('Change Month'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green[700],
                     foregroundColor: Colors.white,
@@ -473,18 +487,23 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
               ],
             ),
           ),
-          
           Container(
-            padding: EdgeInsets.all(12),
-            color: scannedDocumentPath != null ? Colors.green[50] : Colors.blue[50],
+            padding: const EdgeInsets.all(12),
+            color: scannedDocumentPath != null
+                ? Colors.green[50]
+                : Colors.blue[50],
             child: Row(
               children: [
                 Icon(
-                  scannedDocumentPath != null ? Icons.check_circle : Icons.info_outline,
-                  color: scannedDocumentPath != null ? Colors.green[700] : Colors.blue[700],
+                  scannedDocumentPath != null
+                      ? Icons.check_circle
+                      : Icons.info_outline,
+                  color: scannedDocumentPath != null
+                      ? Colors.green[700]
+                      : Colors.blue[700],
                   size: 20,
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     scannedDocumentPath != null
@@ -493,7 +512,9 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
                             ? 'Edit mode: Modify attendance days. Weekends are disabled. Selected: ${selectedDates.length} days'
                             : 'Tap on dates to mark attendance. Weekends are disabled. Selected: ${selectedDates.length} days',
                     style: TextStyle(
-                      color: scannedDocumentPath != null ? Colors.green[900] : Colors.blue[900],
+                      color: scannedDocumentPath != null
+                          ? Colors.green[900]
+                          : Colors.blue[900],
                       fontSize: 13,
                     ),
                   ),
@@ -501,20 +522,18 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
               ],
             ),
           ),
-          
           Expanded(
             child: isLoading
-                ? Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator())
                 : SingleChildScrollView(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     child: _buildCalendar(daysInMonth, firstWeekday),
                   ),
           ),
-          
           if (_hasChanges())
             Container(
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
@@ -533,7 +552,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
                           ElevatedButton.icon(
                             onPressed: isSaving ? null : saveAttendance,
                             icon: isSaving
-                                ? SizedBox(
+                                ? const SizedBox(
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(
@@ -541,24 +560,27 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : Icon(Icons.save),
-                            label: Text(isSaving ? 'Saving...' : 'Save Attendance Changes'),
+                                : const Icon(Icons.save),
+                            label: Text(isSaving
+                                ? 'Saving...'
+                                : 'Save Attendance Changes'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green[700],
                               foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              textStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              textStyle: const TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.bold),
                             ),
                           ),
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
                           // Optional: Re-scan button
                           OutlinedButton.icon(
                             onPressed: proceedToScanner,
-                            icon: Icon(Icons.document_scanner),
-                            label: Text('Re-scan Register (Optional)'),
+                            icon: const Icon(Icons.document_scanner),
+                            label: const Text('Re-scan Register (Optional)'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.blue[700],
-                              padding: EdgeInsets.symmetric(vertical: 16),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
                               side: BorderSide(color: Colors.blue[700]!),
                             ),
                           ),
@@ -567,19 +589,20 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
                     : scannedDocumentPath == null
                         ? ElevatedButton.icon(
                             onPressed: proceedToScanner,
-                            icon: Icon(Icons.document_scanner),
-                            label: Text('Continue to Scan Register'),
+                            icon: const Icon(Icons.document_scanner),
+                            label: const Text('Continue to Scan Register'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.blue[700],
                               foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              textStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              textStyle: const TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.bold),
                             ),
                           )
                         : ElevatedButton.icon(
                             onPressed: isSaving ? null : saveAttendance,
                             icon: isSaving
-                                ? SizedBox(
+                                ? const SizedBox(
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(
@@ -587,13 +610,16 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : Icon(Icons.save),
-                            label: Text(isSaving ? 'Saving...' : 'Save Attendance & Register'),
+                                : const Icon(Icons.save),
+                            label: Text(isSaving
+                                ? 'Saving...'
+                                : 'Save Attendance & Register'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green[700],
                               foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              textStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              textStyle: const TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.bold),
                             ),
                           ),
               ),
@@ -621,8 +647,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
                   ))
               .toList(),
         ),
-        SizedBox(height: 8),
-        
+        const SizedBox(height: 8),
         _buildCalendarGrid(daysInMonth, firstWeekday),
       ],
     );
@@ -631,37 +656,39 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
   Widget _buildCalendarGrid(int daysInMonth, int firstWeekday) {
     List<Widget> weeks = [];
     List<Widget> currentWeek = [];
-    
+
     for (int i = 1; i < firstWeekday; i++) {
-      currentWeek.add(Expanded(child: SizedBox()));
+      currentWeek.add(const Expanded(child: SizedBox()));
     }
-    
+
     for (int day = 1; day <= daysInMonth; day++) {
       final date = DateTime(selectedMonth!.year, selectedMonth!.month, day);
       final isSelected = selectedDates.contains(date);
       final isSaved = savedDates.contains(date);
       final isWeekend = _isWeekend(date);
       final holiday = _getHoliday(date);
-      
+
       // Debug: Print first few dates to check comparison
       if (day <= 3) {
         print('Day $day: date=$date, isSelected=$isSelected, isSaved=$isSaved');
       }
-      
+
       currentWeek.add(
         Expanded(
           child: GestureDetector(
-            onTap: isWeekend ? null : () {
-              setState(() {
-                if (isSelected) {
-                  selectedDates.remove(date);
-                } else {
-                  selectedDates.add(date);
-                }
-              });
-            },
+            onTap: isWeekend
+                ? null
+                : () {
+                    setState(() {
+                      if (isSelected) {
+                        selectedDates.remove(date);
+                      } else {
+                        selectedDates.add(date);
+                      }
+                    });
+                  },
             child: Container(
-              margin: EdgeInsets.all(2),
+              margin: const EdgeInsets.all(2),
               decoration: BoxDecoration(
                 color: isWeekend
                     ? Colors.grey[300]
@@ -685,13 +712,14 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
                       color: isWeekend
                           ? Colors.grey[600]
                           : (isSelected ? Colors.white : Colors.black87),
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.normal,
                       fontSize: 14,
                     ),
                   ),
                   if (holiday != null)
                     Padding(
-                      padding: EdgeInsets.only(top: 1),
+                      padding: const EdgeInsets.only(top: 1),
                       child: Text(
                         'Holiday',
                         style: TextStyle(
@@ -709,15 +737,15 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
           ),
         ),
       );
-      
+
       if ((firstWeekday + day - 1) % 7 == 0 || day == daysInMonth) {
         while (currentWeek.length < 7) {
-          currentWeek.add(Expanded(child: SizedBox()));
+          currentWeek.add(const Expanded(child: SizedBox()));
         }
-        
+
         weeks.add(
           Padding(
-            padding: EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.symmetric(vertical: 4),
             child: SizedBox(
               height: 50,
               child: Row(children: currentWeek),
@@ -727,7 +755,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
         currentWeek = [];
       }
     }
-    
+
     return Column(children: weeks);
   }
 }

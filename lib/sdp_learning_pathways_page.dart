@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'admin.dart';
+import 'sdp_unallocated_learners_page.dart';
 
 class SdpLearningPathwaysPage extends StatefulWidget {
   final String sdpIdentifier;
@@ -49,6 +50,37 @@ class _SdpLearningPathwaysPageState extends State<SdpLearningPathwaysPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.projectName),
+        actions: [
+          // Unallocated Learners button - more visible
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: ElevatedButton.icon(
+              onPressed: () {
+                debugPrint('[SDP_PATHWAYS] Navigating to Unallocated Learners');
+                debugPrint('  - sdpIdentifier: ${widget.sdpIdentifier}');
+                debugPrint('  - projectId: ${widget.projectId}');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => UnallocatedLearnersPage(
+                      sdpIdentifier: widget.sdpIdentifier,
+                      projectId: widget.projectId,
+                      projectName: widget.projectName,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.person_off, size: 18),
+              label: const Text('Unallocated'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+            ),
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -120,12 +152,12 @@ class _SdpLearningPathwaysPageState extends State<SdpLearningPathwaysPage> {
                               isInternship
                                   ? 'Internship Programme'
                                   : 'Training Programme',
-                              style: TextStyle(fontSize: 13),
+                              style: const TextStyle(fontSize: 13),
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Text(
                               'Qualifications: ${qualTypes.length}',
-                              style: TextStyle(
+                              style: const TextStyle(
                                   fontSize: 12,
                                   color: Colors.blue,
                                   fontWeight: FontWeight.bold),
@@ -142,18 +174,18 @@ class _SdpLearningPathwaysPageState extends State<SdpLearningPathwaysPage> {
                           else
                             ...qualTypes.map((qualType) {
                               final qual = qualType['qualification'] as Map?;
-                              if (qual == null) return SizedBox.shrink();
+                              if (qual == null) return const SizedBox.shrink();
 
                               return ListTile(
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 24,
                                   vertical: 8,
                                 ),
-                                leading: Icon(Icons.verified,
+                                leading: const Icon(Icons.verified,
                                     color: Colors.orange, size: 20),
                                 title: Text(
                                   qual['name']?.toString() ?? 'Unknown',
-                                  style: TextStyle(fontSize: 14),
+                                  style: const TextStyle(fontSize: 14),
                                 ),
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,21 +195,21 @@ class _SdpLearningPathwaysPageState extends State<SdpLearningPathwaysPage> {
                                             .isNotEmpty ==
                                         true)
                                       Text('Type: ${qualType['qual_type']}',
-                                          style: TextStyle(fontSize: 12)),
+                                          style: const TextStyle(fontSize: 12)),
                                     if (qual['employment_status']
                                             ?.toString()
                                             .isNotEmpty ==
                                         true)
                                       Text(
                                           'Status: ${qual['employment_status']}',
-                                          style: TextStyle(fontSize: 12)),
+                                          style: const TextStyle(fontSize: 12)),
                                     if (qual['num_participants']
                                             ?.toString()
                                             .isNotEmpty ==
                                         true)
                                       Text(
                                           'Participants: ${qual['num_participants']}',
-                                          style: TextStyle(fontSize: 12)),
+                                          style: const TextStyle(fontSize: 12)),
                                   ],
                                 ),
                               );
@@ -221,10 +253,10 @@ class _SdpLearningPathwaysPageState extends State<SdpLearningPathwaysPage> {
                                   ),
                                 );
                               },
-                              icon: Icon(Icons.location_on),
-                              label: Text('View Sites'),
+                              icon: const Icon(Icons.location_on),
+                              label: const Text('View Sites'),
                               style: ElevatedButton.styleFrom(
-                                minimumSize: Size(double.infinity, 45),
+                                minimumSize: const Size(double.infinity, 45),
                                 backgroundColor: Colors.blue,
                                 foregroundColor: Colors.white,
                               ),

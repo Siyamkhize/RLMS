@@ -47,7 +47,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
     _updateServiceStatus();
 
     // Update service status every 30 seconds
-    Timer.periodic(Duration(seconds: 30), (timer) {
+    Timer.periodic(const Duration(seconds: 30), (timer) {
       if (mounted) {
         _updateServiceStatus();
       } else {
@@ -123,7 +123,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
     try {
       final db = await _dbHelper.database;
       final today = DateTime.now();
-      final weekAgo = today.subtract(Duration(days: 7));
+      final weekAgo = today.subtract(const Duration(days: 7));
 
       final records = await db.rawQuery('''
         SELECT 
@@ -194,15 +194,15 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: Text('Monitoring Dashboard'),
+        title: const Text('Monitoring Dashboard'),
         backgroundColor: Colors.blue[600],
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
           // Service Status Indicator
           Container(
-            margin: EdgeInsets.only(right: 16),
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            margin: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: _isServiceRunning
                   ? Colors.green.withOpacity(0.2)
@@ -221,7 +221,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                   size: 16,
                   color: _isServiceRunning ? Colors.green : Colors.red,
                 ),
-                SizedBox(width: 4),
+                const SizedBox(width: 4),
                 Text(
                   _isServiceRunning ? 'Active' : 'Inactive',
                   style: TextStyle(
@@ -234,7 +234,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
             ),
           ),
           IconButton(
-            icon: Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh),
             onPressed: _loadDashboardData,
             tooltip: 'Refresh Data',
           ),
@@ -245,9 +245,9 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           tabs: [
-            Tab(icon: Icon(Icons.dashboard), text: 'Overview'),
-            Tab(icon: Icon(Icons.people), text: 'People'),
-            Tab(icon: Icon(Icons.analytics), text: 'Analytics'),
+            const Tab(icon: Icon(Icons.dashboard), text: 'Overview'),
+            const Tab(icon: Icon(Icons.people), text: 'People'),
+            const Tab(icon: Icon(Icons.analytics), text: 'Analytics'),
           ],
         ),
       ),
@@ -257,8 +257,8 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   CircularProgressIndicator(color: Colors.blue[600]),
-                  SizedBox(height: 16),
-                  Text('Loading monitoring data...'),
+                  const SizedBox(height: 16),
+                  const Text('Loading monitoring data...'),
                 ],
               ),
             )
@@ -275,21 +275,21 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
 
   Widget _buildOverviewTab() {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Service Status Card
           _buildServiceStatusCard(),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
           // Quick Stats
           _buildQuickStatsGrid(),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
           // Today's Progress
           _buildTodayProgressCard(),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
           // Recent Activity
           _buildRecentActivityCard(),
@@ -303,7 +303,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           gradient: LinearGradient(
@@ -317,7 +317,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
         child: Row(
           children: [
             Container(
-              padding: EdgeInsets.all(12),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
@@ -328,12 +328,12 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                 size: 32,
               ),
             ),
-            SizedBox(width: 16),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'Monitoring Service',
                     style: TextStyle(
                       color: Colors.white,
@@ -348,12 +348,12 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                       fontSize: 14,
                     ),
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       _buildServiceStat(
                           'Available', _availablePeopleCount.toString()),
-                      SizedBox(width: 16),
+                      const SizedBox(width: 16),
                       _buildServiceStat(
                           'Verified', _verifiedTodayCount.toString()),
                     ],
@@ -373,7 +373,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
       children: [
         Text(
           value,
-          style: TextStyle(
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -393,7 +393,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
   Widget _buildQuickStatsGrid() {
     return GridView.count(
       shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
+      physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
       childAspectRatio: 1.5,
       crossAxisSpacing: 12,
@@ -433,7 +433,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           gradient: LinearGradient(
@@ -446,14 +446,14 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: EdgeInsets.all(8),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: color.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(icon, size: 24, color: color),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               value,
               style: TextStyle(
@@ -462,7 +462,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                 color: color,
               ),
             ),
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             Text(
               title,
               style: TextStyle(
@@ -487,7 +487,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -499,7 +499,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                 color: Colors.grey[800],
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
@@ -513,7 +513,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                           color: Colors.grey[600],
                         ),
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       LinearProgressIndicator(
                         value: progressValue,
                         backgroundColor: Colors.grey[300],
@@ -526,7 +526,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                         ),
                         minHeight: 8,
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       Text(
                         '${(progressValue * 100).toStringAsFixed(1)}% Present',
                         style: TextStyle(
@@ -542,9 +542,9 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                     ],
                   ),
                 ),
-                SizedBox(width: 20),
+                const SizedBox(width: 20),
                 Container(
-                  padding: EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.blue[50],
                     borderRadius: BorderRadius.circular(12),
@@ -584,7 +584,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -601,17 +601,17 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                 ),
                 TextButton(
                   onPressed: () => _tabController.animateTo(1),
-                  child: Text('View All'),
+                  child: const Text('View All'),
                 ),
               ],
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             if (recentRecords.isEmpty)
               Center(
                 child: Column(
                   children: [
                     Icon(Icons.inbox, size: 48, color: Colors.grey[400]),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       'No monitoring activity today',
                       style: TextStyle(color: Colors.grey[600]),
@@ -620,9 +620,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                 ),
               )
             else
-              ...recentRecords
-                  .map((record) => _buildActivityItem(record))
-                  ,
+              ...recentRecords.map((record) => _buildActivityItem(record)),
           ],
         ),
       ),
@@ -649,8 +647,8 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
     }
 
     return Container(
-      margin: EdgeInsets.only(bottom: 12),
-      padding: EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: statusColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
@@ -659,21 +657,21 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
       child: Row(
         children: [
           Container(
-            padding: EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: statusColor.withOpacity(0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(statusIcon, color: statusColor, size: 20),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   record['learner_name'] ?? 'Unknown',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
@@ -705,13 +703,13 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
 
   Widget _buildPeopleTab() {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Available People Card
           _buildAvailablePeopleCard(),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
           // Today's Records
           _buildTodayRecordsCard(),
@@ -725,7 +723,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -737,14 +735,14 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                 color: Colors.grey[800],
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             if (_availablePeople.isEmpty)
               Center(
                 child: Column(
                   children: [
                     Icon(Icons.people_outline,
                         size: 48, color: Colors.grey[400]),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       'No people clocked in today',
                       style: TextStyle(color: Colors.grey[600]),
@@ -755,7 +753,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
             else
               ListView.builder(
                 shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(),
+                physics: const NeverScrollableScrollPhysics(),
                 itemCount: _availablePeople.length,
                 itemBuilder: (context, index) {
                   final person = _availablePeople[index];
@@ -767,8 +765,8 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                       record['final_status'] == 'PRESENT');
 
                   return Container(
-                    margin: EdgeInsets.only(bottom: 8),
-                    padding: EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: isVerified ? Colors.green[50] : Colors.grey[50],
                       borderRadius: BorderRadius.circular(8),
@@ -792,14 +790,14 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                             size: 20,
                           ),
                         ),
-                        SizedBox(width: 12),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 person['person_name'] ?? 'Unknown',
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 14,
                                 ),
@@ -815,8 +813,8 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                           ),
                         ),
                         Container(
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: isVerified
                                 ? Colors.green[100]
@@ -850,7 +848,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -862,13 +860,13 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                 color: Colors.grey[800],
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             if (_todayRecords.isEmpty)
               Center(
                 child: Column(
                   children: [
                     Icon(Icons.assignment, size: 48, color: Colors.grey[400]),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       'No monitoring records for today',
                       style: TextStyle(color: Colors.grey[600]),
@@ -879,7 +877,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
             else
               ListView.builder(
                 shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(),
+                physics: const NeverScrollableScrollPhysics(),
                 itemCount: _todayRecords.length,
                 itemBuilder: (context, index) {
                   final record = _todayRecords[index];
@@ -912,8 +910,8 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
     }
 
     return Container(
-      margin: EdgeInsets.only(bottom: 12),
-      padding: EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
@@ -922,33 +920,33 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
           BoxShadow(
             color: Colors.grey.withOpacity(0.1),
             blurRadius: 4,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            padding: EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: statusColor.withOpacity(0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(statusIcon, color: statusColor, size: 24),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   record['learner_name'] ?? 'Unknown',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   'Status: $status',
                   style: TextStyle(
@@ -995,7 +993,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
 
   Widget _buildAnalyticsTab() {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1010,7 +1008,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1022,13 +1020,13 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                 color: Colors.grey[800],
               ),
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             if (_weeklyStats.isEmpty)
               Center(
                 child: Column(
                   children: [
                     Icon(Icons.analytics, size: 48, color: Colors.grey[400]),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       'No data available for the past week',
                       style: TextStyle(color: Colors.grey[600]),
@@ -1052,7 +1050,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
 
                     return Container(
                       width: 80,
-                      margin: EdgeInsets.symmetric(horizontal: 8),
+                      margin: const EdgeInsets.symmetric(horizontal: 8),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
@@ -1070,7 +1068,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                                   begin: Alignment.topCenter,
                                   end: Alignment.bottomCenter,
                                 ),
-                                borderRadius: BorderRadius.vertical(
+                                borderRadius: const BorderRadius.vertical(
                                   top: Radius.circular(4),
                                 ),
                               ),
@@ -1088,18 +1086,18 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                                 ),
                                 borderRadius: BorderRadius.vertical(
                                   bottom: presentCount == 0
-                                      ? Radius.circular(4)
+                                      ? const Radius.circular(4)
                                       : Radius.zero,
                                   top: presentCount == 0
-                                      ? Radius.circular(4)
+                                      ? const Radius.circular(4)
                                       : Radius.zero,
                                 ),
                               ),
                             ),
-                          SizedBox(height: 12),
+                          const SizedBox(height: 12),
                           Text(
                             dayName,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                             ),
@@ -1111,7 +1109,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                               color: Colors.grey[600],
                             ),
                           ),
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
                           Text(
                             total.toString(),
                             style: TextStyle(
@@ -1127,7 +1125,7 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                 ),
               ),
             if (_weeklyStats.isNotEmpty) ...[
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               // Legend
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -1144,13 +1142,13 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
-                      SizedBox(width: 8),
-                      Text('Present',
+                      const SizedBox(width: 8),
+                      const Text('Present',
                           style: TextStyle(
                               fontSize: 14, fontWeight: FontWeight.w500)),
                     ],
                   ),
-                  SizedBox(width: 24),
+                  const SizedBox(width: 24),
                   Row(
                     children: [
                       Container(
@@ -1163,8 +1161,8 @@ class _MonitoringDashboardPageState extends State<MonitoringDashboardPage>
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
-                      SizedBox(width: 8),
-                      Text('Absent',
+                      const SizedBox(width: 8),
+                      const Text('Absent',
                           style: TextStyle(
                               fontSize: 14, fontWeight: FontWeight.w500)),
                     ],

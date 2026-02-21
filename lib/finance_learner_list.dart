@@ -80,25 +80,27 @@ class _FinanceLearnerListState extends State<FinanceLearnerList> {
         backgroundColor: Colors.green[700],
       ),
       body: isLoading
-          ? Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator())
           : errorMessage.isNotEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.error_outline, size: 60, color: Colors.red),
-                      SizedBox(height: 16),
-                      Text(errorMessage, style: TextStyle(color: Colors.red)),
-                      SizedBox(height: 16),
+                      const Icon(Icons.error_outline,
+                          size: 60, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text(errorMessage,
+                          style: const TextStyle(color: Colors.red)),
+                      const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: fetchLearners,
-                        child: Text('Retry'),
+                        child: const Text('Retry'),
                       ),
                     ],
                   ),
                 )
               : learners.isEmpty
-                  ? Center(
+                  ? const Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -112,7 +114,7 @@ class _FinanceLearnerListState extends State<FinanceLearnerList> {
                   : RefreshIndicator(
                       onRefresh: fetchLearners,
                       child: ListView.builder(
-                        padding: EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(16),
                         itemCount: learners.length,
                         itemBuilder: (context, index) {
                           final learner = learners[index];
@@ -131,10 +133,10 @@ class _FinanceLearnerListState extends State<FinanceLearnerList> {
     final registerCount = learner['register_count']?.toString() ?? '0';
 
     return Card(
-      margin: EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -148,7 +150,7 @@ class _FinanceLearnerListState extends State<FinanceLearnerList> {
                         color: Colors.green[700], fontWeight: FontWeight.bold),
                   ),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -157,12 +159,12 @@ class _FinanceLearnerListState extends State<FinanceLearnerList> {
                         learnerName.isNotEmpty
                             ? learnerName
                             : 'Unknown Learner',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
                         'ID: $idNumber',
                         style: TextStyle(
@@ -175,9 +177,9 @@ class _FinanceLearnerListState extends State<FinanceLearnerList> {
                 ),
               ],
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Container(
-              padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
               decoration: BoxDecoration(
                 color: Colors.blue[50],
                 borderRadius: BorderRadius.circular(8),
@@ -186,7 +188,7 @@ class _FinanceLearnerListState extends State<FinanceLearnerList> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.description, size: 18, color: Colors.blue[700]),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Text(
                     '$registerCount Registers',
                     style: TextStyle(
@@ -197,7 +199,7 @@ class _FinanceLearnerListState extends State<FinanceLearnerList> {
                 ],
               ),
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -215,12 +217,12 @@ class _FinanceLearnerListState extends State<FinanceLearnerList> {
                     ),
                   ).then((_) => fetchLearners());
                 },
-                icon: Icon(Icons.calendar_month, size: 20),
-                label: Text('Mark Attendance'),
+                icon: const Icon(Icons.calendar_month, size: 20),
+                label: const Text('Mark Attendance'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green[700],
                   foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
             ),

@@ -183,7 +183,7 @@ class _ModeratorPageState extends State<ModeratorPage> {
               onTap: () {
                 _onItemTapped(2);
                 Navigator.pop(context);
-              ),
+              },
             ),
             ListTile(
               title: const Text('Pothole Checklist'),

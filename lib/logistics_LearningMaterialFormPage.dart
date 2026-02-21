@@ -91,6 +91,10 @@ class _LogisticsLearningMaterialFormPageState
 
     // Set logistics name from widget parameter
     logisticsFullName = widget.logisticsName ?? 'Unknown Logistics';
+    debugPrint(
+        '[LOGISTICS-PAGE] Initialized with logisticsFullName: $logisticsFullName');
+    debugPrint(
+        '[LOGISTICS-PAGE] widget.logisticsName: ${widget.logisticsName}');
 
     _fetchAllLearners();
     _fetchUnitStandards();
@@ -914,6 +918,7 @@ class _LogisticsLearningMaterialFormPageState
           classID: widget.classID,
           contiSuitSizes: contiSuitSizes,
           bootsSizes: bootsSizes,
+          logisticsFullName: logisticsFullName,
         );
       },
     );
@@ -2192,12 +2197,14 @@ class _LogisticsPPEDialog extends StatefulWidget {
   final String classID;
   final List<String> contiSuitSizes;
   final List<String> bootsSizes;
+  final String logisticsFullName;
 
   const _LogisticsPPEDialog({
     required this.learner,
     required this.classID,
     required this.contiSuitSizes,
     required this.bootsSizes,
+    required this.logisticsFullName,
   });
 
   @override
@@ -2462,8 +2469,13 @@ class _LogisticsPPEDialogState extends State<_LogisticsPPEDialog> {
         'boots_size': selectedBootsSize,
         'boots_quantity': bootsQuantity,
         'issued_date': DateTime.now().toIso8601String(),
+        'issuedBy': widget.logisticsFullName,
         'synced': 0,
       };
+
+      debugPrint(
+          '[PPE-SAVE] widget.logisticsFullName value: ${widget.logisticsFullName}');
+      debugPrint('[PPE-SAVE] ppeData issuedBy value: ${ppeData['issuedBy']}');
 
       // Save to local database first
       await db.insert(
@@ -2476,6 +2488,8 @@ class _LogisticsPPEDialogState extends State<_LogisticsPPEDialog> {
       // Try to sync to server if online
       bool synced = false;
       try {
+        debugPrint(
+            '[PPE-SAVE] Sending data to server: ${json.encode(ppeData)}');
         final response = await http
             .post(
               Uri.parse('${AppConfig.baseUrl}/save_learner_ppe.php'),
@@ -2483,6 +2497,9 @@ class _LogisticsPPEDialogState extends State<_LogisticsPPEDialog> {
               body: json.encode(ppeData),
             )
             .timeout(const Duration(seconds: 10));
+
+        debugPrint('[PPE-SAVE] Server response status: ${response.statusCode}');
+        debugPrint('[PPE-SAVE] Server response body: ${response.body}');
 
         if (response.statusCode == 200) {
           final result = json.decode(response.body);
@@ -2551,9 +2568,9 @@ class _LogisticsPPEDialogState extends State<_LogisticsPPEDialog> {
             // Header
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.orange,
-                borderRadius: const BorderRadius.only(
+                borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(16),
                   topRight: Radius.circular(16),
                 ),

@@ -28,7 +28,8 @@ class LogisticsPOELearnersPage extends StatefulWidget {
   });
 
   @override
-  _LogisticsPOELearnersPageState createState() => _LogisticsPOELearnersPageState();
+  _LogisticsPOELearnersPageState createState() =>
+      _LogisticsPOELearnersPageState();
 }
 
 class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
@@ -57,7 +58,7 @@ class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
   void _onSearchChanged() {
     // Cancel previous timer
     _debounceTimer?.cancel();
-    
+
     // Start new timer for debounced search
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
       setState(() {
@@ -75,16 +76,17 @@ class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
 
     try {
       // Build URL with search parameter
-      String url = 'get_logistics_learners.php?classID=${widget.classId}&account_id=${widget.logisticsId}';
+      String url =
+          'get_logistics_learners.php?classID=${widget.classId}&account_id=${widget.logisticsId}';
       if (_searchQuery.isNotEmpty) {
         url += '&search=${Uri.encodeComponent(_searchQuery)}';
       }
-      
+
       final response = await http.get(Uri.parse(AppConfig.buildUrl(url)));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data['success'] == true && data['learners'] != null) {
           // Check POE status for each learner
           List<dynamic> learnersWithStatus = [];
@@ -94,7 +96,7 @@ class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
             learner['POEStatus'] = poeStatus;
             learnersWithStatus.add(learner);
           }
-          
+
           setState(() {
             learners = learnersWithStatus;
             isLoading = false;
@@ -127,7 +129,8 @@ class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
 
     try {
       final response = await http.get(
-        Uri.parse(AppConfig.buildUrl('get_poe_collection_status.php?classID=${widget.classId}')),
+        Uri.parse(AppConfig.buildUrl(
+            'get_poe_collection_status.php?classID=${widget.classId}')),
       );
 
       if (response.statusCode == 200) {
@@ -163,7 +166,7 @@ class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
         ),
       ),
     );
-    
+
     // If POE was successfully submitted, refresh the learners list
     if (result == true) {
       fetchLearners();
@@ -186,7 +189,7 @@ class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
   // Build action button based on POE status
   Widget _buildPOEActionButton(Map<String, dynamic> learner) {
     final status = learner['POEStatus'];
-    
+
     switch (status) {
       case 'Ready for Collection':
         return Container(
@@ -195,12 +198,12 @@ class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
             color: Colors.green,
             borderRadius: BorderRadius.circular(20),
           ),
-          child: Row(
+          child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.check_circle, color: Colors.white, size: 16),
-              const SizedBox(width: 4),
-              const Text(
+              Icon(Icons.check_circle, color: Colors.white, size: 16),
+              SizedBox(width: 4),
+              Text(
                 'Submitted',
                 style: TextStyle(
                   color: Colors.white,
@@ -211,7 +214,7 @@ class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
             ],
           ),
         );
-        
+
       case 'Collected':
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -219,12 +222,12 @@ class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
             color: Colors.blue,
             borderRadius: BorderRadius.circular(20),
           ),
-          child: Row(
+          child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.done_all, color: Colors.white, size: 16),
-              const SizedBox(width: 4),
-              const Text(
+              Icon(Icons.done_all, color: Colors.white, size: 16),
+              SizedBox(width: 4),
+              Text(
                 'Collected',
                 style: TextStyle(
                   color: Colors.white,
@@ -235,7 +238,7 @@ class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
             ],
           ),
         );
-        
+
       case 'Not Submitted':
       default:
         return Container(
@@ -244,12 +247,12 @@ class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
             color: Colors.orange,
             borderRadius: BorderRadius.circular(20),
           ),
-          child: Row(
+          child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.assignment, color: Colors.white, size: 16),
-              const SizedBox(width: 4),
-              const Text(
+              Icon(Icons.assignment, color: Colors.white, size: 16),
+              SizedBox(width: 4),
+              Text(
                 'Collect POE',
                 style: TextStyle(
                   color: Colors.white,
@@ -323,7 +326,8 @@ class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Search by name, surname, ID number, phone, email...',
+                    hintText:
+                        'Search by name, surname, ID number, phone, email...',
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
@@ -339,7 +343,8 @@ class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.orange.shade600, width: 2),
+                      borderSide:
+                          BorderSide(color: Colors.orange.shade600, width: 2),
                     ),
                     filled: true,
                     fillColor: Colors.white,
@@ -356,7 +361,8 @@ class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.error, size: 64, color: Colors.red),
+                            const Icon(Icons.error,
+                                size: 64, color: Colors.red),
                             const SizedBox(height: 16),
                             Text(
                               errorMessage,
@@ -377,15 +383,16 @@ class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  _searchQuery.isNotEmpty ? Icons.search_off : Icons.group_outlined, 
-                                  size: 64, 
-                                  color: Colors.grey[400]
-                                ),
+                                    _searchQuery.isNotEmpty
+                                        ? Icons.search_off
+                                        : Icons.group_outlined,
+                                    size: 64,
+                                    color: Colors.grey[400]),
                                 const SizedBox(height: 16),
                                 Text(
-                                  _searchQuery.isNotEmpty 
-                                    ? 'No learners match your search'
-                                    : 'No learners found in this class',
+                                  _searchQuery.isNotEmpty
+                                      ? 'No learners match your search'
+                                      : 'No learners found in this class',
                                   style: TextStyle(
                                     fontSize: 18,
                                     color: Colors.grey[600],
@@ -419,7 +426,9 @@ class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
                                     leading: CircleAvatar(
                                       backgroundColor: Colors.orange,
                                       child: Text(
-                                        (learner['Name']?.substring(0, 1) ?? 'L').toUpperCase(),
+                                        (learner['Name']?.substring(0, 1) ??
+                                                'L')
+                                            .toUpperCase(),
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.bold,
@@ -427,22 +436,27 @@ class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
                                       ),
                                     ),
                                     title: Text(
-                                      learner['FullName'] ?? '${learner['Name']} ${learner['Surname']}',
+                                      learner['FullName'] ??
+                                          '${learner['Name']} ${learner['Surname']}',
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 16,
                                       ),
                                     ),
                                     subtitle: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         const SizedBox(height: 4),
                                         if (learner['IDNumber'] != null) ...[
                                           Row(
                                             children: [
-                                              Icon(Icons.badge, size: 16, color: Colors.grey[600]),
+                                              Icon(Icons.badge,
+                                                  size: 16,
+                                                  color: Colors.grey[600]),
                                               const SizedBox(width: 4),
-                                              Text('ID: ${learner['IDNumber']}'),
+                                              Text(
+                                                  'ID: ${learner['IDNumber']}'),
                                             ],
                                           ),
                                         ],
@@ -450,19 +464,29 @@ class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
                                         Row(
                                           children: [
                                             Icon(
-                                              learner['POEStatus'] == 'Ready for Collection' || learner['POEStatus'] == 'Collected'
+                                              learner['POEStatus'] ==
+                                                          'Ready for Collection' ||
+                                                      learner['POEStatus'] ==
+                                                          'Collected'
                                                   ? Icons.check_circle
                                                   : Icons.assignment,
                                               size: 16,
-                                              color: learner['POEStatus'] == 'Ready for Collection' || learner['POEStatus'] == 'Collected'
+                                              color: learner['POEStatus'] ==
+                                                          'Ready for Collection' ||
+                                                      learner['POEStatus'] ==
+                                                          'Collected'
                                                   ? Colors.green
                                                   : Colors.orange,
                                             ),
                                             const SizedBox(width: 4),
                                             Text(
-                                              _getPOEStatusText(learner['POEStatus']),
+                                              _getPOEStatusText(
+                                                  learner['POEStatus']),
                                               style: TextStyle(
-                                                color: learner['POEStatus'] == 'Ready for Collection' || learner['POEStatus'] == 'Collected'
+                                                color: learner['POEStatus'] ==
+                                                            'Ready for Collection' ||
+                                                        learner['POEStatus'] ==
+                                                            'Collected'
                                                     ? Colors.green.shade700
                                                     : Colors.orange.shade700,
                                                 fontWeight: FontWeight.w500,
@@ -473,7 +497,9 @@ class _LogisticsPOELearnersPageState extends State<LogisticsPOELearnersPage> {
                                       ],
                                     ),
                                     trailing: _buildPOEActionButton(learner),
-                                    onTap: learner['POEStatus'] == 'Ready for Collection' || learner['POEStatus'] == 'Collected'
+                                    onTap: learner['POEStatus'] ==
+                                                'Ready for Collection' ||
+                                            learner['POEStatus'] == 'Collected'
                                         ? null // Disable tap for already submitted POEs
                                         : () => _collectPOE(learner),
                                   ),
