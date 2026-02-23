@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_doc_scanner/flutter_doc_scanner.dart';
 import 'package:http/http.dart' as http;
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'database_helper.dart';
 import 'LearnerDetailsPage.dart';
@@ -309,9 +309,17 @@ class _LearnerListPageState extends State<LearnerListPage> {
   Future<List<Learner>> fetchLearnersFromServer() async {
     try {
       print('Fetching learners from server for classID: ${widget.classID}');
-      final response = await http.get(
+      final response = await http
+          .get(
         Uri.parse(AppConfig.buildUrl('get_learners.php',
             queryParams: {'classID': widget.classID.toString()})),
+      )
+          .timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          print('Server request timed out after 10 seconds');
+          throw TimeoutException('Server request timed out');
+        },
       );
 
       print('Server response status: ${response.statusCode}');
@@ -348,9 +356,15 @@ class _LearnerListPageState extends State<LearnerListPage> {
       }
     } catch (e) {
       print('Error fetching server data: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching server data: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Loading from local database (offline)'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
       return [];
     }
   }
@@ -593,8 +607,13 @@ class _LearnerListPageState extends State<LearnerListPage> {
 
   Future<void> loadLearnersFromLocalDatabase() async {
     try {
+      print(
+          '[LEARNER_LIST] Loading learners from local database for classID: ${widget.classID}');
       final dbHelper = DatabaseHelper();
       final localLearners = await dbHelper.fetchLearners(widget.classID);
+      print(
+          '[LEARNER_LIST] Found ${localLearners.length} learners in local database');
+
       final learnersList = localLearners
           .map((learnerMap) => Learner.fromJson(learnerMap))
           .toList();
@@ -603,13 +622,24 @@ class _LearnerListPageState extends State<LearnerListPage> {
       });
       // Initialize filtered list and apply current search filter
       _filterLearners();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Loaded learners from local database')),
-      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Loaded ${learnersList.length} learners from local database'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading local data: $e')),
-      );
+      print('[LEARNER_LIST] Error loading local data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading local data: $e')),
+        );
+      }
     }
   }
 
@@ -618,37 +648,69 @@ class _LearnerListPageState extends State<LearnerListPage> {
       final isConnected = await _checkConnectivity();
 
       if (isConnected) {
+        print(
+            '[LEARNER_LIST] Online - attempting to sync and fetch from server');
         // First, sync any local unsynced learners to server
         await _syncLocalLearnersToServer();
 
         // Then fetch from server and merge with local data
         final serverLearners = await fetchLearnersFromServer();
         if (serverLearners.isNotEmpty) {
+          print(
+              '[LEARNER_LIST] Server returned ${serverLearners.length} learners, merging with local data');
           await _mergeServerAndLocalData(serverLearners);
         } else {
-          // Even if server returns empty, still try to load from local
+          // Server returned empty (could be error or no data)
+          print(
+              '[LEARNER_LIST] Server returned empty, loading from local database');
           await loadLearnersFromLocalDatabase();
         }
       } else {
+        print('[LEARNER_LIST] Offline - loading from local database');
         await loadLearnersFromLocalDatabase();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Offline mode - showing cached data'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
       }
     } catch (e) {
       print('Error in fetchLearnersData: $e');
       // Fallback to local data if server fails
       try {
+        print('[LEARNER_LIST] Error occurred, falling back to local database');
         await loadLearnersFromLocalDatabase();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Loading from local database'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
       } catch (localError) {
         print('Error loading local data: $localError');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading data: $e')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error loading data: $e')),
+          );
+        }
       }
     }
   }
 
   Future<bool> _checkConnectivity() async {
-    final connectivityResult = await Connectivity().checkConnectivity();
-    return connectivityResult != ConnectivityResult.none;
+    try {
+      final result = await InternetAddress.lookup('google.com');
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } on SocketException catch (_) {
+      return false;
+    }
   }
 
   Future<void> _syncLocalLearnersToServer() async {

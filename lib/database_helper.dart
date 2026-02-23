@@ -61,11 +61,13 @@ class DatabaseHelper {
       //   whereArgs: [1],
       // );
 
-      // Step 3: Delete old learner_clocking records from previous days (keep only today)
+      // Step 3: Delete old SYNCED learner_clocking records from previous days
+      // CRITICAL: Only delete records that are already synced (synced=1)
+      // Keep unsynced records (synced=0) regardless of date so they can be synced later
       final deletedOld = await db.delete(
         'learner_clocking',
-        where: 'clock_date < ?',
-        whereArgs: [today],
+        where: 'clock_date < ? AND synced = ?',
+        whereArgs: [today, 1],
       );
 
       // DON'T delete old induction_clocking records (keep them permanently)

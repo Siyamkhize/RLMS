@@ -6,10 +6,10 @@ import 'package:sqflite/sqflite.dart';
 import 'package:flutter_doc_scanner/flutter_doc_scanner.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'config.dart';
 import 'database_helper.dart';
 import 'LearnerDetailsPage.dart';
-import 'finance_register_history.dart';
 
 class UnallocatedLearnersPage extends StatefulWidget {
   final String sdpIdentifier;
@@ -30,10 +30,12 @@ class UnallocatedLearnersPage extends StatefulWidget {
 
 class _UnallocatedLearnersPageState extends State<UnallocatedLearnersPage> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  List<Map<String, dynamic>> _unallocatedLearners = [];
-  bool _isLoading = true;
+  final PagingController<int, Map<String, dynamic>> _pagingController =
+      PagingController(firstPageKey: 0);
+
   String _searchQuery = '';
   bool _isScanning = false;
+  static const int _pageSize = 20;
 
   final List<String> requiredDocuments = [
     'ID Document',
@@ -55,14 +57,23 @@ class _UnallocatedLearnersPageState extends State<UnallocatedLearnersPage> {
   void initState() {
     super.initState();
     _createLocalTable();
-    _fetchUnallocatedLearners();
+    _pagingController.addPageRequestListener((pageKey) {
+      _fetchPage(pageKey);
+    });
   }
 
-  /// Create learner_assignments table in local database
+  @override
+  void dispose() {
+    _pagingController.dispose();
+    super.dispose();
+  }
+
+  /// Create local tables for offline support
   Future<void> _createLocalTable() async {
     try {
       final db = await _dbHelper.database;
 
+      // Table 1: Learner assignments
       await db.execute('''
         CREATE TABLE IF NOT EXISTS learner_assignments (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -76,6 +87,44 @@ class _UnallocatedLearnersPageState extends State<UnallocatedLearnersPage> {
         )
       ''');
 
+      // Table 2: Sites and classes cache
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS sdp_sites_classes_cache (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          sdp_id TEXT NOT NULL,
+          project_id TEXT NOT NULL,
+          site_data TEXT NOT NULL,
+          cached_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(sdp_id, project_id)
+        )
+      ''');
+
+      // Table 3: Unallocated learners cache
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS sdp_unallocated_cache (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          sdp_id TEXT NOT NULL,
+          project_id TEXT NOT NULL,
+          learner_id INTEGER NOT NULL,
+          learner_data TEXT NOT NULL,
+          cached_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(sdp_id, project_id, learner_id)
+        )
+      ''');
+
+      // Table 4: Pending assignments (offline queue)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS sdp_pending_assignments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          learner_id INTEGER NOT NULL,
+          class_id INTEGER NOT NULL,
+          class_name TEXT,
+          assigned_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          synced INTEGER DEFAULT 0,
+          UNIQUE(learner_id)
+        )
+      ''');
+
       // Create indexes
       await db.execute(
           'CREATE INDEX IF NOT EXISTS idx_learner_id ON learner_assignments(LearnerID)');
@@ -84,9 +133,9 @@ class _UnallocatedLearnersPageState extends State<UnallocatedLearnersPage> {
       await db.execute(
           'CREATE INDEX IF NOT EXISTS idx_ward ON learner_assignments(Ward)');
 
-      debugPrint('[UNALLOCATED] learner_assignments table created/verified');
+      debugPrint('[UNALLOCATED] Offline tables created/verified');
     } catch (e) {
-      debugPrint('[UNALLOCATED] Error creating table: $e');
+      debugPrint('[UNALLOCATED] Error creating tables: $e');
     }
   }
 
@@ -95,19 +144,22 @@ class _UnallocatedLearnersPageState extends State<UnallocatedLearnersPage> {
     return connectivityResult != ConnectivityResult.none;
   }
 
-  /// Fetch unallocated learners from server
-  Future<void> _fetchUnallocatedLearners() async {
-    setState(() => _isLoading = true);
-
+  /// Fetch paginated learners from server
+  Future<void> _fetchPage(int pageKey) async {
     try {
       // First, sync learner_assignments from server to local
-      await _syncLearnerAssignments();
+      if (pageKey == 0) {
+        await _syncLearnerAssignments();
+      }
 
-      // Then get unallocated learners
+      // Calculate offset
+      final offset = pageKey * _pageSize;
+
+      // Fetch learners with pagination
       final response = await http
           .get(
             Uri.parse(
-                '${AppConfig.baseUrl}/get_unallocated_learners.php?projectId=${widget.projectId}'),
+                '${AppConfig.baseUrl}/get_unallocated_learners.php?projectId=${widget.projectId}&limit=$_pageSize&offset=$offset&search=$_searchQuery'),
           )
           .timeout(const Duration(seconds: 30));
 
@@ -115,29 +167,29 @@ class _UnallocatedLearnersPageState extends State<UnallocatedLearnersPage> {
         final data = json.decode(response.body);
 
         if (data['success'] == true) {
-          setState(() {
-            _unallocatedLearners =
-                List<Map<String, dynamic>>.from(data['learners'] ?? []);
-            _isLoading = false;
-          });
+          final learners =
+              List<Map<String, dynamic>>.from(data['learners'] ?? []);
+          final isLastPage = learners.length < _pageSize;
+
+          if (isLastPage) {
+            _pagingController.appendLastPage(learners);
+          } else {
+            final nextPageKey = pageKey + 1;
+            _pagingController.appendPage(learners, nextPageKey);
+          }
 
           debugPrint(
-              '[UNALLOCATED] Loaded ${_unallocatedLearners.length} unallocated learners');
+              '[UNALLOCATED] Loaded ${learners.length} learners for page $pageKey');
         } else {
-          throw Exception(data['message'] ?? 'Failed to load learners');
+          _pagingController.error =
+              data['message'] ?? 'Failed to load learners';
         }
       } else {
-        throw Exception('Server returned ${response.statusCode}');
+        _pagingController.error = 'Server returned ${response.statusCode}';
       }
     } catch (e) {
       debugPrint('[UNALLOCATED] Error fetching learners: $e');
-      setState(() => _isLoading = false);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading learners: $e')),
-        );
-      }
+      _pagingController.error = e;
     }
   }
 
@@ -283,6 +335,156 @@ class _UnallocatedLearnersPageState extends State<UnallocatedLearnersPage> {
         SnackBar(content: Text('Failed to upload $documentName: $e')),
       );
       rethrow;
+    }
+  }
+
+  Future<void> _syncDocument(Map<String, dynamic> document) async {
+    try {
+      final filePath = document['learner_document'] as String;
+      final file = File(filePath);
+      if (!await file.exists()) {
+        throw Exception('Document file not found: $filePath');
+      }
+
+      var request = http.MultipartRequest('POST', Uri.parse(_uploadUrl));
+      request.fields['learner_id'] = document['learner_id'].toString();
+      request.fields['documentName'] = document['documentName'];
+      request.fields['status'] = document['status'];
+      request.fields['upload_date'] = document['upload_date'];
+      request.fields['synced'] = '1';
+      if (document['rejection_reason'] != null) {
+        request.fields['rejection_reason'] = document['rejection_reason'];
+      }
+
+      request.files.add(await http.MultipartFile.fromPath(
+        'learner_document',
+        filePath,
+        filename: filePath.split('/').last,
+      ));
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(responseBody);
+        if (jsonResponse['success'] == true) {
+          await _dbHelper.updateLearnerDocumentSynced(
+              document['document_id'], 1);
+          print(
+              'Document synced: ${document['documentName']} for learner ${document['learner_id']}');
+        } else {
+          throw Exception(jsonResponse['message'] ?? 'Failed to sync document');
+        }
+      } else {
+        throw Exception('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error syncing document: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> syncUnsyncedDocuments() async {
+    if (!await _checkConnectivity()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No internet connection, cannot sync')),
+      );
+      return;
+    }
+
+    try {
+      // Sync documents
+      final unsyncedDocs = await _dbHelper.fetchUnsyncedLearnerDocuments();
+      print('Found ${unsyncedDocs.length} unsynced documents');
+
+      for (var doc in unsyncedDocs) {
+        await _syncDocument(doc);
+      }
+
+      // Sync pending assignments
+      await _syncPendingAssignments();
+
+      if (unsyncedDocs.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content:
+                  Text('Synced ${unsyncedDocs.length} documents to server')),
+        );
+      }
+
+      setState(() {});
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error syncing: $e')),
+      );
+    }
+  }
+
+  // Sync pending assignments
+  Future<void> _syncPendingAssignments() async {
+    try {
+      final db = await _dbHelper.database;
+
+      final pending = await db.query(
+        'sdp_pending_assignments',
+        where: 'synced = ?',
+        whereArgs: [0],
+      );
+
+      if (pending.isEmpty) {
+        debugPrint('[SYNC] No pending assignments to sync');
+        return;
+      }
+
+      debugPrint('[SYNC] Syncing ${pending.length} pending assignments');
+      int synced = 0;
+
+      for (var assignment in pending) {
+        try {
+          final response = await http.post(
+            Uri.parse('${AppConfig.baseUrl}/assign_learner_to_class.php'),
+            body: {
+              'learner_id': assignment['learner_id'].toString(),
+              'class_id': assignment['class_id'].toString(),
+            },
+          ).timeout(const Duration(seconds: 30));
+
+          if (response.statusCode == 200) {
+            final data = json.decode(response.body);
+            if (data['success'] == true) {
+              // Mark as synced
+              await db.update(
+                'sdp_pending_assignments',
+                {'synced': 1},
+                where: 'id = ?',
+                whereArgs: [assignment['id']],
+              );
+              synced++;
+              debugPrint('[SYNC] Synced assignment ${assignment['id']}');
+            }
+          }
+        } catch (e) {
+          debugPrint('[SYNC] Error syncing assignment ${assignment['id']}: $e');
+        }
+      }
+
+      if (synced > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Synced $synced learner assignments')),
+        );
+
+        // Clean up synced assignments
+        await db.delete(
+          'sdp_pending_assignments',
+          where: 'synced = ?',
+          whereArgs: [1],
+        );
+
+        // Refresh the list
+        _pagingController.refresh();
+      }
+    } catch (e) {
+      debugPrint('[SYNC] Error syncing assignments: $e');
     }
   }
 
@@ -440,16 +642,324 @@ class _UnallocatedLearnersPageState extends State<UnallocatedLearnersPage> {
     );
   }
 
-  List<Map<String, dynamic>> get _filteredLearners {
-    if (_searchQuery.isEmpty) return _unallocatedLearners;
+  void _onSearchChanged(String query) {
+    setState(() {
+      _searchQuery = query;
+    });
+    _pagingController.refresh();
+  }
 
-    return _unallocatedLearners.where((learner) {
-      final name = '${learner['Name']} ${learner['Surname']}'.toLowerCase();
-      final idNumber = learner['IDNumber']?.toString().toLowerCase() ?? '';
-      final query = _searchQuery.toLowerCase();
+  // Fetch sites for this project and SDP (with offline support)
+  Future<List<Map<String, dynamic>>> _fetchSites() async {
+    try {
+      final isOnline = await _checkConnectivity();
 
-      return name.contains(query) || idNumber.contains(query);
-    }).toList();
+      if (isOnline) {
+        // Try to fetch from server
+        final response = await http
+            .get(
+              Uri.parse(
+                  '${AppConfig.baseUrl}/get_sites_and_classes.php?action=get_sites&sdp_id=${widget.sdpIdentifier}&project_id=${widget.projectId}'),
+            )
+            .timeout(const Duration(seconds: 30));
+
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data['success'] == true) {
+            final sites = List<Map<String, dynamic>>.from(data['data'] ?? []);
+
+            // Cache the sites data
+            await _cacheSitesData(sites);
+
+            return sites;
+          }
+        }
+      }
+
+      // Fallback to cached data (offline or server error)
+      return await _getCachedSites();
+    } catch (e) {
+      debugPrint('[ASSIGN] Error fetching sites: $e');
+      // Return cached data on error
+      return await _getCachedSites();
+    }
+  }
+
+  // Cache sites data locally
+  Future<void> _cacheSitesData(List<Map<String, dynamic>> sites) async {
+    try {
+      final db = await _dbHelper.database;
+
+      await db.insert(
+        'sdp_sites_classes_cache',
+        {
+          'sdp_id': widget.sdpIdentifier,
+          'project_id': widget.projectId,
+          'site_data': json.encode(sites),
+          'cached_at': DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+      debugPrint('[ASSIGN] Cached ${sites.length} sites');
+    } catch (e) {
+      debugPrint('[ASSIGN] Error caching sites: $e');
+    }
+  }
+
+  // Get cached sites data
+  Future<List<Map<String, dynamic>>> _getCachedSites() async {
+    try {
+      final db = await _dbHelper.database;
+
+      final results = await db.query(
+        'sdp_sites_classes_cache',
+        where: 'sdp_id = ? AND project_id = ?',
+        whereArgs: [widget.sdpIdentifier, widget.projectId],
+        limit: 1,
+      );
+
+      if (results.isNotEmpty) {
+        final siteData = json.decode(results.first['site_data'] as String);
+        final sites = List<Map<String, dynamic>>.from(siteData);
+        debugPrint('[ASSIGN] Loaded ${sites.length} sites from cache');
+        return sites;
+      }
+
+      return [];
+    } catch (e) {
+      debugPrint('[ASSIGN] Error loading cached sites: $e');
+      return [];
+    }
+  }
+
+  // Assign learner to a class (with offline support)
+  Future<void> _assignLearnerToClass(
+      String learnerId, String classId, String className) async {
+    try {
+      final isOnline = await _checkConnectivity();
+
+      if (isOnline) {
+        // Try to assign online
+        final response = await http.post(
+          Uri.parse('${AppConfig.baseUrl}/assign_learner_to_class.php'),
+          body: {
+            'learner_id': learnerId,
+            'class_id': classId,
+          },
+        ).timeout(const Duration(seconds: 30));
+
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data['success'] == true) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                    content:
+                        Text('Learner assigned to $className successfully')),
+              );
+            }
+            // Refresh the list
+            _pagingController.refresh();
+            return;
+          } else {
+            throw Exception(data['message'] ?? 'Failed to assign learner');
+          }
+        } else {
+          throw Exception('Server returned ${response.statusCode}');
+        }
+      } else {
+        // Queue for offline sync
+        await _queueOfflineAssignment(learnerId, classId, className);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content:
+                  Text('Assignment queued (offline). Will sync when online.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+
+        // Refresh the list
+        _pagingController.refresh();
+      }
+    } catch (e) {
+      // On error, queue for offline sync
+      await _queueOfflineAssignment(learnerId, classId, className);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text('Assignment queued (offline). Will sync when online.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+
+      // Refresh the list
+      _pagingController.refresh();
+    }
+  }
+
+  // Queue assignment for offline sync
+  Future<void> _queueOfflineAssignment(
+      String learnerId, String classId, String className) async {
+    try {
+      final db = await _dbHelper.database;
+
+      await db.insert(
+        'sdp_pending_assignments',
+        {
+          'learner_id': int.parse(learnerId),
+          'class_id': int.parse(classId),
+          'class_name': className,
+          'assigned_at': DateTime.now().toIso8601String(),
+          'synced': 0,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+      debugPrint(
+          '[ASSIGN] Queued offline assignment: Learner $learnerId → Class $classId');
+    } catch (e) {
+      debugPrint('[ASSIGN] Error queuing assignment: $e');
+      rethrow;
+    }
+  }
+
+  // Show dialog to assign learner to class
+  void _showAssignToClassDialog(
+      BuildContext context, String learnerId, Map<String, dynamic> learner) {
+    String? selectedSiteId;
+    String? selectedClassId;
+    String? selectedClassName;
+    List<Map<String, dynamic>> sites = [];
+    List<Map<String, dynamic>> classes = [];
+    bool isLoadingSites = true;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            // Load sites on first build
+            if (isLoadingSites && sites.isEmpty) {
+              _fetchSites().then((fetchedSites) {
+                if (context.mounted) {
+                  setState(() {
+                    sites = fetchedSites;
+                    isLoadingSites = false;
+                  });
+                }
+              });
+            }
+
+            return AlertDialog(
+              title: Text(
+                  'Assign ${learner['Name']} ${learner['Surname']} to Class'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('ID: ${learner['IDNumber']}'),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Select Site:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    if (isLoadingSites)
+                      const Center(child: CircularProgressIndicator())
+                    else if (sites.isEmpty)
+                      const Text('No sites available for this project')
+                    else
+                      DropdownButton<String>(
+                        hint: const Text('Select Site'),
+                        value: selectedSiteId,
+                        isExpanded: true,
+                        items: sites.map((site) {
+                          return DropdownMenuItem<String>(
+                            value: site['siteID'].toString(),
+                            child: Text(site['siteName'] ?? 'Unknown Site'),
+                          );
+                        }).toList(),
+                        onChanged: (newValue) {
+                          setState(() {
+                            selectedSiteId = newValue;
+                            selectedClassId = null;
+                            selectedClassName = null;
+
+                            // Get classes from the selected site
+                            final selectedSite = sites.firstWhere(
+                              (s) => s['siteID'].toString() == newValue,
+                            );
+                            classes = List<Map<String, dynamic>>.from(
+                                selectedSite['classes'] ?? []);
+                          });
+                        },
+                      ),
+                    const SizedBox(height: 16),
+                    if (selectedSiteId != null) ...[
+                      const Text(
+                        'Select Class:',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      if (classes.isEmpty)
+                        const Text('No classes available for this site')
+                      else
+                        DropdownButton<String>(
+                          hint: const Text('Select Class'),
+                          value: selectedClassId,
+                          isExpanded: true,
+                          items: classes.map((classItem) {
+                            return DropdownMenuItem<String>(
+                              value: classItem['classID'].toString(),
+                              child: Text(
+                                  classItem['className'] ?? 'Unknown Class'),
+                            );
+                          }).toList(),
+                          onChanged: (newValue) {
+                            setState(() {
+                              selectedClassId = newValue;
+                              selectedClassName = classes.firstWhere((c) =>
+                                  c['classID'].toString() ==
+                                  newValue)['className'];
+                            });
+                          },
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: selectedClassId == null
+                      ? null
+                      : () async {
+                          Navigator.pop(dialogContext);
+                          await _assignLearnerToClass(
+                            learnerId,
+                            selectedClassId!,
+                            selectedClassName ?? 'Selected Class',
+                          );
+                        },
+                  child: const Text('Assign'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -459,8 +969,14 @@ class _UnallocatedLearnersPageState extends State<UnallocatedLearnersPage> {
         title: const Text('Unallocated Learners'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.upload_file),
+            onPressed: syncUnsyncedDocuments,
+            tooltip: 'Sync Documents',
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _fetchUnallocatedLearners,
+            onPressed: () => _pagingController.refresh(),
+            tooltip: 'Refresh',
           ),
         ],
       ),
@@ -477,147 +993,172 @@ class _UnallocatedLearnersPageState extends State<UnallocatedLearnersPage> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              onChanged: (value) {
-                setState(() => _searchQuery = value);
-              },
+              onChanged: _onSearchChanged,
             ),
           ),
 
-          // Learners list
+          // Paginated learners list
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredLearners.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.check_circle,
-                                size: 64, color: Colors.green),
-                            const SizedBox(height: 16),
-                            Text(
-                              _searchQuery.isEmpty
-                                  ? 'All learners are allocated!'
-                                  : 'No learners found',
-                              style: const TextStyle(fontSize: 18),
-                            ),
-                          ],
-                        ),
-                      )
-                    : SingleChildScrollView(
-                        scrollDirection: Axis.vertical,
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: DataTable(
-                            columns: const [
-                              DataColumn(label: Text('Name')),
-                              DataColumn(label: Text('Surname')),
-                              DataColumn(label: Text('ID Number')),
-                              DataColumn(label: Text('Phone')),
-                              DataColumn(label: Text('Action')),
-                            ],
-                            rows: _filteredLearners.map((learner) {
-                              final learnerId =
-                                  learner['LearnerID']?.toString() ?? 'N/A';
-                              return DataRow(cells: [
-                                DataCell(Text(learner['Name'] ?? '')),
-                                DataCell(Text(learner['Surname'] ?? '')),
-                                DataCell(Text(learner['IDNumber'] ?? '')),
-                                DataCell(Text(learner['PhoneNumber'] ?? 'N/A')),
-                                DataCell(
-                                  Row(
-                                    children: [
-                                      FutureBuilder<bool>(
-                                        future: hasAnyDocuments(learnerId),
-                                        builder: (context, snapshot) {
-                                          if (snapshot.connectionState ==
-                                              ConnectionState.waiting) {
-                                            return const CircularProgressIndicator();
-                                          }
-                                          bool hasDocuments =
-                                              snapshot.data ?? false;
-                                          return ElevatedButton(
-                                            onPressed: hasDocuments
-                                                ? () {
-                                                    Navigator.push(
-                                                      context,
-                                                      MaterialPageRoute(
-                                                        builder: (context) =>
-                                                            LearnerDetailsPage(
-                                                          learnerID: learnerId,
-                                                        ),
-                                                      ),
-                                                    );
-                                                  }
-                                                : null,
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: hasDocuments
-                                                  ? Colors.blue
-                                                  : Colors.grey,
-                                            ),
-                                            child: const Text('View'),
-                                          );
-                                        },
-                                      ),
-                                      const SizedBox(width: 8),
-                                      FutureBuilder<bool>(
-                                        future: canUploadDocuments(learnerId),
-                                        builder: (context, snapshot) {
-                                          if (snapshot.connectionState ==
-                                              ConnectionState.waiting) {
-                                            return const CircularProgressIndicator();
-                                          }
-                                          bool canUpload =
-                                              snapshot.data ?? false;
-                                          return ElevatedButton(
-                                            onPressed: !canUpload || _isScanning
-                                                ? null
-                                                : () => showDocumentUploadModal(
-                                                      context,
-                                                      learnerId,
-                                                    ),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: canUpload
-                                                  ? Colors.green
-                                                  : Colors.grey,
-                                            ),
-                                            child: const Text('Documents'),
-                                          );
-                                        },
-                                      ),
-                                      const SizedBox(width: 8),
-                                      ElevatedButton(
-                                        onPressed: () {
-                                          final learnerName =
-                                              '${learner['Surname'] ?? ''} ${learner['Name'] ?? ''}'
-                                                  .trim();
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) =>
-                                                  FinanceRegisterHistory(
-                                                learnerId: learnerId,
-                                                learnerName: learnerName,
-                                                classId: widget.projectId,
-                                                className: widget.projectName,
-                                                financeId: widget.projectId,
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.orange,
-                                        ),
-                                        child: const Text('Attendance'),
-                                      ),
-                                    ],
+            child: PagedListView<int, Map<String, dynamic>>(
+              pagingController: _pagingController,
+              builderDelegate: PagedChildBuilderDelegate<Map<String, dynamic>>(
+                itemBuilder: (context, learner, index) {
+                  final learnerId = learner['LearnerID']?.toString() ?? 'N/A';
+
+                  return Card(
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${learner['Name']} ${learner['Surname']}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
                                   ),
                                 ),
-                              ]);
-                            }).toList(),
+                                const SizedBox(height: 4),
+                                Text('ID: ${learner['IDNumber']}'),
+                                if (learner['PhoneNumber'] != null)
+                                  Text('Phone: ${learner['PhoneNumber']}'),
+                              ],
+                            ),
                           ),
-                        ),
+                          Column(
+                            children: [
+                              // Assign to Class button
+                              ElevatedButton(
+                                onPressed: () => _showAssignToClassDialog(
+                                  context,
+                                  learnerId,
+                                  learner,
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange,
+                                  minimumSize: const Size(80, 36),
+                                ),
+                                child: const Text('Assign'),
+                              ),
+                              const SizedBox(height: 8),
+                              FutureBuilder<bool>(
+                                future: hasAnyDocuments(learnerId),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    );
+                                  }
+                                  bool hasDocuments = snapshot.data ?? false;
+                                  return ElevatedButton(
+                                    onPressed: hasDocuments
+                                        ? () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    LearnerDetailsPage(
+                                                  learnerID: learnerId,
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        : null,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: hasDocuments
+                                          ? Colors.blue
+                                          : Colors.grey,
+                                      minimumSize: const Size(80, 36),
+                                    ),
+                                    child: const Text('View'),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              FutureBuilder<bool>(
+                                future: canUploadDocuments(learnerId),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    );
+                                  }
+                                  bool canUpload = snapshot.data ?? false;
+                                  return ElevatedButton(
+                                    onPressed: !canUpload || _isScanning
+                                        ? null
+                                        : () => showDocumentUploadModal(
+                                              context,
+                                              learnerId,
+                                            ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: canUpload
+                                          ? Colors.green
+                                          : Colors.grey,
+                                      minimumSize: const Size(80, 36),
+                                    ),
+                                    child: const Text('Docs'),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
+                    ),
+                  );
+                },
+                firstPageErrorIndicatorBuilder: (context) => Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error, size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Error: ${_pagingController.error}',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () => _pagingController.refresh(),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+                noItemsFoundIndicatorBuilder: (context) => Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.check_circle,
+                          size: 64, color: Colors.green),
+                      const SizedBox(height: 16),
+                      Text(
+                        _searchQuery.isEmpty
+                            ? 'All learners are allocated!'
+                            : 'No learners found',
+                        style: const TextStyle(fontSize: 18),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),

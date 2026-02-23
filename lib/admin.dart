@@ -415,7 +415,15 @@ class _AdminPageState extends State<AdminPage> {
 
       // Fetch sites where sdp_id matches the passed sdp (even if widget.sdp is name/email)
       final int sdpId = await _resolveOfflineSdpId(dbHelper);
+
+      debugPrint('[ADMIN] ===== OFFLINE SITES LOOKUP =====');
+      debugPrint('[ADMIN] SDP ID resolved: $sdpId');
+      debugPrint('[ADMIN] Project ID: ${widget.projectId}');
+      debugPrint('[ADMIN] Pathway ID: ${widget.pathwayId}');
+      debugPrint('[ADMIN] Qualification ID: ${widget.qualificationId}');
+
       if (sdpId == 0) {
+        debugPrint('[ADMIN] ❌ Invalid SDP ID, cannot load sites');
         setState(() {
           _siteData = [];
           _isLoading = false;
@@ -423,34 +431,94 @@ class _AdminPageState extends State<AdminPage> {
         return;
       }
 
+      // Check what's in the sites table
+      final db = await dbHelper.database;
+      final allSites = await db.query('sites');
+      debugPrint('[ADMIN] Total sites in database: ${allSites.length}');
+
+      if (allSites.isNotEmpty) {
+        // Show sites grouped by sdp_id
+        final sitesGrouped = <int, int>{};
+        for (var site in allSites) {
+          final siteSDPId =
+              int.tryParse(site['sdp_id']?.toString() ?? '0') ?? 0;
+          sitesGrouped[siteSDPId] = (sitesGrouped[siteSDPId] ?? 0) + 1;
+        }
+        debugPrint('[ADMIN] Sites by SDP:');
+        sitesGrouped.forEach((id, count) {
+          debugPrint('  - SDP ID $id: $count sites');
+        });
+      }
+
       // Now pass the sdpId to your database method
       List<Map<String, dynamic>> offlineSites;
 
-      final db = await dbHelper.database;
       final where = <String>['sdp_id = ?'];
       final args = <Object>[sdpId];
 
       if (widget.projectId != null && widget.projectId!.isNotEmpty) {
         where.add('project_id = ?');
         args.add(int.tryParse(widget.projectId!) ?? 0);
+        debugPrint('[ADMIN] Filtering by project_id: ${widget.projectId}');
       }
 
       // NOTE: widget.pathwayId is passed as pathway NAME (see sdp_learning_pathways_page.dart)
       if (widget.pathwayId != null && widget.pathwayId!.isNotEmpty) {
         where.add('LOWER(TRIM(Project_pathway)) = LOWER(TRIM(?))');
         args.add(widget.pathwayId!);
+        debugPrint('[ADMIN] Filtering by pathway: ${widget.pathwayId}');
       }
       if (widget.qualificationId != null &&
           widget.qualificationId!.isNotEmpty) {
-        where.add('TRIM(qualification_id) = TRIM(?)');
+        // Only filter by qualification if the site has a qualification_id set
+        // Sites with null qualification_id should still be shown
+        where.add(
+            '(TRIM(qualification_id) = TRIM(?) OR qualification_id IS NULL OR qualification_id = "")');
         args.add(widget.qualificationId!);
+        debugPrint(
+            '[ADMIN] Filtering by qualification_id: ${widget.qualificationId} (including null)');
       }
+
+      debugPrint(
+          '[ADMIN] Query: SELECT * FROM sites WHERE ${where.join(' AND ')}');
+      debugPrint('[ADMIN] Args: $args');
 
       offlineSites = await db.query(
         'sites',
         where: where.join(' AND '),
         whereArgs: args,
       );
+
+      debugPrint('[ADMIN] Found ${offlineSites.length} sites matching filters');
+
+      if (offlineSites.isEmpty) {
+        debugPrint('[ADMIN] ❌ No sites found with current filters');
+        debugPrint('[ADMIN] Trying without qualification filter...');
+
+        // Try without qualification filter
+        final whereNoQual = <String>['sdp_id = ?'];
+        final argsNoQual = <Object>[sdpId];
+        if (widget.projectId != null && widget.projectId!.isNotEmpty) {
+          whereNoQual.add('project_id = ?');
+          argsNoQual.add(int.tryParse(widget.projectId!) ?? 0);
+        }
+
+        final sitesNoQual = await db.query(
+          'sites',
+          where: whereNoQual.join(' AND '),
+          whereArgs: argsNoQual,
+        );
+
+        debugPrint(
+            '[ADMIN] Without qualification filter: ${sitesNoQual.length} sites');
+        if (sitesNoQual.isNotEmpty) {
+          debugPrint('[ADMIN] Available qualification IDs in these sites:');
+          for (var site in sitesNoQual) {
+            debugPrint(
+                '  - Site: ${site['siteName']}, Qual ID: ${site['qualification_id']}');
+          }
+        }
+      }
 
       // Normalize keys for table (API uses lowercase; DB may use Province, Project_pathway)
       final normalized = offlineSites.map((s) {
@@ -472,11 +540,15 @@ class _AdminPageState extends State<AdminPage> {
         return m;
       }).toList();
 
+      debugPrint('[ADMIN] ✅ Returning ${normalized.length} normalized sites');
+      debugPrint('[ADMIN] ===== END OFFLINE SITES LOOKUP =====');
+
       setState(() {
         _siteData = normalized;
         _isLoading = false;
       });
     } catch (e) {
+      debugPrint('[ADMIN] ❌ Error loading offline sites: $e');
       setState(() {
         _isLoading = false;
       });
@@ -914,14 +986,17 @@ class _AdminPageState extends State<AdminPage> {
                                       'N/A'));
 
                           return DataRow(cells: [
-                            DataCell(Text(item['siteName'] ?? 'N/A')),
-                            DataCell(Text(item['project_name'] ??
-                                item['project_id'] ??
-                                'N/A')),
-                            DataCell(Text(item['sdp_name'] ??
-                                item['sdp_client_name'] ??
-                                item['sdp_id'] ??
-                                'N/A')),
+                            DataCell(
+                                Text(item['siteName']?.toString() ?? 'N/A')),
+                            DataCell(Text((item['project_name'] ??
+                                    item['project_id'] ??
+                                    'N/A')
+                                .toString())),
+                            DataCell(Text((item['sdp_name'] ??
+                                    item['sdp_client_name'] ??
+                                    item['sdp_id'] ??
+                                    'N/A')
+                                .toString())),
                             DataCell(
                               Tooltip(
                                 message: pathways,
@@ -944,10 +1019,15 @@ class _AdminPageState extends State<AdminPage> {
                                 ),
                               ),
                             ),
-                            DataCell(Text(item['beneficiaries'] ?? 'N/A')),
-                            DataCell(Text(item['classes'] ?? 'N/A')),
-                            DataCell(Text(item['coordinates'] ?? 'N/A')),
-                            DataCell(Text(item['province'] ?? 'N/A')),
+                            DataCell(Text(
+                                item['beneficiaries']?.toString() ?? 'N/A')),
+                            DataCell(
+                                Text(item['classes']?.toString() ?? 'N/A')),
+                            DataCell(
+                                Text(item['coordinates']?.toString() ?? 'N/A')),
+                            DataCell(Text(
+                                (item['province'] ?? item['Province'] ?? 'N/A')
+                                    .toString())),
                             DataCell(
                               ElevatedButton(
                                 onPressed: () {

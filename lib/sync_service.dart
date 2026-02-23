@@ -367,13 +367,14 @@ class SyncService extends ChangeNotifier {
           }
         }
 
-        // Update related tables with new IDs before clearing learnerdetails
+        // Update related tables with new IDs before syncing learnerdetails
         if (localToServerIdMapping.isNotEmpty) {
           await _updateRelatedTablesWithNewIds(db, localToServerIdMapping);
         }
 
-        // Clear and re-insert learner details
-        await _dbHelper.clearTable('learnerdetails');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${learners.length} learner details using UPDATE/INSERT pattern');
 
         // Insert records one by one
         for (var learner in learners) {
@@ -388,12 +389,16 @@ class SyncService extends ChangeNotifier {
           // Keep the server's LearnerID to maintain consistency
 
           try {
-            await _dbHelper.insertData('learnerdetails', learnerData);
+            await db.insert(
+              'learnerdetails',
+              learnerData,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
             print(
-                "Successfully inserted learner with IDNumber: ${learner['IDNumber']}, Server ID: ${learner['LearnerID']}");
+                "Successfully synced learner with IDNumber: ${learner['IDNumber']}, Server ID: ${learner['LearnerID']}");
           } catch (e) {
             print(
-                "Error inserting learner with IDNumber ${learner['IDNumber']}: $e");
+                "Error syncing learner with IDNumber ${learner['IDNumber']}: $e");
             // Continue with other learners even if one fails
           }
         }
@@ -484,10 +489,19 @@ class SyncService extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         List details = json.decode(response.body);
-        await _dbHelper.clearTable('bankdetails');
+
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${details.length} bank details using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var detail in details) {
-          await _dbHelper.insertData('bankdetails', detail);
+          await db.insert(
+            'bankdetails',
+            detail,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
         print("bankdetails table synchronized successfully.");
       } else {
@@ -985,13 +999,21 @@ class SyncService extends ChangeNotifier {
 
           print("sdp data received from server: $sdpData");
 
-          // Clear the local sdp table before inserting new data
-          await _dbHelper.clearTable('sdp');
+          // SMART SYNC: Update existing, insert new (no delete)
+          final db = await _dbHelper.database;
 
-          // Insert each sdp record into the local database
           for (var sdp in sdpData) {
-            print("Inserting sdp: $sdp"); // Debug log
-            await _dbHelper.insertData('sdp', {
+            print("Syncing sdp: $sdp"); // Debug log
+
+            // Check if record exists
+            final existing = await db.query(
+              'sdp',
+              where: 'sdp_id = ?',
+              whereArgs: [sdp['sdp_id']],
+              limit: 1,
+            );
+
+            final sdpRecord = {
               'sdp_id': sdp['sdp_id'],
               'sdp_name': sdp['sdp_name'],
               'Reg_number': sdp['Reg_number'],
@@ -1007,15 +1029,27 @@ class SyncService extends ChangeNotifier {
               'role': sdp['role'],
               'client_name': sdp['client_name'],
               'signature_image': sdp['signature_image'],
-            });
+            };
+
+            if (existing.isNotEmpty) {
+              // Update existing record
+              await db.update(
+                'sdp',
+                sdpRecord,
+                where: 'sdp_id = ?',
+                whereArgs: [sdp['sdp_id']],
+              );
+              print("Updated sdp: ${sdp['sdp_id']}");
+            } else {
+              // Insert new record
+              await _dbHelper.insertData('sdp', sdpRecord);
+              print("Inserted new sdp: ${sdp['sdp_id']}");
+            }
           }
 
-          // Ensure that the database is opened before querying
-          final db = await _dbHelper.database;
-
-          // Query the local sdp table to check if data is inserted
+          // Query the local sdp table to check if data is synced
           final sdp = await db.query('sdp');
-          print("sdp in local database: $sdp");
+          print("sdp in local database: ${sdp.length} records");
 
           print("sdp table synchronized successfully.");
         } else {
@@ -1038,11 +1072,11 @@ class SyncService extends ChangeNotifier {
         var data = json.decode(response.body);
         if (data['status'] == 'success') {
           List sitesData = data['data'];
-          print('Sites data: $sitesData');
+          print('Sites data received: ${sitesData.length} sites');
 
           // Process the data and insert it into the local database (SQLite)
           for (var sites in sitesData) {
-            // Insert each site into the local database
+            // Insert each site into the local database with ALL fields
             await _dbHelper.insertSite({
               'siteID': sites['siteID'],
               'siteName': sites['siteName'],
@@ -1056,16 +1090,22 @@ class SyncService extends ChangeNotifier {
               'Category': sites['Category'],
               'project_id': sites['project_id'],
               'Project_pathway': sites['Project_pathway'],
+              'qualification_id': sites['qualification_id'],
+              'first_name': sites['first_name'],
+              'last_name': sites['last_name'],
+              'cell_phone': sites['cell_phone'],
+              'email': sites['email'],
             });
           }
+
           // Ensure that the database is opened before querying
           final db = await _dbHelper.database;
 
-          // Query the local sdp table to check if data is inserted
-          final sdp = await db.query('sites');
-          print("sites in local database: $sitesData");
+          // Query the local sites table to check if data is inserted
+          final localSites = await db.query('sites');
+          print("Sites in local database: ${localSites.length} records");
 
-          print("sites table synchronized successfully.");
+          print("Sites table synchronized successfully.");
         } else {
           print("Failed to sync sites. Unexpected response format.");
         }
@@ -1093,26 +1133,30 @@ class SyncService extends ChangeNotifier {
 
           print("Class data received from server: $classData");
 
-          // Clear the local class table before inserting new data
-          await _dbHelper.clearTable('class');
+          // SMART SYNC: Update existing, insert new (no delete)
+          print(
+              'Syncing ${classData.length} classes using UPDATE/INSERT pattern');
+
+          final db = await _dbHelper.database;
 
           // Insert each class record into the local database
           for (var classEntry in classData) {
-            print("Inserting class: $classEntry"); // Debug log
-            await _dbHelper.insertData('class', {
-              'classID': classEntry['classID'],
-              'className': classEntry['className'],
-              'numberOfLearners': classEntry['numberOfLearners'],
-              'siteID': classEntry['siteID'],
-            });
+            print("Syncing class: $classEntry"); // Debug log
+            await db.insert(
+              'class',
+              {
+                'classID': classEntry['classID'],
+                'className': classEntry['className'],
+                'numberOfLearners': classEntry['numberOfLearners'],
+                'siteID': classEntry['siteID'],
+              },
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
           }
-
-          // Ensure the database is opened before querying
-          final db = await _dbHelper.database;
 
           // Query the local class table to check if data is inserted
           final localClassData = await db.query('class');
-          print("Class in local database: $localClassData");
+          print("Class in local database: ${localClassData.length} records");
 
           print("Class table synchronized successfully.");
         } else {
@@ -2130,75 +2174,69 @@ class SyncService extends ChangeNotifier {
             // Get an instance of the database
             final db = await _dbHelper.database;
 
-            // Start a database transaction to insert the projects
-            await db.transaction((txn) async {
-              // Clear existing data in the 'project' table before inserting new data
-              await txn.delete('project');
+            // SMART SYNC: Update existing, insert new (no delete)
+            print(
+                'Syncing ${projects.length} projects using UPDATE/INSERT pattern');
 
-              // Insert each project into the table
-              for (var project in projects) {
-                // Check if required fields are missing and provide default values if necessary
-                String projectName = project['Project_name'] ??
-                    'Unknown Project'; // Default value
-                String contractNo =
-                    project['Contract_no'] ?? 'N/A'; // Default value
-                String financialYear =
-                    project['Financial_year'] ?? 'Unknown'; // Default value
-                String startDate =
-                    project['Start_date'] ?? 'Unknown'; // Default value
-                String endDate =
-                    project['End_date'] ?? 'Unknown'; // Default value
-                String projectPathway =
-                    project['Project_pathway'] ?? 'N/A'; // Default value
-                String projectFunder =
-                    project['Project_funder'] ?? 'N/A'; // Default value
-                String province =
-                    project['Province'] ?? 'Unknown'; // Default value
-                String district =
-                    project['District'] ?? 'Unknown'; // Default value
-                String municipality =
-                    project['Municipality'] ?? 'Unknown'; // Default value
-                String ppe = project['PPE'] ?? 'Unknown'; // Default value
-                String learningMaterial =
-                    project['Learning_material'] ?? 'Unknown'; // Default value
-                String toolkit =
-                    project['Toolkit'] ?? 'Unknown'; // Default value
-                String consumables =
-                    project['Consumables'] ?? 'Unknown'; // Default value
-                String budget = project['Budget'] ?? 'Unknown'; // Default value
-                String nBeneficiaries =
-                    project['n_beneficiaries'] ?? '0'; // Default value
+            for (var project in projects) {
+              // Check if required fields are missing and provide default values if necessary
+              String projectName =
+                  project['Project_name'] ?? 'Unknown Project'; // Default value
+              String contractNo =
+                  project['Contract_no'] ?? 'N/A'; // Default value
+              String financialYear =
+                  project['Financial_year'] ?? 'Unknown'; // Default value
+              String startDate =
+                  project['Start_date'] ?? 'Unknown'; // Default value
+              String endDate =
+                  project['End_date'] ?? 'Unknown'; // Default value
+              String projectPathway =
+                  project['Project_pathway'] ?? 'N/A'; // Default value
+              String projectFunder =
+                  project['Project_funder'] ?? 'N/A'; // Default value
+              String province =
+                  project['Province'] ?? 'Unknown'; // Default value
+              String district =
+                  project['District'] ?? 'Unknown'; // Default value
+              String municipality =
+                  project['Municipality'] ?? 'Unknown'; // Default value
+              String ppe = project['PPE'] ?? 'Unknown'; // Default value
+              String learningMaterial =
+                  project['Learning_material'] ?? 'Unknown'; // Default value
+              String toolkit = project['Toolkit'] ?? 'Unknown'; // Default value
+              String consumables =
+                  project['Consumables'] ?? 'Unknown'; // Default value
+              String budget = project['Budget'] ?? 'Unknown'; // Default value
+              String nBeneficiaries =
+                  project['n_beneficiaries'] ?? '0'; // Default value
 
-                await txn.insert(
-                  'project',
-                  {
-                    'project_id': project['project_id'],
-                    'sdp_name': project['sdp_name'],
-                    'client_name': project['client_name'],
-                    'Project_name': projectName, // Ensure this is not NULL
-                    'Contract_no': contractNo, // Ensure this is not NULL
-                    'Financial_year': financialYear, // Ensure this is not NULL
-                    'Start_date': startDate, // Ensure this is not NULL
-                    'End_date': endDate, // Ensure this is not NULL
-                    'Project_pathway':
-                        projectPathway, // Ensure this is not NULL
-                    'Project_funder': projectFunder, // Ensure this is not NULL
-                    'n_beneficiaries':
-                        nBeneficiaries, // Ensure this is not NULL
-                    'Province': province, // Ensure this is not NULL
-                    'District': district, // Ensure this is not NULL
-                    'Municipality': municipality, // Ensure this is not NULL
-                    'PPE': ppe, // Ensure this is not NULL
-                    'Learning_material':
-                        learningMaterial, // Ensure this is not NULL
-                    'Toolkit': toolkit, // Ensure this is not NULL
-                    'Consumables': consumables, // Ensure this is not NULL
-                    'Budget': budget, // Ensure this is not NULL
-                  },
-                  conflictAlgorithm: ConflictAlgorithm.replace,
-                );
-              }
-            });
+              await db.insert(
+                'project',
+                {
+                  'project_id': project['project_id'],
+                  'sdp_name': project['sdp_name'],
+                  'client_name': project['client_name'],
+                  'Project_name': projectName, // Ensure this is not NULL
+                  'Contract_no': contractNo, // Ensure this is not NULL
+                  'Financial_year': financialYear, // Ensure this is not NULL
+                  'Start_date': startDate, // Ensure this is not NULL
+                  'End_date': endDate, // Ensure this is not NULL
+                  'Project_pathway': projectPathway, // Ensure this is not NULL
+                  'Project_funder': projectFunder, // Ensure this is not NULL
+                  'n_beneficiaries': nBeneficiaries, // Ensure this is not NULL
+                  'Province': province, // Ensure this is not NULL
+                  'District': district, // Ensure this is not NULL
+                  'Municipality': municipality, // Ensure this is not NULL
+                  'PPE': ppe, // Ensure this is not NULL
+                  'Learning_material':
+                      learningMaterial, // Ensure this is not NULL
+                  'Toolkit': toolkit, // Ensure this is not NULL
+                  'Consumables': consumables, // Ensure this is not NULL
+                  'Budget': budget, // Ensure this is not NULL
+                },
+                conflictAlgorithm: ConflictAlgorithm.replace,
+              );
+            }
 
             print('Project data synced successfully.');
           } else {

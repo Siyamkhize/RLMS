@@ -108,6 +108,42 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
     }
   }
 
+  // Calculate date of birth from ID number
+  DateTime? _calculateDOBFromID(String? idNumber) {
+    if (idNumber == null || idNumber.length < 6) {
+      return null;
+    }
+
+    try {
+      final yearPrefix = int.parse(idNumber.substring(0, 2));
+      final month = int.parse(idNumber.substring(2, 4));
+      final day = int.parse(idNumber.substring(4, 6));
+
+      // Determine century (00-24 = 2000s, 25-99 = 1900s)
+      final year = yearPrefix <= 24 ? 2000 + yearPrefix : 1900 + yearPrefix;
+
+      return DateTime(year, month, day);
+    } catch (e) {
+      print('[DOB] Error calculating DOB from ID: $e');
+      return null;
+    }
+  }
+
+  // Extract gender from ID number (digits 7-10: 0000-4999 = Female, 5000-9999 = Male)
+  String? _extractGenderFromID(String? idNumber) {
+    if (idNumber == null || idNumber.length < 10) {
+      return null;
+    }
+
+    try {
+      final genderDigits = int.parse(idNumber.substring(6, 10));
+      return genderDigits < 5000 ? 'Female' : 'Male';
+    } catch (e) {
+      print('[GENDER] Error extracting gender from ID: $e');
+      return null;
+    }
+  }
+
   Future<void> fetchBankDetails() async {
     try {
       final db = await DatabaseHelper().database;
@@ -949,62 +985,141 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
   Widget _buildAgeDisplay() {
     int? age;
+    DateTime? dob;
+    String? gender;
 
     // First try to get age from the Age field in learnerData
-    if (learnerData!['Age'] != null) {
+    if (learnerData!['Age'] != null &&
+        learnerData!['Age'].toString().isNotEmpty) {
       age = int.tryParse(learnerData!['Age'].toString());
     }
 
     // If Age field doesn't exist or is invalid, calculate from ID number
     age ??= _calculateAgeFromID(learnerData!['IDNumber']);
 
+    // Try to get DOB from database first (format: 1981-01-19)
+    if (learnerData!['DateOfBirth'] != null &&
+        learnerData!['DateOfBirth'].toString().isNotEmpty) {
+      try {
+        final dobString = learnerData!['DateOfBirth'].toString().trim();
+        // Handle both "1981-01-19" and "1981-01-19 00:00:00" formats
+        if (dobString.contains(' ')) {
+          dob = DateTime.parse(dobString.split(' ')[0]);
+        } else {
+          dob = DateTime.parse(dobString);
+        }
+      } catch (e) {
+        print('[DOB] Error parsing DOB from database: $e');
+        dob = _calculateDOBFromID(learnerData!['IDNumber']);
+      }
+    } else {
+      // Calculate from ID number if not in database
+      dob = _calculateDOBFromID(learnerData!['IDNumber']);
+    }
+
+    // Try to get gender from database first
+    if (learnerData!['Gender'] != null &&
+        learnerData!['Gender'].toString().trim().isNotEmpty) {
+      gender = learnerData!['Gender'].toString().trim();
+    } else {
+      // Extract from ID number if not in database
+      gender = _extractGenderFromID(learnerData!['IDNumber']);
+    }
+
     return Card(
       elevation: 3,
       color: age != null && age < 18 ? Colors.orange[50] : Colors.blue[50],
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Column(
           children: [
-            Icon(
-              Icons.cake,
-              size: 32,
-              color: age != null && age < 18 ? Colors.orange : Colors.blue,
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
-                  'Age',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black54,
-                  ),
+                Icon(
+                  Icons.cake,
+                  size: 32,
+                  color: age != null && age < 18 ? Colors.orange : Colors.blue,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  age != null ? '$age years old' : 'Age not available',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: age != null && age < 18
-                        ? Colors.orange[800]
-                        : Colors.blue[800],
-                  ),
-                ),
-                if (age != null && age < 18)
-                  const Text(
-                    'Minor - Guardian info required',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                      color: Colors.orange,
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Age',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black54,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 4),
+                    Text(
+                      age != null ? '$age years old' : 'Age not available',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: age != null && age < 18
+                            ? Colors.orange[800]
+                            : Colors.blue[800],
+                      ),
+                    ),
+                    if (age != null && age < 18)
+                      const Text(
+                        'Minor - Guardian info required',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                          color: Colors.orange,
+                        ),
+                      ),
+                  ],
+                ),
               ],
             ),
+            if (dob != null) ...[
+              const SizedBox(height: 12),
+              const Divider(),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.calendar_today, size: 20, color: Colors.grey[700]),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Date of Birth: ${DateFormat('dd MMM yyyy').format(dob)}',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (gender != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    gender == 'Male' ? Icons.male : Icons.female,
+                    size: 20,
+                    color:
+                        gender == 'Male' ? Colors.blue[700] : Colors.pink[700],
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Gender: $gender',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -1094,22 +1209,112 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       'futronic_left_template',
       'futronic_right_template',
       'profile_image',
+      'Age',
+      'DateOfBirth',
+      'Gender',
     ];
+
+    // Fields that should use dropdowns when empty
+    final Map<String, List<String>> dropdownFields = {
+      'Title': ['Mr', 'Mrs', 'Miss', 'Ms', 'Dr', 'Prof'],
+      'Gender': ['Male', 'Female'],
+    };
+
+    // Reorder entries to group address fields together
+    final List<MapEntry<String, dynamic>> reorderedEntries = [];
+    final Map<String, MapEntry<String, dynamic>> addressFieldsMap = {};
+
+    // Collect address fields (except AddressLine1)
+    for (var entry in entries) {
+      if (entry.key == 'AddressLine2' ||
+          entry.key == 'AddressLine3' ||
+          entry.key == 'PostalCode') {
+        addressFieldsMap[entry.key] = entry;
+      }
+    }
+
+    // Build reordered list
+    for (var entry in entries) {
+      // Skip address fields (except AddressLine1) as we'll add them after AddressLine1
+      if (entry.key == 'AddressLine2' ||
+          entry.key == 'AddressLine3' ||
+          entry.key == 'PostalCode') {
+        continue;
+      }
+
+      reorderedEntries.add(entry);
+
+      // After AddressLine1, add the other address fields in order
+      if (entry.key == 'AddressLine1') {
+        // Add in specific order: AddressLine2, AddressLine3, PostalCode
+        if (addressFieldsMap.containsKey('AddressLine2')) {
+          reorderedEntries.add(addressFieldsMap['AddressLine2']!);
+        }
+        if (addressFieldsMap.containsKey('AddressLine3')) {
+          reorderedEntries.add(addressFieldsMap['AddressLine3']!);
+        }
+        if (addressFieldsMap.containsKey('PostalCode')) {
+          reorderedEntries.add(addressFieldsMap['PostalCode']!);
+        }
+      }
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: entries.map((entry) {
+      children: reorderedEntries.map((entry) {
         // Skip profile_image from display (it's shown separately)
         if (entry.key == 'profile_image') return const SizedBox.shrink();
 
         // Check if this field should be read-only
         final bool isReadOnly = readOnlyFields.contains(entry.key);
 
+        // Force Age, DateOfBirth, and Gender to ALWAYS be read-only
+        final bool isAlwaysReadOnly = isReadOnly ||
+            entry.key == 'Age' ||
+            entry.key == 'DateOfBirth' ||
+            entry.key == 'Gender';
+
+        // Check if field value is null or empty
+        final bool isEmptyValue =
+            entry.value == null || entry.value.toString().trim().isEmpty;
+
+        // Auto-populate Gender from ID if empty (even if read-only)
+        if (entry.key == 'Gender' && isEmptyValue) {
+          final extractedGender =
+              _extractGenderFromID(learnerData!['IDNumber']);
+          if (extractedGender != null && _controllers[entry.key] != null) {
+            _controllers[entry.key]!.text = extractedGender;
+          }
+        }
+
+        // Auto-populate Age from ID if empty (even if read-only)
+        if (entry.key == 'Age' && isEmptyValue) {
+          final calculatedAge = _calculateAgeFromID(learnerData!['IDNumber']);
+          if (calculatedAge != null && _controllers[entry.key] != null) {
+            _controllers[entry.key]!.text = calculatedAge.toString();
+          }
+        }
+
+        // Auto-populate DateOfBirth from ID if empty (even if read-only)
+        if (entry.key == 'DateOfBirth' && isEmptyValue) {
+          final calculatedDOB = _calculateDOBFromID(learnerData!['IDNumber']);
+          if (calculatedDOB != null && _controllers[entry.key] != null) {
+            // Format as YYYY-MM-DD to match database format
+            _controllers[entry.key]!.text =
+                DateFormat('yyyy-MM-dd').format(calculatedDOB);
+          }
+        }
+
+        // Check if this field should use a dropdown (only when empty and NOT read-only)
+        final bool shouldUseDropdown = dropdownFields.containsKey(entry.key) &&
+            isEmptyValue &&
+            !isAlwaysReadOnly;
+
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 4.0),
           child: Card(
             elevation: 2,
-            color: isReadOnly ? Colors.grey[200] : null,
+            color: isAlwaysReadOnly ? Colors.grey[200] : null,
             child: Padding(
               padding: const EdgeInsets.all(8.0),
               child: Column(
@@ -1123,7 +1328,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
-                      if (isReadOnly) ...[
+                      if (isAlwaysReadOnly) ...[
                         const SizedBox(width: 8),
                         Icon(
                           Icons.lock,
@@ -1132,7 +1337,11 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'System',
+                          entry.key == 'Age' ||
+                                  entry.key == 'DateOfBirth' ||
+                                  entry.key == 'Gender'
+                              ? 'From ID'
+                              : 'System',
                           style: TextStyle(
                             fontSize: 10,
                             color: Colors.grey[600],
@@ -1140,38 +1349,106 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                           ),
                         ),
                       ],
+                      if (shouldUseDropdown) ...[
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.arrow_drop_down_circle,
+                          size: 16,
+                          color: Colors.blue[600],
+                        ),
+                      ],
+                      // Show auto-filled indicator for Age, DOB, Gender
+                      if ((entry.key == 'Age' ||
+                              entry.key == 'DateOfBirth' ||
+                              entry.key == 'Gender') &&
+                          isEmptyValue &&
+                          !isReadOnly) ...[
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.auto_awesome,
+                          size: 16,
+                          color: Colors.green[600],
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Auto',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.green[600],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 8.0),
-                  TextFormField(
-                    controller: _controllers[entry.key],
-                    enabled: !isReadOnly,
-                    readOnly: isReadOnly,
-                    maxLines:
-                        isReadOnly && (entry.value?.toString().length ?? 0) > 50
-                            ? 3
-                            : 1,
-                    decoration: InputDecoration(
-                      labelText: entry.key,
-                      border: const OutlineInputBorder(),
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: 8.0,
-                        horizontal: 8.0,
+                  if (shouldUseDropdown)
+                    DropdownButtonFormField<String>(
+                      value: _controllers[entry.key]?.text.isNotEmpty == true
+                          ? _controllers[entry.key]!.text
+                          : null,
+                      decoration: InputDecoration(
+                        labelText: entry.key,
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 8.0,
+                          horizontal: 12.0,
+                        ),
+                        isDense: true,
                       ),
-                      isDense: true,
-                      filled: isReadOnly,
-                      fillColor: isReadOnly ? Colors.grey[100] : null,
-                      helperText: isReadOnly ? 'System-managed field' : null,
-                      helperStyle: TextStyle(
-                        fontSize: 10,
-                        color: Colors.grey[600],
+                      items: dropdownFields[entry.key]!
+                          .map((value) => DropdownMenuItem<String>(
+                                value: value,
+                                child: Text(value),
+                              ))
+                          .toList(),
+                      onChanged: (newValue) {
+                        if (newValue != null) {
+                          setState(() {
+                            _controllers[entry.key]!.text = newValue;
+                          });
+                        }
+                      },
+                      hint: Text('Select ${entry.key}'),
+                    )
+                  else
+                    TextFormField(
+                      controller: _controllers[entry.key],
+                      enabled: !isAlwaysReadOnly,
+                      readOnly: isAlwaysReadOnly,
+                      maxLines: isAlwaysReadOnly &&
+                              (entry.value?.toString().length ?? 0) > 50
+                          ? 3
+                          : 1,
+                      decoration: InputDecoration(
+                        labelText: entry.key,
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 8.0,
+                          horizontal: 8.0,
+                        ),
+                        isDense: true,
+                        filled: true,
+                        fillColor:
+                            isAlwaysReadOnly ? Colors.grey[200] : Colors.white,
+                        helperText: isAlwaysReadOnly
+                            ? (entry.key == 'Age' ||
+                                    entry.key == 'DateOfBirth' ||
+                                    entry.key == 'Gender'
+                                ? 'Calculated from ID number - Cannot be edited'
+                                : 'System-managed field')
+                            : null,
+                        helperStyle: TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      style: TextStyle(
+                        color:
+                            isAlwaysReadOnly ? Colors.grey[700] : Colors.black,
+                        fontSize: isAlwaysReadOnly ? 12 : 14,
                       ),
                     ),
-                    style: TextStyle(
-                      color: isReadOnly ? Colors.grey[700] : Colors.black,
-                      fontSize: isReadOnly ? 12 : 14,
-                    ),
-                  ),
                 ],
               ),
             ),
