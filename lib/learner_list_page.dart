@@ -610,9 +610,29 @@ class _LearnerListPageState extends State<LearnerListPage> {
       print(
           '[LEARNER_LIST] Loading learners from local database for classID: ${widget.classID}');
       final dbHelper = DatabaseHelper();
+
+      // Debug: Check total learners in database
+      final db = await dbHelper.database;
+      final allLearners = await db.query('learnerdetails');
+      print(
+          '[LEARNER_LIST] Total learners in entire database: ${allLearners.length}');
+
+      if (allLearners.isNotEmpty) {
+        // Show sample of classIDs in database
+        final classIds = allLearners.map((l) => l['classID']).toSet().toList();
+        print('[LEARNER_LIST] Available classIDs in database: $classIds');
+      }
+
       final localLearners = await dbHelper.fetchLearners(widget.classID);
       print(
-          '[LEARNER_LIST] Found ${localLearners.length} learners in local database');
+          '[LEARNER_LIST] Found ${localLearners.length} learners for classID: ${widget.classID}');
+
+      if (localLearners.isEmpty && allLearners.isNotEmpty) {
+        print(
+            '[LEARNER_LIST] ⚠️ WARNING: Database has learners but none for classID ${widget.classID}');
+        print(
+            '[LEARNER_LIST] This class might not have been synced yet, or classID mismatch');
+      }
 
       final learnersList = localLearners
           .map((learnerMap) => Learner.fromJson(learnerMap))
@@ -628,7 +648,7 @@ class _LearnerListPageState extends State<LearnerListPage> {
           SnackBar(
             content: Text(
                 'Loaded ${learnersList.length} learners from local database'),
-            backgroundColor: Colors.orange,
+            backgroundColor: learnersList.isEmpty ? Colors.red : Colors.orange,
             duration: const Duration(seconds: 2),
           ),
         );

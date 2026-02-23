@@ -88,9 +88,22 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       final month = int.parse(idNumber.substring(2, 4));
       final day = int.parse(idNumber.substring(4, 6));
 
-      // Determine century (00-24 = 2000s, 25-99 = 1900s)
-      final year = yearPrefix <= 24 ? 2000 + yearPrefix : 1900 + yearPrefix;
+      // Dynamic century determination based on current year
+      // If year prefix would make person older than 100, assume 2000s
+      // Otherwise, use the century that makes most sense
+      final currentYear = DateTime.now().year;
+      final currentYearPrefix = currentYear % 100; // e.g., 2026 → 26
 
+      int year;
+      if (yearPrefix <= currentYearPrefix) {
+        // Could be 2000s (e.g., 26 in 2026 = born 2026, age 0)
+        year = 2000 + yearPrefix;
+      } else {
+        // Must be 1900s (e.g., 87 in 2026 = born 1987, age 38)
+        year = 1900 + yearPrefix;
+      }
+
+      // Validate: if calculated age would be > 100, assume 2000s instead
       final birthDate = DateTime(year, month, day);
       final today = DateTime.now();
       int age = today.year - birthDate.year;
@@ -100,7 +113,25 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         age--;
       }
 
-      print('[GUARDIAN] Birth date: $birthDate, Age: $age');
+      // If age is negative or > 100, recalculate with opposite century
+      if (age < 0 || age > 100) {
+        if (year >= 2000) {
+          year = 1900 + yearPrefix;
+        } else {
+          year = 2000 + yearPrefix;
+        }
+        final newBirthDate = DateTime(year, month, day);
+        age = today.year - newBirthDate.year;
+        if (today.month < newBirthDate.month ||
+            (today.month == newBirthDate.month &&
+                today.day < newBirthDate.day)) {
+          age--;
+        }
+        print('[GUARDIAN] Adjusted birth date: $newBirthDate, Age: $age');
+      } else {
+        print('[GUARDIAN] Birth date: $birthDate, Age: $age');
+      }
+
       return age;
     } catch (e) {
       print('[GUARDIAN] Error calculating age from ID: $e');
@@ -119,8 +150,25 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       final month = int.parse(idNumber.substring(2, 4));
       final day = int.parse(idNumber.substring(4, 6));
 
-      // Determine century (00-24 = 2000s, 25-99 = 1900s)
-      final year = yearPrefix <= 24 ? 2000 + yearPrefix : 1900 + yearPrefix;
+      // Dynamic century determination based on current year
+      final currentYear = DateTime.now().year;
+      final currentYearPrefix = currentYear % 100;
+
+      int year;
+      if (yearPrefix <= currentYearPrefix) {
+        year = 2000 + yearPrefix;
+      } else {
+        year = 1900 + yearPrefix;
+      }
+
+      // Validate: if age would be > 100, use opposite century
+      final birthDate = DateTime(year, month, day);
+      final today = DateTime.now();
+      int age = today.year - birthDate.year;
+
+      if (age < 0 || age > 100) {
+        year = year >= 2000 ? 1900 + yearPrefix : 2000 + yearPrefix;
+      }
 
       return DateTime(year, month, day);
     } catch (e) {
@@ -141,6 +189,31 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
     } catch (e) {
       print('[GENDER] Error extracting gender from ID: $e');
       return null;
+    }
+  }
+
+  // Update a single field in the database
+  Future<void> _updateDatabaseField(String fieldName, dynamic value) async {
+    try {
+      final db = await DatabaseHelper().database;
+      await db.update(
+        'learnerdetails',
+        {
+          fieldName: value,
+          'synced': 0
+        }, // Mark as unsynced so it uploads to server
+        where: 'LearnerID = ?',
+        whereArgs: [int.parse(widget.learnerID)],
+      );
+      print(
+          '[DB_UPDATE] Updated $fieldName to $value for learner ${widget.learnerID}');
+
+      // Update local learnerData map so UI stays in sync
+      if (learnerData != null) {
+        learnerData![fieldName] = value;
+      }
+    } catch (e) {
+      print('[DB_UPDATE] Error updating $fieldName: $e');
     }
   }
 
@@ -1278,30 +1351,50 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         final bool isEmptyValue =
             entry.value == null || entry.value.toString().trim().isEmpty;
 
-        // Auto-populate Gender from ID if empty (even if read-only)
-        if (entry.key == 'Gender' && isEmptyValue) {
+        // Check if field has invalid/placeholder values that should be recalculated
+        final bool hasInvalidValue = (entry.key == 'Age' &&
+                (entry.value == null ||
+                    entry.value.toString().trim().isEmpty ||
+                    entry.value.toString() == '0')) ||
+            (entry.key == 'Gender' &&
+                (entry.value == null ||
+                    entry.value.toString().trim().isEmpty ||
+                    entry.value.toString().toLowerCase() == 'unknown')) ||
+            (entry.key == 'DateOfBirth' &&
+                (entry.value == null ||
+                    entry.value.toString().trim().isEmpty ||
+                    entry.value.toString().startsWith('1900-01-01')));
+
+        // Auto-populate Gender from ID if empty or invalid
+        if (entry.key == 'Gender' && hasInvalidValue) {
           final extractedGender =
               _extractGenderFromID(learnerData!['IDNumber']);
           if (extractedGender != null && _controllers[entry.key] != null) {
             _controllers[entry.key]!.text = extractedGender;
+            // Update database with correct value
+            _updateDatabaseField('Gender', extractedGender);
           }
         }
 
-        // Auto-populate Age from ID if empty (even if read-only)
-        if (entry.key == 'Age' && isEmptyValue) {
+        // Auto-populate Age from ID if empty or invalid
+        if (entry.key == 'Age' && hasInvalidValue) {
           final calculatedAge = _calculateAgeFromID(learnerData!['IDNumber']);
           if (calculatedAge != null && _controllers[entry.key] != null) {
             _controllers[entry.key]!.text = calculatedAge.toString();
+            // Update database with correct value
+            _updateDatabaseField('Age', calculatedAge);
           }
         }
 
-        // Auto-populate DateOfBirth from ID if empty (even if read-only)
-        if (entry.key == 'DateOfBirth' && isEmptyValue) {
+        // Auto-populate DateOfBirth from ID if empty or invalid
+        if (entry.key == 'DateOfBirth' && hasInvalidValue) {
           final calculatedDOB = _calculateDOBFromID(learnerData!['IDNumber']);
           if (calculatedDOB != null && _controllers[entry.key] != null) {
             // Format as YYYY-MM-DD to match database format
-            _controllers[entry.key]!.text =
-                DateFormat('yyyy-MM-dd').format(calculatedDOB);
+            final formattedDOB = DateFormat('yyyy-MM-dd').format(calculatedDOB);
+            _controllers[entry.key]!.text = formattedDOB;
+            // Update database with correct value
+            _updateDatabaseField('DateOfBirth', formattedDOB);
           }
         }
 

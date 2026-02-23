@@ -837,6 +837,7 @@ class DatabaseHelper {
       await db.execute(
         '''
          CREATE TABLE qualification (
+         id INTEGER,
          qualification_id INTEGER PRIMARY KEY AUTOINCREMENT,
          name TEXT,
          description TEXT,

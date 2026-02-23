@@ -288,13 +288,19 @@ class SyncService extends ChangeNotifier {
         var data = jsonDecode(response.body);
         print('Users data from server: $data'); // Debug the response
 
-        // Clear existing data in the local users table
-        await _dbHelper.clearTable('users');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print('Syncing ${data.length} users using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         // Insert each user into the SQLite database
         for (var user in data) {
-          await _dbHelper.insertData('users', user);
-          print('Inserted user: $user'); // Debug insertion
+          await db.insert(
+            'users',
+            user,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+          print('Synced user: $user'); // Debug insertion
         }
         print(
             "Users table synchronized and data inserted into local database successfully.");
@@ -384,16 +390,43 @@ class SyncService extends ChangeNotifier {
             continue;
           }
 
-          // Create a copy of the learner data and preserve the server's LearnerID
+          // Extract bank details before inserting learner
+          Map<String, dynamic>? bankDetails;
+          if (learner['BankName'] != null || learner['BankAccount'] != null) {
+            bankDetails = {
+              'LearnerID': learner['LearnerID'],
+              'BankName': learner['BankName'] ?? '',
+              'bankType': learner['bankType'] ?? '',
+              'BankAccount': learner['BankAccount'] ?? '',
+              'BankCode': learner['BankCode'] ?? '',
+              'synced': 0,
+            };
+          }
+
+          // Create learner data WITHOUT bank fields
           Map<String, dynamic> learnerData = Map<String, dynamic>.from(learner);
-          // Keep the server's LearnerID to maintain consistency
+          learnerData.remove('BankName');
+          learnerData.remove('bankType');
+          learnerData.remove('BankAccount');
+          learnerData.remove('BankCode');
 
           try {
+            // Insert/update learner details
             await db.insert(
               'learnerdetails',
               learnerData,
               conflictAlgorithm: ConflictAlgorithm.replace,
             );
+
+            // Insert/update bank details if they exist
+            if (bankDetails != null) {
+              await db.insert(
+                'bankdetails',
+                bankDetails,
+                conflictAlgorithm: ConflictAlgorithm.replace,
+              );
+            }
+
             print(
                 "Successfully synced learner with IDNumber: ${learner['IDNumber']}, Server ID: ${learner['LearnerID']}");
           } catch (e) {
@@ -1337,10 +1370,18 @@ class SyncService extends ChangeNotifier {
           insertLearningpathway = [];
         }
 
-        await _dbHelper.clearTable('learningpathway');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${insertLearningpathway.length} learning pathways using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var pathwayData in insertLearningpathway) {
-          await _dbHelper.insertData('learningpathway', pathwayData);
+          await db.insert(
+            'learningpathway',
+            pathwayData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
         print("Pathway selection table synchronized successfully.");
       } else {
@@ -1371,11 +1412,18 @@ class SyncService extends ChangeNotifier {
           pathwaySelectionlist = decodedResponse;
         }
 
-        await _dbHelper.clearTable('pathway_selection');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${pathwaySelectionlist.length} pathway selections using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var pathway_selectionData in pathwaySelectionlist) {
-          await _dbHelper.insertData(
-              'pathway_selection', pathway_selectionData);
+          await db.insert(
+            'pathway_selection',
+            pathway_selectionData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
 
         print("Pathway selection table synchronized successfully.");
@@ -1407,10 +1455,18 @@ class SyncService extends ChangeNotifier {
           qualificationList = decodedResponse;
         }
 
-        await _dbHelper.clearTable('qualification');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${qualificationList.length} qualifications using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var qualificationData in qualificationList) {
-          await _dbHelper.insertData('qualification', qualificationData);
+          await db.insert(
+            'qualification',
+            qualificationData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
 
         print("Qualification table synchronized successfully.");
@@ -1442,11 +1498,18 @@ class SyncService extends ChangeNotifier {
           qualificationSelectionlist = decodedResponse;
         }
 
-        await _dbHelper.clearTable('qualification_selection');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${qualificationSelectionlist.length} qualification selections using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var qualification_selectionData in qualificationSelectionlist) {
-          await _dbHelper.insertData(
-              'qualification_selection', qualification_selectionData);
+          await db.insert(
+            'qualification_selection',
+            qualification_selectionData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
 
         print("Qualification selection table synchronized successfully.");
@@ -1478,11 +1541,18 @@ class SyncService extends ChangeNotifier {
           qualificationPathwaylist = decodedResponse;
         }
 
-        await _dbHelper.clearTable('qualification_pathway');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${qualificationPathwaylist.length} qualification pathways using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var qualification_pathwayData in qualificationPathwaylist) {
-          await _dbHelper.insertData(
-              'qualification_pathway', qualification_pathwayData);
+          await db.insert(
+            'qualification_pathway',
+            qualification_pathwayData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
 
         print("Qualification pathway table synchronized successfully.");
@@ -1514,12 +1584,19 @@ class SyncService extends ChangeNotifier {
           qualificationunitstandardList = decodedResponse;
         }
 
-        await _dbHelper.clearTable('qualificationunitstandard');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${qualificationunitstandardList.length} qualification unit standards using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var qualificationunitstandardData
             in qualificationunitstandardList) {
-          await _dbHelper.insertData(
-              'qualificationunitstandard', qualificationunitstandardData);
+          await db.insert(
+            'qualificationunitstandard',
+            qualificationunitstandardData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
 
         print("Qualification unitstandard table synchronized successfully.");
@@ -1550,10 +1627,18 @@ class SyncService extends ChangeNotifier {
           unitstandardList = decodedResponse;
         }
 
-        await _dbHelper.clearTable('unitstandard');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${unitstandardList.length} unit standards using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var unitstandardData in unitstandardList) {
-          await _dbHelper.insertData('unitstandard', unitstandardData);
+          await db.insert(
+            'unitstandard',
+            unitstandardData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
 
         print("Unitstandard table synchronized successfully.");
@@ -1585,11 +1670,18 @@ class SyncService extends ChangeNotifier {
           unitstandardSelectionList = decodedResponse;
         }
 
-        await _dbHelper.clearTable('unit_standard_selection');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${unitstandardSelectionList.length} unit standard selections using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var unitstandardSelectionData in unitstandardSelectionList) {
-          await _dbHelper.insertData(
-              'unit_standard_selection', unitstandardSelectionData);
+          await db.insert(
+            'unit_standard_selection',
+            unitstandardSelectionData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
 
         print("Unit standard selection table synchronized successfully.");
@@ -1620,10 +1712,18 @@ class SyncService extends ChangeNotifier {
           assessmentsList = decodedResponse;
         }
 
-        await _dbHelper.clearTable('assessments');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${assessmentsList.length} assessments using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var assessmentsData in assessmentsList) {
-          await _dbHelper.insertData('assessments', assessmentsData);
+          await db.insert(
+            'assessments',
+            assessmentsData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
 
         print("Assessments table synchronized successfully.");
@@ -1654,9 +1754,18 @@ class SyncService extends ChangeNotifier {
           poeList = decodedResponse;
         }
 
-        await _dbHelper.clearTable('poe');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${poeList.length} POE records using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
+
         for (var poeData in poeList) {
-          await _dbHelper.insertData('poe', poeData);
+          await db.insert(
+            'poe',
+            poeData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
 
         print("Poe table synchronized successfully.");
