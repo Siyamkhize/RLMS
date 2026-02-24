@@ -358,10 +358,10 @@ class _LearnerListPageState extends State<LearnerListPage> {
       print('Error fetching server data: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('Loading from local database (offline)'),
             backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 2),
+            duration: Duration(seconds: 2),
           ),
         );
       }
@@ -1782,6 +1782,33 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
   String? _selectedDisability;
   String? _selectedBank;
 
+  // Bank codes mapping
+  final Map<String, String> _bankCodes = {
+    'ABSA Bank': '632005',
+    'Capitec Bank': '470010',
+    'First National Bank': '250655',
+    'Nedbank': '198765',
+    'Standard Bank': '051001',
+    'Investec Bank': '580105',
+    'Discovery Bank': '679000',
+    'TymeBank': '678910',
+    'African Bank': '430000',
+    'Bidvest Bank': '462005',
+  };
+
+  // Account types
+  final List<String> _accountTypes = [
+    'Savings',
+    'Cheque',
+    'Current',
+    'Transmission',
+    'Fixed Deposit',
+    'Money Market',
+    'Student',
+    'Business',
+    'Trust',
+  ];
+
   // Helper function to clean file paths - extract only filename
   String _cleanFilePath(String? filePath) {
     if (filePath == null || filePath.isEmpty) return '';
@@ -2285,40 +2312,61 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
                     border: OutlineInputBorder(),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'ABSA', child: Text('ABSA')),
-                    DropdownMenuItem(value: 'FNB', child: Text('FNB')),
+                    DropdownMenuItem(
+                        value: 'ABSA Bank', child: Text('ABSA Bank')),
+                    DropdownMenuItem(
+                        value: 'Capitec Bank', child: Text('Capitec Bank')),
+                    DropdownMenuItem(
+                        value: 'First National Bank',
+                        child: Text('First National Bank')),
                     DropdownMenuItem(value: 'Nedbank', child: Text('Nedbank')),
                     DropdownMenuItem(
                         value: 'Standard Bank', child: Text('Standard Bank')),
-                    DropdownMenuItem(value: 'Capitec', child: Text('Capitec')),
                     DropdownMenuItem(
-                        value: 'TymeBank', child: Text('Tyme Bank')),
-                    DropdownMenuItem(value: 'Ithala', child: Text('Ithala')),
-                    DropdownMenuItem(value: 'Bidvest', child: Text('Bidvest')),
+                        value: 'Investec Bank', child: Text('Investec Bank')),
                     DropdownMenuItem(
-                        value: 'OldMutual', child: Text('Old Mutual')),
+                        value: 'Discovery Bank', child: Text('Discovery Bank')),
                     DropdownMenuItem(
-                        value: 'AfricanBank', child: Text('African Bank')),
+                        value: 'TymeBank', child: Text('TymeBank')),
                     DropdownMenuItem(
-                        value: 'Discovery', child: Text('Discovery')),
+                        value: 'African Bank', child: Text('African Bank')),
                     DropdownMenuItem(
-                        value: 'PostBank', child: Text('Post Bank')),
+                        value: 'Bidvest Bank', child: Text('Bidvest Bank')),
                   ],
                   onChanged: (value) {
                     setState(() {
                       _selectedBank = value;
+                      // Auto-populate bank code when bank is selected
+                      if (value != null && _bankCodes.containsKey(value)) {
+                        _bankBranchCodeController.text = _bankCodes[value]!;
+                      } else {
+                        _bankBranchCodeController.text = '';
+                      }
                     });
                   },
                 ),
                 const SizedBox(height: 16),
 
-                // Type of Account
-                TextFormField(
-                  controller: _bankAccountTypeController,
+                // Type of Account - Dropdown
+                DropdownButtonFormField<String>(
+                  value: _bankAccountTypeController.text.isEmpty
+                      ? null
+                      : _bankAccountTypeController.text,
                   decoration: const InputDecoration(
-                    labelText: 'Enter bank account type',
+                    labelText: 'Select account type',
                     border: OutlineInputBorder(),
                   ),
+                  items: _accountTypes.map((String type) {
+                    return DropdownMenuItem<String>(
+                      value: type,
+                      child: Text(type),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _bankAccountTypeController.text = value ?? '';
+                    });
+                  },
                 ),
                 const SizedBox(height: 16),
 
@@ -2333,12 +2381,15 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Branch Code
+                // Branch Code (read-only, auto-populated)
                 TextFormField(
                   controller: _bankBranchCodeController,
-                  decoration: const InputDecoration(
-                    labelText: 'Enter branch code',
-                    border: OutlineInputBorder(),
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    labelText: 'Branch code (auto-filled)',
+                    border: const OutlineInputBorder(),
+                    filled: true,
+                    fillColor: Colors.grey[200],
                   ),
                   keyboardType: TextInputType.number,
                 ),
@@ -2533,14 +2584,18 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
     });
   }
 
-  void _extractDateAndAgeFromId(String idNumber) {
+  void _extractDateAndAgeFromId(String idNumber) async {
     if (idNumber.length == 13 && RegExp(r'^\d{13}$').hasMatch(idNumber)) {
       int year = int.parse(idNumber.substring(0, 2));
       int month = int.parse(idNumber.substring(2, 4));
       int day = int.parse(idNumber.substring(4, 6));
+      int genderCode = int.parse(idNumber.substring(6, 10));
 
       // Determine full year (assuming cutoff at 21 for 2000s)
       int fullYear = year <= 21 ? 2000 + year : 1900 + year;
+
+      // Determine gender (0000-4999 = Female, 5000-9999 = Male)
+      String gender = genderCode < 5000 ? 'Female' : 'Male';
 
       // Validate date before setting
       if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
@@ -2559,7 +2614,118 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
             _dobController.text =
                 '${fullYear.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
             _ageController.text = age.toString();
+            _selectedGender = gender; // Auto-populate gender
           });
+
+          // Check for duplicate learner in same project
+          final dbHelper = DatabaseHelper();
+          final existingLearner = await dbHelper.checkLearnerExistsInProject(
+            idNumber,
+            widget.classID,
+          );
+
+          if (existingLearner != null && mounted) {
+            // Learner exists in same project - show confirmation dialog
+            final shouldUpdate = await showDialog<bool>(
+              context: context,
+              barrierDismissible: false,
+              builder: (BuildContext dialogContext) {
+                return AlertDialog(
+                  title: const Text('Learner Already Exists'),
+                  content: Text(
+                    'A learner with ID Number $idNumber already exists in this project.\n\n'
+                    'Name: ${existingLearner['Name']} ${existingLearner['Surname']}\n'
+                    'Class: ${existingLearner['className'] ?? 'Unknown'}\n'
+                    'Site: ${existingLearner['siteName'] ?? 'Unknown'}\n\n'
+                    'Do you want to update this learner\'s details?',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop(false);
+                      },
+                      child: const Text('No, Discard Changes'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop(true);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Yes, Update'),
+                    ),
+                  ],
+                );
+              },
+            );
+
+            if (shouldUpdate != true) {
+              // User chose to discard - clear the form
+              setState(() {
+                _idNumberController.clear();
+                _dobController.clear();
+                _ageController.clear();
+                _selectedGender = null;
+                _isValidSAId = false;
+              });
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Changes discarded'),
+                    backgroundColor: Colors.grey,
+                  ),
+                );
+              }
+            } else {
+              // User chose to update - pre-fill form with existing data
+              setState(() {
+                _nameController.text = existingLearner['Name'] ?? '';
+                _surnameController.text = existingLearner['Surname'] ?? '';
+                _selectedTitle = existingLearner['Title'];
+                _contactNumberController.text =
+                    existingLearner['PhoneNumber'] ?? '';
+                _emailController.text = existingLearner['Email'] ?? '';
+                _selectedRace = existingLearner['Race'];
+                _selectedLanguage = existingLearner['Language'];
+                _addressStreetController.text =
+                    existingLearner['AddressLine1'] ?? '';
+                _addressSuburbController.text =
+                    existingLearner['AddressLine2'] ?? '';
+                _addressCityController.text =
+                    existingLearner['AddressLine3'] ?? '';
+                _postalCodeController.text =
+                    existingLearner['PostalCode'] ?? '';
+                _selectedDisability = existingLearner['Disability'];
+                _schoolNameController.text =
+                    existingLearner['SchoolName'] ?? '';
+                _schoolCompletionController.text =
+                    existingLearner['SchoolCompletion'] ?? '';
+                _schoolLocationController.text =
+                    existingLearner['SchoolLocation'] ?? '';
+                _schoolGradeController.text =
+                    existingLearner['SchoolGrade'] ?? '';
+                _kinNameController.text = existingLearner['KinName'] ?? '';
+                _kinRelationController.text =
+                    existingLearner['KinRelation'] ?? '';
+                _kinContactController.text =
+                    existingLearner['KinContact'] ?? '';
+              });
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                        'Form pre-filled with existing learner data. Make changes and save to update.'),
+                    backgroundColor: Colors.blue,
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              }
+            }
+          }
         } catch (e) {
           // Invalid date, don't populate
           print('Invalid date extracted from ID: $e');
@@ -2613,24 +2779,31 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
         learnerOnlyData.remove('BankCode');
       }
 
+      // Note: Duplicate check already done when ID number was entered
+      // So we can proceed directly with insert/update
+
       if (!isConnected) {
         // Offline: Save locally only with temporary ID
         final id =
             await dbHelper.insertOrUpdateLearner(learnerOnlyData, bankData);
         if (id > 0) {
           await dbHelper.syncBankDetails();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Learner saved to local database successfully!${bankData != null ? ' Bank details also saved. Will sync when online.' : ' Will sync when online.'}',
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Learner saved to local database successfully!${bankData != null ? ' Bank details also saved. Will sync when online.' : ' Will sync when online.'}',
+                ),
               ),
-            ),
-          );
+            );
+          }
           return true;
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to save learner locally')),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Failed to save learner locally')),
+            );
+          }
           return false;
         }
       } else {
@@ -2678,9 +2851,11 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
       }
     } catch (e) {
       print('Submission error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving data: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving data: $e')),
+        );
+      }
       return false;
     }
   }

@@ -343,7 +343,7 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
             if (decoded is List) {
               pathways = List<Map<String, dynamic>>.from(decoded);
               pathwayCount = pathways.length;
-              debugPrint('[SDP_PROJECTS]   ✅ Parsed ${pathwayCount} pathways');
+              debugPrint('[SDP_PROJECTS]   ✅ Parsed $pathwayCount pathways');
             }
           } else {
             debugPrint('[SDP_PROJECTS]   ⚠️ No pathway data');

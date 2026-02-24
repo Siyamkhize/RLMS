@@ -10,7 +10,7 @@ class AppConfig {
   // static const String basePath = '/mobile';
 
   static const String serverHost =
-      '192.168.68.100'; // Updated production hostname
+      '192.168.68.125'; // Updated production hostname
   static const int serverPort = 8080; // HTTP poj   ``rt 8080
   static const String serverProtocol = 'http'; // Local server uses HTTP
   static const String basePath = '/assessorReport2/mobile';

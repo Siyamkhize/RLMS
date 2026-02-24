@@ -38,9 +38,40 @@ try {
         }
     }
 
-    // Check if learner already exists by IDNumber
-    $stmt = $conn->prepare("SELECT LearnerID FROM learnerdetails WHERE IDNumber = ?");
-    $stmt->bind_param("s", $input['IDNumber']);
+    // Get project_id from classID (via class -> sites join)
+    $projectStmt = $conn->prepare("
+        SELECT s.project_id 
+        FROM class c 
+        JOIN sites s ON c.siteID = s.siteID 
+        WHERE c.classID = ?
+    ");
+    $projectStmt->bind_param("s", $input['classID']);
+    $projectStmt->execute();
+    $projectResult = $projectStmt->get_result();
+    
+    $projectId = null;
+    if ($projectResult->num_rows > 0) {
+        $projectRow = $projectResult->fetch_assoc();
+        $projectId = $projectRow['project_id'];
+    }
+
+    // Check if learner already exists by IDNumber AND project_id
+    if ($projectId !== null) {
+        // Check for duplicate in same project
+        $stmt = $conn->prepare("
+            SELECT ld.LearnerID 
+            FROM learnerdetails ld
+            JOIN class c ON ld.classID = c.classID
+            JOIN sites s ON c.siteID = s.siteID
+            WHERE ld.IDNumber = ? AND s.project_id = ?
+        ");
+        $stmt->bind_param("ss", $input['IDNumber'], $projectId);
+    } else {
+        // Fallback to old behavior if project_id not found
+        $stmt = $conn->prepare("SELECT LearnerID FROM learnerdetails WHERE IDNumber = ?");
+        $stmt->bind_param("s", $input['IDNumber']);
+    }
+    
     $stmt->execute();
     $result = $stmt->get_result();
     

@@ -6,7 +6,7 @@ import 'config.dart';
 
 class AddLearnerPage extends StatefulWidget {
   final String classID;
-  
+
   const AddLearnerPage({super.key, required this.classID});
 
   @override
@@ -15,38 +15,46 @@ class AddLearnerPage extends StatefulWidget {
 
 class _AddLearnerPageState extends State<AddLearnerPage> {
   final _formKey = GlobalKey<FormState>();
-  
+
   // Personal Information Controllers
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _surnameController = TextEditingController();
   final TextEditingController _idNumberController = TextEditingController();
   final TextEditingController _dobController = TextEditingController();
-  final TextEditingController _contactNumberController = TextEditingController();
+  final TextEditingController _contactNumberController =
+      TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _ageController = TextEditingController();
-  
+
   // Address Controllers
-  final TextEditingController _addressStreetController = TextEditingController();
-  final TextEditingController _addressSuburbController = TextEditingController();
+  final TextEditingController _addressStreetController =
+      TextEditingController();
+  final TextEditingController _addressSuburbController =
+      TextEditingController();
   final TextEditingController _addressCityController = TextEditingController();
   final TextEditingController _postalCodeController = TextEditingController();
-  
+
   // School Information Controllers
   final TextEditingController _schoolNameController = TextEditingController();
-  final TextEditingController _schoolCompletionController = TextEditingController();
-  final TextEditingController _schoolLocationController = TextEditingController();
+  final TextEditingController _schoolCompletionController =
+      TextEditingController();
+  final TextEditingController _schoolLocationController =
+      TextEditingController();
   final TextEditingController _schoolGradeController = TextEditingController();
-  
+
   // Next of Kin Controllers
   final TextEditingController _kinNameController = TextEditingController();
   final TextEditingController _kinRelationController = TextEditingController();
   final TextEditingController _kinContactController = TextEditingController();
-  
+
   // Banking Details Controllers
-  final TextEditingController _bankAccountTypeController = TextEditingController();
-  final TextEditingController _bankAccountNumberController = TextEditingController();
-  final TextEditingController _bankBranchCodeController = TextEditingController();
-  
+  final TextEditingController _bankAccountTypeController =
+      TextEditingController();
+  final TextEditingController _bankAccountNumberController =
+      TextEditingController();
+  final TextEditingController _bankBranchCodeController =
+      TextEditingController();
+
   // Dropdown Selections
   String? _selectedTitle;
   String? _selectedGender;
@@ -54,17 +62,67 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
   String? _selectedLanguage;
   String? _selectedDisability;
   String? _selectedBank;
-  
+
+  // ID validation state
+  bool _isValidSAId = false;
+
   // Dropdown Options
   final List<String> _titles = ['Mr', 'Mrs', 'Miss', 'Dr', 'Prof'];
   final List<String> _genders = ['Male', 'Female', 'Other'];
   final List<String> _races = ['Black', 'White', 'Coloured', 'Indian', 'Other'];
-  final List<String> _languages = ['English', 'Afrikaans', 'Zulu', 'Xhosa', 'Sotho', 'Other'];
-  final List<String> _disabilities = ['None', 'Physical', 'Visual', 'Hearing', 'Learning', 'Other'];
-  final List<String> _banks = [
-    'ABSA', 'FNB', 'Nedbank', 'Standard Bank', 'Capitec', 'African Bank',
-    'Bidvest Bank', 'Discovery Bank', 'TymeBank', 'Bank Zero', 'Other'
+  final List<String> _languages = [
+    'English',
+    'Afrikaans',
+    'Zulu',
+    'Xhosa',
+    'Sotho',
+    'Other'
   ];
+  final List<String> _disabilities = [
+    'None',
+    'Physical',
+    'Visual',
+    'Hearing',
+    'Learning',
+    'Other'
+  ];
+  final List<String> _banks = [
+    'ABSA Bank',
+    'Capitec Bank',
+    'First National Bank',
+    'Nedbank',
+    'Standard Bank',
+    'Investec Bank',
+    'Discovery Bank',
+    'TymeBank',
+    'African Bank',
+    'Bidvest Bank',
+  ];
+  final List<String> _accountTypes = [
+    'Savings',
+    'Cheque',
+    'Current',
+    'Transmission',
+    'Fixed Deposit',
+    'Money Market',
+    'Student',
+    'Business',
+    'Trust',
+  ];
+
+  // Bank codes mapping
+  final Map<String, String> _bankCodes = {
+    'ABSA Bank': '632005',
+    'Capitec Bank': '470010',
+    'First National Bank': '250655',
+    'Nedbank': '198765',
+    'Standard Bank': '051001',
+    'Investec Bank': '580105',
+    'Discovery Bank': '679000',
+    'TymeBank': '678910',
+    'African Bank': '430000',
+    'Bidvest Bank': '462005',
+  };
 
   @override
   void dispose() {
@@ -211,76 +269,297 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
     }
   }
 
-  Future<bool> _submitLearnerData(BuildContext context, Map<String, dynamic> learnerData, Map<String, dynamic>? bankData) async {
+  // Extract date, age, and gender from SA ID number and check for duplicates
+  void _extractFromIdAndCheckDuplicate(String idNumber) async {
+    print(
+        '🔥 DEBUG: Method called with ID: $idNumber (length: ${idNumber.length})');
+
+    if (idNumber.length == 13 && RegExp(r'^\d{13}$').hasMatch(idNumber)) {
+      print('🔥 DEBUG: ID validation passed!');
+      int year = int.parse(idNumber.substring(0, 2));
+      int month = int.parse(idNumber.substring(2, 4));
+      int day = int.parse(idNumber.substring(4, 6));
+      int genderCode = int.parse(idNumber.substring(6, 10));
+      print(
+          '🔥 DEBUG: Extracted - Year: $year, Month: $month, Day: $day, GenderCode: $genderCode');
+
+      // Determine full year (assuming cutoff at 21 for 2000s)
+      int fullYear = year <= 21 ? 2000 + year : 1900 + year;
+
+      // Determine gender (0000-4999 = Female, 5000-9999 = Male)
+      String gender = genderCode < 5000 ? 'Female' : 'Male';
+
+      // Validate date before setting
+      if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        try {
+          DateTime birthDate = DateTime(fullYear, month, day);
+          DateTime today = DateTime.now();
+
+          // Calculate age
+          int age = today.year - birthDate.year;
+          if (today.month < birthDate.month ||
+              (today.month == birthDate.month && today.day < birthDate.day)) {
+            age--;
+          }
+
+          setState(() {
+            _dobController.text =
+                '${fullYear.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
+            _ageController.text = age.toString();
+            _selectedGender = gender; // Auto-populate gender
+            _isValidSAId = true;
+            print('🎯 DEBUG: Gender extracted from ID: $gender');
+            print('🎯 DEBUG: _selectedGender set to: $_selectedGender');
+            print(
+                '🎯 DEBUG: DOB: ${_dobController.text}, Age: ${_ageController.text}');
+          });
+
+          // Check for duplicate learner in same project
+          final dbHelper = DatabaseHelper();
+          final existingLearner = await dbHelper.checkLearnerExistsInProject(
+            idNumber,
+            widget.classID,
+          );
+
+          if (existingLearner != null && mounted) {
+            // Learner exists in same project - show confirmation dialog
+            final shouldUpdate = await showDialog<bool>(
+              context: context,
+              barrierDismissible: false,
+              builder: (BuildContext dialogContext) {
+                return AlertDialog(
+                  title: const Text('Learner Already Exists'),
+                  content: Text(
+                    'A learner with ID Number $idNumber already exists in this project.\n\n'
+                    'Name: ${existingLearner['Name']} ${existingLearner['Surname']}\n'
+                    'Class: ${existingLearner['className'] ?? 'Unknown'}\n'
+                    'Site: ${existingLearner['siteName'] ?? 'Unknown'}\n\n'
+                    'Do you want to update this learner\'s details?',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop(false);
+                      },
+                      child: const Text('No, Discard Changes'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop(true);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Yes, Update'),
+                    ),
+                  ],
+                );
+              },
+            );
+
+            if (shouldUpdate != true) {
+              // User chose to discard - clear the form
+              setState(() {
+                _idNumberController.clear();
+                _dobController.clear();
+                _ageController.clear();
+                _selectedGender = null;
+                _isValidSAId = false;
+              });
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Changes discarded'),
+                    backgroundColor: Colors.grey,
+                  ),
+                );
+              }
+            } else {
+              // User chose to update - pre-fill form with existing data
+              setState(() {
+                _nameController.text = existingLearner['Name'] ?? '';
+                _surnameController.text = existingLearner['Surname'] ?? '';
+                _selectedTitle = existingLearner['Title'];
+                _contactNumberController.text =
+                    existingLearner['PhoneNumber'] ?? '';
+                _emailController.text = existingLearner['Email'] ?? '';
+                _selectedRace = existingLearner['Race'];
+                _selectedLanguage = existingLearner['Language'];
+                _addressStreetController.text =
+                    existingLearner['AddressLine1'] ?? '';
+                _addressSuburbController.text =
+                    existingLearner['AddressLine2'] ?? '';
+                _addressCityController.text =
+                    existingLearner['AddressLine3'] ?? '';
+                _postalCodeController.text =
+                    existingLearner['PostalCode'] ?? '';
+                _selectedDisability = existingLearner['Disability'];
+                _schoolNameController.text =
+                    existingLearner['SchoolName'] ?? '';
+                _schoolCompletionController.text =
+                    existingLearner['SchoolCompletion'] ?? '';
+                _schoolLocationController.text =
+                    existingLearner['SchoolLocation'] ?? '';
+                _schoolGradeController.text =
+                    existingLearner['SchoolGrade'] ?? '';
+                _kinNameController.text = existingLearner['KinName'] ?? '';
+                _kinRelationController.text =
+                    existingLearner['KinRelation'] ?? '';
+                _kinContactController.text =
+                    existingLearner['KinContact'] ?? '';
+              });
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                        'Form pre-filled with existing learner data. Make changes and save to update.'),
+                    backgroundColor: Colors.blue,
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              }
+            }
+          }
+        } catch (e) {
+          print('Error extracting from ID: $e');
+        }
+      }
+    } else {
+      setState(() {
+        _isValidSAId = false;
+      });
+    }
+  }
+
+  Future<bool> _submitLearnerData(BuildContext context,
+      Map<String, dynamic> learnerData, Map<String, dynamic>? bankData) async {
     try {
-      // Insert into local database first
       final dbHelper = DatabaseHelper();
-      final learnerId = await dbHelper.insertOrUpdateLearner(learnerData, bankData);
-      
+
+      // Check if learner exists in same project
+      final existingLearner = await dbHelper.checkLearnerExistsInProject(
+        learnerData['IDNumber'],
+        learnerData['classID'],
+      );
+
+      if (existingLearner != null && mounted) {
+        // Learner exists in same project - show confirmation dialog
+        final shouldUpdate = await showDialog<bool>(
+          context: context,
+          builder: (BuildContext dialogContext) {
+            return AlertDialog(
+              title: const Text('Learner Already Exists'),
+              content: Text(
+                'A learner with ID Number ${learnerData['IDNumber']} already exists in this project.\n\n'
+                'Class: ${existingLearner['className'] ?? 'Unknown'}\n'
+                'Site: ${existingLearner['siteName'] ?? 'Unknown'}\n\n'
+                'Do you want to update the existing learner data?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Update'),
+                ),
+              ],
+            );
+          },
+        );
+
+        if (shouldUpdate != true) {
+          // User cancelled
+          return false;
+        }
+      }
+
+      // Insert into local database first
+      final learnerId =
+          await dbHelper.insertOrUpdateLearner(learnerData, bankData);
+
       // Sync with backend server
       final syncResult = await _syncWithBackend(learnerData, bankData);
-      
+
+      if (!mounted) return false;
+
       // Show appropriate success message based on sync result
       if (syncResult) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Learner added successfully and synced with server'),
+          SnackBar(
+            content: Text(existingLearner != null
+                ? 'Learner updated successfully and synced with server'
+                : 'Learner added successfully and synced with server'),
             backgroundColor: Colors.green,
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Learner saved locally but failed to sync with server. Will retry when online.'),
+          SnackBar(
+            content: Text(existingLearner != null
+                ? 'Learner updated locally but failed to sync with server. Will retry when online.'
+                : 'Learner saved locally but failed to sync with server. Will retry when online.'),
             backgroundColor: Colors.orange,
           ),
         );
       }
-      
+
       // Navigate back
       Navigator.pop(context, true); // Return true to indicate success
       return true;
-      
     } catch (e) {
       print('Error adding learner: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error adding learner: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error adding learner: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
       return false;
     }
   }
 
-  Future<bool> _syncWithBackend(Map<String, dynamic> learnerData, Map<String, dynamic>? bankData) async {
+  Future<bool> _syncWithBackend(
+      Map<String, dynamic> learnerData, Map<String, dynamic>? bankData) async {
     try {
       // Merge learner data with bank data for backend
       final Map<String, dynamic> requestData = Map.from(learnerData);
-      
+
       if (bankData != null) {
         requestData.addAll(bankData);
       }
-      
+
       // Use the proper configuration URL
       final url = AppConfig.addLearnerUrl;
-      
+
       print('=== BACKEND SYNC DEBUG ===');
       print('Full URL: $url');
       print('Request data: $requestData');
       print('========================');
-      
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: json.encode(requestData),
-      ).timeout(const Duration(seconds: 30));
-      
+
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: json.encode(requestData),
+          )
+          .timeout(const Duration(seconds: 30));
+
       print('Backend response status: ${response.statusCode}');
       print('Backend response body: ${response.body}');
-      
+
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
         if (responseData['success'] == true) {
@@ -307,6 +586,18 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
         title: const Text('Add New Learner'),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
+        actions: [
+          // Visual indicator that this is the standalone file
+          Container(
+            padding: const EdgeInsets.all(8),
+            child: const Center(
+              child: Text(
+                'STANDALONE',
+                style: TextStyle(fontSize: 10, color: Colors.yellow),
+              ),
+            ),
+          ),
+        ],
       ),
       body: Form(
         key: _formKey,
@@ -320,7 +611,13 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
             }),
             _buildTextField('Name *', _nameController, isRequired: true),
             _buildTextField('Surname *', _surnameController, isRequired: true),
-            _buildTextField('ID Number', _idNumberController),
+            _buildTextFieldWithOnChanged(
+              'ID Number',
+              _idNumberController,
+              onChanged: _extractFromIdAndCheckDuplicate,
+              maxLength: 13,
+              keyboardType: TextInputType.number,
+            ),
             _buildTextField('Date of Birth', _dobController),
             _buildTextField('Phone Number', _contactNumberController),
             _buildTextField('Email', _emailController),
@@ -331,52 +628,76 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
             _buildDropdownField('Race', _selectedRace, _races, (value) {
               setState(() => _selectedRace = value);
             }),
-            _buildDropdownField('Language', _selectedLanguage, _languages, (value) {
+            _buildDropdownField('Language', _selectedLanguage, _languages,
+                (value) {
               setState(() => _selectedLanguage = value);
             }),
-            _buildDropdownField('Disability', _selectedDisability, _disabilities, (value) {
+            _buildDropdownField(
+                'Disability', _selectedDisability, _disabilities, (value) {
               setState(() => _selectedDisability = value);
             }),
-            
+
             const SizedBox(height: 20),
-            
+
             // Address Section
             _buildSectionHeader('Address Information'),
             _buildTextField('Street Address', _addressStreetController),
             _buildTextField('Suburb', _addressSuburbController),
             _buildTextField('City', _addressCityController),
             _buildTextField('Postal Code', _postalCodeController),
-            
+
             const SizedBox(height: 20),
-            
+
             // School Information Section
             _buildSectionHeader('School Information'),
             _buildTextField('School Name', _schoolNameController),
-            _buildTextField('School Completion Year', _schoolCompletionController),
+            _buildTextField(
+                'School Completion Year', _schoolCompletionController),
             _buildTextField('School Location', _schoolLocationController),
             _buildTextField('School Grade', _schoolGradeController),
-            
+
             const SizedBox(height: 20),
-            
+
             // Next of Kin Section
             _buildSectionHeader('Next of Kin Information'),
             _buildTextField('Kin Name', _kinNameController),
             _buildTextField('Kin Relation', _kinRelationController),
             _buildTextField('Kin Contact', _kinContactController),
-            
+
             const SizedBox(height: 20),
-            
+
             // Banking Details Section
             _buildSectionHeader('Banking Details (Optional)'),
             _buildDropdownField('Bank Name', _selectedBank, _banks, (value) {
-              setState(() => _selectedBank = value);
+              setState(() {
+                _selectedBank = value;
+                print('🏦 DEBUG: Bank selected: $value');
+                // Auto-populate bank code when bank is selected
+                if (value != null && _bankCodes.containsKey(value)) {
+                  _bankBranchCodeController.text = _bankCodes[value]!;
+                  print('🏦 DEBUG: Bank code set to: ${_bankCodes[value]}');
+                } else {
+                  _bankBranchCodeController.text = '';
+                  print('🏦 DEBUG: Bank code cleared (bank not in map)');
+                }
+              });
             }),
-            _buildTextField('Account Type', _bankAccountTypeController),
+            _buildDropdownField(
+                'Account Type',
+                _bankAccountTypeController.text.isEmpty
+                    ? null
+                    : _bankAccountTypeController.text,
+                _accountTypes, (value) {
+              setState(() {
+                _bankAccountTypeController.text = value ?? '';
+              });
+            }),
             _buildTextField('Account Number', _bankAccountNumberController),
-            _buildTextField('Branch Code', _bankBranchCodeController),
-            
+            _buildTextField('Branch Code', _bankBranchCodeController,
+                readOnly: true),
+
             const SizedBox(height: 30),
-            
+
             // Submit Button
             ElevatedButton(
               onPressed: () => _handleFormSubmission(context),
@@ -413,28 +734,55 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, {bool isRequired = false}) {
+  Widget _buildTextField(String label, TextEditingController controller,
+      {bool isRequired = false, bool readOnly = false}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
         controller: controller,
+        readOnly: readOnly,
         decoration: InputDecoration(
           labelText: isRequired ? '$label *' : label,
           border: const OutlineInputBorder(),
           filled: true,
-          fillColor: Colors.grey[50],
+          fillColor: readOnly ? Colors.grey[200] : Colors.grey[50],
         ),
-        validator: isRequired ? (value) {
-          if (value == null || value.isEmpty) {
-            return 'This field is required';
-          }
-          return null;
-        } : null,
+        validator: isRequired
+            ? (value) {
+                if (value == null || value.isEmpty) {
+                  return 'This field is required';
+                }
+                return null;
+              }
+            : null,
       ),
     );
   }
 
-  Widget _buildDropdownField(String label, String? value, List<String> options, Function(String?) onChanged) {
+  Widget _buildTextFieldWithOnChanged(
+      String label, TextEditingController controller,
+      {Function(String)? onChanged,
+      int? maxLength,
+      TextInputType? keyboardType}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: TextFormField(
+        controller: controller,
+        maxLength: maxLength,
+        keyboardType: keyboardType,
+        onChanged: onChanged,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+          filled: true,
+          fillColor: Colors.grey[50],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDropdownField(String label, String? value, List<String> options,
+      Function(String?) onChanged) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: DropdownButtonFormField<String>(

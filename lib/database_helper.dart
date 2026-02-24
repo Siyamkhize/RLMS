@@ -4045,12 +4045,50 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
     debugPrint('[DB] bankData: $bankData');
 
     await db.transaction((txn) async {
-      // Check if learner already exists by IDNumber
-      final existingLearner = await txn.query(
-        'learnerdetails',
-        where: 'IDNumber = ?',
-        whereArgs: [learnerData['IDNumber']],
-      );
+      // Get project_id from classID (via class -> sites join)
+      int? projectId;
+      if (learnerData['classID'] != null) {
+        final projectResult = await txn.rawQuery('''
+          SELECT s.project_id 
+          FROM class c 
+          JOIN sites s ON c.siteID = s.siteID 
+          WHERE c.classID = ?
+        ''', [learnerData['classID'].toString()]);
+
+        if (projectResult.isNotEmpty &&
+            projectResult.first['project_id'] != null) {
+          projectId =
+              int.tryParse(projectResult.first['project_id'].toString());
+          debugPrint(
+              '[DB] Found project_id: $projectId for classID: ${learnerData['classID']}');
+        }
+      }
+
+      // Check if learner already exists by IDNumber AND project_id
+      List<Map<String, dynamic>> existingLearner = [];
+      if (projectId != null) {
+        // Check for duplicate in same project
+        existingLearner = await txn.rawQuery('''
+          SELECT ld.* 
+          FROM learnerdetails ld
+          JOIN class c ON ld.classID = c.classID
+          JOIN sites s ON c.siteID = s.siteID
+          WHERE ld.IDNumber = ? AND s.project_id = ?
+        ''', [learnerData['IDNumber'], projectId]);
+
+        debugPrint(
+            '[DB] Checking for duplicate: IDNumber=${learnerData['IDNumber']}, project_id=$projectId');
+        debugPrint(
+            '[DB] Found ${existingLearner.length} existing learner(s) in same project');
+      } else {
+        // Fallback to old behavior if project_id not found
+        existingLearner = await txn.query(
+          'learnerdetails',
+          where: 'IDNumber = ?',
+          whereArgs: [learnerData['IDNumber']],
+        );
+        debugPrint('[DB] No project_id found, using old duplicate check');
+      }
 
       Map<String, dynamic> learnerOnlyData = Map.from(learnerData)
         ..remove('BankName')
@@ -4067,7 +4105,7 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
       }
 
       if (existingLearner.isNotEmpty) {
-        // Update existing learner
+        // Update existing learner in same project
         learnerId = existingLearner.first['LearnerID'] as int;
         await txn.update(
           'learnerdetails',
@@ -4075,10 +4113,11 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
           where: 'LearnerID = ?',
           whereArgs: [learnerId],
         );
-        debugPrint('[DB] Updated existing learner with ID: $learnerId');
-        print('Updated existing learner with ID: $learnerId');
+        debugPrint(
+            '[DB] Updated existing learner with ID: $learnerId (same project)');
+        print('Updated existing learner with ID: $learnerId (same project)');
       } else {
-        // Insert new learner
+        // Insert new learner (either new or duplicate in different project)
         learnerOnlyData['synced'] = 0; // Ensure synced is 0 for new entries
         learnerId = await txn.insert('learnerdetails', learnerOnlyData);
         debugPrint('[DB] Inserted new learner with ID: $learnerId');
@@ -4153,6 +4192,52 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
     }
 
     return learnerId;
+  }
+
+  // Check if learner exists in the same project
+  Future<Map<String, dynamic>?> checkLearnerExistsInProject(
+      String idNumber, String classID) async {
+    final db = await database;
+
+    try {
+      // Get project_id from classID
+      final projectResult = await db.rawQuery('''
+        SELECT s.project_id 
+        FROM class c 
+        JOIN sites s ON c.siteID = s.siteID 
+        WHERE c.classID = ?
+      ''', [classID]);
+
+      if (projectResult.isEmpty || projectResult.first['project_id'] == null) {
+        debugPrint(
+            '[DB] No project_id found for classID: $classID, cannot check duplicate');
+        return null;
+      }
+
+      final projectId = projectResult.first['project_id'];
+
+      // Check if learner exists in same project
+      final existingLearner = await db.rawQuery('''
+        SELECT ld.*, c.className, s.siteName, s.project_id
+        FROM learnerdetails ld
+        JOIN class c ON ld.classID = c.classID
+        JOIN sites s ON c.siteID = s.siteID
+        WHERE ld.IDNumber = ? AND s.project_id = ?
+      ''', [idNumber, projectId]);
+
+      if (existingLearner.isNotEmpty) {
+        debugPrint(
+            '[DB] Learner with IDNumber $idNumber exists in project $projectId');
+        return existingLearner.first;
+      }
+
+      debugPrint(
+          '[DB] Learner with IDNumber $idNumber does NOT exist in project $projectId');
+      return null;
+    } catch (e) {
+      debugPrint('[DB] Error checking learner duplicate: $e');
+      return null;
+    }
   }
 
   Future<void> syncBankDetails() async {
