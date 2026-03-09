@@ -634,9 +634,14 @@ class _LearnerListPageState extends State<LearnerListPage> {
             '[LEARNER_LIST] This class might not have been synced yet, or classID mismatch');
       }
 
-      final learnersList = localLearners
-          .map((learnerMap) => Learner.fromJson(learnerMap))
-          .toList();
+      final learnersList = localLearners.map((learnerMap) {
+        // Convert QueryRow to Map<String, dynamic> properly
+        final Map<String, dynamic> mapData = <String, dynamic>{};
+        learnerMap.forEach((key, value) {
+          mapData[key] = value;
+        });
+        return Learner.fromJson(mapData);
+      }).toList();
       setState(() {
         learners = learnersList;
       });
@@ -882,7 +887,11 @@ class _LearnerListPageState extends State<LearnerListPage> {
 
           if (!isSynced || notOnServer) {
             // Convert local learner to Learner object and add to merged list
-            final learner = Learner.fromJson(localLearner);
+            final Map<String, dynamic> mapData = <String, dynamic>{};
+            localLearner.forEach((key, value) {
+              mapData[key] = value;
+            });
+            final learner = Learner.fromJson(mapData);
             mergedLearners.add(learner);
             print(
                 'Added local learner to merged data: ${learner.name} ${learner.surname}');
@@ -2334,13 +2343,17 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
                         value: 'Bidvest Bank', child: Text('Bidvest Bank')),
                   ],
                   onChanged: (value) {
+                    print('🏦 DEBUG: Bank selected: $value');
                     setState(() {
                       _selectedBank = value;
                       // Auto-populate bank code when bank is selected
                       if (value != null && _bankCodes.containsKey(value)) {
                         _bankBranchCodeController.text = _bankCodes[value]!;
+                        print(
+                            '🏦 DEBUG: Bank code set to: ${_bankCodes[value]}');
                       } else {
                         _bankBranchCodeController.text = '';
+                        print('🏦 DEBUG: Bank code cleared');
                       }
                     });
                   },
@@ -2496,6 +2509,13 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
                           ..remove('BankCode');
                       }
 
+                      print('💾 DEBUG: Learner data prepared for submission:');
+                      print('💾 DEBUG: BankName: ${learnerData['BankName']}');
+                      print('💾 DEBUG: bankType: ${learnerData['bankType']}');
+                      print(
+                          '💾 DEBUG: BankAccount: ${learnerData['BankAccount']}');
+                      print('💾 DEBUG: BankCode: ${learnerData['BankCode']}');
+                      print('💾 DEBUG: Gender: ${learnerData['Gender']}');
                       print('Request body: ${json.encode(learnerData)}');
 
                       final success =
@@ -2585,17 +2605,25 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
   }
 
   void _extractDateAndAgeFromId(String idNumber) async {
+    print('🔥 DEBUG: _extractDateAndAgeFromId called with ID: $idNumber');
+
     if (idNumber.length == 13 && RegExp(r'^\d{13}$').hasMatch(idNumber)) {
+      print('🔥 DEBUG: ID validation passed!');
+
       int year = int.parse(idNumber.substring(0, 2));
       int month = int.parse(idNumber.substring(2, 4));
       int day = int.parse(idNumber.substring(4, 6));
       int genderCode = int.parse(idNumber.substring(6, 10));
+
+      print(
+          '🔥 DEBUG: Extracted - Year: $year, Month: $month, Day: $day, GenderCode: $genderCode');
 
       // Determine full year (assuming cutoff at 21 for 2000s)
       int fullYear = year <= 21 ? 2000 + year : 1900 + year;
 
       // Determine gender (0000-4999 = Female, 5000-9999 = Male)
       String gender = genderCode < 5000 ? 'Female' : 'Male';
+      print('🎯 DEBUG: Gender extracted from ID: $gender');
 
       // Validate date before setting
       if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
@@ -2615,16 +2643,23 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
                 '${fullYear.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
             _ageController.text = age.toString();
             _selectedGender = gender; // Auto-populate gender
+            print('🎯 DEBUG: _selectedGender set to: $_selectedGender');
+            print(
+                '🎯 DEBUG: DOB: ${_dobController.text}, Age: ${_ageController.text}');
           });
 
           // Check for duplicate learner in same project
+          print('🔍 DEBUG: Checking for duplicate learner...');
           final dbHelper = DatabaseHelper();
           final existingLearner = await dbHelper.checkLearnerExistsInProject(
             idNumber,
             widget.classID,
           );
+          print(
+              '🔍 DEBUG: Duplicate check result: ${existingLearner != null ? "FOUND" : "NOT FOUND"}');
 
           if (existingLearner != null && mounted) {
+            print('🔍 DEBUG: Showing duplicate dialog...');
             // Learner exists in same project - show confirmation dialog
             final shouldUpdate = await showDialog<bool>(
               context: context,

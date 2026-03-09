@@ -3,17 +3,17 @@ class AppConfig {
   // LIVE SERVER CONFIGURATION
   // ========================================
   // static const String serverHost = 'tesing.mtltechnical.co.za';
-  // static const String serverHost = 'rlms.rlms.co.za'; // Live server domain
-  // static const int serverPort = 443; // HTTPS port
-  // static const String serverProtocol = 'https';
-  // // Live server uses HTTPS
-  // static const String basePath = '/mobile';
+  static const String serverHost = 'rlms.rlms.co.za'; // Live server domain
+  static const int serverPort = 443; // HTTPS port
+  static const String serverProtocol = 'https';
+  // Live server uses HTTPS
+  static const String basePath = '/mobile';
 
-  static const String serverHost =
-      '192.168.68.125'; // Updated production hostname
-  static const int serverPort = 8080; // HTTP poj   ``rt 8080
-  static const String serverProtocol = 'http'; // Local server uses HTTP
-  static const String basePath = '/assessorReport2/mobile';
+//   static const String serverHost =
+//       '192.168.68.103'; // Updated production hostname
+//   static const int serverPort = 8080; // HTTP poj   ``rt 8080
+//   static const String serverProtocol = 'http'; // Local server uses HTTP
+//   static const String basePath = '/assessorReport2/mobile';
 
   // Base URL for all API calls
   // Result: https://rlms.rlms.co.za/mobile

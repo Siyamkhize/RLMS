@@ -200,7 +200,13 @@ class MonitoringService {
 
       if (result.isNotEmpty && result.first['first_clock_in'] != null) {
         final clockInStr = result.first['first_clock_in'] as String;
-        return DateTime.parse('$today $clockInStr');
+        try {
+          return DateTime.parse('$today $clockInStr');
+        } catch (parseError) {
+          debugPrint(
+              '[MONITORING_SERVICE] Error parsing clock-in time: $clockInStr, error: $parseError');
+          return null;
+        }
       }
       return null;
     } catch (e) {

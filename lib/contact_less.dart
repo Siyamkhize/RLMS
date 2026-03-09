@@ -739,7 +739,12 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
         }
         widget.learners.clear();
         widget.learners.addAll(learnersWithClockingData.map((learner) {
-          return Map<String, String>.from(learner
+          // Convert QueryRow to Map<String, dynamic> first, then to Map<String, String>
+          final Map<String, dynamic> learnerMap = <String, dynamic>{};
+          learner.forEach((key, value) {
+            learnerMap[key] = value;
+          });
+          return Map<String, String>.from(learnerMap
               .map((key, value) => MapEntry(key, value?.toString() ?? '')));
         }).toList());
       });

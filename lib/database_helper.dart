@@ -1590,7 +1590,28 @@ updated_at TIMESTAMP
       where: 'LearnerID = ? AND clock_date = ? AND clock_out_time IS NULL',
       whereArgs: [learnerID, clockDate],
     );
-    return result.isNotEmpty ? result.first : null;
+    if (result.isEmpty) return null;
+
+    // Ensure only ONE open record per learner/date by cleaning up duplicates
+    if (result.length > 1) {
+      // Keep the earliest record by clocking_id, delete the rest
+      result.sort((a, b) {
+        final aId = (a['clocking_id'] ?? 0) as int;
+        final bId = (b['clocking_id'] ?? 0) as int;
+        return aId.compareTo(bId);
+      });
+      final keepId = result.first['clocking_id'] as int;
+      final deleted = await db.delete(
+        'learner_clocking',
+        where:
+            'LearnerID = ? AND clock_date = ? AND clock_out_time IS NULL AND clocking_id != ?',
+        whereArgs: [learnerID, clockDate, keepId],
+      );
+      print(
+          '[CLOCKING_CLEANUP] Removed $deleted duplicate open learner_clocking rows for learner=$learnerID, date=$clockDate, kept clocking_id=$keepId');
+    }
+
+    return result.first;
   }
 
 //find all data for clockins
@@ -1626,16 +1647,34 @@ updated_at TIMESTAMP
       // If no existing record, insert a new clock-in record
       await db.insert('learner_clocking', clockInData);
       print('Learner Clock In Data Inserted: $clockInData');
-    } else {
-      // If record exists, update the clock-in data (do not create a new record)
-      await db.update(
-        'learner_clocking',
-        clockInData,
-        where: 'LearnerID = ? AND clock_date = ?',
-        whereArgs: [learnerID, clockDate],
-      );
-      print('Learner Clock In Data Updated: $clockInData');
+      return;
     }
+
+    // If multiple records exist for this learner/date, clean them up: keep one, delete others
+    if (existingClockIn.length > 1) {
+      existingClockIn.sort((a, b) {
+        final aId = (a['clocking_id'] ?? 0) as int;
+        final bId = (b['clocking_id'] ?? 0) as int;
+        return aId.compareTo(bId);
+      });
+      final keepId = existingClockIn.first['clocking_id'] as int;
+      final deleted = await db.delete(
+        'learner_clocking',
+        where: 'LearnerID = ? AND clock_date = ? AND clocking_id != ?',
+        whereArgs: [learnerID, clockDate, keepId],
+      );
+      print(
+          '[CLOCKING_CLEANUP] Removed $deleted duplicate learner_clocking rows for learner=$learnerID, date=$clockDate, kept clocking_id=$keepId');
+    }
+
+    // Update the single remaining record
+    await db.update(
+      'learner_clocking',
+      clockInData,
+      where: 'LearnerID = ? AND clock_date = ?',
+      whereArgs: [learnerID, clockDate],
+    );
+    print('Learner Clock In Data Updated: $clockInData');
   }
 
 //update clock out
@@ -1658,9 +1697,11 @@ updated_at TIMESTAMP
       String contactTime = contactTimeDuration.toString();
 
       // Prepare the data to update the record
+      // Mark as unsynced so full offline record can be pushed to server
       Map<String, dynamic> updatedData = {
         'clock_out_time': clockOutData['clock_out_time'],
         'contact_time': contactTime, // Directly use the value of inMinutes
+        'synced': 0,
       };
 
       print('Learner Clock Out Data Updated: $updatedData');

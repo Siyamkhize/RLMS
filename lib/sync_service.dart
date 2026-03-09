@@ -673,21 +673,20 @@ class SyncService extends ChangeNotifier {
 
           // Insert or update each record
           for (var clocking in clockingData) {
-            // Map JSON keys to match table schema if needed
-            var mappedClocking = {
-              'clocking_id': clocking['clocking_id'],
-              'LearnerID': clocking['LearnerID'] ??
-                  clocking['learner_id'], // Handle key mismatch
-              'clock_date': clocking['clock_date'],
-              'clock_in_time': clocking['clock_in_time'],
-              'clock_out_time': clocking['clock_out_time'],
-              'contact_time': clocking['contact_time'],
-              'signature': clocking['signature'],
-              'synced': clocking['synced'] ??
-                  1, // Mark as synced since it's from server
-              'user_latitude': clocking['user_latitude'],
-              'user_longitude': clocking['user_longitude'],
-              'user_accuracy': clocking['user_accuracy'],
+            // Map JSON keys to match table schema - include ALL columns for full sync
+            final raw = clocking as Map<String, dynamic>;
+            var mappedClocking = <String, dynamic>{
+              'clocking_id': raw['clocking_id'],
+              'LearnerID': raw['LearnerID'] ?? raw['learner_id'],
+              'clock_date': raw['clock_date'],
+              'clock_in_time': raw['clock_in_time'],
+              'clock_out_time': raw['clock_out_time'],
+              'contact_time': raw['contact_time'],
+              'signature': raw['signature'],
+              'synced': raw['synced'] ?? 1,
+              'user_latitude': raw['user_latitude'],
+              'user_longitude': raw['user_longitude'],
+              'user_accuracy': raw['user_accuracy'],
             };
 
             // Validate required fields
@@ -711,49 +710,30 @@ class SyncService extends ChangeNotifier {
             print("Merging server record: $mappedClocking");
             try {
               final db = await _dbHelper.database;
-              // Check for existing record with same learner, date, AND clock-in time
+              // Check for existing record with same learner and date ONLY.
+              // This guarantees max ONE local record per learner per date.
               final existingRecords = await db.query(
                 'learner_clocking',
-                where: 'LearnerID = ? AND clock_date = ? AND clock_in_time = ?',
+                where: 'LearnerID = ? AND clock_date = ?',
                 whereArgs: [
                   mappedClocking['LearnerID'],
                   mappedClocking['clock_date'],
-                  mappedClocking['clock_in_time']
                 ],
               );
 
               if (existingRecords.isNotEmpty) {
-                final existingRecord = existingRecords.first;
-
-                // Only preserve local unsynced records (synced=0)
-                // Server records (synced=1 or coming from server) should always be accepted
-                if (existingRecord['synced'] == 0 &&
-                    existingRecord['clock_in_time'] != null &&
-                    existingRecord['clock_out_time'] == null) {
-                  // Local has unsynced clock-in without clock-out - preserve it
-                  print(
-                      "PRESERVING local unsynced clock-in for ${mappedClocking['LearnerID']}");
-                  continue;
-                }
-
-                // Update with server data (server is source of truth for current day)
-                await db.update(
+                // NEVER overwrite local records - local is source of truth.
+                // Also, do NOT create a second record for the same learner/date.
+                print(
+                    "⏭️ PRESERVING local record for ${mappedClocking['LearnerID']} (clock_date=${mappedClocking['clock_date']}) - not inserting duplicate for day");
+                skippedCount++;
+              } else {
+                // Insert new record from server (no existing record for that learner/date)
+                await db.insert(
                   'learner_clocking',
                   mappedClocking,
-                  where:
-                      'LearnerID = ? AND clock_date = ? AND clock_in_time = ?',
-                  whereArgs: [
-                    mappedClocking['LearnerID'],
-                    mappedClocking['clock_date'],
-                    mappedClocking['clock_in_time']
-                  ],
+                  conflictAlgorithm: ConflictAlgorithm.replace,
                 );
-                print(
-                    "✅ Updated local with server record for ${mappedClocking['LearnerID']}");
-                insertedCount++;
-              } else {
-                // Insert new record from server (no existing record found)
-                await db.insert('learner_clocking', mappedClocking);
                 print(
                     "✅ Inserted new server record for ${mappedClocking['LearnerID']}");
                 insertedCount++;
@@ -811,12 +791,16 @@ class SyncService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Only sync current day's records
-      final today = DateTime.now().toIso8601String().split('T')[0];
+      // Sync ALL unsynced records for the last 10 days (including clock-in only)
+      // This allows devices to be offline for a few days but avoids sending very old data.
+      final now = DateTime.now();
+      final cutoffDate =
+          DateFormat('yyyy-MM-dd').format(now.subtract(const Duration(days: 10)));
+
       final List<Map<String, dynamic>> clockingDataList = await db.query(
         'learner_clocking',
-        where: 'synced = ? AND clock_date = ?',
-        whereArgs: [false, today],
+        where: 'synced = ? AND clock_date >= ?',
+        whereArgs: [0, cutoffDate],
       );
 
       if (clockingDataList.isEmpty) {
@@ -832,7 +816,7 @@ class SyncService extends ChangeNotifier {
         final clockInTime = clockingData['clock_in_time'];
         final clockOutTime = clockingData['clock_out_time'];
         final contactTime = clockingData['contact_time'];
-        final signaturePath = clockingData['signature_path'];
+        // We no longer send signature for clocking sync; always null on server
         final userLatitude = clockingData['user_latitude'];
         final userLongitude = clockingData['user_longitude'];
         final userAccuracy = clockingData['user_accuracy'];
@@ -858,32 +842,6 @@ class SyncService extends ChangeNotifier {
             request.fields['user_latitude'] = userLatitude?.toString() ?? '';
             request.fields['user_longitude'] = userLongitude?.toString() ?? '';
             request.fields['user_accuracy'] = userAccuracy?.toString() ?? '';
-
-            // Add signature file if it exists
-            if (signaturePath != null && File(signaturePath).existsSync()) {
-              var signatureFile = File(signaturePath);
-              var signatureStream = http.ByteStream(signatureFile.openRead());
-              var signatureLength = await signatureFile.length();
-              var extension = path
-                  .extension(signaturePath)
-                  .toLowerCase()
-                  .replaceFirst('.', '');
-              var mimeType = extension == 'png' ? 'image/png' : 'image/jpeg';
-
-              var signatureMultipart = http.MultipartFile(
-                'signature',
-                signatureStream,
-                signatureLength,
-                filename: path.basename(signaturePath),
-                contentType: MediaType.parse(mimeType),
-              );
-              request.files.add(signatureMultipart);
-              print(
-                  'Attempt $attempt: Signature file added: $signaturePath, MIME type: $mimeType');
-            } else if (signaturePath != null) {
-              print(
-                  'Attempt $attempt: Signature file not found: $signaturePath');
-            }
 
             // Log request details
             print('Attempt $attempt: Request fields: ${request.fields}');
@@ -2941,7 +2899,7 @@ class SyncService extends ChangeNotifier {
         final clockInTime = clockingData['clock_in_time'];
         final clockOutTime = clockingData['clock_out_time'];
         final contactTime = clockingData['contact_time'];
-        final signaturePath = clockingData['signature_path'];
+        final signaturePath = clockingData['signature_path'] ?? clockingData['signature'];
         final userLatitude = clockingData['user_latitude'];
         final userLongitude = clockingData['user_longitude'];
         final userAccuracy = clockingData['user_accuracy'];

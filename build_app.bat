@@ -1,13 +1,16 @@
 @echo off
 echo ========================================
-echo Building Flutter App
+echo BUILDING APP WITH TYPE CASTING FIX V2
 echo ========================================
 echo.
+echo Fix Applied: Using for-loop instead of cast
+echo This should resolve the CastList error
+echo.
 
-echo Step 1: Cleaning...
+echo Step 1: Cleaning build cache...
 call flutter clean
 if %errorlevel% neq 0 (
-    echo ERROR: Flutter clean failed
+    echo ERROR: Flutter clean failed!
     pause
     exit /b 1
 )
@@ -17,27 +20,29 @@ echo.
 echo Step 2: Getting dependencies...
 call flutter pub get
 if %errorlevel% neq 0 (
-    echo ERROR: Pub get failed
+    echo ERROR: Flutter pub get failed!
     pause
     exit /b 1
 )
-echo Dependencies retrieved!
+echo Dependencies updated!
 echo.
 
-echo Step 3: Building APK (this may take a few minutes)...
-call flutter build apk --debug
+echo Step 3: Building and running app...
+echo This will take 2-3 minutes...
+call flutter run
 if %errorlevel% neq 0 (
-    echo ERROR: Build failed
-    echo Check the error messages above
+    echo ERROR: Flutter run failed!
     pause
     exit /b 1
 )
 
 echo.
 echo ========================================
-echo BUILD SUCCESSFUL!
+echo BUILD COMPLETE!
 echo ========================================
-echo APK Location: build\app\outputs\flutter-apk\app-debug.apk
+echo.
+echo The app should now be running with the fix applied.
+echo Check the console for the load summary.
+echo You should see: [LOAD] Total unique learners: 33
 echo.
 pause
-
