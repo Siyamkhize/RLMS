@@ -2526,13 +2526,13 @@ class SyncService extends ChangeNotifier {
               'N/A',
               'n/a',
               '1900-01-01',
-              '0',
               '0.0',
               'false',
               'null',
               'NULL',
               'undefined'
             ];
+            // Don't exclude '0' as it's a valid value for Age (newborns) and other numeric fields
             return excludeValues.contains(trimmed);
           }
 

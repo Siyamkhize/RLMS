@@ -10,14 +10,9 @@ import 'sdp_learners_page.dart';
 import 'learner_list_page.dart'; // Import LearnerListPage for class navigation
 import 'LearnerDetailsPage.dart'; // Import for View button
 import 'finance_register_history.dart'; // Import for Attendance button
-import 'learner_induction_page.dart'; // Import for Induction button
-
+// Import for Documents button
 import 'config.dart'; // Import AppConfig
 import 'dart:async'; // For Timer
-
-// ADMIN PAGE WITH STRICT PROJECT FILTERING
-// This implementation ensures learner searches are restricted to the current project context
-// to prevent document upload confusion when same person is enrolled in multiple projects
 
 class AdminPage extends StatefulWidget {
   final String sdp;
@@ -123,7 +118,7 @@ class _AdminPageState extends State<AdminPage> {
     super.dispose();
   }
 
-  // Smart search functionality with STRICT PROJECT FILTERING
+  // Smart search functionality
   void _onSearchTextChanged() {
     final query = _searchController.text.trim();
 
@@ -167,46 +162,12 @@ class _AdminPageState extends State<AdminPage> {
     });
 
     try {
-      // Get SDP identifier
-      String sdpIdentifier = widget.sdp.trim();
-      if (sdpIdentifier.isEmpty) {
-        final resolved = _resolveSdpIdentifier();
-        if (resolved != null && resolved.isNotEmpty) {
-          sdpIdentifier = resolved;
-        }
-      }
-
-      // Build query params with STRICT PROJECT filtering
-      final queryParams = <String, String>{
-        'q': query,
-        'limit': '8',
-      };
-
-      if (sdpIdentifier.isNotEmpty) {
-        queryParams['sdp_id'] = sdpIdentifier;
-      }
-
-      // STRICT PROJECT FILTERING - only search within current project context
-      if (widget.projectId != null && widget.projectId!.isNotEmpty) {
-        queryParams['project_id'] = widget.projectId!;
-        debugPrint(
-            '[ADMIN] STRICT FILTER: Searching only in project_id: ${widget.projectId}');
-      }
-      if (widget.pathwayId != null && widget.pathwayId!.isNotEmpty) {
-        queryParams['pathway_id'] = widget.pathwayId!;
-        debugPrint(
-            '[ADMIN] STRICT FILTER: Searching only in pathway_id: ${widget.pathwayId}');
-      }
-      if (widget.qualificationId != null &&
-          widget.qualificationId!.isNotEmpty) {
-        queryParams['qualification_id'] = widget.qualificationId!;
-        debugPrint(
-            '[ADMIN] STRICT FILTER: Searching only in qualification_id: ${widget.qualificationId}');
-      }
-
-      // Use project-filtered autocomplete endpoint for STRICT project filtering
-      final url = AppConfig.buildUrl('search_learner_autocomplete_sdp.php',
-          queryParams: queryParams);
+      // Use global search autocomplete endpoint (no SDP filter)
+      final url = AppConfig.buildUrl('search_learner_autocomplete_global.php',
+          queryParams: {
+            'q': query,
+            'limit': '8',
+          });
 
       final response = await http.get(Uri.parse(url)).timeout(
             const Duration(seconds: 5),
@@ -366,8 +327,9 @@ class _AdminPageState extends State<AdminPage> {
             '[ADMIN] Filtering by qualification_id: ${widget.qualificationId}');
       }
 
-      final uri = Uri.parse(
-          AppConfig.buildUrl('get_sdp_all_data.php', queryParams: queryParams));
+      final uri = Uri.parse(AppConfig.getSdpSitesUrl).replace(
+        queryParameters: queryParams,
+      );
       debugPrint('[ADMIN] Requesting URL: $uri');
 
       final response = await http.get(uri).timeout(
@@ -377,60 +339,34 @@ class _AdminPageState extends State<AdminPage> {
 
       debugPrint('[ADMIN] Response status: ${response.statusCode}');
       debugPrint(
-          '[ADMIN] Response body (first 500 chars): ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
+          '[ADMIN] Response body: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
 
       if (response.statusCode == 200) {
-        try {
-          // Clean the response body - remove any HTML tags and whitespace
-          String cleaned = response.body.trim();
-
-          // Remove any HTML/PHP output before JSON
-          cleaned = cleaned.replaceAll(RegExp(r'<[^>]+>'), '').trim();
-
-          // Find JSON boundaries
-          final start = cleaned.indexOf('{');
-          final end = cleaned.lastIndexOf('}');
-
-          if (start == -1 || end == -1 || end < start) {
-            throw Exception('No valid JSON found in response');
-          }
-
+        String cleaned =
+            response.body.replaceAll(RegExp(r'<[^>]+>'), '').trim();
+        final start = cleaned.indexOf('{');
+        final end = cleaned.lastIndexOf('}');
+        if (start != -1 && end != -1 && end >= start) {
           cleaned = cleaned.substring(start, end + 1);
+        }
+        final jsonData = json.decode(cleaned);
+        debugPrint(
+            '[ADMIN] Parsed JSON success: ${jsonData['success']}, data count: ${jsonData['data']?.length ?? 0}');
 
-          debugPrint(
-              '[ADMIN] Cleaned JSON (first 200 chars): ${cleaned.substring(0, cleaned.length > 200 ? 200 : cleaned.length)}');
-
-          final jsonData = json.decode(cleaned);
-          debugPrint(
-              '[ADMIN] Parsed JSON - success: ${jsonData['success']}, sites count: ${jsonData['sites']?.length ?? 0}');
-
-          if (jsonData['success'] == true && jsonData['sites'] != null) {
-            final sites = List<Map<String, dynamic>>.from(jsonData['sites']);
-            debugPrint(
-                '[ADMIN] Successfully loaded ${sites.length} sites from API');
-
-            // Cache for offline use
-            try {
-              await DatabaseHelper().saveSdpSitesForOffline(sdpId, sites);
-              debugPrint('[ADMIN] Sites cached for offline use');
-            } catch (e) {
-              debugPrint('[ADMIN] Failed to cache sites for offline: $e');
-            }
-
-            if (mounted) {
-              setState(() {
-                _siteData = sites;
-                _isLoading = false;
-              });
-            }
-            return;
-          } else {
-            debugPrint(
-                '[ADMIN] API returned success=false or no sites: ${jsonData['message'] ?? 'Unknown error'}');
+        if (jsonData['success'] == true && jsonData['data'] != null) {
+          final sites = List<Map<String, dynamic>>.from(jsonData['data']);
+          debugPrint('[ADMIN] Loaded ${sites.length} sites from API');
+          // Offline caching removed - method not implemented
+          if (mounted) {
+            setState(() {
+              _siteData = sites;
+              _isLoading = false;
+            });
           }
-        } catch (e) {
-          debugPrint('[ADMIN] Error parsing JSON response: $e');
-          debugPrint('[ADMIN] Raw response: ${response.body}');
+          return;
+        } else {
+          debugPrint(
+              '[ADMIN] API returned success=false or no data: ${jsonData['message'] ?? 'Unknown error'}');
         }
       }
 
@@ -465,15 +401,7 @@ class _AdminPageState extends State<AdminPage> {
 
       // Fetch sites where sdp_id matches the passed sdp (even if widget.sdp is name/email)
       final int sdpId = await _resolveOfflineSdpId(dbHelper);
-
-      debugPrint('[ADMIN] ===== OFFLINE SITES LOOKUP =====');
-      debugPrint('[ADMIN] SDP ID resolved: $sdpId');
-      debugPrint('[ADMIN] Project ID: ${widget.projectId}');
-      debugPrint('[ADMIN] Pathway ID: ${widget.pathwayId}');
-      debugPrint('[ADMIN] Qualification ID: ${widget.qualificationId}');
-
       if (sdpId == 0) {
-        debugPrint('[ADMIN] ❌ Invalid SDP ID, cannot load sites');
         setState(() {
           _siteData = [];
           _isLoading = false;
@@ -481,94 +409,34 @@ class _AdminPageState extends State<AdminPage> {
         return;
       }
 
-      // Check what's in the sites table
-      final db = await dbHelper.database;
-      final allSites = await db.query('sites');
-      debugPrint('[ADMIN] Total sites in database: ${allSites.length}');
-
-      if (allSites.isNotEmpty) {
-        // Show sites grouped by sdp_id
-        final sitesGrouped = <int, int>{};
-        for (var site in allSites) {
-          final siteSDPId =
-              int.tryParse(site['sdp_id']?.toString() ?? '0') ?? 0;
-          sitesGrouped[siteSDPId] = (sitesGrouped[siteSDPId] ?? 0) + 1;
-        }
-        debugPrint('[ADMIN] Sites by SDP:');
-        sitesGrouped.forEach((id, count) {
-          debugPrint('  - SDP ID $id: $count sites');
-        });
-      }
-
       // Now pass the sdpId to your database method
       List<Map<String, dynamic>> offlineSites;
 
+      final db = await dbHelper.database;
       final where = <String>['sdp_id = ?'];
       final args = <Object>[sdpId];
 
       if (widget.projectId != null && widget.projectId!.isNotEmpty) {
         where.add('project_id = ?');
         args.add(int.tryParse(widget.projectId!) ?? 0);
-        debugPrint('[ADMIN] Filtering by project_id: ${widget.projectId}');
       }
 
       // NOTE: widget.pathwayId is passed as pathway NAME (see sdp_learning_pathways_page.dart)
       if (widget.pathwayId != null && widget.pathwayId!.isNotEmpty) {
         where.add('LOWER(TRIM(Project_pathway)) = LOWER(TRIM(?))');
         args.add(widget.pathwayId!);
-        debugPrint('[ADMIN] Filtering by pathway: ${widget.pathwayId}');
       }
       if (widget.qualificationId != null &&
           widget.qualificationId!.isNotEmpty) {
-        // Only filter by qualification if the site has a qualification_id set
-        // Sites with null qualification_id should still be shown
-        where.add(
-            '(TRIM(qualification_id) = TRIM(?) OR qualification_id IS NULL OR qualification_id = "")');
+        where.add('TRIM(qualification_id) = TRIM(?)');
         args.add(widget.qualificationId!);
-        debugPrint(
-            '[ADMIN] Filtering by qualification_id: ${widget.qualificationId} (including null)');
       }
-
-      debugPrint(
-          '[ADMIN] Query: SELECT * FROM sites WHERE ${where.join(' AND ')}');
-      debugPrint('[ADMIN] Args: $args');
 
       offlineSites = await db.query(
         'sites',
         where: where.join(' AND '),
         whereArgs: args,
       );
-
-      debugPrint('[ADMIN] Found ${offlineSites.length} sites matching filters');
-
-      if (offlineSites.isEmpty) {
-        debugPrint('[ADMIN] ❌ No sites found with current filters');
-        debugPrint('[ADMIN] Trying without qualification filter...');
-
-        // Try without qualification filter
-        final whereNoQual = <String>['sdp_id = ?'];
-        final argsNoQual = <Object>[sdpId];
-        if (widget.projectId != null && widget.projectId!.isNotEmpty) {
-          whereNoQual.add('project_id = ?');
-          argsNoQual.add(int.tryParse(widget.projectId!) ?? 0);
-        }
-
-        final sitesNoQual = await db.query(
-          'sites',
-          where: whereNoQual.join(' AND '),
-          whereArgs: argsNoQual,
-        );
-
-        debugPrint(
-            '[ADMIN] Without qualification filter: ${sitesNoQual.length} sites');
-        if (sitesNoQual.isNotEmpty) {
-          debugPrint('[ADMIN] Available qualification IDs in these sites:');
-          for (var site in sitesNoQual) {
-            debugPrint(
-                '  - Site: ${site['siteName']}, Qual ID: ${site['qualification_id']}');
-          }
-        }
-      }
 
       // Normalize keys for table (API uses lowercase; DB may use Province, Project_pathway)
       final normalized = offlineSites.map((s) {
@@ -590,15 +458,11 @@ class _AdminPageState extends State<AdminPage> {
         return m;
       }).toList();
 
-      debugPrint('[ADMIN] ✅ Returning ${normalized.length} normalized sites');
-      debugPrint('[ADMIN] ===== END OFFLINE SITES LOOKUP =====');
-
       setState(() {
         _siteData = normalized;
         _isLoading = false;
       });
     } catch (e) {
-      debugPrint('[ADMIN] ❌ Error loading offline sites: $e');
       setState(() {
         _isLoading = false;
       });
@@ -720,9 +584,9 @@ class _AdminPageState extends State<AdminPage> {
 
     print('[ADMIN] ❌ Cache MISS for ID: $idNumber');
 
-    // Try local database first (faster!) - PROJECT-FILTERED SEARCH
-    print('[ADMIN] 🔍 Searching local database first (PROJECT-FILTERED)...');
-    final localResult = await _searchLearnerOffline(idNumber);
+    // Try local database first (faster!) - GLOBAL SEARCH (no SDP filter)
+    print('[ADMIN] 🔍 Searching local database first (GLOBAL)...');
+    final localResult = await _searchLearnerOfflineGlobal(idNumber);
     if (localResult != null) {
       print('[ADMIN] ✅ Found in local database!');
       // Cache the local result
@@ -733,56 +597,21 @@ class _AdminPageState extends State<AdminPage> {
       return localResult;
     }
 
-    // Not found locally, try server with PROJECT FILTERING
-    print(
-        '[ADMIN] ⚠️ Not found locally, searching server with PROJECT FILTERING...');
+    // Not found locally, try server
+    print('[ADMIN] ⚠️ Not found locally, searching server...');
 
     try {
-      // Get SDP identifier
-      String sdpIdentifier = widget.sdp.trim();
-      if (sdpIdentifier.isEmpty) {
-        final resolved = _resolveSdpIdentifier();
-        if (resolved != null && resolved.isNotEmpty) {
-          sdpIdentifier = resolved;
-        }
-      }
-
-      // Build query parameters with STRICT PROJECT filtering
-      final queryParams = <String, String>{
-        'search': idNumber, // PHP expects 'search' not 'id_number'
-        'page': '1',
-        'limit': '50',
-      };
-
-      if (sdpIdentifier.isNotEmpty) {
-        queryParams['sdp_id'] = sdpIdentifier;
-      }
-
-      // STRICT PROJECT FILTERING - only search within current project context
-      if (widget.projectId != null && widget.projectId!.isNotEmpty) {
-        queryParams['project_id'] = widget.projectId!;
-        debugPrint(
-            '[ADMIN] STRICT FILTER: Searching only in project_id: ${widget.projectId}');
-      }
-      if (widget.pathwayId != null && widget.pathwayId!.isNotEmpty) {
-        queryParams['pathway_id'] = widget.pathwayId!;
-        debugPrint(
-            '[ADMIN] STRICT FILTER: Searching only in pathway_id: ${widget.pathwayId}');
-      }
-      if (widget.qualificationId != null &&
-          widget.qualificationId!.isNotEmpty) {
-        queryParams['qualification_id'] = widget.qualificationId!;
-        debugPrint(
-            '[ADMIN] STRICT FILTER: Searching only in qualification_id: ${widget.qualificationId}');
-      }
-
-      // Use project-filtered search endpoint for STRICT project filtering
+      // Use global search endpoint (no SDP filter) with 5s timeout for faster feedback
       final uri =
           Uri.parse(AppConfig.buildUrl('search_learner_global.php')).replace(
-        queryParameters: queryParams,
+        queryParameters: {
+          'search': idNumber, // Fixed: PHP expects 'search' not 'id_number'
+          'page': '1',
+          'limit': '50',
+        },
       );
 
-      print('[ADMIN] Searching learner online (PROJECT-FILTERED): $uri');
+      print('[ADMIN] Searching learner online (global): $uri');
 
       final response = await http.get(uri).timeout(
         const Duration(seconds: 5), // Reduced timeout from 10s to 5s
@@ -865,62 +694,89 @@ class _AdminPageState extends State<AdminPage> {
         throw Exception('SDP identifier not available');
       }
 
-      // STRICT PROJECT FILTERING for offline search
-      final db = await dbHelper.database;
+      // Get all learners for this SDP
+      final learners = await dbHelper.getLearnersBySdp(sdpIdentifier);
 
-      // Build WHERE clause with project filtering
-      final where = <String>['IDNumber = ?'];
-      final args = <Object>[idNumber];
-
-      // Add SDP filter
-      final sdpId = await _resolveOfflineSdpId(dbHelper);
-      if (sdpId > 0) {
-        where.add('l.sdp_id = ?');
-        args.add(sdpId);
+      // Find learner by ID number
+      for (final learner in learners) {
+        final learnerIdNumber = learner['IDNumber']?.toString().trim();
+        if (learnerIdNumber != null && learnerIdNumber == idNumber) {
+          return {
+            'learner_id': learner['LearnerID']?.toString() ?? '',
+            'name': learner['Name']?.toString() ?? '',
+            'surname': learner['Surname']?.toString() ?? '',
+            'id_number': learnerIdNumber,
+            'class_id': learner['classID']?.toString() ?? '',
+            'class_name': learner['className']?.toString() ?? '',
+          };
+        }
       }
 
-      // STRICT PROJECT FILTERING - only search within current project context
-      if (widget.projectId != null && widget.projectId!.isNotEmpty) {
-        where.add('c.project_id = ?');
-        args.add(int.tryParse(widget.projectId!) ?? 0);
-        debugPrint(
-            '[ADMIN] OFFLINE STRICT FILTER: Searching only in project_id: ${widget.projectId}');
-      }
+      return null;
+    } catch (e) {
+      print('[ADMIN] Error searching offline: $e');
+      return null;
+    }
+  }
 
-      // Query with JOIN to get class and project information for filtering
-      final query = '''
-        SELECT l.*, c.ClassName, c.classID, c.project_id
-        FROM learner l
-        LEFT JOIN class c ON l.classID = c.classID
-        WHERE ${where.join(' AND ')}
-        LIMIT 1
-      ''';
+  // Global search - searches ALL learners in local database (no SDP filter)
+  Future<Map<String, dynamic>?> _searchLearnerOfflineGlobal(
+      String idNumber) async {
+    try {
+      print('[ADMIN] 🔍 _searchLearnerOfflineGlobal called with ID: $idNumber');
+      final dbHelper = DatabaseHelper();
 
-      debugPrint('[ADMIN] OFFLINE QUERY: $query');
-      debugPrint('[ADMIN] OFFLINE ARGS: $args');
+      // Use the global fetchLearnerByIDNumber method
+      print('[ADMIN] 📞 Calling dbHelper.fetchLearnerByIDNumber...');
+      final learner = await dbHelper.fetchLearnerByIDNumber(idNumber);
 
-      final results = await db.rawQuery(query, args);
+      if (learner != null) {
+        print(
+            '[ADMIN] ✅ Learner found in local DB: ${learner['Name']} ${learner['Surname']}');
+        // Get class name if available
+        String? className;
+        final classId = learner['classID']?.toString();
+        if (classId != null && classId.isNotEmpty) {
+          try {
+            final db = await dbHelper.database;
+            final classResult = await db.query(
+              'class',
+              columns: ['ClassName'],
+              where: 'classID = ?',
+              whereArgs: [classId],
+              limit: 1,
+            );
+            if (classResult.isNotEmpty) {
+              className = classResult.first['ClassName']?.toString();
+              print('[ADMIN] 📚 Class name found: $className');
+            } else {
+              print('[ADMIN] ⚠️ No class found for classID: $classId');
+            }
+          } catch (e) {
+            print('[ADMIN] ❌ Error fetching class name: $e');
+          }
+        } else {
+          print('[ADMIN] ⚠️ No classID for learner');
+        }
 
-      if (results.isNotEmpty) {
-        final learner = results.first;
-        debugPrint(
-            '[ADMIN] OFFLINE FOUND: ${learner['Name']} ${learner['Surname']} in project ${learner['project_id']}');
-
-        return {
+        final result = {
           'learner_id': learner['LearnerID']?.toString() ?? '',
           'name': learner['Name']?.toString() ?? '',
           'surname': learner['Surname']?.toString() ?? '',
           'id_number': learner['IDNumber']?.toString() ?? '',
-          'class_id': learner['classID']?.toString() ?? '',
-          'class_name': learner['ClassName']?.toString() ?? '',
+          'class_id': classId ?? '',
+          'class_name': className ?? '',
         };
+        print('[ADMIN] 📦 Returning learner data: $result');
+        return result;
+      } else {
+        print('[ADMIN] ❌ No learner found in local DB for ID: $idNumber');
       }
 
-      debugPrint(
-          '[ADMIN] OFFLINE: No learner found with ID $idNumber in current project context');
       return null;
     } catch (e) {
-      print('[ADMIN] Error searching offline: $e');
+      print('[ADMIN] ❌ Error searching offline (global): $e');
+      print('[ADMIN] Stack trace: ${StackTrace.current}');
       return null;
     }
   }
@@ -1294,6 +1150,42 @@ class _AdminPageState extends State<AdminPage> {
     );
   }
 
+  // Show document upload dialog
+  void _showDocumentUploadDialog(String learnerId) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Document Upload'),
+          content: const Text(
+            'Document upload functionality requires navigating to the learner details page.\n\n'
+            'Click "View" button to access full document management.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => LearnerDetailsPage(
+                      learnerID: learnerId,
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Go to Details'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _openSdpLearners() {
     String identifier = widget.sdp.trim();
 
@@ -1465,8 +1357,6 @@ class _AdminPageState extends State<AdminPage> {
                               final idNumber = suggestion['id_number'] ?? '';
                               final className = suggestion['class_name'] ?? '';
                               final siteName = suggestion['site_name'] ?? '';
-                              final projectName =
-                                  suggestion['project_name'] ?? '';
 
                               return ListTile(
                                 dense: true,
@@ -1477,7 +1367,7 @@ class _AdminPageState extends State<AdminPage> {
                                       fontWeight: FontWeight.w500),
                                 ),
                                 subtitle: Text(
-                                  'Project: $projectName${className.isNotEmpty ? ' • Class: $className' : ''}${siteName.isNotEmpty ? ' • Site: $siteName' : ''}',
+                                  'Class: $className${siteName.isNotEmpty ? ' • Site: $siteName' : ''}',
                                   style: const TextStyle(fontSize: 12),
                                 ),
                                 onTap: () =>
@@ -1654,35 +1544,6 @@ class _AdminPageState extends State<AdminPage> {
                               label: const Text('Attendance'),
                             ),
                             ElevatedButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => LearnerInductionPage(
-                                      learnerID: _searchedLearner!['learner_id']
-                                              ?.toString() ??
-                                          '',
-                                      learnerName:
-                                          '${_searchedLearner!['surname'] ?? ''} ${_searchedLearner!['name'] ?? ''}'
-                                              .trim(),
-                                      classID: _searchedLearner!['class_id']
-                                              ?.toString() ??
-                                          '',
-                                    ),
-                                  ),
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.teal,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                              ),
-                              icon: const Icon(Icons.access_time),
-                              label: const Text('Induction'),
-                            ),
-                            ElevatedButton.icon(
                               onPressed: syncUnsyncedDocuments,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.purple,
@@ -1758,17 +1619,14 @@ class _AdminPageState extends State<AdminPage> {
                                       'N/A'));
 
                           return DataRow(cells: [
-                            DataCell(
-                                Text(item['siteName']?.toString() ?? 'N/A')),
-                            DataCell(Text((item['project_name'] ??
-                                    item['project_id'] ??
-                                    'N/A')
-                                .toString())),
-                            DataCell(Text((item['sdp_name'] ??
-                                    item['sdp_client_name'] ??
-                                    item['sdp_id'] ??
-                                    'N/A')
-                                .toString())),
+                            DataCell(Text(item['siteName'] ?? 'N/A')),
+                            DataCell(Text(item['project_name'] ??
+                                item['project_id'] ??
+                                'N/A')),
+                            DataCell(Text(item['sdp_name'] ??
+                                item['sdp_client_name'] ??
+                                item['sdp_id'] ??
+                                'N/A')),
                             DataCell(
                               Tooltip(
                                 message: pathways,
@@ -1791,15 +1649,10 @@ class _AdminPageState extends State<AdminPage> {
                                 ),
                               ),
                             ),
-                            DataCell(Text(
-                                item['beneficiaries']?.toString() ?? 'N/A')),
-                            DataCell(
-                                Text(item['classes']?.toString() ?? 'N/A')),
-                            DataCell(
-                                Text(item['coordinates']?.toString() ?? 'N/A')),
-                            DataCell(Text(
-                                (item['province'] ?? item['Province'] ?? 'N/A')
-                                    .toString())),
+                            DataCell(Text(item['beneficiaries'] ?? 'N/A')),
+                            DataCell(Text(item['classes'] ?? 'N/A')),
+                            DataCell(Text(item['coordinates'] ?? 'N/A')),
+                            DataCell(Text(item['province'] ?? 'N/A')),
                             DataCell(
                               ElevatedButton(
                                 onPressed: () {

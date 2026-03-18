@@ -52,7 +52,23 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
       });
       debugPrint(
           '[SDP_PROJECTS] Loaded ${projects.length} projects from widget');
+      // Print project names for debugging
+      for (var project in projects) {
+        debugPrint(
+            '[SDP_PROJECTS] - ${project['Project_name'] ?? project['project_name']}');
+      }
+
+      // If we have fewer than expected projects, also try to fetch from server
+      // This handles cases where login data might be incomplete
+      if (projects.length < 3) {
+        // Adjust this threshold as needed
+        debugPrint(
+            '[SDP_PROJECTS] Only ${projects.length} projects from widget, fetching more from server...');
+        _loadProjects();
+      }
     } else {
+      debugPrint(
+          '[SDP_PROJECTS] No projects from widget, fetching from server...');
       _loadProjects();
     }
     _searchController.addListener(() {
@@ -161,6 +177,11 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
         final response =
             await http.get(Uri.parse(url)).timeout(const Duration(seconds: 30));
 
+        debugPrint(
+            '[SDP_PROJECTS] Server response status: ${response.statusCode}');
+        debugPrint(
+            '[SDP_PROJECTS] Server response body length: ${response.body.length}');
+
         if (response.statusCode == 200) {
           String cleaned =
               response.body.replaceAll(RegExp(r'<[^>]+>'), '').trim();
@@ -170,22 +191,84 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
             cleaned = cleaned.substring(start, end + 1);
           }
 
+          debugPrint(
+              '[SDP_PROJECTS] Cleaned response: ${cleaned.substring(0, cleaned.length > 200 ? 200 : cleaned.length)}...');
+
           final data = json.decode(cleaned);
+          debugPrint('[SDP_PROJECTS] Parsed data success: ${data['success']}');
+          debugPrint(
+              '[SDP_PROJECTS] Projects count in response: ${data['projects']?.length ?? 0}');
+
           if (data['success'] == true) {
             final projectsList =
                 List<Map<String, dynamic>>.from(data['projects'] ?? []);
 
+            debugPrint(
+                '[SDP_PROJECTS] Successfully loaded ${projectsList.length} projects from server');
+            for (var project in projectsList) {
+              debugPrint(
+                  '[SDP_PROJECTS] - ${project['Project_name'] ?? project['project_name']}');
+            }
+
             setState(() {
-              projects = projectsList;
+              // If we already have projects (from widget), merge them with server data
+              // This prevents losing data when doing a fallback fetch
+              if (projects.isNotEmpty) {
+                debugPrint(
+                    '[SDP_PROJECTS] Merging ${projectsList.length} server projects with ${projects.length} existing projects');
+                // Create a map of existing projects by ID for quick lookup
+                final existingProjectMap = <String, Map<String, dynamic>>{};
+                for (var existing in projects) {
+                  final id = existing['project_id']?.toString();
+                  if (id != null) existingProjectMap[id] = existing;
+                }
+
+                // Update existing projects with server data (server data is more complete)
+                // and add new projects that don't already exist
+                final updatedProjects = <Map<String, dynamic>>[];
+
+                for (var serverProject in projectsList) {
+                  final id = serverProject['project_id']?.toString();
+                  if (id != null && existingProjectMap.containsKey(id)) {
+                    // Update existing project with server data (server has site/learner counts)
+                    debugPrint(
+                        '[SDP_PROJECTS] Updated project with server data: ${serverProject['Project_name'] ?? serverProject['project_name']}');
+                    updatedProjects.add(serverProject);
+                    existingProjectMap.remove(id); // Mark as processed
+                  } else if (id != null) {
+                    // New project from server
+                    updatedProjects.add(serverProject);
+                    debugPrint(
+                        '[SDP_PROJECTS] Added new project: ${serverProject['Project_name'] ?? serverProject['project_name']}');
+                  }
+                }
+
+                // Add any remaining widget projects that weren't found on server
+                for (var remainingProject in existingProjectMap.values) {
+                  updatedProjects.add(remainingProject);
+                  debugPrint(
+                      '[SDP_PROJECTS] Kept widget-only project: ${remainingProject['Project_name'] ?? remainingProject['project_name']}');
+                }
+
+                projects = updatedProjects;
+                debugPrint(
+                    '[SDP_PROJECTS] Final project count after merge: ${projects.length}');
+              } else {
+                // No existing projects, use server data
+                projects = projectsList;
+              }
               isLoading = false;
             });
             return;
           } else {
+            debugPrint(
+                '[SDP_PROJECTS] Server returned error: ${data['message']}');
             setState(() {
               errorMessage = data['message'] ?? 'Failed to load projects';
             });
           }
         } else {
+          debugPrint('[SDP_PROJECTS] Server error: ${response.statusCode}');
           setState(() {
             errorMessage = 'Server error: ${response.statusCode}';
           });
