@@ -9,6 +9,7 @@ import 'package:flutter_doc_scanner/flutter_doc_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'database_helper.dart';
 import 'package:intl/intl.dart';
+import 'services/camera_resource_manager.dart';
 
 import 'config.dart';
 
@@ -34,6 +35,23 @@ class _CameraScanPageState extends State<CameraScanPage> {
   bool isScanning = false;
   List<File> scannedImages = [];
   final TextEditingController _logbookTextController = TextEditingController();
+  final CameraResourceManager _cameraManager = CameraResourceManager();
+
+  String? _tryUriToFilePath(String raw) {
+    try {
+      final uri = Uri.parse(raw);
+      if (uri.scheme == 'file') {
+        return uri.toFilePath(windows: false);
+      }
+      // Some scanners return plain paths (no scheme) or other schemes.
+      // We only handle file paths here; other schemes must be resolved by plugin/native side.
+      if (uri.scheme.isEmpty) return raw;
+      return null;
+    } catch (_) {
+      // Not a valid URI; treat as a raw file path.
+      return raw;
+    }
+  }
 
   @override
   void initState() {
@@ -63,6 +81,10 @@ class _CameraScanPageState extends State<CameraScanPage> {
 
   Future<void> _scanDocument() async {
     if (isScanning) return;
+
+    const String requester = 'DocumentScanner';
+
+    // Check camera permissions first
     var status = await Permission.camera.status;
     if (!status.isGranted) {
       status = await Permission.camera.request();
@@ -71,12 +93,31 @@ class _CameraScanPageState extends State<CameraScanPage> {
         return;
       }
     }
+
+    // Request camera access with timeout
+    final bool hasAccess = await _cameraManager.requestCameraAccess(requester,
+        timeout: const Duration(seconds: 10));
+
+    if (!hasAccess) {
+      _showErrorSnackBar(
+          _cameraManager.currentUser != null
+              ? 'Camera is being used by ${_cameraManager.currentUser}. Please wait and try again.'
+              : 'Camera is currently busy. Please wait and try again.',
+          retryable: true);
+      return;
+    }
+
+    if (!mounted) return;
     setState(() => isScanning = true);
     try {
+      // Mark ML Kit scanner as active before starting
+      _cameraManager.markMLKitScannerActive();
+
       // All types (including LogBook) now use FlutterDocScanner for multi-page scanning with edge detection
-      final dynamic scanResult = await FlutterDocScanner().getScanDocuments(
-          // Remove page limitation by setting to unlimited (high number)
-          page: 999);
+      // IMPORTANT: keep a reasonable page limit.
+      // Very high values (e.g. 999) can cause native scanner crashes / OOM on some devices.
+      final dynamic scanResult =
+          await FlutterDocScanner().getScanDocuments(page: 25);
       print('Scan Result: $scanResult');
       if (scanResult is! Map ||
           !scanResult.containsKey('pdfUri') ||
@@ -87,24 +128,36 @@ class _CameraScanPageState extends State<CameraScanPage> {
         return;
       }
       final String? pdfUri = scanResult['pdfUri'] as String?;
-      final pdfPath = pdfUri!.replaceFirst('file:///', '');
-      print('Processed PDF Path: $pdfPath');
-      final file = File(pdfPath);
+      final resolvedPath = pdfUri == null ? null : _tryUriToFilePath(pdfUri);
+      if (resolvedPath == null || resolvedPath.trim().isEmpty) {
+        print('Unable to resolve pdfUri to file path: $pdfUri');
+        _showErrorSnackBar(
+            'Scanner returned an unsupported file location', retryable: true);
+        return;
+      }
+
+      print('Processed PDF Path: $resolvedPath');
+      final file = File(resolvedPath);
       if (await file.exists()) {
         print('PDF exists: ${file.path}, size: ${await file.length()} bytes');
-        setState(() {
-          scannedImages = [file];
-        });
+        if (!mounted) return;
+        setState(() => scannedImages = [file]);
         _showSnackBar('PDF document scanned successfully!');
       } else {
-        print('Error: PDF does not exist at $pdfPath');
+        print('Error: PDF does not exist at $resolvedPath');
         _showErrorSnackBar('PDF file not found or invalid', retryable: true);
       }
     } catch (e, stackTrace) {
       print('Scan Error: $e\nStack Trace: $stackTrace');
       _showErrorSnackBar('Document scan error: $e', retryable: true);
     } finally {
-      setState(() => isScanning = false);
+      if (mounted) {
+        setState(() => isScanning = false);
+      }
+      // Mark ML Kit scanner as inactive
+      _cameraManager.markMLKitScannerInactive();
+      // Always release camera access
+      _cameraManager.releaseCameraAccess(requester);
     }
   }
 
@@ -302,6 +355,7 @@ class _CameraScanPageState extends State<CameraScanPage> {
 
   void _showSnackBar(String message) {
     print('SnackBar: $message');
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -312,6 +366,7 @@ class _CameraScanPageState extends State<CameraScanPage> {
 
   void _showErrorSnackBar(String message, {bool retryable = false}) {
     print('Error SnackBar: $message');
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -330,6 +385,9 @@ class _CameraScanPageState extends State<CameraScanPage> {
   @override
   void dispose() {
     _logbookTextController.dispose();
+    // Ensure camera manager state isn't left "busy" if this page is closed mid-scan.
+    _cameraManager.markMLKitScannerInactive();
+    _cameraManager.releaseCameraAccess('DocumentScanner');
     super.dispose();
   }
 

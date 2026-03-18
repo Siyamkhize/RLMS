@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import 'package:signature/signature.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
@@ -12,6 +13,7 @@ import 'database_helper.dart';
 import 'config.dart';
 import 'GuardianDetailsPage.dart';
 import 'WorkExperienceForm.dart';
+import 'services/camera_resource_manager.dart';
 
 class LearnerDetailsPage extends StatefulWidget {
   final String learnerID;
@@ -23,7 +25,10 @@ class LearnerDetailsPage extends StatefulWidget {
 }
 
 class _LearnerDetailsPageState extends State<LearnerDetailsPage>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
+  // Camera resource manager for preventing conflicts
+  final CameraResourceManager _cameraManager = CameraResourceManager();
+
   Map<String, dynamic>? learnerData;
   Map<String, dynamic>? bankDetails;
   XFile? capturedImage;
@@ -38,8 +43,6 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
   final TextEditingController _witnessInitialsController =
       TextEditingController();
   CameraController? _cameraController;
-  bool _isCameraInitialized = false;
-  final bool _isWitnessSignatureCompleted = false;
   late Map<String, TextEditingController> _controllers;
 
   // Guardian fields
@@ -83,6 +86,9 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
   @override
   void initState() {
     super.initState();
+    // Add observer for app lifecycle changes
+    WidgetsBinding.instance.addObserver(this);
+
     _tabController = TabController(
         length: 5, vsync: this); // Will be updated after data loads
     _controllers = {};
@@ -93,11 +99,60 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
     _setupControllerListeners();
   }
 
+  @override
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    print('[LIFECYCLE] App state changed to: $state');
+
+    // Handle different app lifecycle states
+    switch (state) {
+      case AppLifecycleState.paused:
+        // App is going to background - could be ML Kit scanner launching
+        print('[LIFECYCLE] App paused - checking if ML Kit scanner is active');
+        if (_cameraManager.isMLKitScannerActive) {
+          print(
+              '[LIFECYCLE] ML Kit scanner is active - app paused for document scanning');
+        } else {
+          // Normal pause - release camera resources
+          _cameraManager.forceReleaseCameraAccess('App lifecycle: paused');
+        }
+        break;
+
+      case AppLifecycleState.resumed:
+        // App is coming back to foreground
+        print('[LIFECYCLE] App resumed');
+        // If ML Kit was active and we're resuming, it likely finished
+        if (_cameraManager.isMLKitScannerActive) {
+          print(
+              '[LIFECYCLE] App resumed after ML Kit scanner - marking scanner inactive');
+          _cameraManager.markMLKitScannerInactive();
+        }
+        break;
+
+      case AppLifecycleState.detached:
+        // App is being terminated
+        print(
+            '[LIFECYCLE] App detached - force releasing all camera resources');
+        _cameraManager.forceReleaseCameraAccess('App lifecycle: detached');
+        break;
+
+      case AppLifecycleState.inactive:
+        // App is inactive (e.g., phone call, notification panel)
+        print('[LIFECYCLE] App inactive');
+        break;
+
+      case AppLifecycleState.hidden:
+        // App is hidden
+        print('[LIFECYCLE] App hidden');
+        break;
+    }
+  }
+
   void _setupControllerListeners() {
     // Add listeners for dropdown fields to update UI when cleared
-    for (String field in _dropdownOptions.keys) {
-      // Will be set up after controllers are initialized in fetchLearnerDetails
-    }
+    // Will be set up after controllers are initialized in fetchLearnerDetails
   }
 
   void _addControllerListeners() {
@@ -120,16 +175,6 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         }
       });
     }
-  }
-
-  // Get database priority value for dropdowns
-  String? _getDatabasePriorityValue(String fieldName) {
-    // Prioritize database value over controller text
-    final dbValue = learnerData?[fieldName]?.toString().trim();
-    if (dbValue != null && dbValue.isNotEmpty && dbValue != 'null') {
-      return dbValue;
-    }
-    return null;
   }
 
   // Check if dropdown should be used
@@ -361,48 +406,6 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
     }
   }
 
-  // Update database field individually
-  Future<void> _updateDatabaseField(String fieldName, dynamic value) async {
-    try {
-      Map<String, dynamic> updateData = {fieldName: value};
-
-      bool isConnected = await _checkConnectivity();
-      if (isConnected) {
-        final response = await http.post(
-          Uri.parse(AppConfig.updateLearnerUrl),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'LearnerID': widget.learnerID,
-            'data': updateData,
-          }),
-        );
-
-        if (response.statusCode == 200) {
-          final jsonResponse = jsonDecode(response.body);
-          if (jsonResponse['success'] == true) {
-            print('[UPDATE_FIELD] $fieldName updated successfully online');
-          } else {
-            print(
-                '[UPDATE_FIELD] Failed to update $fieldName online: ${jsonResponse['message']}');
-            await DatabaseHelper()
-                .updateLearnerLocally(widget.learnerID, updateData);
-          }
-        } else {
-          print(
-              '[UPDATE_FIELD] Server error for $fieldName: ${response.statusCode}');
-          await DatabaseHelper()
-              .updateLearnerLocally(widget.learnerID, updateData);
-        }
-      } else {
-        await DatabaseHelper()
-            .updateLearnerLocally(widget.learnerID, updateData);
-        print('[UPDATE_FIELD] $fieldName updated locally (offline)');
-      }
-    } catch (e) {
-      print('[UPDATE_FIELD] Error updating $fieldName: $e');
-    }
-  }
-
   Future<void> fetchBankDetails() async {
     try {
       final db = await DatabaseHelper().database;
@@ -573,6 +576,12 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
   @override
   void dispose() {
+    // Remove observer
+    WidgetsBinding.instance.removeObserver(this);
+
+    // Release camera resources on dispose
+    _cameraManager.releaseCameraAccess('LearnerDetailsPage dispose');
+
     _tabController.dispose();
     _learnerSignatureController.dispose();
     _witnessSignatureController.dispose();
@@ -581,24 +590,6 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
     _cameraController?.dispose();
     _controllers.forEach((_, controller) => controller.dispose());
     super.dispose();
-  }
-
-  Future<void> _initializeCamera() async {
-    try {
-      final cameras = await availableCameras();
-      final firstCamera = cameras.first;
-      _cameraController =
-          CameraController(firstCamera, ResolutionPreset.medium);
-      await _cameraController!.initialize();
-      setState(() {
-        _isCameraInitialized = true;
-      });
-    } catch (e) {
-      print("Camera initialization failed: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Camera initialization failed: $e')),
-      );
-    }
   }
 
   // Update Age and Gender based on ID number
@@ -676,6 +667,21 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
     }
   }
 
+  // Initialize camera for direct camera capture
+  Future<void> _initializeCamera() async {
+    try {
+      final cameras = await availableCameras();
+      final firstCamera = cameras.first;
+      _cameraController =
+          CameraController(firstCamera, ResolutionPreset.medium);
+      await _cameraController!.initialize();
+      print('[CAMERA] Camera initialized successfully');
+    } catch (e) {
+      print('[CAMERA] Camera initialization failed: $e');
+      throw Exception('Camera initialization failed: $e');
+    }
+  }
+
   // Force update Age and Gender (guaranteed update)
   Future<void> _forceUpdateAgeAndGender() async {
     try {
@@ -749,9 +755,18 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
       // Add all the form fields that have been modified
       _controllers.forEach((key, controller) {
-        if (controller.text.isNotEmpty &&
-            controller.text != learnerData?[key]?.toString()) {
-          updateData[key] = controller.text;
+        if (controller.text.isNotEmpty) {
+          // For dropdown fields (Title, Race, Language, Disability), always include if not empty
+          // For other fields, only include if different from original database value
+          if (_dropdownOptions.containsKey(key)) {
+            // This is a dropdown field - include if controller has a value
+            updateData[key] = controller.text;
+          } else {
+            // Regular field - only include if different from original database value
+            if (controller.text != learnerData?[key]?.toString()) {
+              updateData[key] = controller.text;
+            }
+          }
         }
       });
 
@@ -1066,73 +1081,185 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
     // Check for profile image in learner data
     String? imagePath = learnerData?['profile_image']?.toString();
 
-    if (imagePath != null && imagePath.isNotEmpty && imagePath != 'null') {
-      return Container(
-        width: 120,
-        height: 120,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.grey[300]!, width: 2),
-        ),
-        child: ClipOval(
-          child: Image.network(
-            '${AppConfig.learnerImagesUrl}/$imagePath',
-            fit: BoxFit.cover,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Center(
-                child: CircularProgressIndicator(
-                  value: loadingProgress.expectedTotalBytes != null
-                      ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
-                      : null,
-                ),
-              );
-            },
-            errorBuilder: (context, error, stackTrace) {
-              return _buildDefaultImage();
-            },
+    return GestureDetector(
+      onTap: _showImageCaptureOptions,
+      child: Stack(
+        children: [
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.grey[300]!, width: 2),
+            ),
+            child: ClipOval(
+              child: _getImageWidget(imagePath),
+            ),
           ),
-        ),
+          // Camera icon overlay
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.blue,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: const Icon(
+                Icons.camera_alt,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _getImageWidget(String? imagePath) {
+    if (imagePath != null && imagePath.isNotEmpty && imagePath != 'null') {
+      return Image.network(
+        '${AppConfig.learnerImagesUrl}/$imagePath',
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Center(
+            child: CircularProgressIndicator(
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded /
+                      loadingProgress.expectedTotalBytes!
+                  : null,
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return _buildDefaultImageContent();
+        },
       );
     }
 
     // Check for captured image
     if (capturedImage != null) {
-      return Container(
-        width: 120,
-        height: 120,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.grey[300]!, width: 2),
-        ),
-        child: ClipOval(
-          child: Image.file(
-            File(capturedImage!.path),
-            fit: BoxFit.cover,
-          ),
-        ),
+      return Image.file(
+        File(capturedImage!.path),
+        fit: BoxFit.cover,
       );
     }
 
-    // Finally, show default image
-    return _buildDefaultImage();
+    // Finally, show default image content
+    return _buildDefaultImageContent();
   }
 
-  Widget _buildDefaultImage() {
+  Widget _buildDefaultImageContent() {
     return Container(
-      width: 120,
-      height: 120,
-      decoration: BoxDecoration(
-        color: Colors.grey[300],
-        shape: BoxShape.circle,
-      ),
+      color: Colors.grey[300],
       child: Icon(
         Icons.person,
         size: 60,
         color: Colors.grey[600],
       ),
     );
+  }
+
+  Future<void> _showImageCaptureOptions() async {
+    // Check if camera is already in use
+    if (_cameraManager.isCameraInUse) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_cameraManager.currentUser != null
+                ? 'Camera is being used by ${_cameraManager.currentUser}. Please wait and try again.'
+                : 'Camera is currently in use. Please wait and try again.'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        isDismissible: true,
+        enableDrag: true,
+        builder: (BuildContext context) {
+          return SafeArea(
+            child: Wrap(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    'Profile Photo Options',
+                    style: Theme.of(context).textTheme.titleLarge,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.camera_alt, color: Colors.blue),
+                  title: const Text('Take Photo'),
+                  subtitle: const Text('Use camera to capture new photo'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    // Add small delay to ensure modal is closed
+                    await Future.delayed(const Duration(milliseconds: 300));
+                    await _capturePhotoFromCamera();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library, color: Colors.green),
+                  title: const Text('Choose from Gallery'),
+                  subtitle: const Text('Select existing photo from gallery'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    // Add small delay to ensure modal is closed
+                    await Future.delayed(const Duration(milliseconds: 300));
+                    await _pickImageFromGallery();
+                  },
+                ),
+                if (capturedImage != null ||
+                    (learnerData?['profile_image']?.toString().isNotEmpty ==
+                            true &&
+                        learnerData?['profile_image']?.toString() != 'null'))
+                  ListTile(
+                    leading: const Icon(Icons.delete, color: Colors.red),
+                    title: const Text('Remove Photo',
+                        style: TextStyle(color: Colors.red)),
+                    subtitle: const Text('Delete current profile photo'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _removePhoto();
+                    },
+                  ),
+                ListTile(
+                  leading: const Icon(Icons.cancel, color: Colors.grey),
+                  title: const Text('Cancel'),
+                  onTap: () {
+                    Navigator.pop(context);
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      print('Error showing image capture options: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening photo options: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildAgeDisplay() {
@@ -1386,7 +1513,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                         if (newValue != null) {
                           setState(() {
                             _controllers[entry.key]!.text = newValue;
-                            learnerData![entry.key] = newValue;
+                            // Don't update learnerData here - let _updateLearnerInformation handle it
                           });
                         }
                       },
@@ -2291,59 +2418,321 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
   }
 
   Future<void> _uploadImage(String imagePath) async {
-    final imageName = imagePath.split('/').last;
-    final imageBytes = await File(imagePath).readAsBytes();
     try {
+      // Validate image file exists and is readable
+      final File imageFile = File(imagePath);
+      if (!await imageFile.exists()) {
+        throw Exception('Image file does not exist: $imagePath');
+      }
+
+      final int fileSize = await imageFile.length();
+      if (fileSize == 0) {
+        throw Exception('Image file is empty');
+      }
+
+      print('Uploading image: $imagePath (${fileSize} bytes)');
+
+      final imageName = imagePath.split('/').last;
+      final imageBytes = await imageFile.readAsBytes();
+
       var request = http.MultipartRequest(
         'POST',
         Uri.parse(AppConfig.saveImageUrl),
       );
+
       request.files.add(http.MultipartFile.fromBytes(
         'image',
         imageBytes,
         filename: imageName,
       ));
+
       request.fields['learner_id'] = widget.learnerID.trim();
-      var response = await request.send();
+
+      // Add timeout to prevent hanging
+      var response = await request.send().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception(
+              'Upload timeout - please check your internet connection');
+        },
+      );
+
       var responseBody = await response.stream.bytesToString();
       print('Image upload response: $responseBody');
+
       if (response.statusCode == 200) {
         var jsonResponse = jsonDecode(responseBody);
         if (jsonResponse['success']) {
           print('Image uploaded successfully');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Profile image uploaded successfully!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
         } else {
           print('Image upload failed: ${jsonResponse['message']}');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
                 content:
-                    Text('Failed to upload image: ${jsonResponse['message']}')),
-          );
+                    Text('Failed to upload image: ${jsonResponse['message']}'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
           await saveImageLocally(imagePath);
         }
       } else {
         print('Failed to upload image: HTTP ${response.statusCode}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
               content: Text(
-                  'Failed to upload image: Server error (${response.statusCode})')),
-        );
+                  'Failed to upload image: Server error (${response.statusCode})'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
         await saveImageLocally(imagePath);
       }
     } catch (e) {
       print('Error uploading image: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error uploading image: $e')),
-      );
-      await saveImageLocally(imagePath);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error uploading image: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+
+      // Try to save locally as fallback
+      try {
+        await saveImageLocally(imagePath);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Image saved locally for later sync'),
+              backgroundColor: Colors.blue,
+            ),
+          );
+        }
+      } catch (localError) {
+        print('Error saving image locally: $localError');
+      }
     }
+  }
+
+  Future<void> _capturePhotoFromCamera() async {
+    const String requester = 'ProfileImageCapture';
+
+    // Request camera access with timeout
+    final bool hasAccess = await _cameraManager.requestCameraAccess(requester,
+        timeout: const Duration(seconds: 5));
+
+    if (!hasAccess) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_cameraManager.currentUser != null
+                ? 'Camera is being used by ${_cameraManager.currentUser}. Please wait and try again.'
+                : 'Camera is currently busy. Please wait and try again.'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      // Initialize camera if needed
+      if (_cameraController == null ||
+          !_cameraController!.value.isInitialized) {
+        await _initializeCamera();
+      }
+
+      if (_cameraController == null ||
+          !_cameraController!.value.isInitialized) {
+        throw Exception('Camera initialization failed');
+      }
+
+      // Use direct camera navigation - no external app launch
+      final imagePath = await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => CameraPreviewScreen(
+            cameraController: _cameraController!,
+            learnerID: widget.learnerID,
+          ),
+        ),
+      );
+
+      if (imagePath != null) {
+        print('Image captured: $imagePath');
+        final directory = await getApplicationDocumentsDirectory();
+        final savedImagePath =
+            '${directory.path}/learnerImages_${widget.learnerID}.png';
+
+        final capturedFile = File(imagePath);
+        await capturedFile.copy(savedImagePath);
+        print('Image saved to: $savedImagePath');
+
+        if (!mounted) return;
+        setState(() {
+          capturedImage = XFile(savedImagePath);
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Photo captured successfully!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        print('No image captured - user cancelled');
+      }
+    } catch (e) {
+      print('Error capturing photo: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error capturing photo: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      // Always release camera access
+      _cameraManager.releaseCameraAccess(requester);
+    }
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    const String requester = 'ProfileGalleryPicker';
+
+    // Request camera access with timeout (gallery picker might use camera resources)
+    final bool hasAccess = await _cameraManager.requestCameraAccess(requester,
+        timeout: const Duration(seconds: 5));
+
+    if (!hasAccess) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_cameraManager.currentUser != null
+                ? 'Camera is being used by ${_cameraManager.currentUser}. Please wait and try again.'
+                : 'Camera resources are busy. Please wait and try again.'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        // Verify the image file exists and is valid
+        final File imageFile = File(image.path);
+        if (await imageFile.exists()) {
+          final int fileSize = await imageFile.length();
+          print('Selected image size: ${fileSize} bytes');
+
+          if (fileSize > 0) {
+            if (!mounted) return;
+            setState(() => capturedImage = image);
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Image selected successfully!'),
+                  backgroundColor: Colors.green,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
+          } else {
+            throw Exception('Selected image file is empty');
+          }
+        } else {
+          throw Exception('Selected image file does not exist');
+        }
+      } else {
+        // User cancelled - not an error
+        print('User cancelled image selection');
+      }
+    } catch (e) {
+      print('Error picking image: $e');
+
+      // Clear any partial state
+      if (!mounted) return;
+      setState(() => capturedImage = null);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error selecting image: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      // Always release camera access
+      _cameraManager.releaseCameraAccess(requester);
+    }
+  }
+
+  Future<void> _removePhoto() async {
+    setState(() {
+      capturedImage = null;
+      if (learnerData != null) {
+        learnerData!['profile_image'] = null;
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Photo removed'),
+        backgroundColor: Colors.orange,
+      ),
+    );
   }
 
   Future<void> saveImageLocally(String imagePath) async {
     try {
+      // Validate image file exists before saving
+      final File imageFile = File(imagePath);
+      if (!await imageFile.exists()) {
+        throw Exception('Image file does not exist: $imagePath');
+      }
+
+      final int fileSize = await imageFile.length();
+      if (fileSize == 0) {
+        throw Exception('Image file is empty');
+      }
+
       await DatabaseHelper().saveImageLocally(widget.learnerID, imagePath);
-      print('Image saved locally for learner_id: ${widget.learnerID}');
+      print(
+          'Image saved locally for learner_id: ${widget.learnerID} (${fileSize} bytes)');
     } catch (e) {
       print('Error saving image locally: $e');
+      rethrow; // Re-throw so caller can handle
     }
   }
 }
