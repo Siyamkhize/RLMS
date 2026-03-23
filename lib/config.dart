@@ -9,11 +9,11 @@ class AppConfig {
   // Live server uses HTTPS
   static const String basePath = '/mobile';
 
-//   static const String serverHost =
-//       '192.168.68.103'; // Updated production hostname
-//   static const int serverPort = 8080; // HTTP poj   ``rt 8080
-//   static const String serverProtocol = 'http'; // Local server uses HTTP
-//   static const String basePath = '/assessorReport2/mobile';
+  // static const String serverHost =
+  //     '192.168.68.115'; // Updated production hostname
+  // static const int serverPort = 8080; // HTTP poj   ``rt 8080
+  // static const String serverProtocol = 'http'; // Local server uses HTTP
+  // static const String basePath = '/assessorReport2/mobile';
 
   // Base URL for all API calls
   // Result: https://rlms.rlms.co.za/mobile
@@ -46,6 +46,8 @@ class AppConfig {
   static String get syncSickNotesUrl => '$baseUrl/sync_sick_notes.php';
   static String get syncUsersUrl => '$baseUrl/sync_users.php';
   static String get syncLearnerDetailsUrl => '$baseUrl/sync_learnerdetails.php';
+  static String get syncLearnerDocumentsUrl =>
+      '$baseUrl/sync_learner_documents.php';
   static String get syncBankLocalUrl => '$baseUrl/sync_bank_local.php';
   static String get syncFacilitatorUrl => '$baseUrl/sync_facilitator.php';
   static String get syncLearnerClockingUrl =>

@@ -330,10 +330,10 @@ packages:
     dependency: "direct main"
     description:
       name: flutter_doc_scanner
-      sha256: "4a1dd77d37004ee8b9bdbb7437b0c970706d51b74ddd9806d491420d066d255d"
+      sha256: "4df50bbdd7b8a5d648d0ac4d629b1fb50d6aea00c4df444423434207dd31b2d5"
       url: "https://pub.dev"
     source: hosted
-    version: "0.0.16"
+    version: "0.0.18"
   flutter_image_compress:
     dependency: "direct main"
     description:

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'database_helper.dart';
 import 'config.dart';
@@ -283,8 +284,8 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
       print(
           '🔥 DEBUG: Extracted - Year: $year, Month: $month, Day: $day, GenderCode: $genderCode');
 
-      // Determine full year (assuming cutoff at 21 for 2000s)
-      int fullYear = year <= 21 ? 2000 + year : 1900 + year;
+      // SA ID standard: 00-24 = 2000s, 25-99 = 1900s (matches LearnerDetailsPage)
+      int fullYear = year <= 24 ? 2000 + year : 1900 + year;
 
       // Determine gender (0000-4999 = Female, 5000-9999 = Male)
       String gender = genderCode < 5000 ? 'Female' : 'Male';
@@ -482,16 +483,20 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
         }
       }
 
-      // Insert into local database first
+      // Insert into local database first (offline-first)
       final learnerId =
           await dbHelper.insertOrUpdateLearner(learnerData, bankData);
 
-      // Sync with backend server
-      final syncResult = await _syncWithBackend(learnerData, bankData);
+      // Sync with backend when online
+      final isOnline = await _checkConnectivity();
+      bool syncResult = false;
+      if (isOnline) {
+        syncResult = await _syncWithBackend(learnerData, bankData);
+      }
 
       if (!mounted) return false;
 
-      // Show appropriate success message based on sync result
+      // Show appropriate success message
       if (syncResult) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -504,10 +509,14 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(existingLearner != null
-                ? 'Learner updated locally but failed to sync with server. Will retry when online.'
-                : 'Learner saved locally but failed to sync with server. Will retry when online.'),
-            backgroundColor: Colors.orange,
+            content: Text(isOnline
+                ? (existingLearner != null
+                    ? 'Learner updated locally. Will retry sync when connection improves.'
+                    : 'Learner saved locally. Will retry sync when connection improves.')
+                : (existingLearner != null
+                    ? 'Learner updated and saved offline. Will sync when online.'
+                    : 'Learner saved offline. Will sync when online.')),
+            backgroundColor: Colors.blue,
           ),
         );
       }
@@ -525,6 +534,15 @@ class _AddLearnerPageState extends State<AddLearnerPage> {
           ),
         );
       }
+      return false;
+    }
+  }
+
+  Future<bool> _checkConnectivity() async {
+    try {
+      final result = await InternetAddress.lookup('google.com');
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } on SocketException catch (_) {
       return false;
     }
   }

@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_doc_scanner/flutter_doc_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'config.dart';
+import 'services/camera_resource_manager.dart';
 
 class PoeDocumentScanner extends StatefulWidget {
   final int learnerId;
@@ -37,6 +39,13 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
   String? _statusMessage;
   List<String> _scannedPages = [];
   File? _pdfFile;
+  final CameraResourceManager _cameraManager = CameraResourceManager();
+
+  @override
+  void dispose() {
+    _cameraManager.markMLKitScannerInactive();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -329,14 +338,43 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
       if (shouldContinue != true) return;
     }
 
+    // Check camera permissions first
+    var status = await Permission.camera.status;
+    if (!status.isGranted) {
+      status = await Permission.camera.request();
+      if (!status.isGranted) {
+        if (mounted) {
+          _showErrorDialog('Camera Permission Required',
+              'Camera permission is needed to scan documents. Please enable it in your device settings.');
+        }
+        return;
+      }
+    }
+
+    // Request camera access (prevents conflicts when app goes to background for native scanner)
+    const String requester = 'PoeDocumentScanner';
+    final bool hasAccess = await _cameraManager.requestCameraAccess(requester,
+        timeout: const Duration(seconds: 10));
+
+    if (!hasAccess && mounted) {
+      _showErrorDialog('Camera Busy',
+          _cameraManager.currentUser != null
+              ? 'Camera is being used by ${_cameraManager.currentUser}. Please wait and try again.'
+              : 'Camera is currently busy. Please wait and try again.');
+      return;
+    }
+
+    if (!mounted) return;
     setState(() {
       _isScanning = true;
       _statusMessage = 'Opening scanner... Scan continuously for best results!';
     });
 
     try {
-      // Use FlutterDocScanner with unlimited pages (same as CameraScanPage)
-      // No timeout - let scanner run as long as needed for large documents
+      // Mark ML Kit scanner as active (prevents incorrect camera release when app pauses)
+      _cameraManager.markMLKitScannerActive();
+
+      // Use FlutterDocScanner - upgraded to 0.0.18 for Android crash fixes
       final dynamic scanResult = await FlutterDocScanner().getScanDocuments(
         page: 999, // Unlimited pages
       );
@@ -427,40 +465,44 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
       }
     } catch (e, stackTrace) {
       print('Scan Error: $e\nStack Trace: $stackTrace');
-      setState(() {
-        _isScanning = false;
-        _statusMessage = 'Scanning error: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _isScanning = false;
+          _statusMessage = 'Scanning error: $e';
+        });
 
-      // Check for plugin initialization error
-      if (e.toString().contains('UninitializedPropertyAccessException') ||
-          e.toString().contains('resultChannel')) {
-        _showErrorDialog(
-          'Scanner Plugin Error',
-          'The scanner plugin encountered an error. This can happen when scanning multiple times.\n\n'
-              'Solutions:\n'
-              '• Close this screen and open it again\n'
-              '• Restart the app\n'
-              '• If problem persists, restart your device\n\n'
-              'Your previous scan was saved successfully.',
-        );
-        return;
+        // Check for plugin initialization error
+        if (e.toString().contains('UninitializedPropertyAccessException') ||
+            e.toString().contains('resultChannel')) {
+          _showErrorDialog(
+            'Scanner Plugin Error',
+            'The scanner plugin encountered an error. This can happen when scanning multiple times.\n\n'
+                'Solutions:\n'
+                '• Close this screen and open it again\n'
+                '• Restart the app\n'
+                '• If problem persists, restart your device\n\n'
+                'Your previous scan was saved successfully.',
+          );
+        } else if (e.toString().contains('FileNotFoundException') ||
+            e.toString().contains('ENOENT')) {
+          _showErrorDialog(
+            'Scanner Cache Error',
+            'The document scanner ran out of cache space. This typically happens with very large documents (100+ pages).\n\n'
+                'Solutions:\n'
+                '• Scan in smaller batches (50-100 pages)\n'
+                '• Clear app cache and try again\n'
+                '• Restart the device\n'
+                '• Free up device storage',
+          );
+        } else {
+          _showErrorDialog('Scanning Error', 'Error: $e');
+        }
       }
-
-      // Check if it's the Google ML Kit cache error
-      if (e.toString().contains('FileNotFoundException') ||
-          e.toString().contains('ENOENT')) {
-        _showErrorDialog(
-          'Scanner Cache Error',
-          'The document scanner ran out of cache space. This typically happens with very large documents (100+ pages).\n\n'
-              'Solutions:\n'
-              '• Scan in smaller batches (50-100 pages)\n'
-              '• Clear app cache and try again\n'
-              '• Restart the device\n'
-              '• Free up device storage',
-        );
-      } else {
-        _showErrorDialog('Scanning Error', 'Error: $e');
+    } finally {
+      _cameraManager.markMLKitScannerInactive();
+      _cameraManager.releaseCameraAccess(requester);
+      if (mounted) {
+        setState(() => _isScanning = false);
       }
     }
   }

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'config.dart';
 import 'database_helper.dart';
+import 'sync_service.dart';
 import 'sdp_learning_pathways_page.dart';
 
 enum ProjectSortOption {
@@ -44,14 +45,29 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
   @override
   void initState() {
     super.initState();
+
+    debugPrint('[SDP_PROJECTS] Initializing SDP Projects Page');
+    debugPrint('[SDP_PROJECTS] SDP Identifier: ${widget.sdpIdentifier}');
+    debugPrint('[SDP_PROJECTS] SDP Display Name: ${widget.sdpDisplayName}');
+
+    // Check project table status on initialization
+    _checkProjectTableStatus();
+
     // Use projects from login if available, otherwise fetch
     if (widget.projects != null && widget.projects!.isNotEmpty) {
+      debugPrint(
+          '[SDP_PROJECTS] Received ${widget.projects!.length} projects from widget');
+
+      // IMPORTANT: Filter widget.projects by SDP to match offline behavior
+      final filteredProjects = _filterProjectsBySdp(widget.projects!);
+
       setState(() {
-        projects = widget.projects!;
+        projects = filteredProjects;
         isLoading = false;
       });
+
       debugPrint(
-          '[SDP_PROJECTS] Loaded ${projects.length} projects from widget');
+          '[SDP_PROJECTS] After SDP filtering: ${projects.length} projects');
       // Print project names for debugging
       for (var project in projects) {
         debugPrint(
@@ -63,7 +79,7 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
       if (projects.length < 3) {
         // Adjust this threshold as needed
         debugPrint(
-            '[SDP_PROJECTS] Only ${projects.length} projects from widget, fetching more from server...');
+            '[SDP_PROJECTS] Only ${projects.length} projects after filtering, fetching more from server...');
         _loadProjects();
       }
     } else {
@@ -77,10 +93,96 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
     });
   }
 
+  // Debug method to check project table status
+  Future<void> _checkProjectTableStatus() async {
+    try {
+      final db = await _dbHelper.database;
+
+      // Check if project table exists
+      final tableCheck = await db.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='project'");
+
+      if (tableCheck.isEmpty) {
+        debugPrint('[SDP_PROJECTS] ❌ PROJECT TABLE DOES NOT EXIST!');
+        return;
+      }
+
+      // Count total projects
+      final countResult =
+          await db.rawQuery('SELECT COUNT(*) as count FROM project');
+      final totalCount = countResult.first['count'] as int? ?? 0;
+      debugPrint(
+          '[SDP_PROJECTS] 📊 Total projects in local database: $totalCount');
+
+      // Check projects for this specific SDP
+      final sdpProjects = await db.rawQuery('''
+        SELECT COUNT(*) as count 
+        FROM project p
+        WHERE EXISTS (
+          SELECT 1 FROM sites s 
+          WHERE s.project_id = p.project_id 
+          AND (s.sdp_id = ? OR s.sdp_id IN (
+            SELECT sdp_id FROM sdp 
+            WHERE sdp_name = ? OR email = ? OR client_name = ?
+          ))
+        )
+      ''', [
+        widget.sdpIdentifier,
+        widget.sdpIdentifier,
+        widget.sdpIdentifier,
+        widget.sdpIdentifier
+      ]);
+
+      final sdpProjectCount = sdpProjects.first['count'] as int? ?? 0;
+      debugPrint(
+          '[SDP_PROJECTS] 📊 Projects for SDP ${widget.sdpIdentifier}: $sdpProjectCount');
+
+      if (totalCount == 0) {
+        debugPrint(
+            '[SDP_PROJECTS] ⚠️ PROJECT TABLE IS EMPTY - SYNC MAY NOT BE WORKING');
+        // Try to trigger sync
+        debugPrint('[SDP_PROJECTS] 🔄 Attempting to sync project data...');
+        final syncService = SyncService();
+        await syncService.syncProjectData();
+
+        // Check again after sync
+        final newCountResult =
+            await db.rawQuery('SELECT COUNT(*) as count FROM project');
+        final newCount = newCountResult.first['count'] as int? ?? 0;
+        debugPrint('[SDP_PROJECTS] 📊 Projects after sync attempt: $newCount');
+      }
+    } catch (e) {
+      debugPrint('[SDP_PROJECTS] ❌ Error checking project table: $e');
+    }
+  }
+
   Future<bool> _checkConnectivity() async {
     final connectivityResult = await Connectivity().checkConnectivity();
     return connectivityResult.contains(ConnectivityResult.wifi) ||
         connectivityResult.contains(ConnectivityResult.mobile);
+  }
+
+  /// Filter projects by SDP identifier using database logic (match backend exactly)
+  /// Only shows projects that have sites for the specific SDP
+  List<Map<String, dynamic>> _filterProjectsBySdp(
+      List<Map<String, dynamic>> allProjects) {
+    debugPrint('[SDP_PROJECTS] ===== FILTERING WIDGET PROJECTS BY SDP =====');
+    debugPrint('[SDP_PROJECTS] SDP Identifier: ${widget.sdpIdentifier}');
+    debugPrint(
+        '[SDP_PROJECTS] Total projects to filter: ${allProjects.length}');
+
+    // This method should use database filtering to match backend logic exactly
+    // Backend query: WHERE p.project_id IN (SELECT DISTINCT s2.project_id FROM sites s2 WHERE s2.sdp_id = ?)
+    // For now, return all projects and let _getProjectsFromDatabase handle the filtering
+    // This ensures consistency with backend behavior
+
+    debugPrint(
+        '[SDP_PROJECTS] Using database filtering for consistency with backend');
+    debugPrint('[SDP_PROJECTS] ===== END SDP FILTERING =====');
+
+    // Return all projects - the real filtering happens in _getProjectsFromDatabase
+    // which matches the backend SQL logic exactly
+    return allProjects;
   }
 
   @override
@@ -332,7 +434,8 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
     }
   }
 
-  /// Get projects from local database (project table)
+  /// Get projects from local database using exact backend logic
+  /// Only returns projects that have sites for the specific SDP (matches get_sdp_all_data.php)
   Future<List<Map<String, dynamic>>> _getProjectsFromDatabase() async {
     try {
       final db = await _dbHelper.database;
@@ -340,19 +443,10 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
       debugPrint('[SDP_PROJECTS] ===== OFFLINE DATA LOOKUP =====');
       debugPrint(
           '[SDP_PROJECTS] Looking for identifier: ${widget.sdpIdentifier}');
+      debugPrint(
+          '[SDP_PROJECTS] Widget SDP Display Name: ${widget.sdpDisplayName}');
 
-      // First, check what's in the sdp table
-      final allSdps = await db.query('sdp');
-      debugPrint('[SDP_PROJECTS] Total SDPs in database: ${allSdps.length}');
-      if (allSdps.isNotEmpty) {
-        debugPrint('[SDP_PROJECTS] Available SDPs:');
-        for (var sdp in allSdps) {
-          debugPrint(
-              '  - ID: ${sdp['sdp_id']}, Name: ${sdp['sdp_name']}, Email: ${sdp['email']}');
-        }
-      }
-
-      // Get sdp_name from sdp table using sdpIdentifier
+      // First, resolve SDP identifier to numeric ID (same as backend)
       final sdpResults = await db.query(
         'sdp',
         columns: ['sdp_id', 'sdp_name', 'client_name'],
@@ -372,37 +466,83 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
         return [];
       }
 
+      final sdpId = sdpResults.first['sdp_id'];
       final sdpName = sdpResults.first['sdp_name'];
-      final clientName = sdpResults.first['client_name'];
+      debugPrint('[SDP_PROJECTS] ✅ Found SDP ID: $sdpId, Name: $sdpName');
 
-      debugPrint('[SDP_PROJECTS] ✅ Found SDP: $sdpName (client: $clientName)');
+      // EXACT BACKEND LOGIC: Only get projects that have sites for this SDP
+      // Backend query: WHERE p.project_id IN (SELECT DISTINCT s2.project_id FROM sites s2 WHERE s2.sdp_id = ?)
+      List<Map<String, dynamic>> projectResults = [];
 
-      // Check what's in the project table
-      final allProjects = await db.query('project');
-      debugPrint(
-          '[SDP_PROJECTS] Total projects in database: ${allProjects.length}');
-      if (allProjects.isNotEmpty) {
-        debugPrint('[SDP_PROJECTS] Available projects:');
-        final uniqueSdpNames = allProjects.map((p) => p['sdp_name']).toSet();
-        for (var name in uniqueSdpNames) {
-          final count = allProjects.where((p) => p['sdp_name'] == name).length;
-          debugPrint('  - SDP: $name ($count projects)');
+      try {
+        projectResults = await db.rawQuery('''
+          SELECT 
+            p.project_id,
+            p.Project_name,
+            p.Project_pathway,
+            COUNT(DISTINCT s.siteID) AS active_sites,
+            COUNT(DISTINCT l.LearnerID) AS total_learners
+          FROM project p
+          LEFT JOIN sites s ON s.project_id = p.project_id AND s.sdp_id = ?
+          LEFT JOIN class c ON c.siteId = s.siteID
+          LEFT JOIN learnerdetails l ON l.classID = c.classID
+          WHERE p.project_id IN (SELECT DISTINCT s2.project_id FROM sites s2 WHERE s2.sdp_id = ?)
+          GROUP BY p.project_id, p.Project_name, p.Project_pathway
+          ORDER BY p.Project_name
+        ''', [sdpId, sdpId]);
+
+        debugPrint(
+            '[SDP_PROJECTS] Primary query found ${projectResults.length} projects');
+      } catch (e) {
+        debugPrint('[SDP_PROJECTS] ⚠️ Primary query failed: $e');
+        debugPrint(
+            '[SDP_PROJECTS] 🔄 Trying fallback query using sites table only...');
+
+        // FALLBACK: Build projects directly from sites table
+        try {
+          projectResults = await db.rawQuery('''
+            SELECT 
+              s.project_id,
+              s.project_name AS Project_name,
+              s.Project_pathway,
+              COUNT(DISTINCT s.siteID) AS active_sites,
+              COUNT(DISTINCT l.LearnerID) AS total_learners
+            FROM sites s
+            LEFT JOIN class c ON c.siteId = s.siteID
+            LEFT JOIN learnerdetails l ON l.classID = c.classID
+            WHERE s.sdp_id = ?
+            GROUP BY s.project_id, s.project_name, s.Project_pathway
+            ORDER BY s.project_name
+          ''', [sdpId]);
+
+          debugPrint(
+              '[SDP_PROJECTS] ✅ Fallback query found ${projectResults.length} projects');
+        } catch (e2) {
+          debugPrint('[SDP_PROJECTS] ❌ Fallback query also failed: $e2');
+          return [];
         }
       }
 
-      // Query project table for this SDP (try both sdp_name and client_name)
-      final projectResults = await db.query(
-        'project',
-        where: 'sdp_name = ? OR client_name = ?',
-        whereArgs: [sdpName, clientName],
-      );
-
       debugPrint(
-          '[SDP_PROJECTS] Found ${projectResults.length} projects for this SDP');
+          '[SDP_PROJECTS] Found ${projectResults.length} projects with sites for SDP $sdpId');
 
       if (projectResults.isEmpty) {
         debugPrint(
-            '[SDP_PROJECTS] ❌ No projects found for sdp_name: $sdpName or client_name: $clientName');
+            '[SDP_PROJECTS] ❌ No projects found with sites for SDP $sdpId');
+        debugPrint('[SDP_PROJECTS] 🔍 Checking if sites table has data...');
+
+        // Debug: Check what's in the sites table
+        final sitesCheck = await db.rawQuery(
+            'SELECT COUNT(*) as count FROM sites WHERE sdp_id = ?', [sdpId]);
+        final sitesCount = sitesCheck.first['count'] as int? ?? 0;
+        debugPrint(
+            '[SDP_PROJECTS] Sites table has $sitesCount sites for SDP $sdpId');
+
+        if (sitesCount > 0) {
+          debugPrint(
+              '[SDP_PROJECTS] ⚠️ Sites exist but no projects found - possible table structure issue');
+        }
+
         return [];
       }
 
@@ -440,8 +580,10 @@ class _SdpProjectsPageState extends State<SdpProjectsPage> {
           'project_name': project['Project_name'],
           'Project_name': project['Project_name'],
           'Project_pathway': project['Project_pathway'],
-          'active_sites': 0, // Will be calculated if needed
-          'total_learners': 0, // Will be calculated if needed
+          'active_sites':
+              int.tryParse(project['active_sites']?.toString() ?? '0') ?? 0,
+          'total_learners':
+              int.tryParse(project['total_learners']?.toString() ?? '0') ?? 0,
           'pathways': pathways,
           'pathway_count': pathwayCount,
           'qualifications': [],

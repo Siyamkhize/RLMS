@@ -2392,7 +2392,7 @@ class _DashboardPageState extends State<DashboardPage> {
         break;
       case 11:
         // Perform Logout
-        Navigator.pushReplacementNamed(context, '/login');
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
         break;
       // case 10:
       // // Test Random Prompt

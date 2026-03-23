@@ -268,6 +268,8 @@ class SyncService extends ChangeNotifier {
     await _syncUnitstandard();
     await _syncUnit_standard_selection();
     await _syncAssessment();
+    // Sync learner documents
+    await _syncLearnerDocuments();
     await _syncPoe();
     await syncAcknowledgmentOfReceiptToServer();
     await syncDataFromServer();
@@ -794,8 +796,8 @@ class SyncService extends ChangeNotifier {
       // Sync ALL unsynced records for the last 10 days (including clock-in only)
       // This allows devices to be offline for a few days but avoids sending very old data.
       final now = DateTime.now();
-      final cutoffDate =
-          DateFormat('yyyy-MM-dd').format(now.subtract(const Duration(days: 10)));
+      final cutoffDate = DateFormat('yyyy-MM-dd')
+          .format(now.subtract(const Duration(days: 10)));
 
       final List<Map<String, dynamic>> clockingDataList = await db.query(
         'learner_clocking',
@@ -1718,20 +1720,37 @@ class SyncService extends ChangeNotifier {
 
         final db = await _dbHelper.database;
 
-        for (var poeData in poeList) {
-          await db.insert(
-            'poe',
-            poeData,
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
+        for (var poe in poeList) {
+          try {
+            await db.insert(
+              'poe',
+              poe,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          } catch (e) {
+            print("Error syncing POE with ID ${poe['poe_id']}: $e");
+            // Continue with other POE records even if one fails
+          }
         }
 
-        print("Poe table synchronized successfully.");
+        print("Successfully synchronized ${poeList.length} POE records");
       } else {
-        print("Failed to sync poe. Status code: ${response.statusCode}");
+        throw Exception(
+            "Failed to sync POE. Status code: ${response.statusCode}");
       }
     } catch (e) {
-      print("Error syncing poe: $e");
+      print("Error syncing POE: $e");
+    }
+  }
+
+  // Sync learner documents from server
+  Future<void> _syncLearnerDocuments() async {
+    try {
+      print('[SYNC] Starting learner documents sync...');
+      await _dbHelper.syncLearnerDocuments();
+      print('[SYNC] Learner documents sync completed');
+    } catch (e) {
+      print('[SYNC] Error syncing learner documents: $e');
     }
   }
 
@@ -2217,108 +2236,157 @@ class SyncService extends ChangeNotifier {
 
   // Method to sync project data
   Future<void> syncProjectData() async {
+    print('[PROJECT_SYNC] ===== STARTING PROJECT SYNC =====');
     try {
       // Define your PHP API URL
       final apiUrl = AppConfig.syncProjectUrl;
+      print('[PROJECT_SYNC] API URL: $apiUrl');
 
       // Make the API call
+      print('[PROJECT_SYNC] Making HTTP GET request...');
       final response = await http.get(Uri.parse(apiUrl));
+      print('[PROJECT_SYNC] Response status: ${response.statusCode}');
 
       // Check if the response is successful
       if (response.statusCode == 200) {
+        print('[PROJECT_SYNC] ✅ HTTP request successful');
         print(
-            'Response body: ${response.body}'); // Print the response for debugging
+            '[PROJECT_SYNC] Response body length: ${response.body.length} characters');
+        print(
+            '[PROJECT_SYNC] Response body preview: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}...');
 
         try {
           // Decode the JSON response into a Map
+          print('[PROJECT_SYNC] Attempting to decode JSON...');
           final Map<String, dynamic> data = jsonDecode(response.body);
+          print('[PROJECT_SYNC] ✅ JSON decoded successfully');
+          print('[PROJECT_SYNC] Response status: ${data['status']}');
 
           // Check if the response contains 'status' as 'success'
           if (data['status'] == 'success') {
             // Access the 'data' field which contains the list of projects
             List<dynamic> projects = data['data'];
+            print(
+                '[PROJECT_SYNC] ✅ Found ${projects.length} projects in response');
 
             // Get an instance of the database
             final db = await _dbHelper.database;
+            print('[PROJECT_SYNC] ✅ Database connection obtained');
 
             // SMART SYNC: Update existing, insert new (no delete)
             print(
-                'Syncing ${projects.length} projects using UPDATE/INSERT pattern');
+                '[PROJECT_SYNC] Syncing ${projects.length} projects using UPDATE/INSERT pattern');
+
+            int successCount = 0;
+            int errorCount = 0;
 
             for (var project in projects) {
-              // Check if required fields are missing and provide default values if necessary
-              String projectName =
-                  project['Project_name'] ?? 'Unknown Project'; // Default value
-              String contractNo =
-                  project['Contract_no'] ?? 'N/A'; // Default value
-              String financialYear =
-                  project['Financial_year'] ?? 'Unknown'; // Default value
-              String startDate =
-                  project['Start_date'] ?? 'Unknown'; // Default value
-              String endDate =
-                  project['End_date'] ?? 'Unknown'; // Default value
-              String projectPathway =
-                  project['Project_pathway'] ?? 'N/A'; // Default value
-              String projectFunder =
-                  project['Project_funder'] ?? 'N/A'; // Default value
-              String province =
-                  project['Province'] ?? 'Unknown'; // Default value
-              String district =
-                  project['District'] ?? 'Unknown'; // Default value
-              String municipality =
-                  project['Municipality'] ?? 'Unknown'; // Default value
-              String ppe = project['PPE'] ?? 'Unknown'; // Default value
-              String learningMaterial =
-                  project['Learning_material'] ?? 'Unknown'; // Default value
-              String toolkit = project['Toolkit'] ?? 'Unknown'; // Default value
-              String consumables =
-                  project['Consumables'] ?? 'Unknown'; // Default value
-              String budget = project['Budget'] ?? 'Unknown'; // Default value
-              String nBeneficiaries =
-                  project['n_beneficiaries'] ?? '0'; // Default value
+              try {
+                print(
+                    '[PROJECT_SYNC] Processing project ID: ${project['project_id']}, Name: ${project['Project_name']}');
+                // Check if required fields are missing and provide default values if necessary
+                String projectName = project['Project_name'] ??
+                    'Unknown Project'; // Default value
+                String contractNo =
+                    project['Contract_no'] ?? 'N/A'; // Default value
+                String financialYear =
+                    project['Financial_year'] ?? 'Unknown'; // Default value
+                String startDate =
+                    project['Start_date'] ?? 'Unknown'; // Default value
+                String endDate =
+                    project['End_date'] ?? 'Unknown'; // Default value
+                String projectPathway =
+                    project['Project_pathway'] ?? 'N/A'; // Default value
+                String projectFunder =
+                    project['Project_funder'] ?? 'N/A'; // Default value
+                String province =
+                    project['Province'] ?? 'Unknown'; // Default value
+                String district =
+                    project['District'] ?? 'Unknown'; // Default value
+                String municipality =
+                    project['Municipality'] ?? 'Unknown'; // Default value
+                String ppe = project['PPE'] ?? 'Unknown'; // Default value
+                String learningMaterial =
+                    project['Learning_material'] ?? 'Unknown'; // Default value
+                String toolkit =
+                    project['Toolkit'] ?? 'Unknown'; // Default value
+                String consumables =
+                    project['Consumables'] ?? 'Unknown'; // Default value
+                String budget = project['Budget'] ?? 'Unknown'; // Default value
+                String nBeneficiaries =
+                    project['n_beneficiaries'] ?? '0'; // Default value
 
-              await db.insert(
-                'project',
-                {
-                  'project_id': project['project_id'],
-                  'sdp_name': project['sdp_name'],
-                  'client_name': project['client_name'],
-                  'Project_name': projectName, // Ensure this is not NULL
-                  'Contract_no': contractNo, // Ensure this is not NULL
-                  'Financial_year': financialYear, // Ensure this is not NULL
-                  'Start_date': startDate, // Ensure this is not NULL
-                  'End_date': endDate, // Ensure this is not NULL
-                  'Project_pathway': projectPathway, // Ensure this is not NULL
-                  'Project_funder': projectFunder, // Ensure this is not NULL
-                  'n_beneficiaries': nBeneficiaries, // Ensure this is not NULL
-                  'Province': province, // Ensure this is not NULL
-                  'District': district, // Ensure this is not NULL
-                  'Municipality': municipality, // Ensure this is not NULL
-                  'PPE': ppe, // Ensure this is not NULL
-                  'Learning_material':
-                      learningMaterial, // Ensure this is not NULL
-                  'Toolkit': toolkit, // Ensure this is not NULL
-                  'Consumables': consumables, // Ensure this is not NULL
-                  'Budget': budget, // Ensure this is not NULL
-                },
-                conflictAlgorithm: ConflictAlgorithm.replace,
-              );
+                await db.insert(
+                  'project',
+                  {
+                    'project_id': project['project_id'],
+                    'sdp_name': project['sdp_name'],
+                    'client_name': project['client_name'],
+                    'Project_name': projectName, // Ensure this is not NULL
+                    'Contract_no': contractNo, // Ensure this is not NULL
+                    'Financial_year': financialYear, // Ensure this is not NULL
+                    'Start_date': startDate, // Ensure this is not NULL
+                    'End_date': endDate, // Ensure this is not NULL
+                    'Project_pathway':
+                        projectPathway, // Ensure this is not NULL
+                    'Project_funder': projectFunder, // Ensure this is not NULL
+                    'n_beneficiaries':
+                        nBeneficiaries, // Ensure this is not NULL
+                    'Province': province, // Ensure this is not NULL
+                    'District': district, // Ensure this is not NULL
+                    'Municipality': municipality, // Ensure this is not NULL
+                    'PPE': ppe, // Ensure this is not NULL
+                    'Learning_material':
+                        learningMaterial, // Ensure this is not NULL
+                    'Toolkit': toolkit, // Ensure this is not NULL
+                    'Consumables': consumables, // Ensure this is not NULL
+                    'Budget': budget, // Ensure this is not NULL
+                  },
+                  conflictAlgorithm: ConflictAlgorithm.replace,
+                );
+                print(
+                    '[PROJECT_SYNC] ✅ Successfully inserted project ID: ${project['project_id']}');
+                successCount++;
+              } catch (insertError) {
+                print(
+                    '[PROJECT_SYNC] ❌ Error inserting project ID ${project['project_id']}: $insertError');
+                errorCount++;
+              }
             }
 
-            print('Project data synced successfully.');
+            print(
+                '[PROJECT_SYNC] ✅ Project sync completed: $successCount successful, $errorCount errors');
+
+            // Verify data was inserted
+            final projectCount =
+                await db.rawQuery('SELECT COUNT(*) as count FROM project');
+            final count = projectCount.first['count'] as int? ?? 0;
+            print('[PROJECT_SYNC] 📊 Total projects in local database: $count');
           } else {
-            print('Error syncing project data: ${data['message']}');
+            print(
+                '[PROJECT_SYNC] ❌ Server response status not success: ${data['status']}');
+            print(
+                '[PROJECT_SYNC] Server message: ${data['message'] ?? 'No message provided'}');
           }
         } catch (e) {
-          print('Error decoding JSON response: $e');
+          print('[PROJECT_SYNC] ❌ Error decoding JSON response: $e');
+          print('[PROJECT_SYNC] Raw response body: ${response.body}');
         }
       } else {
         print(
-            'Error: Failed to fetch project data. Status code: ${response.statusCode}');
+            '[PROJECT_SYNC] ❌ HTTP request failed with status: ${response.statusCode}');
+        print('[PROJECT_SYNC] Response body: ${response.body}');
       }
     } catch (e) {
-      print('Error syncing project data: $e');
+      print('[PROJECT_SYNC] ❌ Error syncing project data: $e');
     }
+    print('[PROJECT_SYNC] ===== PROJECT SYNC COMPLETED =====');
+  }
+
+  // Public method to manually sync project data for testing
+  Future<void> manualSyncProjectData() async {
+    print('[MANUAL_SYNC] Manually triggering project sync...');
+    await syncProjectData();
   }
 
   Future<void> syncToServerPOE(Map<String, dynamic> poe) async {
@@ -2899,7 +2967,8 @@ class SyncService extends ChangeNotifier {
         final clockInTime = clockingData['clock_in_time'];
         final clockOutTime = clockingData['clock_out_time'];
         final contactTime = clockingData['contact_time'];
-        final signaturePath = clockingData['signature_path'] ?? clockingData['signature'];
+        final signaturePath =
+            clockingData['signature_path'] ?? clockingData['signature'];
         final userLatitude = clockingData['user_latitude'];
         final userLongitude = clockingData['user_longitude'];
         final userAccuracy = clockingData['user_accuracy'];

@@ -1,5 +1,5 @@
 buildscript {
-    ext.minSdkVersion = 21
+    ext.minSdkVersion = 23  // Required by flutter_doc_scanner (ML Kit document scanner)
     repositories {
         google()
         mavenCentral()

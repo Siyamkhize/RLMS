@@ -171,7 +171,8 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
     if (_controllers['IDNumber'] != null) {
       _controllers['IDNumber']!.addListener(() {
         if (mounted) {
-          _calculateAndUpdateFromIDNumber();
+          // Use Future.microtask to handle async call in listener
+          Future.microtask(() => _calculateAndUpdateFromIDNumber());
         }
       });
     }
@@ -184,11 +185,22 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
   }
 
   // Calculate and update age, gender, and DOB when ID number changes
-  void _calculateAndUpdateFromIDNumber() {
-    final idNumber = _controllers['IDNumber']?.text.trim();
+  Future<void> _calculateAndUpdateFromIDNumber() async {
+    // Try to get ID number from controller first, then fallback to learnerData
+    String? idNumber = _controllers['IDNumber']?.text.trim();
+    if (idNumber == null || idNumber.isEmpty) {
+      idNumber = learnerData?['IDNumber']?.toString().trim();
+    }
+
+    print('[ID_CALC] ===== CALCULATE FROM ID NUMBER =====');
+    print(
+        '[ID_CALC] IDNumber controller text: "${_controllers['IDNumber']?.text}"');
+    print('[ID_CALC] IDNumber from learnerData: "${learnerData?['IDNumber']}"');
+    print('[ID_CALC] Final IDNumber used: "$idNumber"');
 
     if (idNumber == null || idNumber.length < 6) {
       // Need at least 6 characters for date calculation
+      print('[ID_CALC] ❌ ID number too short or null: "$idNumber"');
       return;
     }
 
@@ -201,43 +213,147 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       final gender =
           idNumber.length >= 10 ? _calculateGenderFromID(idNumber) : null;
 
-      setState(() {
-        // Update Age field
-        if (age != null) {
-          learnerData!['Age'] = age.toString();
-          if (_controllers['Age'] != null) {
-            _controllers['Age']!.text = age.toString();
-          }
-        }
+      print('[ID_CALC] Calculated values: Age=$age, Gender=$gender, DOB=$dob');
 
-        // Update Gender field (only if we have enough digits)
-        if (gender != null) {
-          learnerData!['Gender'] = gender;
-          if (_controllers['Gender'] != null) {
-            _controllers['Gender']!.text = gender;
-          }
-        }
+      // Check if we should update (always update if offline or if values are wrong)
+      bool shouldUpdate = false;
 
-        // Update Date of Birth field (DateOfBirth is visible, DOB is hidden)
-        if (dob != null) {
-          final dobString =
-              '${dob.year}-${dob.month.toString().padLeft(2, '0')}-${dob.day.toString().padLeft(2, '0')}';
-          learnerData!['DateOfBirth'] = dobString;
-          if (_controllers['DateOfBirth'] != null) {
-            _controllers['DateOfBirth']!.text = dobString;
-          }
-          // Also store in DOB field for database compatibility (but DOB field is hidden from UI)
-          learnerData!['DOB'] = dobString;
-        }
-
-        // Update minor status
-        _isMinor = age != null && age < 18;
-      });
+      // Get current values
+      final currentAge = learnerData?['Age']?.toString();
+      final currentGender = learnerData?['Gender']?.toString();
 
       print(
-          '[ID_CALC] Auto-calculated from ID $idNumber: Age=$age, Gender=$gender, DOB=$dob, IsMinor=$_isMinor');
+          '[ID_CALC] Current values: Age="$currentAge", Gender="$currentGender"');
+
+      // Always update if:
+      // 1. Age is null, empty, "0", or obviously wrong
+      // 2. Gender is null, empty, "Unknown", or doesn't match calculation
+      // 3. Date of Birth is default/wrong (1900-01-01)
+      // 4. We're offline (to fix any wrong values)
+
+      final currentDOB = learnerData?['DateOfBirth']?.toString();
+      final isDefaultDOB = currentDOB == null ||
+          currentDOB.isEmpty ||
+          currentDOB.startsWith('1900-01-01');
+
+      if (age != null &&
+          (currentAge == null ||
+              currentAge.isEmpty ||
+              currentAge == '0' ||
+              int.tryParse(currentAge) != age)) {
+        shouldUpdate = true;
+        print('[ID_CALC] 🔄 Age needs update: "$currentAge" → "$age"');
+      }
+
+      if (gender != null &&
+          (currentGender == null ||
+              currentGender.isEmpty ||
+              currentGender == 'Unknown' ||
+              currentGender != gender)) {
+        shouldUpdate = true;
+        print('[ID_CALC] 🔄 Gender needs update: "$currentGender" → "$gender"');
+      }
+
+      if (dob != null && isDefaultDOB) {
+        shouldUpdate = true;
+        print('[ID_CALC] 🔄 DOB needs update: "$currentDOB" → calculated DOB');
+      }
+
+      // Force update if we're offline (to fix any wrong cached values)
+      final isOffline = !await _checkConnectivity();
+      if (isOffline && (age != null || gender != null)) {
+        shouldUpdate = true;
+        print('[ID_CALC] 🔄 Forcing update because offline mode');
+      }
+
+      // Also force update if any value is obviously wrong (regardless of online/offline)
+      if ((currentAge == '0' || currentGender == 'Unknown' || isDefaultDOB) &&
+          (age != null || gender != null)) {
+        shouldUpdate = true;
+        print('[ID_CALC] 🔄 Forcing update because values are obviously wrong');
+      }
+
+      if (shouldUpdate) {
+        setState(() {
+          // Update Age field
+          if (age != null) {
+            learnerData!['Age'] = age.toString();
+            if (_controllers['Age'] != null) {
+              _controllers['Age']!.text = age.toString();
+            }
+            print('[ID_CALC] ✅ Updated Age to: $age');
+          }
+
+          // Update Gender field (only if we have enough digits)
+          if (gender != null) {
+            learnerData!['Gender'] = gender;
+            if (_controllers['Gender'] != null) {
+              _controllers['Gender']!.text = gender;
+            }
+            print('[ID_CALC] ✅ Updated Gender to: $gender');
+          }
+
+          // Update Date of Birth field (DateOfBirth is visible, DOB is hidden)
+          if (dob != null) {
+            final dobString =
+                '${dob.year}-${dob.month.toString().padLeft(2, '0')}-${dob.day.toString().padLeft(2, '0')}';
+            learnerData!['DateOfBirth'] = dobString;
+            if (_controllers['DateOfBirth'] != null) {
+              _controllers['DateOfBirth']!.text = dobString;
+            }
+            // Also store in DOB field for database compatibility (but DOB field is hidden from UI)
+            learnerData!['DOB'] = dobString;
+            print('[ID_CALC] ✅ Updated DOB to: $dobString');
+          }
+
+          // Update minor status
+          _isMinor = age != null && age < 18;
+        });
+
+        print(
+            '[ID_CALC] ✅ Auto-calculated from ID $idNumber: Age=$age, Gender=$gender, DOB=$dob, IsMinor=$_isMinor');
+
+        // CRITICAL: Save calculated values to database for offline persistence
+        if (age != null || gender != null || dob != null) {
+          _saveCalculatedValuesToDatabase(age, gender, dob);
+        }
+      } else {
+        print('[ID_CALC] ℹ️ No update needed - current values are correct');
+      }
     } catch (e) {
-      print('[ID_CALC] Error calculating from ID number: $e');
+      print('[ID_CALC] ❌ Error calculating from ID number: $e');
+    }
+  }
+
+  // Save calculated age, gender, and DOB to database for offline persistence
+  Future<void> _saveCalculatedValuesToDatabase(
+      int? age, String? gender, DateTime? dob) async {
+    try {
+      Map<String, dynamic> updateData = {};
+
+      if (age != null) {
+        updateData['Age'] = age.toString();
+      }
+
+      if (gender != null) {
+        updateData['Gender'] = gender;
+      }
+
+      if (dob != null) {
+        final dobString =
+            '${dob.year}-${dob.month.toString().padLeft(2, '0')}-${dob.day.toString().padLeft(2, '0')}';
+        updateData['DateOfBirth'] = dobString;
+        updateData['DOB'] =
+            dobString; // Also update DOB field for compatibility
+      }
+
+      if (updateData.isNotEmpty) {
+        await DatabaseHelper()
+            .updateLearnerLocally(widget.learnerID, updateData);
+        print('[ID_CALC] 💾 Saved calculated values to database: $updateData');
+      }
+    } catch (e) {
+      print('[ID_CALC] ❌ Error saving calculated values to database: $e');
     }
   }
 
@@ -351,16 +467,22 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
   // Calculate gender from South African ID number
   String? _calculateGenderFromID(String? idNumber) {
+    print('[GENDER] Calculating gender from ID: $idNumber');
+
     if (idNumber == null || idNumber.length < 10) {
+      print('[GENDER] ID number is null or too short (need 10 digits)');
       return null;
     }
 
     try {
       // Gender digit is at position 6 (0-indexed)
       final genderDigit = int.parse(idNumber.substring(6, 7));
+      print('[GENDER] Gender digit: $genderDigit');
 
       // 0-4 = Female, 5-9 = Male
-      return genderDigit < 5 ? 'Female' : 'Male';
+      final gender = genderDigit < 5 ? 'Female' : 'Male';
+      print('[GENDER] Calculated gender: $gender');
+      return gender;
     } catch (e) {
       print('[GENDER] Error calculating gender from ID: $e');
       return null;
@@ -457,7 +579,8 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
           final jsonResponse = jsonDecode(response.body);
           if (jsonResponse['success'] == true) {
             setState(() {
-              learnerData = jsonResponse['data'];
+              learnerData = Map<String, dynamic>.from(
+                  jsonResponse['data']); // Create mutable copy
               isLoading = false;
               // Initialize controllers with fetched data
               learnerData!.forEach((key, value) {
@@ -466,8 +589,12 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
               });
               // Set up controller listeners after controllers are initialized
               _addControllerListeners();
-              // Perform initial calculations from ID number
-              _calculateAndUpdateFromIDNumber();
+            });
+
+            // Perform initial calculations from ID number (outside setState)
+            await _calculateAndUpdateFromIDNumber();
+
+            setState(() {
               // Check if learner is a minor - use Age field from data or calculate from ID
               int? age;
               if (learnerData!['Age'] != null) {
@@ -511,8 +638,12 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
           });
           // Set up controller listeners after controllers are initialized
           _addControllerListeners();
-          // Perform initial calculations from ID number
-          _calculateAndUpdateFromIDNumber();
+        });
+
+        // Perform initial calculations from ID number (outside setState)
+        await _calculateAndUpdateFromIDNumber();
+
+        setState(() {
           // Check if learner is a minor - use Age field from data or calculate from ID
           int? age;
           if (learnerData!['Age'] != null) {
@@ -837,10 +968,24 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       // Update learner information if any fields have changed
       await _updateLearnerInformation();
 
-      // Handle image upload
+      // Handle image - save locally when offline, upload when online
       if (capturedImage != null) {
-        print('Uploading captured image...');
-        await _uploadImage(capturedImage!.path);
+        final isConnected = await _checkConnectivity();
+        if (isConnected) {
+          print('Uploading captured image...');
+          await _uploadImage(capturedImage!.path);
+        } else {
+          await saveImageLocally(capturedImage!.path);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content:
+                    Text('Profile image saved locally (will sync when online)'),
+                backgroundColor: Colors.blue,
+              ),
+            );
+          }
+        }
       }
 
       // Handle learner signature
@@ -912,9 +1057,17 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       // Refresh the data to show updated information
       await fetchLearnerDetails();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Data updated successfully')),
-      );
+      final isConnected = await _checkConnectivity();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isConnected
+                ? 'Data updated successfully'
+                : 'Data saved locally. Will sync when online.'),
+            backgroundColor: isConnected ? Colors.green : Colors.blue,
+          ),
+        );
+      }
     } catch (e) {
       print('Error updating data: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1410,6 +1563,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       'futronic_right_template',
       'profile_image',
       'Age', // Age is calculated from ID, so read-only in UI
+      'Gender', // Gender is calculated from ID, so read-only in UI
       'DateOfBirth', // DateOfBirth is calculated from ID, so read-only in UI
     ];
 
@@ -2190,9 +2344,10 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
   Future<String> _saveSignatureImage(
       Uint8List signatureBytes, String fileNamePrefix) async {
-    final tempDir = await getTemporaryDirectory();
+    // Use app documents directory so signatures persist for offline sync
+    final appDir = await getApplicationDocumentsDirectory();
     final signatureFilePath =
-        '${tempDir.path}/${fileNamePrefix}_${widget.learnerID}.png';
+        '${appDir.path}/${fileNamePrefix}_${widget.learnerID}.png';
     final signatureFile = File(signatureFilePath);
     await signatureFile.writeAsBytes(signatureBytes);
     return signatureFilePath;
@@ -2430,7 +2585,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         throw Exception('Image file is empty');
       }
 
-      print('Uploading image: $imagePath (${fileSize} bytes)');
+      print('Uploading image: $imagePath ($fileSize bytes)');
 
       final imageName = imagePath.split('/').last;
       final imageBytes = await imageFile.readAsBytes();
@@ -2585,12 +2740,18 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
           capturedImage = XFile(savedImagePath);
         });
 
+        // Save to local DB immediately (offline-first - never lose the image)
+        await saveImageLocally(savedImagePath);
+
         if (mounted) {
+          final isConnected = await _checkConnectivity();
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Photo captured successfully!'),
+            SnackBar(
+              content: Text(isConnected
+                  ? 'Photo captured and saved!'
+                  : 'Photo saved locally (will sync when online)'),
               backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
+              duration: const Duration(seconds: 2),
             ),
           );
         }
@@ -2651,18 +2812,30 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         final File imageFile = File(image.path);
         if (await imageFile.exists()) {
           final int fileSize = await imageFile.length();
-          print('Selected image size: ${fileSize} bytes');
+          print('Selected image size: $fileSize bytes');
 
           if (fileSize > 0) {
+            // Copy to app directory so file persists (gallery path may be temporary)
+            final directory = await getApplicationDocumentsDirectory();
+            final savedPath =
+                '${directory.path}/learnerImages_${widget.learnerID}.png';
+            await imageFile.copy(savedPath);
+
             if (!mounted) return;
-            setState(() => capturedImage = image);
+            setState(() => capturedImage = XFile(savedPath));
+
+            // Save to local DB immediately (offline-first)
+            await saveImageLocally(savedPath);
 
             if (mounted) {
+              final isConnected = await _checkConnectivity();
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Image selected successfully!'),
+                SnackBar(
+                  content: Text(isConnected
+                      ? 'Image selected and saved!'
+                      : 'Image saved locally (will sync when online)'),
                   backgroundColor: Colors.green,
-                  duration: Duration(seconds: 2),
+                  duration: const Duration(seconds: 2),
                 ),
               );
             }
@@ -2729,7 +2902,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
       await DatabaseHelper().saveImageLocally(widget.learnerID, imagePath);
       print(
-          'Image saved locally for learner_id: ${widget.learnerID} (${fileSize} bytes)');
+          'Image saved locally for learner_id: ${widget.learnerID} ($fileSize bytes)');
     } catch (e) {
       print('Error saving image locally: $e');
       rethrow; // Re-throw so caller can handle

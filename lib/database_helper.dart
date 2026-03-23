@@ -995,7 +995,8 @@ updated_at TIMESTAMP
     status TEXT,
     learner_id TEXT,
     upload_date TEXT,
-    synced INTEGER DEFAULT 0
+    synced INTEGER DEFAULT 0,
+    rejection_reason TEXT
 )''');
       await db.execute('''
   CREATE TABLE sick_note (
@@ -1258,7 +1259,11 @@ updated_at TIMESTAMP
           results.isNotEmpty ? results.first : ConnectivityResult.none;
 
       if (result != ConnectivityResult.none) {
-        print('Internet available - syncing data...');
+        print('Internet available - syncing offline data...');
+        // Sync unsynced learners (profile, images, etc.) when back online
+        syncUnsyncedLearnersWhenOnline().catchError((error) {
+          print('Error syncing learner data: $error');
+        });
         // Don't block the UI with sync operations
         syncUnsyncedData().catchError((error) {
           print('Error syncing data: $error');
@@ -1270,6 +1275,54 @@ updated_at TIMESTAMP
     } catch (e) {
       print('Error updating connection status: $e');
       // Don't let connectivity errors crash the app
+    }
+  }
+
+  /// Sync unsynced learners to server when back online (no UI - for connectivity listener)
+  Future<void> syncUnsyncedLearnersWhenOnline() async {
+    final db = await database;
+    if (!await _checkConnectivity()) return;
+
+    final unsyncedLearners = await db.query(
+      'learnerdetails',
+      where: 'synced = ?',
+      whereArgs: [0],
+    );
+    if (unsyncedLearners.isEmpty) return;
+
+    print(
+        '[SYNC] Found ${unsyncedLearners.length} unsynced learners - syncing to server');
+    List<Map<String, dynamic>> allDataToSync = [];
+    for (var learner in unsyncedLearners) {
+      try {
+        int localLearnerId = learner['LearnerID'] as int;
+        final bankDetails = await db.query(
+          'bankdetails',
+          where: 'LearnerID = ?',
+          whereArgs: [localLearnerId],
+        );
+        Map<String, dynamic> learnerData =
+            await _prepareLearnerDataWithBase64Images(Map.from(learner));
+        allDataToSync.add({
+          'learner': learnerData,
+          'bank': bankDetails.isNotEmpty ? Map.from(bankDetails.first) : null,
+        });
+      } catch (e) {
+        print('Error preparing learner ${learner['IDNumber']}: $e');
+      }
+    }
+    final responseData = await _sendAllDataToBackend(allDataToSync);
+    if (responseData != null && responseData['status'] == 'success') {
+      List<dynamic> syncedLearners = responseData['learners'] ?? [];
+      for (var syncedLearner in syncedLearners) {
+        try {
+          await updateSyncedStatus(
+              syncedLearner['IDNumber'], syncedLearner['LearnerID']);
+        } catch (e) {
+          print('Error updating sync status: $e');
+        }
+      }
+      print('[SYNC] Successfully synced ${syncedLearners.length} learners');
     }
   }
 
@@ -1962,19 +2015,56 @@ updated_at TIMESTAMP
     final batch = db.batch();
 
     for (var site in sites) {
-      // Ensure sdp_id is set
-      if (sdpIdInt != null) {
-        site['sdp_id'] = sdpIdInt;
-      }
+      // Map and convert the API data to match the sites table schema
+      final mappedSite = <String, dynamic>{
+        'siteID': _parseToInt(site['siteID']),
+        'siteName': site['siteName']?.toString(),
+        'beneficiaries': site['beneficiaries']?.toString(),
+        'latitude': site['coordinates']?.toString().split(',')[0].trim(),
+        'longitude': site['coordinates']?.toString().split(',')[1].trim(),
+        'sdp_id': sdpIdInt ?? _parseToInt(site['sdp_id']),
+        'Province': site['province']?.toString(),
+        'District': site['District']?.toString(),
+        'Municipality': site['Municipality']?.toString(),
+        'Category': site['category']?.toString(),
+        'project_id': _parseToInt(site['project_id']),
+        'Project_pathway': site['project_pathway']?.toString(),
+        'qualification_id': site['qualification_id']?.toString(),
+        'first_name': site['first_name']?.toString(),
+        'last_name': site['last_name']?.toString(),
+        'cell_phone': site['cell_phone']?.toString(),
+        'email': site['email']?.toString(),
+      };
+
+      // Remove null values
+      mappedSite.removeWhere((key, value) => value == null);
 
       batch.insert(
         'sites',
-        site,
+        mappedSite,
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     }
 
     await batch.commit(noResult: true);
+  }
+
+  // Helper method to safely parse integers
+  int? _parseToInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  // Helper method to safely parse coordinates
+  String? _parseCoordinate(dynamic coordinates, int index) {
+    if (coordinates == null) return null;
+    final coordStr = coordinates.toString();
+    if (!coordStr.contains(',')) return null;
+    final parts = coordStr.split(',');
+    if (parts.length <= index) return null;
+    return parts[index].trim();
   }
 
   // Fetch class data by siteID from SQLite
@@ -2098,16 +2188,6 @@ updated_at TIMESTAMP
     );
   }
 
-  Future<List<Map<String, dynamic>>> fetchLearners(String classID) async {
-    final db = await database;
-
-    return await db.query(
-      'learnerdetails',
-      where: 'classID = ?',
-      whereArgs: [classID],
-    );
-  }
-
   Future<Map<String, dynamic>?> fetchLearnerByID(String learnerID) async {
     final db = await database; // Assuming you have your database instance here
     final result = await db.query(
@@ -2117,7 +2197,7 @@ updated_at TIMESTAMP
     );
 
     return result.isNotEmpty
-        ? result.first
+        ? Map<String, dynamic>.from(result.first) // Create mutable copy
         : null; // Return the first result or null
   }
 
@@ -3836,16 +3916,11 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
         where: 'LearnerID = ?',
         whereArgs: [oldLearnerID],
       );
-
-      print(
-          'Updated LearnerID from $oldLearnerID to $newLearnerID in both tables');
     } catch (e) {
       print('Error updating LearnerID: $e');
-      rethrow;
     }
   }
 
-  // Fetch learner by IDNumber
   Future<Map<String, dynamic>?> fetchLearnerByIDNumber(String idNumber) async {
     final db = await database;
     try {
@@ -3854,11 +3929,61 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
         where: 'IDNumber = ?',
         whereArgs: [idNumber],
       );
-      return result.isNotEmpty ? result.first : null;
+      return result.isNotEmpty
+          ? Map<String, dynamic>.from(result.first)
+          : null; // Create mutable copy
     } catch (e) {
       print('Error fetching learner by IDNumber: $e');
       return null;
     }
+  }
+
+  /// Fetch all learners for a specific class ID
+  Future<List<Map<String, dynamic>>> fetchLearners(String classID) async {
+    final db = await database;
+    try {
+      final result = await db.query(
+        'learnerdetails',
+        where: 'classID = ?',
+        whereArgs: [classID],
+      );
+      // Return mutable copies of all results
+      return result.map((row) => Map<String, dynamic>.from(row)).toList();
+    } catch (e) {
+      print('Error fetching learners for classID $classID: $e');
+      return [];
+    }
+  }
+
+  /// Encodes local image/signature files as base64 for offline sync.
+  /// When profile_image, signature, or witness_signature contain device paths
+  /// to existing files, reads and encodes them for server upload.
+  Future<Map<String, dynamic>> _prepareLearnerDataWithBase64Images(
+      Map<String, dynamic> learnerData) async {
+    final result = Map<String, dynamic>.from(learnerData);
+    final learnerId = learnerData['LearnerID']?.toString() ?? '';
+
+    // Helper to encode local file as base64 if it exists
+    Future<void> encodeIfLocalFile(
+        String fieldName, String base64FieldName) async {
+      final path = learnerData[fieldName]?.toString();
+      if (path == null || path.isEmpty) return;
+      try {
+        final file = File(path);
+        if (await file.exists()) {
+          final bytes = await file.readAsBytes();
+          result[base64FieldName] = base64Encode(bytes);
+        }
+      } catch (e) {
+        debugPrint('[SYNC] Error encoding $fieldName: $e');
+      }
+    }
+
+    await encodeIfLocalFile('profile_image', 'profile_image_base64');
+    await encodeIfLocalFile('signature', 'signature_base64');
+    await encodeIfLocalFile('witness_signature', 'witness_signature_base64');
+
+    return result;
   }
 
   Future<bool> _checkConnectivity() async {
@@ -3927,7 +4052,7 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
       return;
     }
 
-    // Prepare all data for batch sync
+    // Prepare all data for batch sync (with base64 images for offline sync)
     List<Map<String, dynamic>> allDataToSync = [];
 
     for (var learner in unsyncedLearners) {
@@ -3942,6 +4067,8 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
         );
 
         Map<String, dynamic> learnerData = Map.from(learner);
+        learnerData = await _prepareLearnerDataWithBase64Images(learnerData);
+
         Map<String, dynamic>? bankData =
             bankDetails.isNotEmpty ? Map.from(bankDetails.first) : null;
 
@@ -4305,6 +4432,85 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
         print(
             'Error processing bank details for BankID ${bankDetail['BankID']}: $e');
       }
+    }
+  }
+
+  // Sync learner documents from server to local database
+  Future<void> syncLearnerDocuments() async {
+    try {
+      print('[SYNC] Starting learner documents sync...');
+
+      // Make request to sync endpoint
+      final response = await http.get(
+        Uri.parse(AppConfig.syncLearnerDocumentsUrl),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+
+        if (jsonData['success'] == true) {
+          final documents = jsonData['documents'] as List;
+          print(
+              '[SYNC] Retrieved ${documents.length} learner documents from server');
+
+          final db = await database;
+          int syncedCount = 0;
+
+          for (var document in documents) {
+            try {
+              // Check if document already exists
+              final existing = await db.query(
+                'learner_document',
+                where: 'document_id = ?',
+                whereArgs: [document['document_id']],
+              );
+
+              if (existing.isEmpty) {
+                // Insert new document
+                await db.insert('learner_document', {
+                  'document_id': document['document_id'],
+                  'documentName': document['documentName'],
+                  'learner_document': document['learner_document'],
+                  'status': document['status'],
+                  'learner_id': document['learner_id'],
+                  'upload_date': document['upload_date'],
+                  'synced': 1, // Mark as synced
+                  'rejection_reason': document['rejection_reason'],
+                });
+                syncedCount++;
+              } else {
+                // Update existing document (in case status changed on server)
+                await db.update(
+                  'learner_document',
+                  {
+                    'documentName': document['documentName'],
+                    'learner_document': document['learner_document'],
+                    'status': document['status'],
+                    'upload_date': document['upload_date'],
+                    'synced': 1,
+                    'rejection_reason': document['rejection_reason'],
+                  },
+                  where: 'document_id = ?',
+                  whereArgs: [document['document_id']],
+                );
+              }
+            } catch (e) {
+              print(
+                  '[SYNC] Error syncing document ${document['document_id']}: $e');
+            }
+          }
+
+          print(
+              '[SYNC] Successfully synced $syncedCount new learner documents');
+        } else {
+          print('[SYNC] Server returned error: ${jsonData['message']}');
+        }
+      } else {
+        print('[SYNC] HTTP error: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('[SYNC] Error syncing learner documents: $e');
     }
   }
 
