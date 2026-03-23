@@ -2,22 +2,12 @@ import 'dart:io'; // For checking connectivity
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:flutter_doc_scanner/flutter_doc_scanner.dart'; // For document scanning
-import 'package:permission_handler/permission_handler.dart'; // For camera permission
 import 'class_details_page.dart'; // Import the class details page
 import 'database_helper.dart'; // Import your DatabaseHelper class
 import 'sdp_learners_page.dart';
 import 'learner_list_page.dart'; // Import LearnerListPage for class navigation
-import 'LearnerDetailsPage.dart'; // Import for View button
-import 'finance_register_history.dart'; // Import for Attendance button
-import 'learner_induction_page.dart'; // Import for Induction button
-
 import 'config.dart'; // Import AppConfig
 import 'dart:async'; // For Timer
-
-// ADMIN PAGE WITH STRICT PROJECT FILTERING
-// This implementation ensures learner searches are restricted to the current project context
-// to prevent document upload confusion when same person is enrolled in multiple projects
 
 class AdminPage extends StatefulWidget {
   final String sdp;
@@ -49,30 +39,6 @@ class _AdminPageState extends State<AdminPage> {
   List<Map<String, dynamic>> _searchSuggestions = [];
   bool _showSuggestions = false;
   Timer? _debounceTimer;
-  Map<String, dynamic>? _searchedLearner; // Store the searched learner result
-
-  // Simple search result cache (caches individual search results)
-  final Map<String, Map<String, dynamic>> _searchCache = {};
-  final Map<String, DateTime> _searchCacheTimestamps = {};
-  static const Duration _cacheExpiry = Duration(hours: 24);
-
-  // Document upload related variables
-  final List<String> requiredDocuments = [
-    'ID Document',
-    'Qualifications',
-    'Bank Confirmation Letter',
-    'Proof of Residence',
-    'CV',
-    'Business form',
-    'Learner agreement'
-  ];
-  final int _maxFileSize = 5 * 1024 * 1024; // 5MB
-  final int _minFileSize = 10 * 1024; // 10KB
-  bool _isScanning = false;
-
-  // Server endpoints for document upload
-  String get _uploadUrl => AppConfig.buildUrl('upload_learner_document.php');
-  String get _checkDocsUrl => AppConfig.buildUrl('check_learner_documents.php');
 
   Future<int> _resolveOfflineSdpId(DatabaseHelper dbHelper) async {
     final raw = widget.sdp.trim();
@@ -118,12 +84,10 @@ class _AdminPageState extends State<AdminPage> {
     _searchController.dispose();
     _searchFocusNode.dispose();
     _debounceTimer?.cancel();
-    _searchCache.clear();
-    _searchCacheTimestamps.clear();
     super.dispose();
   }
 
-  // Smart search functionality with STRICT PROJECT FILTERING
+  // Smart search functionality
   void _onSearchTextChanged() {
     final query = _searchController.text.trim();
 
@@ -176,7 +140,7 @@ class _AdminPageState extends State<AdminPage> {
         }
       }
 
-      // Build query params with STRICT PROJECT filtering
+      // Build query params with SDP and Project filters
       final queryParams = <String, String>{
         'q': query,
         'limit': '8',
@@ -186,26 +150,12 @@ class _AdminPageState extends State<AdminPage> {
         queryParams['sdp_id'] = sdpIdentifier;
       }
 
-      // STRICT PROJECT FILTERING - only search within current project context
       if (widget.projectId != null && widget.projectId!.isNotEmpty) {
         queryParams['project_id'] = widget.projectId!;
-        debugPrint(
-            '[ADMIN] STRICT FILTER: Searching only in project_id: ${widget.projectId}');
-      }
-      if (widget.pathwayId != null && widget.pathwayId!.isNotEmpty) {
-        queryParams['pathway_id'] = widget.pathwayId!;
-        debugPrint(
-            '[ADMIN] STRICT FILTER: Searching only in pathway_id: ${widget.pathwayId}');
-      }
-      if (widget.qualificationId != null &&
-          widget.qualificationId!.isNotEmpty) {
-        queryParams['qualification_id'] = widget.qualificationId!;
-        debugPrint(
-            '[ADMIN] STRICT FILTER: Searching only in qualification_id: ${widget.qualificationId}');
       }
 
-      // Use project-filtered autocomplete endpoint for STRICT project filtering
-      final url = AppConfig.buildUrl('search_learner_autocomplete_sdp.php',
+      // Use global search autocomplete endpoint with SDP and Project filters
+      final url = AppConfig.buildUrl('search_learner_autocomplete_global.php',
           queryParams: queryParams);
 
       final response = await http.get(Uri.parse(url)).timeout(
@@ -646,34 +596,34 @@ class _AdminPageState extends State<AdminPage> {
       }
 
       if (learner != null && learner['learner_id'] != null) {
-        // Store the learner result to display in UI
-        // Convert all fields to strings to avoid type mismatch errors
-        setState(() {
-          _searchedLearner = {
-            'learner_id': learner!['learner_id']?.toString() ?? '',
-            'name': learner['name']?.toString() ?? '',
-            'surname': learner['surname']?.toString() ?? '',
-            'id_number': learner['id_number']?.toString() ?? '',
-            'class_id': learner['class_id']?.toString() ?? '',
-            'class_name': learner['class_name']?.toString() ?? '',
-            'site_id': learner['site_id']?.toString() ?? '',
-            'site_name': learner['site_name']?.toString() ?? '',
-          };
-        });
+        // Navigate to class list page so user can scan documents and mark attendance
+        final learnerId = learner['learner_id'].toString();
+        final classId = learner['class_id']?.toString() ?? '';
 
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Found: ${learner['surname']} ${learner['name']}'),
-            duration: const Duration(seconds: 2),
-            backgroundColor: Colors.green,
-          ),
-        );
+        if (learnerId.isNotEmpty && classId.isNotEmpty) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => LearnerListPage(
+                classID: classId,
+              ),
+            ),
+          );
+          // Clear search field after successful navigation
+          _searchController.clear();
+        } else if (learnerId.isNotEmpty) {
+          // Fallback: if no class_id, show error
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Learner found but class information is missing'),
+              duration: Duration(seconds: 3),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        } else {
+          throw Exception('Learner ID is missing');
+        }
       } else {
-        setState(() {
-          _searchedLearner = null;
-        });
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('No learner found with ID number: $idNumber'),
@@ -683,10 +633,6 @@ class _AdminPageState extends State<AdminPage> {
         );
       }
     } catch (e) {
-      setState(() {
-        _searchedLearner = null;
-      });
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error searching for learner: $e'),
@@ -702,41 +648,6 @@ class _AdminPageState extends State<AdminPage> {
   }
 
   Future<Map<String, dynamic>?> _searchLearnerOnline(String idNumber) async {
-    // Check cache first
-    final cacheKey = idNumber.trim().toLowerCase();
-    if (_searchCache.containsKey(cacheKey)) {
-      final cacheTime = _searchCacheTimestamps[cacheKey];
-      if (cacheTime != null &&
-          DateTime.now().difference(cacheTime) < _cacheExpiry) {
-        print('[ADMIN] ✅ Cache HIT for ID: $idNumber');
-        return _searchCache[cacheKey];
-      } else {
-        // Cache expired
-        _searchCache.remove(cacheKey);
-        _searchCacheTimestamps.remove(cacheKey);
-        print('[ADMIN] ⏰ Cache EXPIRED for ID: $idNumber');
-      }
-    }
-
-    print('[ADMIN] ❌ Cache MISS for ID: $idNumber');
-
-    // Try local database first (faster!) - PROJECT-FILTERED SEARCH
-    print('[ADMIN] 🔍 Searching local database first (PROJECT-FILTERED)...');
-    final localResult = await _searchLearnerOffline(idNumber);
-    if (localResult != null) {
-      print('[ADMIN] ✅ Found in local database!');
-      // Cache the local result
-      _searchCache[cacheKey] = localResult;
-      _searchCacheTimestamps[cacheKey] = DateTime.now();
-      print(
-          '[ADMIN] 💾 Cached local result for ID: $idNumber (expires in 24 hours)');
-      return localResult;
-    }
-
-    // Not found locally, try server with PROJECT FILTERING
-    print(
-        '[ADMIN] ⚠️ Not found locally, searching server with PROJECT FILTERING...');
-
     try {
       // Get SDP identifier
       String sdpIdentifier = widget.sdp.trim();
@@ -747,42 +658,26 @@ class _AdminPageState extends State<AdminPage> {
         }
       }
 
-      // Build query parameters with STRICT PROJECT filtering
+      // Build query parameters with SDP and Project filters
       final queryParams = <String, String>{
-        'search': idNumber, // PHP expects 'search' not 'id_number'
-        'page': '1',
-        'limit': '50',
+        'id_number': idNumber,
       };
 
       if (sdpIdentifier.isNotEmpty) {
         queryParams['sdp_id'] = sdpIdentifier;
       }
 
-      // STRICT PROJECT FILTERING - only search within current project context
       if (widget.projectId != null && widget.projectId!.isNotEmpty) {
         queryParams['project_id'] = widget.projectId!;
-        debugPrint(
-            '[ADMIN] STRICT FILTER: Searching only in project_id: ${widget.projectId}');
-      }
-      if (widget.pathwayId != null && widget.pathwayId!.isNotEmpty) {
-        queryParams['pathway_id'] = widget.pathwayId!;
-        debugPrint(
-            '[ADMIN] STRICT FILTER: Searching only in pathway_id: ${widget.pathwayId}');
-      }
-      if (widget.qualificationId != null &&
-          widget.qualificationId!.isNotEmpty) {
-        queryParams['qualification_id'] = widget.qualificationId!;
-        debugPrint(
-            '[ADMIN] STRICT FILTER: Searching only in qualification_id: ${widget.qualificationId}');
       }
 
-      // Use project-filtered search endpoint for STRICT project filtering
+      // Use global search endpoint with SDP and Project filters
       final uri =
           Uri.parse(AppConfig.buildUrl('search_learner_global.php')).replace(
         queryParameters: queryParams,
       );
 
-      print('[ADMIN] Searching learner online (PROJECT-FILTERED): $uri');
+      print('[ADMIN] Searching learner online (global): $uri');
 
       final response = await http.get(uri).timeout(
         const Duration(seconds: 5), // Reduced timeout from 10s to 5s
@@ -791,60 +686,18 @@ class _AdminPageState extends State<AdminPage> {
         },
       );
 
-      print('[ADMIN] 📡 Server response status: ${response.statusCode}');
-      print('[ADMIN] 📡 Server response body: ${response.body}');
-
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
-        print('[ADMIN] 📦 Parsed JSON: $jsonData');
-        print('[ADMIN] 📦 Success: ${jsonData['success']}');
-        print('[ADMIN] 📦 Learners: ${jsonData['learners']}');
-
-        if (jsonData['success'] == true && jsonData['learners'] != null) {
-          final learners = jsonData['learners'] as List;
-          print('[ADMIN] 📦 Learners count: ${learners.length}');
-
-          if (learners.isNotEmpty) {
-            final learnerData = learners[0] as Map<String, dynamic>;
-            print(
-                '[ADMIN] ✅ Found learner: ${learnerData['surname']}, ${learnerData['name']}');
-
-            // Convert all fields to strings to avoid type mismatch errors
-            final normalizedData = {
-              'learner_id': learnerData['learner_id']?.toString() ?? '',
-              'name': learnerData['name']?.toString() ?? '',
-              'surname': learnerData['surname']?.toString() ?? '',
-              'id_number': learnerData['id_number']?.toString() ?? '',
-              'class_id': learnerData['class_id']?.toString() ?? '',
-              'class_name': learnerData['class_name']?.toString() ?? '',
-              'site_id': learnerData['site_id']?.toString() ?? '',
-              'site_name': learnerData['site_name']?.toString() ?? '',
-            };
-
-            // Cache the normalized result
-            _searchCache[cacheKey] = normalizedData;
-            _searchCacheTimestamps[cacheKey] = DateTime.now();
-            print(
-                '[ADMIN] 💾 Cached server result for ID: $idNumber (expires in 24 hours)');
-
-            // Return the normalized learner data
-            return normalizedData;
-          } else {
-            print('[ADMIN] ⚠️ Server returned empty learners array');
-          }
-        } else {
-          print(
-              '[ADMIN] ⚠️ Server returned success=false or no learners field');
+        if (jsonData['success'] == true && jsonData['learner'] != null) {
+          return jsonData['learner'] as Map<String, dynamic>;
         }
-      } else {
-        print('[ADMIN] ❌ Server returned status code: ${response.statusCode}');
       }
 
-      print('[ADMIN] ❌ No learner found on server');
       return null;
     } catch (e) {
       print('[ADMIN] Error searching online: $e');
-      return null;
+      // Fallback to offline search
+      return await _searchLearnerOffline(idNumber);
     }
   }
 
@@ -865,433 +718,29 @@ class _AdminPageState extends State<AdminPage> {
         throw Exception('SDP identifier not available');
       }
 
-      // STRICT PROJECT FILTERING for offline search
-      final db = await dbHelper.database;
+      // Get all learners for this SDP
+      final learners = await dbHelper.getLearnersBySdp(sdpIdentifier);
 
-      // Build WHERE clause with project filtering
-      final where = <String>['IDNumber = ?'];
-      final args = <Object>[idNumber];
-
-      // Add SDP filter
-      final sdpId = await _resolveOfflineSdpId(dbHelper);
-      if (sdpId > 0) {
-        where.add('l.sdp_id = ?');
-        args.add(sdpId);
+      // Find learner by ID number
+      for (final learner in learners) {
+        final learnerIdNumber = learner['IDNumber']?.toString().trim();
+        if (learnerIdNumber != null && learnerIdNumber == idNumber) {
+          return {
+            'learner_id': learner['LearnerID']?.toString() ?? '',
+            'name': learner['Name']?.toString() ?? '',
+            'surname': learner['Surname']?.toString() ?? '',
+            'id_number': learnerIdNumber,
+            'class_id': learner['classID']?.toString() ?? '',
+            'class_name': learner['className']?.toString() ?? '',
+          };
+        }
       }
 
-      // STRICT PROJECT FILTERING - only search within current project context
-      if (widget.projectId != null && widget.projectId!.isNotEmpty) {
-        where.add('c.project_id = ?');
-        args.add(int.tryParse(widget.projectId!) ?? 0);
-        debugPrint(
-            '[ADMIN] OFFLINE STRICT FILTER: Searching only in project_id: ${widget.projectId}');
-      }
-
-      // Query with JOIN to get class and project information for filtering
-      final query = '''
-        SELECT l.*, c.ClassName, c.classID, c.project_id
-        FROM learner l
-        LEFT JOIN class c ON l.classID = c.classID
-        WHERE ${where.join(' AND ')}
-        LIMIT 1
-      ''';
-
-      debugPrint('[ADMIN] OFFLINE QUERY: $query');
-      debugPrint('[ADMIN] OFFLINE ARGS: $args');
-
-      final results = await db.rawQuery(query, args);
-
-      if (results.isNotEmpty) {
-        final learner = results.first;
-        debugPrint(
-            '[ADMIN] OFFLINE FOUND: ${learner['Name']} ${learner['Surname']} in project ${learner['project_id']}');
-
-        return {
-          'learner_id': learner['LearnerID']?.toString() ?? '',
-          'name': learner['Name']?.toString() ?? '',
-          'surname': learner['Surname']?.toString() ?? '',
-          'id_number': learner['IDNumber']?.toString() ?? '',
-          'class_id': learner['classID']?.toString() ?? '',
-          'class_name': learner['ClassName']?.toString() ?? '',
-        };
-      }
-
-      debugPrint(
-          '[ADMIN] OFFLINE: No learner found with ID $idNumber in current project context');
       return null;
     } catch (e) {
       print('[ADMIN] Error searching offline: $e');
       return null;
     }
-  }
-
-  // Helper methods for document upload
-  Future<List<String>> _fetchServerDocuments(String learnerId) async {
-    try {
-      print('Fetching server documents for learner: $learnerId');
-      print('Request URL: $_checkDocsUrl');
-      print('Request body: {"learner_id": "$learnerId"}');
-
-      final response = await http.post(
-        Uri.parse(_checkDocsUrl),
-        body: {'learner_id': learnerId},
-      ).timeout(const Duration(seconds: 10));
-
-      print('Server response status: ${response.statusCode}');
-      print('Server response body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        try {
-          final jsonResponse = jsonDecode(response.body);
-          print('Parsed JSON response: $jsonResponse');
-
-          if (jsonResponse['success'] == true) {
-            final documents = List<String>.from(jsonResponse['documents']);
-            print('Successfully fetched server documents: $documents');
-            return documents;
-          } else {
-            print('Server returned error: ${jsonResponse['message']}');
-            throw Exception(jsonResponse['message']);
-          }
-        } catch (e) {
-          print('Error parsing JSON response: $e');
-          print('Raw response: ${response.body}');
-          return [];
-        }
-      } else {
-        print('Server error: ${response.statusCode}');
-        throw Exception('Server error: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Error fetching server documents: $e');
-      return [];
-    }
-  }
-
-  Future<List<String>> getExistingDocuments(String learnerId) async {
-    try {
-      final dbHelper = DatabaseHelper();
-      List<String> existingDocs = [];
-
-      // Check local database
-      final localDocs = await dbHelper.fetchLearnerDocuments(learnerId);
-      existingDocs =
-          localDocs.map((doc) => doc['documentName'] as String).toList();
-      print('Local documents for $learnerId: $existingDocs');
-
-      // Check server if online
-      if (await _checkConnectivity()) {
-        final serverDocs = await _fetchServerDocuments(learnerId);
-        print('Server documents for $learnerId: $serverDocs');
-        for (var doc in serverDocs) {
-          if (!existingDocs.contains(doc)) {
-            existingDocs.add(doc);
-          }
-        }
-      } else {
-        print('No internet connection, skipping server check for $learnerId');
-      }
-
-      print('Combined existing documents for $learnerId: $existingDocs');
-      return existingDocs;
-    } catch (e) {
-      print('Error getting existing documents: $e');
-      return [];
-    }
-  }
-
-  Future<bool> canUploadDocuments(String learnerId) async {
-    try {
-      final existingDocs = await getExistingDocuments(learnerId);
-      // Check if there are any documents that can still be uploaded
-      return requiredDocuments.any((doc) => !existingDocs.contains(doc));
-    } catch (e) {
-      print('Error checking if documents can be uploaded: $e');
-      return false;
-    }
-  }
-
-  Future<void> uploadDocument(
-      String learnerId, String documentName, String filePath) async {
-    try {
-      final dbHelper = DatabaseHelper();
-      final document = {
-        'learner_id': learnerId,
-        'documentName': documentName,
-        'learner_document': filePath,
-        'status': 'Pending',
-        'upload_date': DateTime.now().toIso8601String(),
-        'synced': 0,
-      };
-      await dbHelper.insertLearnerDocument(document);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$documentName uploaded locally')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to upload $documentName: $e')),
-      );
-      rethrow;
-    }
-  }
-
-  Future<void> _syncDocument(Map<String, dynamic> document) async {
-    try {
-      final filePath = document['learner_document'] as String;
-      final file = File(filePath);
-      if (!await file.exists()) {
-        throw Exception('Document file not found: $filePath');
-      }
-
-      var request = http.MultipartRequest('POST', Uri.parse(_uploadUrl));
-      request.fields['learner_id'] = document['learner_id'].toString();
-      request.fields['documentName'] = document['documentName'];
-      request.fields['status'] = document['status'];
-      request.fields['upload_date'] = document['upload_date'];
-      request.fields['synced'] = '1';
-      if (document['rejection_reason'] != null) {
-        request.fields['rejection_reason'] = document['rejection_reason'];
-      }
-
-      request.files.add(await http.MultipartFile.fromPath(
-        'learner_document',
-        filePath,
-        filename: filePath.split('/').last,
-      ));
-
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-      print('Sync response status: ${response.statusCode}');
-      print('Sync response body: $responseBody');
-
-      if (response.statusCode == 200) {
-        try {
-          final jsonResponse = jsonDecode(responseBody);
-          if (jsonResponse['success'] == true) {
-            final dbHelper = DatabaseHelper();
-            await dbHelper.updateLearnerDocumentSynced(
-                document['document_id'], 1);
-            print(
-                'Document synced: ${document['documentName']} for learner ${document['learner_id']}');
-          } else {
-            throw Exception(
-                jsonResponse['message'] ?? 'Failed to sync document');
-          }
-        } catch (e) {
-          throw Exception('Invalid JSON response: $responseBody');
-        }
-      } else {
-        throw Exception('Server error: ${response.statusCode} - $responseBody');
-      }
-    } catch (e) {
-      print('Error syncing document: $e');
-      rethrow;
-    }
-  }
-
-  Future<void> syncUnsyncedDocuments() async {
-    if (!await _checkConnectivity()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No internet connection, cannot sync')),
-      );
-      return;
-    }
-
-    try {
-      final dbHelper = DatabaseHelper();
-      final unsyncedDocs = await dbHelper.fetchUnsyncedLearnerDocuments();
-      print('Found ${unsyncedDocs.length} unsynced documents');
-
-      for (var doc in unsyncedDocs) {
-        await _syncDocument(doc);
-      }
-
-      if (unsyncedDocs.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content:
-                  Text('Synced ${unsyncedDocs.length} documents to server')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No documents to sync')),
-        );
-      }
-
-      setState(() {});
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error syncing documents: $e')),
-      );
-    }
-  }
-
-  void showDocumentUploadModal(BuildContext context, String learnerId) {
-    String? selectedDocument;
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return FutureBuilder<List<String>>(
-              future: getExistingDocuments(learnerId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const AlertDialog(
-                    title: Text('Loading...'),
-                    content: Center(child: CircularProgressIndicator()),
-                  );
-                }
-
-                final existingDocs = snapshot.data ?? [];
-                final availableDocs = requiredDocuments
-                    .where((doc) => !existingDocs.contains(doc))
-                    .toList();
-
-                if (availableDocs.isEmpty) {
-                  return AlertDialog(
-                    title: const Text('All Documents Uploaded'),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                            'All required documents have already been uploaded for this learner.'),
-                        const SizedBox(height: 8),
-                        Text('Existing documents: ${existingDocs.join(', ')}'),
-                        const SizedBox(height: 8),
-                        Text(
-                            'Required documents: ${requiredDocuments.join(', ')}'),
-                      ],
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('OK'),
-                      ),
-                    ],
-                  );
-                }
-
-                return AlertDialog(
-                  title: const Text('Upload Document'),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                          'Available documents to upload: ${availableDocs.length}/${requiredDocuments.length}'),
-                      const SizedBox(height: 8),
-                      if (existingDocs.isNotEmpty)
-                        Text('Already uploaded: ${existingDocs.join(', ')}'),
-                      const SizedBox(height: 16),
-                      DropdownButton<String>(
-                        hint: const Text('Select Document Type'),
-                        value: selectedDocument,
-                        isExpanded: true,
-                        items: availableDocs.map((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                        onChanged: (newValue) {
-                          setState(() {
-                            selectedDocument = newValue;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
-                    ),
-                    TextButton(
-                      onPressed: selectedDocument == null || _isScanning
-                          ? null
-                          : () async {
-                              setState(() => _isScanning = true);
-                              try {
-                                final status =
-                                    await Permission.camera.request();
-                                if (!status.isGranted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Camera permission denied. Please enable it in settings.',
-                                      ),
-                                    ),
-                                  );
-                                  await openAppSettings();
-                                  setState(() => _isScanning = false);
-                                  return;
-                                }
-
-                                final scanner = FlutterDocScanner();
-                                // Allow unlimited pages (999) for CV and learner agreements
-                                final scanResult =
-                                    await scanner.getScanDocuments(
-                                  page: 999, // Unlimited pages
-                                );
-                                if (scanResult is! Map ||
-                                    !scanResult.containsKey('pdfUri') ||
-                                    scanResult['pdfUri'] == null) {
-                                  throw 'Invalid scan result';
-                                }
-
-                                final pdfPath = (scanResult['pdfUri'] as String)
-                                    .replaceFirst('file:///', '');
-                                final file = File(pdfPath);
-
-                                if (!await file.exists() ||
-                                    !pdfPath.endsWith('.pdf')) {
-                                  throw 'Invalid or missing PDF file';
-                                }
-
-                                final fileSize = await file.length();
-                                if (fileSize > _maxFileSize) {
-                                  throw 'File size exceeds 5MB limit';
-                                }
-                                if (fileSize < _minFileSize) {
-                                  throw 'The scanned page may not be clear. Ensure text is sharp and entire page is captured.';
-                                }
-
-                                await uploadDocument(
-                                    learnerId, selectedDocument!, pdfPath);
-                                // Close the dialog
-                                Navigator.pop(context);
-
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                        '$selectedDocument uploaded successfully'),
-                                    backgroundColor: Colors.green,
-                                  ),
-                                );
-                              } catch (e) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                      content:
-                                          Text('Error scanning document: $e')),
-                                );
-                              } finally {
-                                setState(() => _isScanning = false);
-                              }
-                            },
-                      child: const Text('Scan and Upload'),
-                    ),
-                  ],
-                );
-              },
-            );
-          },
-        );
-      },
-    );
   }
 
   void _openSdpLearners() {
@@ -1465,8 +914,6 @@ class _AdminPageState extends State<AdminPage> {
                               final idNumber = suggestion['id_number'] ?? '';
                               final className = suggestion['class_name'] ?? '';
                               final siteName = suggestion['site_name'] ?? '';
-                              final projectName =
-                                  suggestion['project_name'] ?? '';
 
                               return ListTile(
                                 dense: true,
@@ -1477,7 +924,7 @@ class _AdminPageState extends State<AdminPage> {
                                       fontWeight: FontWeight.w500),
                                 ),
                                 subtitle: Text(
-                                  'Project: $projectName${className.isNotEmpty ? ' • Class: $className' : ''}${siteName.isNotEmpty ? ' • Site: $siteName' : ''}',
+                                  'Class: $className${siteName.isNotEmpty ? ' • Site: $siteName' : ''}',
                                   style: const TextStyle(fontSize: 12),
                                 ),
                                 onTap: () =>
@@ -1492,232 +939,13 @@ class _AdminPageState extends State<AdminPage> {
                 ],
               ),
               const SizedBox(height: 8),
-
-              // Display searched learner result with action buttons
-              if (_searchedLearner != null)
-                Card(
-                  elevation: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Search Result',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.close),
-                              onPressed: () {
-                                setState(() {
-                                  _searchedLearner = null;
-                                  _searchController.clear();
-                                });
-                              },
-                              tooltip: 'Clear result',
-                            ),
-                          ],
-                        ),
-                        const Divider(),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(Icons.person,
-                                size: 40, color: Colors.blue),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${_searchedLearner!['surname'] ?? ''} ${_searchedLearner!['name'] ?? ''}',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'ID: ${_searchedLearner!['id_number'] ?? 'N/A'}',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                  if (_searchedLearner!['class_name'] != null &&
-                                      _searchedLearner!['class_name']
-                                          .toString()
-                                          .isNotEmpty)
-                                    Text(
-                                      'Class: ${_searchedLearner!['class_name']}',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            ElevatedButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => LearnerDetailsPage(
-                                      learnerID: _searchedLearner!['learner_id']
-                                              ?.toString() ??
-                                          'N/A',
-                                    ),
-                                  ),
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                              ),
-                              icon: const Icon(Icons.visibility),
-                              label: const Text('View'),
-                            ),
-                            ElevatedButton.icon(
-                              onPressed: () {
-                                // Show document upload modal for scanning/uploading
-                                showDocumentUploadModal(
-                                  context,
-                                  _searchedLearner!['learner_id']?.toString() ??
-                                      'N/A',
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                              ),
-                              icon: const Icon(Icons.upload_file),
-                              label: const Text('Documents'),
-                            ),
-                            ElevatedButton.icon(
-                              onPressed: () {
-                                final learnerName =
-                                    '${_searchedLearner!['surname'] ?? ''} ${_searchedLearner!['name'] ?? ''}'
-                                        .trim();
-                                final classId =
-                                    _searchedLearner!['class_id']?.toString() ??
-                                        '';
-                                final className =
-                                    _searchedLearner!['class_name']
-                                            ?.toString() ??
-                                        'Class $classId';
-
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        FinanceRegisterHistory(
-                                      learnerId: _searchedLearner!['learner_id']
-                                              ?.toString() ??
-                                          'N/A',
-                                      learnerName: learnerName,
-                                      classId: classId,
-                                      className: className,
-                                      financeId: classId,
-                                    ),
-                                  ),
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                              ),
-                              icon: const Icon(Icons.calendar_today),
-                              label: const Text('Attendance'),
-                            ),
-                            ElevatedButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => LearnerInductionPage(
-                                      learnerID: _searchedLearner!['learner_id']
-                                              ?.toString() ??
-                                          '',
-                                      learnerName:
-                                          '${_searchedLearner!['surname'] ?? ''} ${_searchedLearner!['name'] ?? ''}'
-                                              .trim(),
-                                      classID: _searchedLearner!['class_id']
-                                              ?.toString() ??
-                                          '',
-                                    ),
-                                  ),
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.teal,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                              ),
-                              icon: const Icon(Icons.access_time),
-                              label: const Text('Induction'),
-                            ),
-                            ElevatedButton.icon(
-                              onPressed: syncUnsyncedDocuments,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.purple,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                              ),
-                              icon: const Icon(Icons.sync),
-                              label: const Text('Sync Docs'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: ElevatedButton.icon(
+                  onPressed: _isLoading ? null : _openSdpLearners,
+                  icon: const Icon(Icons.people_alt),
+                  label: const Text('View All Learners'),
                 ),
-
-              Row(
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _openSdpLearners,
-                    icon: const Icon(Icons.people_alt),
-                    label: const Text('View All Learners'),
-                  ),
-                  const SizedBox(width: 16),
-                  ElevatedButton.icon(
-                    onPressed: _isLoading ? null : syncUnsyncedDocuments,
-                    icon: const Icon(Icons.upload_file),
-                    label: const Text('Sync Documents'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                    ),
-                  ),
-                ],
               ),
               const SizedBox(height: 16),
               _isLoading
