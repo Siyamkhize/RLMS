@@ -947,7 +947,7 @@ class _POETabContentState extends State<POETabContent> {
   }
 
   Future<bool> fetchOnlineLearnerData() async {
-    final url = Uri.parse(AppConfig.buildUrl('poe.php'));
+    final url = Uri.parse(AppConfig.buildUrl('get_poe.php'));
     try {
       final response = await http.post(
         url,
