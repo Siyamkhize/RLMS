@@ -947,7 +947,7 @@ class _POETabContentState extends State<POETabContent> {
   }
 
   Future<bool> fetchOnlineLearnerData() async {
-    final url = Uri.parse(AppConfig.buildUrl('get_poe.php'));
+    final url = Uri.parse(AppConfig.buildUrl('poe.php'));
     try {
       final response = await http.post(
         url,
@@ -2147,7 +2147,8 @@ class _POETabContentState extends State<POETabContent> {
                 SnackBar(content: Text('Server error: ${decoded['message']}')),
               );
               await _saveLocally(document, assessmentType, exercise,
-                  updatedLogbookText ?? logbookText);
+                  updatedLogbookText ?? logbookText,
+                  unitStandard: unitStandard);
             }
           } catch (e) {
             print('Upload error: $e');
@@ -2155,11 +2156,13 @@ class _POETabContentState extends State<POETabContent> {
               SnackBar(content: Text('Upload failed: $e. Saving locally.')),
             );
             await _saveLocally(document, assessmentType, exercise,
-                updatedLogbookText ?? logbookText);
+                updatedLogbookText ?? logbookText,
+                unitStandard: unitStandard);
           }
         } else {
           await _saveLocally(document, assessmentType, exercise,
-              updatedLogbookText ?? logbookText);
+              updatedLogbookText ?? logbookText,
+              unitStandard: unitStandard);
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2419,7 +2422,8 @@ class _POETabContentState extends State<POETabContent> {
             // Save to local database for all exercises
             for (var item in formativeQuestions) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
-              await _saveLocally(document, 'Formative', exercise, null);
+              await _saveLocally(document, 'Formative', exercise, null,
+                  unitStandard: unitStandard);
             }
             successfulUploads = formativeQuestions.length;
             print(
@@ -2429,7 +2433,8 @@ class _POETabContentState extends State<POETabContent> {
             // Save locally for all exercises
             for (var item in formativeQuestions) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
-              await _saveLocally(document, 'Formative', exercise, null);
+              await _saveLocally(document, 'Formative', exercise, null,
+                  unitStandard: unitStandard);
             }
             failedUploads = formativeQuestions.length;
           }
@@ -2438,7 +2443,8 @@ class _POETabContentState extends State<POETabContent> {
           // Save locally for all exercises
           for (var item in formativeQuestions) {
             final exercise = item['exercise']?.toString() ?? 'N/A';
-            await _saveLocally(document, 'Formative', exercise, null);
+            await _saveLocally(document, 'Formative', exercise, null,
+                unitStandard: unitStandard);
           }
           failedUploads = formativeQuestions.length;
         }
@@ -2488,7 +2494,8 @@ class _POETabContentState extends State<POETabContent> {
           print(
               '[OFFLINE_SCAN] Processing question $localSaveCount/${formativeQuestions.length}: $exercise');
 
-          await _saveLocally(document, 'Formative', exercise, null);
+          await _saveLocally(document, 'Formative', exercise, null,
+              unitStandard: unitStandard);
           localSaveCount++;
 
           // Verify it was marked
@@ -2777,7 +2784,8 @@ class _POETabContentState extends State<POETabContent> {
             // Save to local database for all exercises
             for (var item in summativeQuestions) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
-              await _saveLocally(document, 'Summative', exercise, null);
+              await _saveLocally(document, 'Summative', exercise, null,
+                  unitStandard: unitStandard);
             }
             successfulUploads = summativeQuestions.length;
             print(
@@ -2787,7 +2795,8 @@ class _POETabContentState extends State<POETabContent> {
             // Save locally for all exercises
             for (var item in summativeQuestions) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
-              await _saveLocally(document, 'Summative', exercise, null);
+              await _saveLocally(document, 'Summative', exercise, null,
+                  unitStandard: unitStandard);
             }
             failedUploads = summativeQuestions.length;
           }
@@ -2796,7 +2805,8 @@ class _POETabContentState extends State<POETabContent> {
           // Save locally for all exercises
           for (var item in summativeQuestions) {
             final exercise = item['exercise']?.toString() ?? 'N/A';
-            await _saveLocally(document, 'Summative', exercise, null);
+            await _saveLocally(document, 'Summative', exercise, null,
+                unitStandard: unitStandard);
           }
           failedUploads = summativeQuestions.length;
         }
@@ -2846,7 +2856,8 @@ class _POETabContentState extends State<POETabContent> {
           print(
               '[OFFLINE_SCAN] Processing question $localSaveCount/${summativeQuestions.length}: $exercise');
 
-          await _saveLocally(document, 'Summative', exercise, null);
+          await _saveLocally(document, 'Summative', exercise, null,
+              unitStandard: unitStandard);
           localSaveCount++;
 
           // Verify it was marked
@@ -3026,15 +3037,18 @@ class _POETabContentState extends State<POETabContent> {
             print('[REMEDIAL] $remedialType uploaded to server successfully');
           } else {
             print('[REMEDIAL] Server error: ${decoded['message']}');
-            await _saveLocally(document, remedialType, exercise, null);
+            await _saveLocally(document, remedialType, exercise, null,
+                unitStandard: unitStandard);
           }
         } catch (e) {
           print('[REMEDIAL] Upload error: $e');
-          await _saveLocally(document, remedialType, exercise, null);
+          await _saveLocally(document, remedialType, exercise, null,
+              unitStandard: unitStandard);
         }
       } else {
         // Save locally
-        await _saveLocally(document, remedialType, exercise, null);
+        await _saveLocally(document, remedialType, exercise, null,
+            unitStandard: unitStandard);
       }
 
       print('[REMEDIAL] $remedialType document saved for $unitStandard');
@@ -3237,7 +3251,8 @@ class _POETabContentState extends State<POETabContent> {
             for (var item in logBookItems) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
               await _saveLocally(document, 'LogBook', exercise,
-                  'Logbook entry for $exercise - $unitStandard');
+                  'Logbook entry for $exercise - $unitStandard',
+                  unitStandard: unitStandard);
             }
             successfulUploads = logBookItems.length;
             print(
@@ -3248,7 +3263,8 @@ class _POETabContentState extends State<POETabContent> {
             for (var item in logBookItems) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
               await _saveLocally(document, 'LogBook', exercise,
-                  'Logbook entry for $exercise - $unitStandard');
+                  'Logbook entry for $exercise - $unitStandard',
+                  unitStandard: unitStandard);
             }
             failedUploads = logBookItems.length;
           }
@@ -3258,7 +3274,8 @@ class _POETabContentState extends State<POETabContent> {
           for (var item in logBookItems) {
             final exercise = item['exercise']?.toString() ?? 'N/A';
             await _saveLocally(document, 'LogBook', exercise,
-                'Logbook entry for $exercise - $unitStandard');
+                'Logbook entry for $exercise - $unitStandard',
+                unitStandard: unitStandard);
           }
           failedUploads = logBookItems.length;
         }
@@ -3304,7 +3321,8 @@ class _POETabContentState extends State<POETabContent> {
               '[OFFLINE_SCAN] Processing logbook item $localSaveCount/${logBookItems.length}: $exercise');
 
           await _saveLocally(document, 'LogBook', exercise,
-              'Logbook entry for $exercise - $unitStandard');
+              'Logbook entry for $exercise - $unitStandard',
+              unitStandard: unitStandard);
           localSaveCount++;
 
           // Verify it was marked
@@ -3440,22 +3458,26 @@ class _POETabContentState extends State<POETabContent> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Server error: ${decoded['message']}')),
           );
-          await _saveLocally(pdfFile, assessmentType, exercise, null);
+          await _saveLocally(pdfFile, assessmentType, exercise, null,
+              unitStandard: unitStandard);
         }
       } catch (e) {
         print('Upload error: $e');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to upload to server')),
         );
-        await _saveLocally(pdfFile, assessmentType, exercise, null);
+        await _saveLocally(pdfFile, assessmentType, exercise, null,
+            unitStandard: unitStandard);
       }
     } else {
-      await _saveLocally(pdfFile, assessmentType, exercise, null);
+      await _saveLocally(pdfFile, assessmentType, exercise, null,
+          unitStandard: unitStandard);
     }
   }
 
   Future<void> _saveLocally(File document, String assessmentType,
-      String exercise, String? logbookText) async {
+      String exercise, String? logbookText,
+      {String? unitStandard}) async {
     final dbHelper = DatabaseHelper();
     String filePath = document.path;
 
@@ -3469,8 +3491,24 @@ class _POETabContentState extends State<POETabContent> {
 
       final extension = filePath.split('.').last;
       final timestamp = DateTime.now().millisecondsSinceEpoch;
+
+      // Extract unit standard ID from unit standard name or use a simple approach
+      String unitStandardId = 'UNKNOWN';
+      if (unitStandard != null && unitStandard.isNotEmpty) {
+        // Try to extract numeric ID from unit standard name
+        // Common patterns: "Unit Standard 9964 - Name", "9964 - Name", "US9964", or just "9964"
+        RegExp idPattern = RegExp(r'(?:US|Unit\s*Standard\s*)?(\d{4,6})\b');
+        Match? match = idPattern.firstMatch(unitStandard);
+        if (match != null) {
+          unitStandardId = match.group(1)!;
+        } else {
+          // Fallback: use a simple hash but make it shorter and more readable
+          unitStandardId = (unitStandard.hashCode.abs() % 99999).toString();
+        }
+      }
+
       final newFileName =
-          '${assessmentType}_${widget.learnerID}_${exercise.replaceAll(' ', '_')}_$timestamp.$extension';
+          '${assessmentType}_${unitStandardId}_${exercise.replaceAll(' ', '_')}_$timestamp.$extension';
       final newFilePath = '${poeDir.path}/$newFileName';
 
       // Copy file to app directory
