@@ -161,6 +161,73 @@ class _AttendancePageState extends State<AttendancePage> {
     }
   }
 
+  // Load local attendance records from the learner_clocking table
+  Future<List<Map<String, dynamic>>> _loadLocalAttendanceRecords() async {
+    try {
+      final db = await DatabaseHelper().database;
+      final monthStr =
+          '${selectedMonth.year}-${selectedMonth.month.toString().padLeft(2, '0')}';
+
+      print(
+          '[ATTENDANCE] Loading local records for month: $monthStr, class: ${widget.classID}');
+
+      // Debug: Check what's actually in the database
+      final allClockingRecords = await db.query('learner_clocking', limit: 10);
+      print(
+          '[ATTENDANCE] DEBUG: Total clocking records in DB: ${allClockingRecords.length}');
+      if (allClockingRecords.isNotEmpty) {
+        print(
+            '[ATTENDANCE] DEBUG: Sample clocking record: ${allClockingRecords.first}');
+      }
+
+      final allLearners = await db.query('learnerdetails',
+          where: 'classID = ?', whereArgs: [widget.classID], limit: 5);
+      print(
+          '[ATTENDANCE] DEBUG: Learners in class ${widget.classID}: ${allLearners.length}');
+      if (allLearners.isNotEmpty) {
+        print('[ATTENDANCE] DEBUG: Sample learner: ${allLearners.first}');
+      }
+
+      // Get learners in this class with their local clocking records for the month
+      // Use a more flexible date matching approach
+      final localRecords = await db.rawQuery('''
+        SELECT 
+          l.LearnerID,
+          l.Name,
+          l.Surname,
+          COUNT(CASE WHEN lc.clock_in_time IS NOT NULL AND lc.clock_date LIKE ? THEN 1 END) as local_days_clocked,
+          COUNT(CASE WHEN lc.clock_in_time IS NOT NULL THEN 1 END) as total_days_clocked
+        FROM learnerdetails l
+        LEFT JOIN learner_clocking lc ON l.LearnerID = lc.LearnerID 
+        WHERE l.classID = ?
+        GROUP BY l.LearnerID, l.Name, l.Surname
+        HAVING COUNT(l.LearnerID) > 0
+        ORDER BY l.Surname, l.Name
+      ''', ['$monthStr%', widget.classID]);
+
+      print('[ATTENDANCE] Found ${localRecords.length} local learner records');
+
+      if (localRecords.isNotEmpty) {
+        print('[ATTENDANCE] First local record: ${localRecords.first}');
+        // Show records that have any clocking data
+        final recordsWithClocking = localRecords
+            .where((r) =>
+                (r['local_days_clocked'] as int) > 0 ||
+                (r['total_days_clocked'] as int) > 0)
+            .toList();
+        print(
+            '[ATTENDANCE] Records with clocking data: ${recordsWithClocking.length}');
+      }
+
+      return localRecords
+          .map((record) => Map<String, dynamic>.from(record))
+          .toList();
+    } catch (e) {
+      print('[ATTENDANCE] Error loading local records: $e');
+      return [];
+    }
+  }
+
   // Sync attendance data from server and return the data
   Future<List<Map<String, dynamic>>?> _syncAttendanceFromServer(
       {bool showMessage = false}) async {
@@ -280,8 +347,8 @@ class _AttendancePageState extends State<AttendancePage> {
     });
 
     try {
-      // ONLY USE SERVER DATA - NO LOCAL DATABASE
-      final serverData = await _syncAttendanceFromServer(showMessage: false);
+      // OFFLINE-FIRST APPROACH: Load local records first, then sync with server
+      final localData = await _loadLocalAttendanceRecords();
 
       // Calculate working days and holidays for the month
       final workingDays =
@@ -293,23 +360,24 @@ class _AttendancePageState extends State<AttendancePage> {
 
       print(
           '[ATTENDANCE] Working days: $workingDays, Holidays: $holidaysInMonth, Daily rate: $dailyRate');
+      print('[ATTENDANCE] Local data: ${localData.length} records');
+
+      // Try to sync with server (but don't block on it)
+      final serverData = await _syncAttendanceFromServer(showMessage: false);
       print(
           '[ATTENDANCE] Server data: ${serverData != null ? serverData.length : 0} records');
 
-      if (serverData != null && serverData.isNotEmpty) {
-        // Use server data
-        print('[ATTENDANCE] ✅ Using server data: ${serverData.length} records');
-        print('[ATTENDANCE] First server record: ${serverData.first}');
+      List<Map<String, dynamic>> finalData = [];
 
-        final List<Map<String, dynamic>> mappedData = [];
+      if (serverData != null && serverData.isNotEmpty) {
+        // Use server data (most up-to-date)
+        print('[ATTENDANCE] ✅ Using server data: ${serverData.length} records');
 
         for (final record in serverData) {
-          // Get values from server
           final totalDaysAttended = (record['total_days_attended'] is int)
               ? record['total_days_attended'] as int
               : int.tryParse(record['total_days_attended'].toString()) ?? 0;
 
-          // Use daily_rate from server
           final serverDailyRate = (record['daily_rate'] != null)
               ? (record['daily_rate'] is double
                   ? record['daily_rate'] as double
@@ -317,14 +385,13 @@ class _AttendancePageState extends State<AttendancePage> {
                       dailyRate)
               : dailyRate;
 
-          // Use amount_due from server
           final totalDue = (record['amount_due'] != null)
               ? (record['amount_due'] is double
                   ? record['amount_due'] as double
                   : double.tryParse(record['amount_due'].toString()) ?? 0.0)
               : serverDailyRate * totalDaysAttended;
 
-          mappedData.add({
+          finalData.add({
             'LearnerID': record['LearnerID'],
             'Name': record['Name'],
             'Surname': record['Surname'],
@@ -336,45 +403,60 @@ class _AttendancePageState extends State<AttendancePage> {
             'daily_rate': serverDailyRate,
             'total_due': totalDue,
             'holidays': holidaysInMonth,
+            'data_source': 'server', // Track data source
+          });
+        }
+      } else if (localData.isNotEmpty) {
+        // Fallback to local data when server is unavailable
+        print('[ATTENDANCE] 📱 Using local data: ${localData.length} records');
+
+        for (final record in localData) {
+          final localDaysClocked = record['local_days_clocked'] ?? 0;
+          final totalDaysAttended =
+              localDaysClocked; // Only count local clocking for now
+          final totalDue = dailyRate * totalDaysAttended;
+
+          finalData.add({
+            'LearnerID': record['LearnerID'],
+            'Name': record['Name'],
+            'Surname': record['Surname'],
+            'days_clocked': localDaysClocked,
+            'manual_days_clocked': 0, // Not available locally
+            'sick_note_days': 0, // Not available locally
+            'days_attended': totalDaysAttended,
+            'expected_days': expectedDays,
+            'daily_rate': dailyRate,
+            'total_due': totalDue,
+            'holidays': holidaysInMonth,
+            'data_source': 'local', // Track data source
           });
         }
 
-        print('[ATTENDANCE] ✅ Mapped ${mappedData.length} records from server');
-        if (mappedData.isNotEmpty) {
-          print('[ATTENDANCE] First mapped record: ${mappedData.first}');
-          print(
-              '[ATTENDANCE] Days attended: ${mappedData.first['days_attended']}/${mappedData.first['expected_days']}');
-        }
-
-        setState(() {
-          learnerAttendance = mappedData;
-          isLoading = false;
-        });
-
-        print(
-            '[ATTENDANCE] ✅ Server data loaded successfully with ${mappedData.length} learners');
-      } else {
-        // No server data
-        print('[ATTENDANCE] ❌ No server data available');
-
-        setState(() {
-          learnerAttendance = [];
-          isLoading = false;
-        });
-
+        // Show offline indicator
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Unable to load attendance data from server'),
-              backgroundColor: Colors.orange,
-              action: SnackBarAction(
-                label: 'Retry',
-                textColor: Colors.white,
-                onPressed: _loadMonthlyAttendance,
-              ),
+            const SnackBar(
+              content: Text('📱 Showing local clocking records (offline mode)'),
+              backgroundColor: Colors.blue,
+              duration: Duration(seconds: 3),
             ),
           );
         }
+      } else {
+        // No data available at all
+        print('[ATTENDANCE] ❌ No data available (server or local)');
+        finalData = [];
+      }
+
+      setState(() {
+        learnerAttendance = finalData;
+        isLoading = false;
+      });
+
+      print('[ATTENDANCE] ✅ Loaded ${finalData.length} attendance records');
+      if (finalData.isNotEmpty) {
+        final source = finalData.first['data_source'];
+        print('[ATTENDANCE] Data source: $source');
       }
     } catch (e, stackTrace) {
       print('[ATTENDANCE] ❌ Error loading attendance: $e');
@@ -685,12 +767,14 @@ class _AttendancePageState extends State<AttendancePage> {
     final dailyRate = record['daily_rate'] as double;
     final totalDue = record['total_due'] as double;
     final holidays = record['holidays'] as int;
+    final dataSource = record['data_source'] ?? 'unknown';
 
     final bgColor = index % 2 == 0 ? Colors.white : Colors.grey.shade50;
 
     // Build breakdown tooltip
-    final breakdown =
-        'Regular: $daysClocked\nManual: $manualDaysClocked\nSick Notes: $sickNoteDays\nHolidays: $holidays\nTotal: $daysAttended';
+    final breakdown = dataSource == 'local'
+        ? 'Local clocking: $daysClocked\nTotal: $daysAttended\n📱 Offline mode'
+        : 'Regular: $daysClocked\nManual: $manualDaysClocked\nSick Notes: $sickNoteDays\nHolidays: $holidays\nTotal: $daysAttended';
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
@@ -704,7 +788,16 @@ class _AttendancePageState extends State<AttendancePage> {
         children: [
           Expanded(
             flex: 3,
-            child: _buildTableCell(record['Surname'].toString(), isBold: true),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildTableCell(record['Surname'].toString(),
+                      isBold: true),
+                ),
+                if (dataSource == 'local')
+                  const Icon(Icons.phone_android, size: 12, color: Colors.blue),
+              ],
+            ),
           ),
           Expanded(
             flex: 3,

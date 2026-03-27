@@ -34,8 +34,16 @@ class MonitoringService {
       {}; // Track when learner was last prompted
   final Map<String, bool> _learnerResponded = {}; // Track if learner responded
 
-  DateTime? _firstClockInTime; // Track first clock-in of the day
-  bool _monitoringStarted = false; // Track if 2-hour wait has passed
+  // Scheduled monitoring times with random windows
+  final Map<String, DateTime?> _scheduledPromptTimes = {
+    'morning_learner_1': null, // Random between 9:00-9:30 AM
+    'morning_learner_2': null, // Random between 10:30-11:00 AM
+    'afternoon_learner_1': null, // Random between 13:15-13:45 (1:15-1:45 PM)
+    'afternoon_learner_2': null, // Random between 14:00-15:15 (2:00-3:15 PM)
+  };
+
+  bool _learnersSelected =
+      false; // Track if learners have been selected for the day
 
   // Random generator
   final Random _random = Random();
@@ -63,6 +71,16 @@ class MonitoringService {
     _backgroundTimer?.cancel();
     _isServiceRunning = false;
     _isMonitoringActive = false;
+    _learnersSelected = false;
+
+    // Clear all selections and tracking for next day
+    _morningSelectedLearners.clear();
+    _afternoonSelectedLearners.clear();
+    _promptAttempts.clear();
+    _lastPromptTime.clear();
+    _learnerResponded.clear();
+    _scheduledPromptTimes.clear();
+
     debugPrint('[MONITORING_SERVICE] Stopped background monitoring service');
   }
 
@@ -76,147 +94,150 @@ class MonitoringService {
       final hour = now.hour;
       final minute = now.minute;
 
-      // Determine session type
-      final isLunchBreak = (hour == 12) || (hour == 13 && minute < 15);
-      final isMorningSession = hour >= 8 && hour < 12;
-      final isAfternoonSession =
-          (hour == 13 && minute >= 15) || (hour >= 14 && hour < 16);
-
-      // Skip if lunch break
-      if (isLunchBreak) {
-        debugPrint('[MONITORING_SERVICE] Lunch break - monitoring paused');
-        return;
-      }
-
-      // Skip if outside monitoring hours
-      if (!isMorningSession && !isAfternoonSession) {
-        return;
-      }
+      debugPrint(
+          '[MONITORING_SERVICE] Checking time: $hour:${minute.toString().padLeft(2, '0')}');
 
       // Skip if already showing a popup
       if (_isMonitoringActive) {
         return;
       }
 
-      // Get first clock-in time if not set
-      if (_firstClockInTime == null) {
-        _firstClockInTime = await _getFirstClockInTime();
-        if (_firstClockInTime != null) {
-          debugPrint(
-              '[MONITORING_SERVICE] First clock-in time: $_firstClockInTime');
-        }
+      // Select learners for the day if not already done
+      if (!_learnersSelected) {
+        await _selectLearnersForDay();
+        _setupScheduledTimes(now);
+        _learnersSelected = true;
       }
 
-      // Check if 2 hours have passed since first clock-in
-      if (_firstClockInTime != null && !_monitoringStarted) {
-        final timeSinceFirstClockIn = now.difference(_firstClockInTime!);
-        if (timeSinceFirstClockIn.inHours >= 2) {
-          _monitoringStarted = true;
-          debugPrint(
-              '[MONITORING_SERVICE] ✅ 2 hours passed since first clock-in - monitoring activated!');
-        } else {
-          debugPrint(
-              '[MONITORING_SERVICE] Waiting for 2 hours since first clock-in (${timeSinceFirstClockIn.inMinutes} minutes elapsed)');
-          return;
-        }
-      }
-
-      if (!_monitoringStarted) {
-        return; // Don't start monitoring until 2 hours have passed
-      }
-
-      // Select learners for the session if not already selected
-      if (isMorningSession && _morningSelectedLearners.isEmpty) {
-        await _selectLearnersForSession('morning');
-      } else if (isAfternoonSession && _afternoonSelectedLearners.isEmpty) {
-        await _selectLearnersForSession('afternoon');
-      }
-
-      // Get learners to prompt based on session
-      final learnersToPrompt = isMorningSession
-          ? _morningSelectedLearners
-          : _afternoonSelectedLearners;
-
-      if (learnersToPrompt.isEmpty) {
-        debugPrint(
-            '[MONITORING_SERVICE] No learners selected for this session');
-        return;
-      }
-
-      // Check each learner and prompt if needed
-      for (final learnerId in learnersToPrompt) {
-        // Skip if learner already responded
-        if (_learnerResponded[learnerId] == true) {
-          continue;
-        }
-
-        final attempts = _promptAttempts[learnerId] ?? 0;
-        final lastPrompt = _lastPromptTime[learnerId];
-
-        // First prompt - trigger immediately
-        if (attempts == 0) {
-          await _promptLearner(learnerId);
-          break; // Only prompt one learner at a time
-        }
-
-        // Second prompt - wait 10-15 minutes after first prompt
-        if (attempts == 1 && lastPrompt != null) {
-          final timeSinceLastPrompt = now.difference(lastPrompt);
-          final waitTime = 10 + _random.nextInt(6); // Random 10-15 minutes
-
-          if (timeSinceLastPrompt.inMinutes >= waitTime) {
-            debugPrint(
-                '[MONITORING_SERVICE] $waitTime minutes passed - prompting learner again');
-            await _promptLearner(learnerId);
-            break; // Only prompt one learner at a time
-          }
-        }
-
-        // After 2 attempts, mark as non-responsive and move to next learner
-        if (attempts >= 2) {
-          debugPrint(
-              '[MONITORING_SERVICE] Learner $learnerId did not respond after 2 attempts');
-          _learnerResponded[learnerId] = false;
-          await _saveMonitoringRecord(learnerId, 'ABSENT');
-        }
-      }
+      // Check each scheduled time slot
+      await _checkScheduledPrompts(now);
     } catch (e) {
       debugPrint('[MONITORING_SERVICE] Error in background check: $e');
     }
   }
 
-  /// Get the first clock-in time of the day for this class
-  Future<DateTime?> _getFirstClockInTime() async {
-    try {
-      final db = await _dbHelper.database;
-      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+  /// Setup random scheduled times within specified windows for the day
+  void _setupScheduledTimes(DateTime now) {
+    final today = DateTime(now.year, now.month, now.day);
 
-      final result = await db.rawQuery('''
-        SELECT MIN(clock_in_time) as first_clock_in
-        FROM learner_clocking
-        WHERE clock_date = ? 
-        AND LearnerID IN (SELECT LearnerID FROM learnerdetails WHERE classID = ?)
-      ''', [today, _currentClassID]);
+    // Morning Learner 1: Random time between 9:00-9:30 AM
+    final morning1Start = today.add(const Duration(hours: 9)); // 9:00 AM
+    final morning1RandomMinutes = _random.nextInt(31); // 0-30 minutes
+    _scheduledPromptTimes['morning_learner_1'] =
+        morning1Start.add(Duration(minutes: morning1RandomMinutes));
 
-      if (result.isNotEmpty && result.first['first_clock_in'] != null) {
-        final clockInStr = result.first['first_clock_in'] as String;
-        try {
-          return DateTime.parse('$today $clockInStr');
-        } catch (parseError) {
-          debugPrint(
-              '[MONITORING_SERVICE] Error parsing clock-in time: $clockInStr, error: $parseError');
-          return null;
-        }
-      }
-      return null;
-    } catch (e) {
-      debugPrint('[MONITORING_SERVICE] Error getting first clock-in time: $e');
-      return null;
+    // Morning Learner 2: Random time between 10:30-11:00 AM
+    final morning2Start =
+        today.add(const Duration(hours: 10, minutes: 30)); // 10:30 AM
+    final morning2RandomMinutes = _random.nextInt(31); // 0-30 minutes
+    _scheduledPromptTimes['morning_learner_2'] =
+        morning2Start.add(Duration(minutes: morning2RandomMinutes));
+
+    // Afternoon Learner 1: Random time between 13:15-13:45 (1:15-1:45 PM)
+    final afternoon1Start =
+        today.add(const Duration(hours: 13, minutes: 15)); // 1:15 PM
+    final afternoon1RandomMinutes = _random.nextInt(31); // 0-30 minutes
+    _scheduledPromptTimes['afternoon_learner_1'] =
+        afternoon1Start.add(Duration(minutes: afternoon1RandomMinutes));
+
+    // Afternoon Learner 2: Random time between 14:00-15:15 (2:00-3:15 PM)
+    final afternoon2Start = today.add(const Duration(hours: 14)); // 2:00 PM
+    final afternoon2RandomMinutes =
+        _random.nextInt(76); // 0-75 minutes (1 hour 15 minutes)
+    _scheduledPromptTimes['afternoon_learner_2'] =
+        afternoon2Start.add(Duration(minutes: afternoon2RandomMinutes));
+
+    debugPrint('[MONITORING_SERVICE] 🎲 Random monitoring times generated:');
+    debugPrint(
+        '[MONITORING_SERVICE] Morning Learner 1: ${DateFormat('HH:mm').format(_scheduledPromptTimes['morning_learner_1']!)} (9:00-9:30 window)');
+    debugPrint(
+        '[MONITORING_SERVICE] Morning Learner 2: ${DateFormat('HH:mm').format(_scheduledPromptTimes['morning_learner_2']!)} (10:30-11:00 window)');
+    debugPrint(
+        '[MONITORING_SERVICE] Afternoon Learner 1: ${DateFormat('HH:mm').format(_scheduledPromptTimes['afternoon_learner_1']!)} (13:15-13:45 window)');
+    debugPrint(
+        '[MONITORING_SERVICE] Afternoon Learner 2: ${DateFormat('HH:mm').format(_scheduledPromptTimes['afternoon_learner_2']!)} (14:00-15:15 window)');
+  }
+
+  /// Check if any scheduled prompts should be triggered
+  Future<void> _checkScheduledPrompts(DateTime now) async {
+    // Check morning learner 1 (9:00 AM)
+    if (_morningSelectedLearners.isNotEmpty) {
+      await _checkAndPromptLearner(
+          'morning_learner_1', _morningSelectedLearners[0], now);
+    }
+
+    // Check morning learner 2 (10:00 AM)
+    if (_morningSelectedLearners.length > 1) {
+      await _checkAndPromptLearner(
+          'morning_learner_2', _morningSelectedLearners[1], now);
+    }
+
+    // Check afternoon learner 1 (1:00 PM)
+    if (_afternoonSelectedLearners.isNotEmpty) {
+      await _checkAndPromptLearner(
+          'afternoon_learner_1', _afternoonSelectedLearners[0], now);
+    }
+
+    // Check afternoon learner 2 (2:00 PM)
+    if (_afternoonSelectedLearners.length > 1) {
+      await _checkAndPromptLearner(
+          'afternoon_learner_2', _afternoonSelectedLearners[1], now);
     }
   }
 
-  /// Select 2 random learners for the session (morning or afternoon)
-  Future<void> _selectLearnersForSession(String session) async {
+  /// Check if a specific learner should be prompted at their scheduled time
+  Future<void> _checkAndPromptLearner(
+      String timeSlot, String learnerId, DateTime now) async {
+    final scheduledTime = _scheduledPromptTimes[timeSlot];
+    if (scheduledTime == null) return;
+
+    // Skip if learner already responded
+    if (_learnerResponded[learnerId] == true) {
+      return;
+    }
+
+    final attempts = _promptAttempts[learnerId] ?? 0;
+    final lastPrompt = _lastPromptTime[learnerId];
+
+    // Check if it's time for the first prompt (within 1 minute of scheduled time)
+    if (attempts == 0) {
+      final timeDiff = now.difference(scheduledTime).inMinutes.abs();
+      if (timeDiff <= 1 && now.isAfter(scheduledTime)) {
+        debugPrint(
+            '[MONITORING_SERVICE] ⏰ Time for $timeSlot - prompting learner $learnerId');
+        await _promptLearner(learnerId);
+        return;
+      }
+    }
+
+    // Check for second prompt (10-15 minutes after first prompt)
+    if (attempts == 1 && lastPrompt != null) {
+      final timeSinceLastPrompt = now.difference(lastPrompt);
+      final waitTime = 10 + _random.nextInt(6); // Random 10-15 minutes
+
+      if (timeSinceLastPrompt.inMinutes >= waitTime) {
+        debugPrint(
+            '[MONITORING_SERVICE] 🔄 $waitTime minutes passed - second prompt for learner $learnerId');
+        await _promptLearner(learnerId);
+        return;
+      }
+    }
+
+    // After 2 attempts, mark as non-responsive
+    if (attempts >= 2 && lastPrompt != null) {
+      final timeSinceLastPrompt = now.difference(lastPrompt);
+      if (timeSinceLastPrompt.inMinutes >= 20) {
+        // Give 20 minutes total
+        debugPrint(
+            '[MONITORING_SERVICE] ❌ Learner $learnerId did not respond after 2 attempts');
+        _learnerResponded[learnerId] = false;
+        await _saveMonitoringRecord(learnerId, 'ABSENT');
+      }
+    }
+  }
+
+  /// Select 4 random learners for the entire day (2 morning + 2 afternoon)
+  Future<void> _selectLearnersForDay() async {
     try {
       final db = await _dbHelper.database;
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
@@ -227,6 +248,7 @@ class MonitoringService {
         FROM learner_clocking lc
         INNER JOIN learnerdetails ld ON lc.LearnerID = ld.LearnerID
         WHERE lc.clock_date = ? AND ld.classID = ?
+        AND lc.clock_in_time IS NOT NULL AND lc.clock_in_time != ''
       ''', [today, _currentClassID]);
 
       if (result.isEmpty) {
@@ -234,48 +256,49 @@ class MonitoringService {
         return;
       }
 
-      // Filter out learners already selected in other session
-      final allSelectedLearners = [
-        ..._morningSelectedLearners,
-        ..._afternoonSelectedLearners
-      ];
-      final availableLearners = result.where((learner) {
-        final learnerId = learner['LearnerID'].toString();
-        return !allSelectedLearners.contains(learnerId);
-      }).toList();
-
-      if (availableLearners.isEmpty) {
+      if (result.length < 4) {
         debugPrint(
-            '[MONITORING_SERVICE] No available learners (all already selected)');
-        return;
+            '[MONITORING_SERVICE] Only ${result.length} learners available (need 4 for full schedule)');
       }
 
-      // Randomly select 2 learners (or less if not enough available)
-      final numToSelect =
-          availableLearners.length >= 2 ? 2 : availableLearners.length;
-      final selectedLearners = <String>[];
+      // Randomly shuffle all available learners
+      final shuffledLearners = List.from(result)..shuffle(_random);
 
-      final shuffled = List.from(availableLearners)..shuffle(_random);
+      // Select up to 4 learners total
+      final numToSelect =
+          shuffledLearners.length >= 4 ? 4 : shuffledLearners.length;
+
+      // Clear previous selections
+      _morningSelectedLearners.clear();
+      _afternoonSelectedLearners.clear();
+
+      // Assign learners to sessions
       for (int i = 0; i < numToSelect; i++) {
-        final learnerId = shuffled[i]['LearnerID'].toString();
-        selectedLearners.add(learnerId);
+        final learnerId = shuffledLearners[i]['LearnerID'].toString();
+        final learnerName =
+            '${shuffledLearners[i]['Name']} ${shuffledLearners[i]['Surname']}';
+
+        // Initialize tracking
         _promptAttempts[learnerId] = 0;
         _learnerResponded[learnerId] = false;
+
+        if (i < 2) {
+          // First 2 learners go to morning session
+          _morningSelectedLearners.add(learnerId);
+          debugPrint(
+              '[MONITORING_SERVICE] 🌅 Morning Learner ${i + 1}: $learnerName (ID: $learnerId)');
+        } else {
+          // Next 2 learners go to afternoon session
+          _afternoonSelectedLearners.add(learnerId);
+          debugPrint(
+              '[MONITORING_SERVICE] 🌇 Afternoon Learner ${i - 1}: $learnerName (ID: $learnerId)');
+        }
       }
 
-      if (session == 'morning') {
-        _morningSelectedLearners.clear();
-        _morningSelectedLearners.addAll(selectedLearners);
-        debugPrint(
-            '[MONITORING_SERVICE] Selected ${selectedLearners.length} learners for MORNING: $selectedLearners');
-      } else {
-        _afternoonSelectedLearners.clear();
-        _afternoonSelectedLearners.addAll(selectedLearners);
-        debugPrint(
-            '[MONITORING_SERVICE] Selected ${selectedLearners.length} learners for AFTERNOON: $selectedLearners');
-      }
+      debugPrint(
+          '[MONITORING_SERVICE] 📋 Selected ${_morningSelectedLearners.length} morning + ${_afternoonSelectedLearners.length} afternoon learners');
     } catch (e) {
-      debugPrint('[MONITORING_SERVICE] Error selecting learners: $e');
+      debugPrint('[MONITORING_SERVICE] Error selecting learners for day: $e');
     }
   }
 
@@ -412,8 +435,7 @@ class MonitoringService {
 
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
       final now = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
-      final hour = DateTime.now().hour;
-      final sessionType = hour < 12 ? 'morning' : 'afternoon';
+      final sessionType = _getSessionTypeForLearner(learnerId);
 
       // Get learner name
       final learnerResult = await db.query(
@@ -487,10 +509,33 @@ class MonitoringService {
     }
   }
 
+  /// Get session type for a specific learner
+  String _getSessionTypeForLearner(String learnerId) {
+    if (_morningSelectedLearners.contains(learnerId)) {
+      return 'morning';
+    } else if (_afternoonSelectedLearners.contains(learnerId)) {
+      return 'afternoon';
+    }
+    // Fallback to time-based detection
+    final hour = DateTime.now().hour;
+    return hour < 12 ? 'morning' : 'afternoon';
+  }
+
   // Getters for external access
   bool get isServiceRunning => _isServiceRunning;
   bool get isMonitoringActive => _isMonitoringActive;
-  bool get monitoringStarted => _monitoringStarted;
+  bool get learnersSelected => _learnersSelected;
   int get morningLearnersCount => _morningSelectedLearners.length;
   int get afternoonLearnersCount => _afternoonSelectedLearners.length;
+
+  // Get scheduled times for debugging
+  Map<String, String> get scheduledTimes {
+    final times = <String, String>{};
+    _scheduledPromptTimes.forEach((key, dateTime) {
+      if (dateTime != null) {
+        times[key] = DateFormat('HH:mm').format(dateTime);
+      }
+    });
+    return times;
+  }
 }

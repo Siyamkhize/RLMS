@@ -33,7 +33,7 @@ class DatabaseHelper {
       final db = await database;
       final today = DateTime.now().toIso8601String().split('T')[0];
 
-      // Step 1: Check for unsynced records (synced=0)
+      // Step 1: CRITICAL FIX - Attempt to sync unsynced records BEFORE cleanup
       final unsyncedRecords = await db.query(
         'learner_clocking',
         where: 'synced = ?',
@@ -42,16 +42,58 @@ class DatabaseHelper {
 
       if (unsyncedRecords.isNotEmpty) {
         print(
-            '[CLEANUP] Found ${unsyncedRecords.length} unsynced records - will attempt to sync via background service');
-        // Note: Actual sync happens via connectivity listener and background service
-        // We just log here that unsynced records exist
+            '[CLEANUP] Found ${unsyncedRecords.length} unsynced records - attempting to sync before cleanup');
+
+        // Check if we have internet connectivity
+        bool hasInternet = false;
+        try {
+          final connectivityResult = await Connectivity().checkConnectivity();
+          hasInternet = connectivityResult.isNotEmpty &&
+              connectivityResult.first != ConnectivityResult.none;
+        } catch (e) {
+          print('[CLEANUP] Error checking connectivity: $e');
+        }
+
+        if (hasInternet) {
+          print(
+              '[CLEANUP] Internet available - syncing ${unsyncedRecords.length} unsynced records');
+
+          // Attempt to sync each unsynced record
+          int syncedCount = 0;
+          for (var record in unsyncedRecords) {
+            try {
+              final success = await _syncSingleRecord(record);
+              if (success) {
+                // Mark as synced
+                await db.update(
+                  'learner_clocking',
+                  {'synced': 1},
+                  where: 'clocking_id = ?',
+                  whereArgs: [record['clocking_id']],
+                );
+                syncedCount++;
+              }
+            } catch (e) {
+              print(
+                  '[CLEANUP] Failed to sync record ${record['clocking_id']}: $e');
+            }
+          }
+
+          print(
+              '[CLEANUP] Successfully synced $syncedCount/${unsyncedRecords.length} records');
+        } else {
+          print(
+              '[CLEANUP] No internet - preserving ${unsyncedRecords.length} unsynced records');
+          // Don't delete unsynced records when offline
+        }
       }
 
-      // Step 2: Delete synced records (synced=1) - already on server, safe to delete
+      // Step 2: Delete OLD synced records (synced=1) from previous days only
+      // KEEP today's synced records so they remain visible when offline
       final deletedSyncedLearner = await db.delete(
         'learner_clocking',
-        where: 'synced = ?',
-        whereArgs: [1],
+        where: 'synced = ? AND clock_date < ?',
+        whereArgs: [1, today],
       );
 
       // DON'T delete induction_clocking records (keep them permanently)
@@ -61,14 +103,9 @@ class DatabaseHelper {
       //   whereArgs: [1],
       // );
 
-      // Step 3: Delete old SYNCED learner_clocking records from previous days
-      // CRITICAL: Only delete records that are already synced (synced=1)
-      // Keep unsynced records (synced=0) regardless of date so they can be synced later
-      final deletedOld = await db.delete(
-        'learner_clocking',
-        where: 'clock_date < ? AND synced = ?',
-        whereArgs: [today, 1],
-      );
+      // Step 3: The above step already handles old synced records
+      // This step is now redundant but kept for clarity
+      final deletedOld = 0; // No additional deletion needed
 
       // DON'T delete old induction_clocking records (keep them permanently)
       // final deletedOldInduction = await db.delete(
@@ -102,6 +139,107 @@ class DatabaseHelper {
           '[CLEANUP] induction_clocking records: $inductionRemaining (kept permanently, NOT deleted)');
     } catch (e) {
       print('[CLEANUP] Error cleaning up old records: $e');
+    }
+  }
+
+  // Helper method to sync a single record to the server
+  Future<bool> _syncSingleRecord(Map<String, Object?> record) async {
+    try {
+      final learnerId = record['LearnerID'].toString();
+      final clockInTime = record['clock_in_time']?.toString() ?? '';
+      final clockOutTime = record['clock_out_time']?.toString() ?? '';
+      final contactTime = record['contact_time']?.toString() ?? '';
+      final clockDate = record['clock_date']?.toString() ?? '';
+      final classID = record['classID']?.toString() ?? '';
+
+      // Prepare attendance data for sync
+      final attendance = {
+        'LearnerID': learnerId,
+        'clock_in_time': clockInTime,
+        'clock_out_time': clockOutTime,
+        'contact_time': contactTime,
+        'clock_date': clockDate,
+        'classID': classID,
+        'synced': 0,
+        'user_latitude': record['user_latitude']?.toString() ?? '0.0',
+        'user_longitude': record['user_longitude']?.toString() ?? '0.0',
+        'user_accuracy': record['user_accuracy']?.toString() ?? '10.0',
+      };
+
+      // Determine if this is a clock-in or clock-out record
+      bool success = false;
+      if (clockInTime.isNotEmpty && clockOutTime.isEmpty) {
+        // Clock-in only record
+        success = await _syncClockInToServer(attendance);
+      } else if (clockInTime.isNotEmpty && clockOutTime.isNotEmpty) {
+        // Complete clock-in/out record
+        success = await _syncClockOutToServer(attendance);
+      }
+
+      return success;
+    } catch (e) {
+      print('[SYNC_SINGLE] Error syncing record: $e');
+      return false;
+    }
+  }
+
+  // Sync clock-in record to server
+  Future<bool> _syncClockInToServer(Map<String, dynamic> attendance) async {
+    try {
+      final url = '${AppConfig.baseUrl}/mobile/clocking/clockin.php';
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {
+          'learner_id': attendance['LearnerID'].toString(),
+          'clock_in_time': attendance['clock_in_time'].toString(),
+          'clock_date': attendance['clock_date'].toString(),
+          'class_id': attendance['classID'].toString(),
+          'user_latitude': attendance['user_latitude'].toString(),
+          'user_longitude': attendance['user_longitude'].toString(),
+          'user_accuracy': attendance['user_accuracy'].toString(),
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['success'] == true;
+      }
+      return false;
+    } catch (e) {
+      print('[SYNC_CLOCK_IN] Error: $e');
+      return false;
+    }
+  }
+
+  // Sync clock-out record to server
+  Future<bool> _syncClockOutToServer(Map<String, dynamic> attendance) async {
+    try {
+      final url = '${AppConfig.baseUrl}/mobile/clocking/clockout.php';
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {
+          'learner_id': attendance['LearnerID'].toString(),
+          'clock_in_time': attendance['clock_in_time'].toString(),
+          'clock_out_time': attendance['clock_out_time'].toString(),
+          'contact_time': attendance['contact_time'].toString(),
+          'clock_date': attendance['clock_date'].toString(),
+          'class_id': attendance['classID'].toString(),
+          'user_latitude': attendance['user_latitude'].toString(),
+          'user_longitude': attendance['user_longitude'].toString(),
+          'user_accuracy': attendance['user_accuracy'].toString(),
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['success'] == true;
+      }
+      return false;
+    } catch (e) {
+      print('[SYNC_CLOCK_OUT] Error: $e');
+      return false;
     }
   }
 
