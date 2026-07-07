@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'LearnerListPage.dart';
 import 'LearningMaterialFormPage.dart';
 import 'database_helper.dart';
@@ -97,7 +98,12 @@ class _DashboardPageState extends State<DashboardPage> {
     MonitoringService().stopService();
     print('[DASHBOARD] ✅ Monitoring service stopped');
 
+    // Cancel stream subscription BEFORE disposing the service
     _enrollSuccessSubscription?.cancel();
+
+    // Dispose the fingerprint service AFTER cancelling subscriptions
+    _fingerprintService.dispose();
+
     super.dispose();
   }
 
@@ -1262,303 +1268,6 @@ class _DashboardPageState extends State<DashboardPage> {
     _showLearnerSelectionDialog(isUpdate: false);
   }
 
-  Future<void> _forceClassIDFix() async {
-    try {
-      print('\\n🔧 ===== FORCE CLASSID FIX START =====');
-
-      final db = await DatabaseHelper().database;
-      final classQuery = await db.rawQuery('''
-        SELECT DISTINCT classID, COUNT(*) as learner_count
-        FROM learnerdetails 
-        WHERE (futronic_left_template IS NOT NULL AND futronic_left_template != '') 
-           OR (futronic_right_template IS NOT NULL AND futronic_right_template != '')
-           OR (zkteco_left_template IS NOT NULL AND zkteco_left_template != '')
-           OR (zkteco_right_template IS NOT NULL AND zkteco_right_template != '')
-        GROUP BY classID
-        ORDER BY learner_count DESC
-        LIMIT 1
-      ''');
-
-      if (classQuery.isNotEmpty) {
-        final suggestedClassID = classQuery.first['classID']?.toString();
-        if (suggestedClassID != null && suggestedClassID != widget.classID) {
-          print(
-              '🎯 Found best classID: $suggestedClassID with ${classQuery.first['learner_count']} learners');
-          print(
-              '🔧 Current classID: ${widget.classID} → Switching to: $suggestedClassID');
-
-          // Apply the permanent fix
-          setState(() {
-            classData = _loadClassDataWithCorrectClassID(suggestedClassID);
-          });
-
-          await reloadClassData(overrideClassID: suggestedClassID);
-
-          _showErrorDialog(
-              'ClassID Fixed!',
-              'Dashboard switched from classID ${widget.classID} to $suggestedClassID\n\n'
-                  'Found ${classQuery.first['learner_count']} learners with fingerprints\n\n'
-                  'Fingerprint verification should now work!',
-              skipPop: true);
-
-          print('✅ FORCE CLASSID FIX COMPLETE');
-        } else {
-          _showErrorDialog('No Fix Needed',
-              'Current classID ${widget.classID} already has the most learners with fingerprints',
-              skipPop: true);
-        }
-      } else {
-        _showErrorDialog('No Fingerprints',
-            'No learners found with fingerprint templates in any classID',
-            skipPop: true);
-      }
-    } catch (e) {
-      print('❌ Error during force ClassID fix: $e');
-      _showErrorDialog('Fix Failed', 'Error during ClassID fix: $e',
-          skipPop: true);
-    }
-  }
-
-  Future<void> _debugFingerprintDatabase() async {
-    try {
-      print('\n🔍 ===== FINGERPRINT DATABASE DEBUG START =====');
-
-      // Get current learners from classData
-      final snapshot = await classData;
-      final learners =
-          snapshot?['learners'] as List<Map<String, dynamic>>? ?? [];
-
-      print('📊 Total learners in current class: ${learners.length}');
-
-      // Check a few learners in detail
-      int learnersWithFingerprints = 0;
-      int learnersChecked = 0;
-
-      for (var learner in learners.take(10)) {
-        // Check first 10 learners
-        final learnerId = learner['LearnerID']?.toString();
-        if (learnerId == null) continue;
-
-        learnersChecked++;
-        print(
-            '\n👤 Checking Learner $learnerId (${learner['Name']} ${learner['Surname']}):');
-
-        // Use the same method as the verification process
-        final learnerIdInt = int.tryParse(learnerId);
-        if (learnerIdInt == null) continue;
-
-        final storedTemplates =
-            await DatabaseHelper().getFingerprints(learnerIdInt);
-        final leftTemplate = storedTemplates['left'];
-        final rightTemplate = storedTemplates['right'];
-
-        final hasLeft = leftTemplate != null && leftTemplate.isNotEmpty;
-        final hasRight = rightTemplate != null && rightTemplate.isNotEmpty;
-
-        // Also do direct database query to see raw data
-        final db = await DatabaseHelper().database;
-        final rawResult = await db.query(
-          'learnerdetails',
-          columns: [
-            'LearnerID',
-            'Name',
-            'Surname',
-            'zkteco_left_template',
-            'zkteco_right_template',
-            'futronic_left_template',
-            'futronic_right_template'
-          ],
-          where: 'LearnerID = ?',
-          whereArgs: [learnerId],
-        );
-
-        if (rawResult.isNotEmpty) {
-          final rawRow = rawResult.first;
-          print('  📋 RAW DATABASE DATA:');
-          print(
-              '    zkteco_left_template: ${rawRow['zkteco_left_template']?.toString().length ?? 'NULL'} chars');
-          print(
-              '    zkteco_right_template: ${rawRow['zkteco_right_template']?.toString().length ?? 'NULL'} chars');
-          print(
-              '    futronic_left_template: ${rawRow['futronic_left_template']?.toString().length ?? 'NULL'} chars');
-          print(
-              '    futronic_right_template: ${rawRow['futronic_right_template']?.toString().length ?? 'NULL'} chars');
-
-          // Check if templates contain actual data vs empty strings
-          final futronicLeftRaw = rawRow['futronic_left_template']?.toString();
-          final futronicRightRaw =
-              rawRow['futronic_right_template']?.toString();
-          print(
-              '    futronic_left_template actual content: ${futronicLeftRaw?.substring(0, futronicLeftRaw.length > 50 ? 50 : futronicLeftRaw.length) ?? 'NULL'}...');
-          print(
-              '    futronic_right_template actual content: ${futronicRightRaw?.substring(0, futronicRightRaw.length > 50 ? 50 : futronicRightRaw.length) ?? 'NULL'}...');
-        }
-
-        if (hasLeft || hasRight) {
-          learnersWithFingerprints++;
-          print('  ✅ HAS FINGERPRINTS:');
-          print('    Left: ${hasLeft ? "${leftTemplate.length} chars" : "❌"}');
-          print(
-              '    Right: ${hasRight ? "${rightTemplate.length} chars" : "❌"}');
-        } else {
-          print('  ❌ NO FINGERPRINTS DETECTED');
-        }
-      }
-
-      // Direct database count of learners with fingerprints
-      final db = await DatabaseHelper().database;
-      final fingerprintCount = await db.rawQuery('''
-        SELECT COUNT(*) as count FROM learnerdetails 
-        WHERE (zkteco_left_template IS NOT NULL AND zkteco_left_template != '') 
-           OR (zkteco_right_template IS NOT NULL AND zkteco_right_template != '')
-           OR (futronic_left_template IS NOT NULL AND futronic_left_template != '')
-           OR (futronic_right_template IS NOT NULL AND futronic_right_template != '')
-           OR (sourceafis_template IS NOT NULL AND sourceafis_template != '')
-      ''');
-
-      final totalFingerprintCount = fingerprintCount.first['count'] as int;
-      print('\n📊 DIRECT DATABASE COUNT:');
-      print(
-          '  Total learners with ANY fingerprint data: $totalFingerprintCount');
-
-      // Show specific breakdown
-      final futronicCount = await db.rawQuery('''
-        SELECT COUNT(*) as count FROM learnerdetails 
-        WHERE (futronic_left_template IS NOT NULL AND futronic_left_template != '') 
-           OR (futronic_right_template IS NOT NULL AND futronic_right_template != '')
-      ''');
-
-      final zktecoCount = await db.rawQuery('''
-        SELECT COUNT(*) as count FROM learnerdetails 
-        WHERE (zkteco_left_template IS NOT NULL AND zkteco_left_template != '') 
-           OR (zkteco_right_template IS NOT NULL AND zkteco_right_template != '')
-      ''');
-
-      print(
-          '  Learners with Futronic templates: ${futronicCount.first['count']}');
-      print('  Learners with ZKTeco templates: ${zktecoCount.first['count']}');
-
-      print('\n📈 SUMMARY:');
-      print('  Learners checked: $learnersChecked');
-      print('  Learners with fingerprints: $learnersWithFingerprints');
-      print(
-          '  Percentage with fingerprints: ${learnersChecked > 0 ? ((learnersWithFingerprints / learnersChecked) * 100).toStringAsFixed(1) : 0}%');
-
-      // Check if we have fingerprints but no learners (ClassID mismatch)
-      print(
-          '🔍 Debug check: learnersChecked=$learnersChecked, totalFingerprintCount=$totalFingerprintCount');
-      if (learnersChecked == 0 && totalFingerprintCount > 0) {
-        print('\n🔍 ClassID MISMATCH DETECTED - Finding correct classID...');
-        final classQuery = await db.rawQuery('''
-          SELECT DISTINCT classID, COUNT(*) as learner_count
-          FROM learnerdetails 
-          WHERE (futronic_left_template IS NOT NULL AND futronic_left_template != '') 
-             OR (futronic_right_template IS NOT NULL AND futronic_right_template != '')
-             OR (zkteco_left_template IS NOT NULL AND zkteco_left_template != '')
-             OR (zkteco_right_template IS NOT NULL AND zkteco_right_template != '')
-          GROUP BY classID
-          ORDER BY learner_count DESC
-        ''');
-
-        if (classQuery.isNotEmpty) {
-          print('📊 ClassIDs with fingerprint templates:');
-          for (var row in classQuery) {
-            print(
-                '   ClassID ${row['classID']}: ${row['learner_count']} learners with fingerprints');
-          }
-
-          final suggestedClassID = classQuery.first['classID']?.toString();
-          print(
-              '\n💡 SOLUTION: Current classID "${widget.classID}" has no learners.');
-          print(
-              '💡 Suggested classID "$suggestedClassID" which has ${classQuery.first['learner_count']} learners with fingerprints');
-
-          // AUTOMATIC FIX: Load learners from the classID with fingerprints
-          if (suggestedClassID != null) {
-            print(
-                '\n🔧 APPLYING AUTOMATIC FIX: Loading learners from classID with fingerprints...');
-            try {
-              final learnersFromCorrectClass = await DatabaseHelper()
-                  .getLearnersWithClockingData(suggestedClassID);
-              if (learnersFromCorrectClass.isNotEmpty) {
-                print(
-                    '✅ Found ${learnersFromCorrectClass.length} learners in suggested classID');
-                // Update currentLearners to use the correct class
-                setState(() {
-                  currentLearners = learnersFromCorrectClass.map((learner) {
-                    return {
-                      'LearnerID': learner['LearnerID']?.toString() ?? 'N/A',
-                      'Name': learner['Name']?.toString() ?? 'N/A',
-                      'Surname': learner['Surname']?.toString() ?? 'N/A',
-                      'clock_in_time':
-                          learner['clock_in_time']?.toString() ?? '',
-                      'clock_out_time':
-                          learner['clock_out_time']?.toString() ?? '',
-                      'contact_time': learner['contact_time']?.toString() ?? '',
-                      // CRITICAL: Preserve fingerprint template data
-                      'zkteco_left_template':
-                          learner['zkteco_left_template']?.toString() ?? '',
-                      'zkteco_right_template':
-                          learner['zkteco_right_template']?.toString() ?? '',
-                      'futronic_left_template':
-                          learner['futronic_left_template']?.toString() ?? '',
-                      'futronic_right_template':
-                          learner['futronic_right_template']?.toString() ?? '',
-                      'sourceafis_template':
-                          learner['sourceafis_template']?.toString() ?? '',
-                    };
-                  }).toList();
-                });
-                print(
-                    '✅ currentLearners updated with ${currentLearners.length} learners from correct classID');
-              }
-            } catch (e) {
-              print('❌ Error loading learners from suggested classID: $e');
-            }
-          }
-        }
-      }
-
-      // Check if we need to sync from server
-      if (learnersWithFingerprints == 0 || learnersChecked == 0) {
-        print(
-            '\n⚠️  NO FINGERPRINTS FOUND OR NO LEARNERS - Checking server sync...');
-        final classID = snapshot?['classID']?.toString() ?? widget.classID;
-        print('📡 Attempting to sync from server for classID: $classID');
-        await DatabaseHelper().syncLearnersFromServer(classID);
-        print('✅ Server sync completed - reloading class data...');
-
-        // Trigger a data reload
-        await reloadClassData();
-        print('✅ Class data reloaded - please tap debug again to see results');
-      }
-
-      print('🔍 ===== FINGERPRINT DATABASE DEBUG END =====\n');
-
-      // Show dialog with results
-      String autoFixMessage = '';
-      if (learnersChecked == 0 && totalFingerprintCount > 0) {
-        autoFixMessage =
-            '\n✅ AUTO-FIX APPLIED: Loaded learners from correct classID';
-      }
-
-      _showErrorDialog(
-          'Debug Results',
-          'Checked $learnersChecked learners\n'
-              'Found $learnersWithFingerprints with fingerprints\n'
-              'Database total: $totalFingerprintCount\n'
-              'Futronic: ${futronicCount.first['count']}, ZKTeco: ${zktecoCount.first['count']}\n'
-              'Current classID: ${widget.classID}$autoFixMessage\n'
-              '${learnersWithFingerprints == 0 && learnersChecked > 0 ? "\n⚠️ Server sync triggered" : ""}\n'
-              'Check console for detailed logs',
-          skipPop: true);
-    } catch (e) {
-      print('❌ Debug error: $e');
-      _showErrorDialog('Debug Error', 'Error debugging database: $e',
-          skipPop: true);
-    }
-  }
-
   void _showLearnerSelectionDialog({required bool isUpdate}) {
     showDialog(
       context: context,
@@ -2169,7 +1878,6 @@ class _DashboardPageState extends State<DashboardPage> {
                 // _buildMenuItem(Icons.fingerprint, 'Contact Less Clock In', 7),
                 _buildMenuItem(Icons.people, 'Attendance', 8),
                 // _buildMenuItem(Icons.fingerprint_outlined, 'My Fingerprints', 9),
-                // _buildMenuItem(Icons.security, 'Test Random Prompt', 10),
                 _buildMenuItem(Icons.logout, 'Logout', 11),
               ],
               elevation: 8.0,
@@ -2180,17 +1888,6 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.bug_report, color: Colors.red, size: 20),
-            tooltip: 'Debug Fingerprints',
-            onPressed: _debugFingerprintDatabase,
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings_backup_restore,
-                color: Colors.purple, size: 20),
-            tooltip: 'Fix ClassID',
-            onPressed: _forceClassIDFix,
-          ),
           IconButton(
             icon: const Icon(Icons.fingerprint_outlined,
                 color: Colors.blue, size: 20),
@@ -2392,81 +2089,14 @@ class _DashboardPageState extends State<DashboardPage> {
         break;
       case 11:
         // Perform Logout
-        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+        Navigator.of(context)
+            .pushNamedAndRemoveUntil('/login', (route) => false);
         break;
-      // case 10:
-      // // Test Random Prompt
-      //   _testRandomPrompt();
-      //   break;
       default:
         print('Unknown menu option: $value');
         break;
     }
   }
-
-  // /// Test random prompt functionality
-  // void _testRandomPrompt() async {
-  //   try {
-  //     debugPrint('[DASHBOARD] Testing random prompt...');
-  //
-  //     // Get random clocked learners
-  //     final dbHelper = DatabaseHelper();
-  //     final learners = await dbHelper.getRandomClockedLearners(count: 2);
-  //
-  //     if (learners.isEmpty) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         const SnackBar(
-  //           content: Text('No clocked learners found for random prompt'),
-  //           backgroundColor: Colors.orange,
-  //         ),
-  //       );
-  //       return;
-  //     }
-  //
-  //     // Select first learner for testing
-  //     final selectedLearner = learners.first;
-  //     final learnerId = selectedLearner['LearnerID'] as int;
-  //     final learnerName = '${selectedLearner['firstName']} ${selectedLearner['lastName']}';
-  //
-  //     debugPrint('[DASHBOARD] Testing prompt for learner: $learnerName (ID: $learnerId)');
-  //
-  //     // Create monitoring record
-  //     final monitoringId = await dbHelper.createRandomPrompt(learnerId, countdownDuration: 180);
-  //
-  //     // Show the prompt
-  //     final result = await RandomPromptService.showRandomPromptDialog(
-  //       context,
-  //       learnerId,
-  //       learnerName,
-  //       monitoringId,
-  //     );
-  //
-  //     if (result == true) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         const SnackBar(
-  //           content: Text('Random prompt test completed successfully'),
-  //           backgroundColor: Colors.green,
-  //         ),
-  //       );
-  //     } else {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         const SnackBar(
-  //           content: Text('Random prompt test was skipped or failed'),
-  //           backgroundColor: Colors.orange,
-  //         ),
-  //       );
-  //     }
-  //
-  //   } catch (e) {
-  //     debugPrint('[DASHBOARD] Error testing random prompt: $e');
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(
-  //         content: Text('Error testing random prompt: $e'),
-  //         backgroundColor: Colors.red,
-  //       ),
-  //     );
-  //   }
-  // }
 
   /// Navigate to facilitator fingerprint management page
   void _navigateToFacilitatorFingerprints() async {

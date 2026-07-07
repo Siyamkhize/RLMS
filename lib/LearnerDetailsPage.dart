@@ -14,18 +14,44 @@ import 'config.dart';
 import 'GuardianDetailsPage.dart';
 import 'WorkExperienceForm.dart';
 import 'services/camera_resource_manager.dart';
+import 'utils/monitoring_mixin.dart';
 
 class LearnerDetailsPage extends StatefulWidget {
   final String learnerID;
+  final bool missingProfileOnlyMode;
+  final List<String>? missingProfileFields;
 
-  const LearnerDetailsPage({super.key, required this.learnerID});
+  const LearnerDetailsPage({
+    super.key,
+    required this.learnerID,
+    this.missingProfileOnlyMode = false,
+    this.missingProfileFields,
+  });
 
   @override
   _LearnerDetailsPageState createState() => _LearnerDetailsPageState();
 }
 
 class _LearnerDetailsPageState extends State<LearnerDetailsPage>
-    with TickerProviderStateMixin, WidgetsBindingObserver {
+    with TickerProviderStateMixin, WidgetsBindingObserver, MonitoringMixin {
+  bool get _isMissingProfileOnlyMode => widget.missingProfileOnlyMode;
+  Set<String> get _missingProfileFieldSet =>
+      (widget.missingProfileFields ?? const <String>[]).toSet();
+  bool get _needsProfileImageCapture =>
+      _missingProfileFieldSet.contains('profile_image');
+  bool get _needsSignatureCapture =>
+      _missingProfileFieldSet.contains('signature') ||
+      _missingProfileFieldSet.contains('witness_signature');
+  bool get _hasMissingDetailsFields {
+    const nonDetailsFields = {
+      'signature',
+      'witness_signature',
+      'profile_image'
+    };
+    return _missingProfileFieldSet
+        .any((field) => !nonDetailsFields.contains(field));
+  }
+
   // Camera resource manager for preventing conflicts
   final CameraResourceManager _cameraManager = CameraResourceManager();
 
@@ -594,6 +620,9 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
             // Perform initial calculations from ID number (outside setState)
             await _calculateAndUpdateFromIDNumber();
 
+            // Initialize monitoring for this learner
+            initMonitoring(int.parse(widget.learnerID));
+
             setState(() {
               // Check if learner is a minor - use Age field from data or calculate from ID
               int? age;
@@ -642,6 +671,9 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
         // Perform initial calculations from ID number (outside setState)
         await _calculateAndUpdateFromIDNumber();
+
+        // Initialize monitoring for this learner
+        initMonitoring(int.parse(widget.learnerID));
 
         setState(() {
           // Check if learner is a minor - use Age field from data or calculate from ID
@@ -720,6 +752,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
     _witnessInitialsController.dispose();
     _cameraController?.dispose();
     _controllers.forEach((_, controller) => controller.dispose());
+    disposeMonitoring();
     super.dispose();
   }
 
@@ -1078,6 +1111,54 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
   @override
   Widget build(BuildContext context) {
+    if (_isMissingProfileOnlyMode) {
+      final tabs = <Tab>[];
+      final views = <Widget>[];
+      final tabKeys = <String>[];
+
+      if (_hasMissingDetailsFields || _needsProfileImageCapture) {
+        tabs.add(const Tab(text: 'Profile'));
+        views.add(_buildDetailsTab());
+        tabKeys.add('profile');
+      }
+      if (_needsSignatureCapture) {
+        tabs.add(const Tab(text: 'Signature'));
+        views.add(_buildSignatureTab());
+        tabKeys.add('signature');
+      }
+
+      if (tabs.isEmpty) {
+        tabs.add(const Tab(text: 'Profile'));
+        views.add(_buildDetailsTab());
+        tabKeys.add('profile');
+      }
+
+      int initialIndex = 0;
+      final onlySignatureMissing = _needsSignatureCapture &&
+          !_hasMissingDetailsFields &&
+          !_needsProfileImageCapture;
+      if (onlySignatureMissing) {
+        final sigIdx = tabKeys.indexOf('signature');
+        if (sigIdx >= 0) initialIndex = sigIdx;
+      }
+
+      return DefaultTabController(
+        length: tabs.length,
+        initialIndex: initialIndex,
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Complete Profile'),
+            bottom: tabs.length > 1 ? TabBar(tabs: tabs) : null,
+          ),
+          body: isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : tabs.length == 1
+                  ? views.first
+                  : TabBarView(children: views),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Learner Details'),
@@ -1146,6 +1227,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       'Race',
       'Language',
       'Disability',
+      'PhoneNumber',
       'CellphoneNumber', // Phone number above email
       'Email',
       'AddressLine1', // Street Name
@@ -1183,31 +1265,67 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       }
     }
 
-    final entries = orderedEntries;
+    List<MapEntry<String, dynamic>> entries = orderedEntries;
+    if (_isMissingProfileOnlyMode) {
+      final onlyFields = (widget.missingProfileFields ?? const <String>[])
+          .map((f) => f.trim())
+          .where((f) => f.isNotEmpty)
+          .toSet();
+      entries = orderedEntries
+          .where((entry) => onlyFields.contains(entry.key))
+          .where((entry) => _isEntryCurrentlyMissing(entry))
+          .toList();
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Profile Image Section
-          Center(
-            child: _buildProfileImage(),
-          ),
-          const SizedBox(height: 20),
-
-          // Age Display
-          _buildAgeDisplay(),
-          const SizedBox(height: 20),
-
-          // Bank Details (if available)
-          if (bankDetails != null) ...[
-            _buildBankDetails(),
+          if (_isMissingProfileOnlyMode) ...[
+            Text(
+              _needsSignatureCapture &&
+                      !_hasMissingDetailsFields &&
+                      !_needsProfileImageCapture
+                  ? 'Capture the missing signature, then press Update Data.'
+                  : _needsProfileImageCapture && !_hasMissingDetailsFields
+                      ? 'Capture the missing profile image, then press Update Data.'
+                      : 'Fill in the missing profile fields below, then press Update Data.',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            if (_needsProfileImageCapture) ...[
+              Center(
+                child: _buildProfileImage(),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ] else ...[
+            // Profile Image Section
+            Center(
+              child: _buildProfileImage(),
+            ),
             const SizedBox(height: 20),
+
+            // Age Display
+            _buildAgeDisplay(),
+            const SizedBox(height: 20),
+
+            // Bank Details (if available)
+            if (bankDetails != null) ...[
+              _buildBankDetails(),
+              const SizedBox(height: 20),
+            ],
           ],
 
           // Learner Data Fields
-          _buildDataList(entries),
+          if (entries.isEmpty && _isMissingProfileOnlyMode)
+            const Text(
+              'No missing profile fields found.',
+              style: TextStyle(color: Colors.green),
+            )
+          else
+            _buildDataList(entries),
 
           const SizedBox(height: 20),
 
@@ -1228,6 +1346,23 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         ],
       ),
     );
+  }
+
+  bool _isEntryCurrentlyMissing(MapEntry<String, dynamic> entry) {
+    final controllerValue = _controllers[entry.key]?.text;
+    if (controllerValue != null && !_isMissingValue(controllerValue)) {
+      return false;
+    }
+    return _isMissingValue(entry.value);
+  }
+
+  bool _isMissingValue(dynamic value) {
+    final normalized = value?.toString().trim().toLowerCase() ?? '';
+    return normalized.isEmpty ||
+        normalized == 'null' ||
+        normalized == 'n/a' ||
+        normalized == 'na' ||
+        normalized == '-';
   }
 
   Widget _buildProfileImage() {

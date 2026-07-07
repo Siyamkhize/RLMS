@@ -30,6 +30,8 @@ class MonitoringService {
       []; // 2 learners for afternoon
   final Map<String, int> _promptAttempts =
       {}; // Track prompt attempts per learner
+  final Map<String, int> _nextRetryGap =
+      {}; // Track random retry gap for next attempt
   final Map<String, DateTime> _lastPromptTime =
       {}; // Track when learner was last prompted
   final Map<String, bool> _learnerResponded = {}; // Track if learner responded
@@ -44,6 +46,7 @@ class MonitoringService {
 
   bool _learnersSelected =
       false; // Track if learners have been selected for the day
+  String? _lastSelectedDay;
 
   // Random generator
   final Random _random = Random();
@@ -67,6 +70,14 @@ class MonitoringService {
     _checkAndTriggerMonitoring();
   }
 
+  /// Update the context reference (useful when navigating between pages)
+  void updateContext(BuildContext context) {
+    if (_isServiceRunning) {
+      _context = context;
+      debugPrint('[MONITORING_SERVICE] Context updated');
+    }
+  }
+
   void stopService() {
     _backgroundTimer?.cancel();
     _isServiceRunning = false;
@@ -85,7 +96,19 @@ class MonitoringService {
   }
 
   Future<void> _checkAndTriggerMonitoring() async {
-    if (!_isServiceRunning || _currentClassID == null || _context == null) {
+    if (!_isServiceRunning || _currentClassID == null) {
+      return;
+    }
+
+    // Check if context is available and mounted
+    if (_context == null) {
+      debugPrint('[MONITORING_SERVICE] ⚠️ Context is null - monitoring paused');
+      return;
+    }
+
+    if (!_context!.mounted) {
+      debugPrint(
+          '[MONITORING_SERVICE] ⚠️ Context not mounted - monitoring paused');
       return;
     }
 
@@ -93,9 +116,18 @@ class MonitoringService {
       final now = DateTime.now();
       final hour = now.hour;
       final minute = now.minute;
+      final todayStr = DateFormat('yyyy-MM-dd').format(now);
 
       debugPrint(
           '[MONITORING_SERVICE] Checking time: $hour:${minute.toString().padLeft(2, '0')}');
+
+      // Reset selection if it's a new day
+      if (_lastSelectedDay != todayStr) {
+        debugPrint(
+            '[MONITORING_SERVICE] 📅 New day detected ($todayStr) - resetting monitoring schedule');
+        _learnersSelected = false;
+        _lastSelectedDay = todayStr;
+      }
 
       // Skip if already showing a popup
       if (_isMonitoringActive) {
@@ -213,25 +245,46 @@ class MonitoringService {
     // Check for second prompt (10-15 minutes after first prompt)
     if (attempts == 1 && lastPrompt != null) {
       final timeSinceLastPrompt = now.difference(lastPrompt);
-      final waitTime = 10 + _random.nextInt(6); // Random 10-15 minutes
+
+      // Generate gap if not set
+      _nextRetryGap[learnerId] ??= 10 + _random.nextInt(6);
+      final waitTime = _nextRetryGap[learnerId]!;
 
       if (timeSinceLastPrompt.inMinutes >= waitTime) {
         debugPrint(
             '[MONITORING_SERVICE] 🔄 $waitTime minutes passed - second prompt for learner $learnerId');
+        _nextRetryGap.remove(learnerId); // Clear for next potential retry
         await _promptLearner(learnerId);
         return;
       }
     }
 
-    // After 2 attempts, mark as non-responsive
-    if (attempts >= 2 && lastPrompt != null) {
+    // Check for third prompt (10-15 minutes after second prompt)
+    if (attempts == 2 && lastPrompt != null) {
+      final timeSinceLastPrompt = now.difference(lastPrompt);
+
+      // Generate gap if not set
+      _nextRetryGap[learnerId] ??= 10 + _random.nextInt(6);
+      final waitTime = _nextRetryGap[learnerId]!;
+
+      if (timeSinceLastPrompt.inMinutes >= waitTime) {
+        debugPrint(
+            '[MONITORING_SERVICE] 🔄 $waitTime minutes passed - third prompt for learner $learnerId');
+        _nextRetryGap.remove(learnerId);
+        await _promptLearner(learnerId);
+        return;
+      }
+    }
+
+    // After 3 attempts, mark as non-responsive
+    if (attempts >= 3 && lastPrompt != null) {
       final timeSinceLastPrompt = now.difference(lastPrompt);
       if (timeSinceLastPrompt.inMinutes >= 20) {
         // Give 20 minutes total
         debugPrint(
-            '[MONITORING_SERVICE] ❌ Learner $learnerId did not respond after 2 attempts');
+            '[MONITORING_SERVICE] ❌ Learner $learnerId did not respond after 3 attempts');
         _learnerResponded[learnerId] = false;
-        await _saveMonitoringRecord(learnerId, 'ABSENT');
+        await _saveMonitoringRecord(learnerId, 'MISSED');
       }
     }
   }
@@ -409,33 +462,22 @@ class MonitoringService {
     try {
       final db = await _dbHelper.database;
 
-      // Create table if doesn't exist
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS monitoring_records (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          learner_id TEXT NOT NULL,
-          learner_name TEXT NOT NULL,
-          person_type TEXT DEFAULT 'learner',
-          class_id TEXT NOT NULL,
-          monitoring_date DATE NOT NULL,
-          attempt_1_time DATETIME,
-          attempt_1_status TEXT,
-          attempt_2_time DATETIME,
-          attempt_2_status TEXT,
-          final_status TEXT NOT NULL,
-          verification_time DATETIME,
-          verification_method TEXT,
-          scanner_type TEXT,
-          fingerprint_matched INTEGER DEFAULT 0,
-          session_type TEXT,
-          created_at DATETIME NOT NULL,
-          synced INTEGER DEFAULT 0
-        )
-      ''');
-
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
       final now = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
       final sessionType = _getSessionTypeForLearner(learnerId);
+
+      // Check for existing record to preserve previous attempts
+      final existingRecords = await db.query(
+        'monitoring_records',
+        where: 'learner_id = ? AND monitoring_date = ?',
+        whereArgs: [learnerId, today],
+        limit: 1,
+      );
+
+      Map<String, dynamic>? existing;
+      if (existingRecords.isNotEmpty) {
+        existing = existingRecords.first;
+      }
 
       // Get learner name
       final learnerResult = await db.query(
@@ -458,10 +500,18 @@ class MonitoringService {
         'person_type': 'learner',
         'class_id': _currentClassID,
         'monitoring_date': today,
-        'attempt_1_time': attempts >= 1 ? now : null,
-        'attempt_1_status': attempts >= 1 ? status : null,
-        'attempt_2_time': attempts >= 2 ? now : null,
-        'attempt_2_status': attempts >= 2 ? status : null,
+        'attempt_1_time': attempts == 1
+            ? now
+            : (existing?['attempt_1_time'] ?? (attempts > 1 ? now : null)),
+        'attempt_1_status': attempts == 1
+            ? status
+            : (existing?['attempt_1_status'] ?? (attempts > 1 ? status : null)),
+        'attempt_2_time': attempts == 2 ? now : (existing?['attempt_2_time']),
+        'attempt_2_status':
+            attempts == 2 ? status : (existing?['attempt_2_status']),
+        'attempt_3_time': attempts == 3 ? now : (existing?['attempt_3_time']),
+        'attempt_3_status':
+            attempts == 3 ? status : (existing?['attempt_3_status']),
         'final_status': status,
         'verification_time': now,
         'verification_method':
@@ -469,17 +519,18 @@ class MonitoringService {
         'scanner_type': _currentPerson?['scanner_type'] ?? 'unknown',
         'fingerprint_matched': _currentPerson?['fingerprint_matched'] ?? 0,
         'session_type': sessionType,
-        'created_at': now,
+        'created_at': existing?['created_at'] ?? now,
         'synced': 0,
       };
 
       debugPrint('[MONITORING_SERVICE] Saving monitoring record: $recordData');
 
-      await db.insert('monitoring_records', recordData);
+      final localId = await _dbHelper.saveMonitoringRecordLocally(recordData);
 
-      // Try to sync to server
+      // Try to sync to both endpoints to ensure compatibility
       try {
-        final response = await http
+        // 1. Original monitoring_records endpoint
+        final responseRecords = await http
             .post(
               Uri.parse(AppConfig.saveMonitoringRecordsUrl),
               headers: {'Content-Type': 'application/json'},
@@ -487,17 +538,49 @@ class MonitoringService {
             )
             .timeout(const Duration(seconds: 10));
 
-        if (response.statusCode == 200) {
-          final result = json.decode(response.body);
+        if (responseRecords.statusCode == 200) {
+          final result = json.decode(responseRecords.body);
           if (result['success'] == true) {
-            debugPrint('[MONITORING_SERVICE] ✅ Saved to server successfully');
-            await db.update(
-              'monitoring_records',
-              {'synced': 1},
-              where: 'learner_id = ? AND monitoring_date = ?',
-              whereArgs: [learnerId, today],
-            );
+            debugPrint(
+                '[MONITORING_SERVICE] ✅ Saved to monitoring_records successfully');
+            if (localId != -1) {
+              await _dbHelper.markMonitoringRecordAsSynced(localId);
+            }
           }
+        }
+
+        // 2. New monitoring_clockin endpoint (as requested by user)
+        final clockinData = {
+          'person_id': learnerId,
+          'person_name': learnerName,
+          'person_type': 'learner',
+          'class_id': _currentClassID,
+          'monitoring_date': today,
+          'monitoring_time': DateFormat('HH:mm:ss').format(DateTime.now()),
+          'verification_status': status,
+          'session_type': sessionType,
+          'verification_method':
+              _currentPerson?['verification_method'] ?? 'fingerprint_zkteco',
+          'attempt_number': attempts,
+          'is_lunch_break': 0,
+          'fingerprint_matched': _currentPerson?['fingerprint_matched'] ?? 0,
+          'scanner_type': _currentPerson?['scanner_type'] ?? 'zkteco',
+        };
+
+        final responseClockin = await http
+            .post(
+              Uri.parse(AppConfig.saveMonitoringClockinUrl),
+              headers: {'Content-Type': 'application/json'},
+              body: json.encode(clockinData),
+            )
+            .timeout(const Duration(seconds: 10));
+
+        if (responseClockin.statusCode == 200) {
+          debugPrint(
+              '[MONITORING_SERVICE] ✅ Saved to monitoring_clockin successfully');
+        } else {
+          debugPrint(
+              '[MONITORING_SERVICE] ⚠️ monitoring_clockin failed: ${responseClockin.statusCode}');
         }
       } catch (e) {
         debugPrint(
@@ -519,6 +602,13 @@ class MonitoringService {
     // Fallback to time-based detection
     final hour = DateTime.now().hour;
     return hour < 12 ? 'morning' : 'afternoon';
+  }
+
+  /// Manually trigger a monitoring prompt for a specific learner (for testing)
+  Future<void> triggerManualPrompt(String learnerId) async {
+    debugPrint(
+        '[MONITORING_SERVICE] 🛠️ Manually triggering prompt for learner $learnerId');
+    await _promptLearner(learnerId);
   }
 
   // Getters for external access

@@ -92,11 +92,16 @@ class _DashboardPageState extends State<DashboardPage> {
     print('[DASHBOARD] Stack trace during dispose: ${StackTrace.current}');
     print('[DASHBOARD] Current mounted state: $mounted');
     print('[DASHBOARD] Is scanning: $_isScanning');
-    _enrollSuccessSubscription?.cancel();
 
     // Stop monitoring service
     MonitoringService().stopService();
     print('[DASHBOARD] ✅ Monitoring service stopped');
+
+    // Cancel stream subscription BEFORE disposing the service
+    _enrollSuccessSubscription?.cancel();
+
+    // Dispose the fingerprint service AFTER cancelling subscriptions
+    _fingerprintService.dispose();
 
     super.dispose();
   }
@@ -2392,7 +2397,8 @@ class _DashboardPageState extends State<DashboardPage> {
         break;
       case 11:
         // Perform Logout
-        Navigator.pushReplacementNamed(context, '/login');
+        Navigator.of(context)
+            .pushNamedAndRemoveUntil('/login', (route) => false);
         break;
       // case 10:
       // // Test Random Prompt

@@ -75,10 +75,27 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
       issuedByName = widget.logisticsName!;
     }
 
-    _fetchClockedInLearners();
-    _fetchUnitStandards();
-    _fetchClassInfo();
+    _loadAllData();
     _detectScanner();
+  }
+
+  Future<void> _loadAllData() async {
+    try {
+      setState(() => isLoading = true);
+
+      // Load everything in parallel
+      await Future.wait([
+        _fetchClockedInLearners(),
+        _fetchUnitStandards(),
+        _fetchClassInfo(),
+      ]);
+    } catch (e) {
+      debugPrint('Error loading form data: $e');
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+    }
   }
 
   Future<void> _detectScanner() async {
@@ -126,6 +143,9 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
 
+      debugPrint(
+          '[QUALIFICATION] Fetching class info for ID: ${widget.classID}');
+
       // Get class and facilitator info
       final query = '''
         SELECT 
@@ -138,21 +158,24 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
       ''';
 
       final results = await db.rawQuery(query, [widget.classID]);
+      debugPrint('[QUALIFICATION] Class info results: ${results.length}');
 
       if (results.isNotEmpty) {
-        setState(() {
-          facilitatorFullName =
-              '${results.first['firstName'] ?? ''} ${results.first['lastName'] ?? ''}'
-                  .trim();
-          if (facilitatorFullName.isEmpty) {
-            facilitatorFullName = 'Unknown Facilitator';
-          }
+        if (mounted) {
+          setState(() {
+            facilitatorFullName =
+                '${results.first['firstName'] ?? ''} ${results.first['lastName'] ?? ''}'
+                    .trim();
+            if (facilitatorFullName.isEmpty) {
+              facilitatorFullName = 'Unknown Facilitator';
+            }
 
-          // If logistics name wasn't provided, use facilitator name
-          if (widget.logisticsName == null || widget.logisticsName!.isEmpty) {
-            issuedByName = facilitatorFullName;
-          }
-        });
+            // If logistics name wasn't provided, use facilitator name
+            if (widget.logisticsName == null || widget.logisticsName!.isEmpty) {
+              issuedByName = facilitatorFullName;
+            }
+          });
+        }
       }
     } catch (e) {
       debugPrint('Error fetching class info: $e');
@@ -161,8 +184,6 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
 
   Future<void> _fetchClockedInLearners() async {
     try {
-      setState(() => isLoading = true);
-
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
 
@@ -200,11 +221,8 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
 
       // Apply filtering based on selected material type
       await _filterLearnersByMaterialType();
-
-      setState(() => isLoading = false);
     } catch (e) {
       debugPrint('Error fetching learners: $e');
-      setState(() => isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading learners: $e')),
@@ -353,48 +371,99 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
           c.className,
           s.siteID,
           s.project_id,
-          pr.Project_pathway
+          pr.Project_pathway,
+          s.qualification_id as site_qual_id
         FROM class c
         LEFT JOIN sites s ON c.siteID = s.siteID
         LEFT JOIN project pr ON s.project_id = pr.project_id
         WHERE c.classID = ?
       ''';
 
-      final projectResult = await db.rawQuery(projectQuery, [widget.classID]);
+      final List<Map<String, dynamic>> projectResults =
+          await db.rawQuery(projectQuery, [widget.classID]);
 
-      if (projectResult.isNotEmpty) {
-        final projectPathway =
-            projectResult.first['Project_pathway'] as String?;
+      debugPrint('[QUALIFICATION] Project query result: $projectResults');
 
-        if (projectPathway != null && projectPathway.isNotEmpty) {
-          final pathwayJson = jsonDecode(projectPathway);
+      if (projectResults.isNotEmpty) {
+        final firstRow = projectResults.first;
+        final String? pathwayJson = firstRow['Project_pathway'];
+        final String? siteQualId = firstRow['site_qual_id']?.toString();
 
-          if (pathwayJson is List && pathwayJson.isNotEmpty) {
-            final firstPathway = pathwayJson[0];
+        if (pathwayJson != null && pathwayJson.isNotEmpty) {
+          try {
+            final dynamic decoded = json.decode(pathwayJson);
+            debugPrint(
+                '[QUALIFICATION] Successfully parsed Project_pathway JSON');
 
-            if (firstPathway['qual_types'] != null &&
-                firstPathway['qual_types'] is List &&
-                firstPathway['qual_types'].isNotEmpty) {
-              final qualification =
-                  firstPathway['qual_types'][0]['qualification'];
+            if (decoded is List && decoded.isNotEmpty) {
+              final firstPathway = decoded[0];
+              if (firstPathway['qual_types'] != null &&
+                  firstPathway['qual_types'] is List &&
+                  firstPathway['qual_types'].isNotEmpty) {
+                final qualificationData =
+                    firstPathway['qual_types'][0]['qualification'];
 
-              if (qualification != null &&
-                  qualification['unitStandards'] != null) {
-                final unitStandardsList = qualification['unitStandards'];
+                if (qualificationData != null) {
+                  final qualName = qualificationData['name']?.toString() ??
+                      qualificationData['qualification_name']?.toString() ??
+                      'Unknown Qualification';
 
-                if (unitStandardsList is List) {
-                  setState(() {
-                    unitStandards = unitStandardsList
-                        .map((us) => {
-                              'unitstandard_id': us['id']?.toString() ?? '',
-                              'unit_standard_name': us['name']?.toString() ??
-                                  'Unknown Unit Standard',
-                            })
-                        .toList();
-                  });
+                  if (qualificationData['unitStandards'] != null) {
+                    final unitStandardsList =
+                        qualificationData['unitStandards'];
+                    if (unitStandardsList is List &&
+                        unitStandardsList.isNotEmpty) {
+                      setState(() {
+                        qualification = qualName;
+                        unitStandards = unitStandardsList
+                            .map((us) => {
+                                  'unitstandard_id': us['id']?.toString() ?? '',
+                                  'unit_standard_name':
+                                      us['name']?.toString() ??
+                                          'Unknown Unit Standard',
+                                })
+                            .toList();
+                      });
+                      return; // Success!
+                    }
+                  }
                 }
               }
             }
+          } catch (e) {
+            debugPrint(
+                '[QUALIFICATION] Error parsing Project_pathway JSON: $e');
+          }
+        }
+
+        // Fallback: If JSON is missing or empty, try the unitstandard table
+        debugPrint('[QUALIFICATION] Falling back to unitstandard table...');
+        if (siteQualId != null && siteQualId.isNotEmpty) {
+          final usQuery = '''
+            SELECT unitstandard_id, unit_standard_name 
+            FROM unitstandard 
+            WHERE qualification_id = ?
+          ''';
+          final List<Map<String, dynamic>> usResults =
+              await db.rawQuery(usQuery, [siteQualId]);
+
+          if (usResults.isNotEmpty) {
+            debugPrint(
+                '[QUALIFICATION] Found ${usResults.length} unit standards in table');
+            setState(() {
+              unitStandards = usResults
+                  .map((row) => {
+                        'unitstandard_id':
+                            row['unitstandard_id']?.toString() ?? '',
+                        'unit_standard_name':
+                            row['unit_standard_name']?.toString() ??
+                                'Unknown Unit Standard',
+                      })
+                  .toList();
+            });
+          } else {
+            debugPrint(
+                '[QUALIFICATION] No unit standards found in table for qualification_id: $siteQualId');
           }
         }
       }
@@ -1088,6 +1157,27 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
                                                   color: Colors.grey[600],
                                                 ),
                                               ),
+                                              const SizedBox(height: 2),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.green.shade50,
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  'Clocked In: ${learner['ClockInTime']}',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w500,
+                                                    color:
+                                                        Colors.green.shade700,
+                                                  ),
+                                                ),
+                                              ),
                                             ],
                                           ),
                                         ),
@@ -1142,18 +1232,32 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
                                   ],
 
                                   // All Materials Button / Verify Button
-                                  if (showUnitStandards)
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.arrow_forward_ios,
-                                        size: 16,
-                                        color: Colors.blue,
+                                  if (selectedLearningMaterialType != 'PPE' &&
+                                      selectedLearningMaterialType !=
+                                          'Learning Material' &&
+                                      selectedLearningMaterialType != 'Select')
+                                    Expanded(
+                                      flex: 2,
+                                      child: ElevatedButton.icon(
+                                        onPressed: () =>
+                                            _verifyAndIssueMaterial(learner),
+                                        icon: const Icon(Icons.verified,
+                                            size: 18),
+                                        label: Text(
+                                            'Issue $selectedLearningMaterialType'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.blue,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 12,
+                                          ),
+                                        ),
                                       ),
-                                      onPressed: () =>
-                                          _navigateToLearnerMaterialSelection(
-                                              learner),
-                                      tooltip: 'All Materials',
-                                    )
+                                    ),
+
+                                  if (showUnitStandards)
+                                    const SizedBox.shrink()
                                   else if (selectedLearningMaterialType !=
                                       'PPE')
                                     ElevatedButton.icon(
@@ -1295,9 +1399,12 @@ class _UnitStandardsDialogState extends State<_UnitStandardsDialog> {
   Future<void> _loadExistingSubmissions() async {
     try {
       // Load from server what this specific learner has already received
+      // STRICTLY use internal LearnerID for database consistency
+      final learnerIdentifier =
+          widget.learner['LearnerID']?.toString() ?? widget.learner['IDNumber'];
       final response = await http.get(
         Uri.parse(AppConfig.buildUrl(
-            'get_logistics_checkbox_status.php?classID=${widget.classID}&learnerID=${widget.learner['IDNumber']}')),
+            'get_logistics_checkbox_status.php?classID=${widget.classID}&learnerID=$learnerIdentifier')),
       );
 
       if (response.statusCode == 200) {

@@ -213,8 +213,9 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
   Future<void> _refreshDataWithoutClearingState() async {
     try {
       final dbHelper = DatabaseHelper();
+      // CHANGED: Use getClockedInLearnersOnly instead of getLearnersWithClockingData
       final learnersWithClockingData =
-          await dbHelper.getLearnersWithClockingData(widget.classID);
+          await dbHelper.getClockedInLearnersOnly(widget.classID);
 
       setState(() {
         for (var learner in learnersWithClockingData) {
@@ -260,8 +261,9 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
   Future<void> _loadLearnersFromLocalDatabase() async {
     try {
       final dbHelper = DatabaseHelper();
+      // CHANGED: Use getClockedInLearnersOnly instead of getLearnersWithClockingData
       final learnersWithClockingData =
-          await dbHelper.getLearnersWithClockingData(widget.classID);
+          await dbHelper.getClockedInLearnersOnly(widget.classID);
 
       setState(() {
         widget.learners.clear();
@@ -300,9 +302,12 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
           widget.learners.add(stringLearner);
         }
       });
+
+      print(
+          '[LEARNER_LIST] Loaded ${widget.learners.length} clocked-in learners for today');
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading offline learners: $e')),
+        SnackBar(content: Text('Error loading clocked-in learners: $e')),
       );
     }
   }

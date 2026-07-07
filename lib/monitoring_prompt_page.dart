@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:vibration/vibration.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'services/fingerprint_service.dart';
 import 'services/random_prompt_service.dart';
 import 'database_helper.dart';
@@ -59,11 +60,19 @@ class _MonitoringPromptPageState extends State<MonitoringPromptPage>
 
   Future<void> _vibrateOnStart() async {
     try {
+      // Play ringtone alert
+      FlutterRingtonePlayer().play(
+        android: AndroidSounds.ringtone,
+        ios: IosSounds.glass,
+        looping: false,
+        volume: 0.8,
+      );
+
       if (await Vibration.hasVibrator() ?? false) {
         await Vibration.vibrate(duration: 500);
       }
     } catch (e) {
-      debugPrint('[MONITORING] Vibration error: $e');
+      debugPrint('[MONITORING] Sound/Vibration error: $e');
     }
   }
 

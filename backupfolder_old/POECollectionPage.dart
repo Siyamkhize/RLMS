@@ -44,7 +44,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
   TextEditingController practitionerNameController = TextEditingController();
   TextEditingController representativeNameController = TextEditingController();
   TextEditingController commentsController = TextEditingController();
-  String learnerSignature = ''; // For simplicity, assuming you get signature as a base64
+  String learnerSignature =
+      ''; // For simplicity, assuming you get signature as a base64
   bool received = false; // Checkbox for "Received" field
 
   @override
@@ -71,7 +72,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
         final signature = result['signature'] as Uint8List?;
 
         // Find the learner in the current list and mark as submitted
-        final learnerIndex = learners.indexWhere((learner) => learner['IDNumber'] == learnerId);
+        final learnerIndex =
+            learners.indexWhere((learner) => learner['IDNumber'] == learnerId);
         if (learnerIndex != -1) {
           learners[learnerIndex]['Signature'] = signature;
           learners[learnerIndex]['POESubmitted'] = true;
@@ -99,19 +101,20 @@ class _POECollectionPageState extends State<POECollectionPage> {
       }
 
       print('🌐 Internet found. Fetching learners from API...');
-      final response = await http.get(Uri.parse(
-          AppConfig.buildUrl('get_poe_collection_status.php?classID=${widget.classID}')));
+      final response = await http.get(Uri.parse(AppConfig.buildUrl(
+          'get_poe_collection_status.php?classID=${widget.classID}')));
 
       print('API Response Status: ${response.statusCode}');
       print('API Response Body: ${response.body}');
 
       if (response.statusCode != 200) {
-        throw Exception('❌ Failed to load learners from API: ${response.statusCode}');
+        throw Exception(
+            '❌ Failed to load learners from API: ${response.statusCode}');
       }
 
       final data = json.decode(response.body);
       print('🔍 Decoded API data: $data');
-      
+
       final apiData = data['learners'] as List<dynamic>?;
 
       if (apiData == null || apiData.isEmpty) {
@@ -125,15 +128,16 @@ class _POECollectionPageState extends State<POECollectionPage> {
 
       // Process learners - the API already provides POE status
       final processedLearners = <Map<String, dynamic>>[];
-      
+
       print('🔍 Processing ${apiData.length} learners from API...');
-      
+
       for (var learner in apiData) {
         final idNumber = learner['IDNumber']?.toString() ?? '';
         final poeStatus = learner['POEStatus'] ?? 'Not Submitted';
-        
-        print('📋 Learner: ${learner['FullName']} ($idNumber) - POE Status: $poeStatus');
-        
+
+        print(
+            '📋 Learner: ${learner['FullName']} ($idNumber) - POE Status: $poeStatus');
+
         if (idNumber.isNotEmpty) {
           processedLearners.add({
             'FullName': learner['FullName'] ?? '',
@@ -144,8 +148,10 @@ class _POECollectionPageState extends State<POECollectionPage> {
             'Date': DateTime.now().toString().split(' ')[0],
             'Description': 'POE Submission',
             'Signature': null,
-            'FacilitatorFullName': learner['FacilitatorFullName'] ?? 'Unknown Facilitator',
-            'qualification_name': learner['qualification_name'] ?? 'No qualification assigned',
+            'FacilitatorFullName':
+                learner['FacilitatorFullName'] ?? 'Unknown Facilitator',
+            'qualification_name':
+                learner['qualification_name'] ?? 'No qualification assigned',
             'POEStatus': poeStatus, // Use status from API
             'submission_date': learner['submission_date'],
             'collection_date': learner['collection_date'],
@@ -156,9 +162,11 @@ class _POECollectionPageState extends State<POECollectionPage> {
       setState(() {
         learners = processedLearners;
         if (learners.isNotEmpty) {
-          practitionerFullName = learners.first['FacilitatorFullName'] ?? 'Unknown Facilitator';
+          practitionerFullName =
+              learners.first['FacilitatorFullName'] ?? 'Unknown Facilitator';
           className = learners.first['ClassName'] ?? 'N/A';
-          qualification_name = learners.first['qualification_name'] ?? 'No qualification assigned';
+          qualification_name = learners.first['qualification_name'] ??
+              'No qualification assigned';
           print('✅ Set qualification_name: $qualification_name');
         } else {
           practitionerFullName = 'Unknown Facilitator';
@@ -175,7 +183,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
     } catch (e) {
       print('❌ Error fetching learners: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to fetch learners. Please try again later.')),
+        const SnackBar(
+            content: Text('Failed to fetch learners. Please try again later.')),
       );
     }
   }
@@ -204,7 +213,7 @@ class _POECollectionPageState extends State<POECollectionPage> {
       // Update POE status for each learner based on database records
       for (var learner in uniqueLearnersMap.values) {
         final idNumber = learner['IDNumber'] as String;
-        
+
         if (submittedIds.contains(idNumber)) {
           learner['POEStatus'] = 'Ready for Collection';
           learner['Description'] = 'POE Submission';
@@ -217,9 +226,11 @@ class _POECollectionPageState extends State<POECollectionPage> {
       setState(() {
         learners = uniqueLearnersMap.values.toList();
         if (learners.isNotEmpty) {
-          practitionerFullName = learners.first['FacilitatorFullName'] ?? 'Unknown Facilitator';
+          practitionerFullName =
+              learners.first['FacilitatorFullName'] ?? 'Unknown Facilitator';
           className = learners.first['ClassName'] ?? 'N/A';
-          qualification_name = learners.first['qualification_name'] ?? 'No qualification assigned';
+          qualification_name = learners.first['qualification_name'] ??
+              'No qualification assigned';
           print('✅ Set qualification_name (local): $qualification_name');
         }
       });
@@ -232,7 +243,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
     } catch (e) {
       print('❌ Error fetching learners from local database: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error fetching learners from local database.')),
+        const SnackBar(
+            content: Text('Error fetching learners from local database.')),
       );
       setState(() => learners = []);
     }
@@ -249,7 +261,9 @@ class _POECollectionPageState extends State<POECollectionPage> {
         ['POE Submission'],
       );
 
-      return submittedLearners.map((record) => record['student_id_number'] as String).toSet();
+      return submittedLearners
+          .map((record) => record['student_id_number'] as String)
+          .toSet();
     } catch (e) {
       print('❌ Error fetching submitted learners: $e');
       return <String>{};
@@ -271,7 +285,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
           'Received': false,
           'Quantity': '1',
           'Date': DateTime.now().toString().split(' ')[0],
-          'Description': 'POE Submission', // Always POE Submission for POE Collection
+          'Description':
+              'POE Submission', // Always POE Submission for POE Collection
           'Signature': null,
           'FacilitatorFullName': learner['FacilitatorFullName'] ?? '',
           'qualification_name': learner['qualification_name'] ?? '',
@@ -297,7 +312,9 @@ class _POECollectionPageState extends State<POECollectionPage> {
           'Received': learner['Received'] ? 'Yes' : 'No',
           'Quantity': learner['Quantity'].toString(),
           'Date': learner['Date'] ?? '',
-          'Signature': learner['Signature'] != null ? base64Encode(learner['Signature']) : '',
+          'Signature': learner['Signature'] != null
+              ? base64Encode(learner['Signature'])
+              : '',
           'Description': learner['Description'] ?? '',
         };
       }).toList(),
@@ -317,7 +334,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
       print('📥 Response Body: ${response.body}');
 
       if (response.statusCode != 200) {
-        throw Exception('Server returned status ${response.statusCode}: ${response.body}');
+        throw Exception(
+            'Server returned status ${response.statusCode}: ${response.body}');
       }
 
       final responseData = jsonDecode(response.body);
@@ -343,7 +361,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
             );
 
             if (existingRecords.isNotEmpty) {
-              print("⚠️ $studentName already exists locally with description: '$description'. Skipping...");
+              print(
+                  "⚠️ $studentName already exists locally with description: '$description'. Skipping...");
               continue;
             }
 
@@ -352,7 +371,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
               'learner_signature_$studentId',
             );
 
-            String receivedText = learnerSignaturePath.isNotEmpty ? 'Yes' : 'No';
+            String receivedText =
+                learnerSignaturePath.isNotEmpty ? 'Yes' : 'No';
 
             Map<String, dynamic> data = {
               'student_id_number': studentId,
@@ -383,7 +403,9 @@ class _POECollectionPageState extends State<POECollectionPage> {
         await fetchLearners();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to submit data: ${responseData['message']}')),
+          SnackBar(
+              content:
+                  Text('Failed to submit data: ${responseData['message']}')),
         );
       }
     } catch (e) {
@@ -392,7 +414,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
 
       // Provide more specific error messages
       if (e.toString().contains('FormatException')) {
-        errorMessage = 'Server returned invalid response. Please check if the server endpoint exists.';
+        errorMessage =
+            'Server returned invalid response. Please check if the server endpoint exists.';
       } else if (e.toString().contains('SocketException')) {
         errorMessage = 'Network error. Please check your internet connection.';
       } else if (e.toString().contains('404')) {
@@ -409,7 +432,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
     }
   }
 
-  Future<String> saveSignatureAsPng(Uint8List signatureBytes, String fileName) async {
+  Future<String> saveSignatureAsPng(
+      Uint8List signatureBytes, String fileName) async {
     try {
       final appDir = await getApplicationDocumentsDirectory();
       final signaturesDir = Directory('${appDir.path}/signatures');
@@ -449,7 +473,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
           );
 
           if (existingRecords.isNotEmpty) {
-            print("⚠️ $studentName already exists locally with description: '$description'. Skipping...");
+            print(
+                "⚠️ $studentName already exists locally with description: '$description'. Skipping...");
             continue;
           }
 
@@ -515,7 +540,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
           children: [
             Card(
               elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
@@ -551,7 +577,11 @@ class _POECollectionPageState extends State<POECollectionPage> {
                         ),
                         const SizedBox(width: 8.0),
                         Expanded(
-                          child: buildCard('Representative', representativeName.isNotEmpty ? representativeName : 'N/A'),
+                          child: buildCard(
+                              'Representative',
+                              representativeName.isNotEmpty
+                                  ? representativeName
+                                  : 'N/A'),
                         ),
                       ],
                     ),
@@ -562,21 +592,26 @@ class _POECollectionPageState extends State<POECollectionPage> {
             const SizedBox(height: 20),
             Card(
               elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Table(
-                    border: TableBorder.all(color: Colors.grey, width: 1, borderRadius: BorderRadius.circular(12)),
+                    border: TableBorder.all(
+                        color: Colors.grey,
+                        width: 1,
+                        borderRadius: BorderRadius.circular(12)),
                     columnWidths: const {
-                      0: FixedColumnWidth(90),  // Name + Status - increased slightly
-                      1: FixedColumnWidth(90),  // ID Number
-                      2: FixedColumnWidth(80),  // Class Name
-                      3: FixedColumnWidth(60),  // Received
-                      4: FixedColumnWidth(50),  // Quantity
-                      5: FixedColumnWidth(80),  // Date
-                      6: FixedColumnWidth(80),  // Description
+                      0: FixedColumnWidth(
+                          90), // Name + Status - increased slightly
+                      1: FixedColumnWidth(90), // ID Number
+                      2: FixedColumnWidth(80), // Class Name
+                      3: FixedColumnWidth(60), // Received
+                      4: FixedColumnWidth(50), // Quantity
+                      5: FixedColumnWidth(80), // Date
+                      6: FixedColumnWidth(80), // Description
                       7: FixedColumnWidth(100), // Signature
                     },
                     children: [
@@ -602,7 +637,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
                             // Name column with status indicator under ID
                             TableCell(
                               child: Padding(
-                                padding: const EdgeInsets.all(4.0), // Reduced padding
+                                padding: const EdgeInsets.all(
+                                    4.0), // Reduced padding
                                 child: Column(
                                   children: [
                                     Text(
@@ -622,7 +658,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
                             dataCell(learner['IDNumber'] ?? ''),
                             textFieldCell(
                               initialValue: learner['ClassName'] ?? '',
-                              onChanged: (value) => learner['ClassName'] = value,
+                              onChanged: (value) =>
+                                  learner['ClassName'] = value,
                             ),
                             checkboxCell(
                               value: learner['Received'] ?? false,
@@ -631,11 +668,14 @@ class _POECollectionPageState extends State<POECollectionPage> {
                             quantityDropdown(learner),
                             datePickerCell(
                               initialValue: learner['Date'] ?? '',
-                              onChanged: (date) => setState(() => learner['Date'] = date),
+                              onChanged: (date) =>
+                                  setState(() => learner['Date'] = date),
                             ),
                             textFieldCell(
-                              initialValue: learner['Description'] ?? 'POE Submission',
-                              onChanged: (value) => learner['Description'] = value,
+                              initialValue:
+                                  learner['Description'] ?? 'POE Submission',
+                              onChanged: (value) =>
+                                  learner['Description'] = value,
                             ),
                             // POE-specific signature button that turns into a tick after signing
                             TableCell(
@@ -657,13 +697,13 @@ class _POECollectionPageState extends State<POECollectionPage> {
               onPressed: learners.isEmpty
                   ? null
                   : () async {
-                final isOnline = await _checkConnectivity();
-                if (isOnline) {
-                  await sendData();
-                } else {
-                  await saveMaterialReceiptForm();
-                }
-              },
+                      final isOnline = await _checkConnectivity();
+                      if (isOnline) {
+                        await sendData();
+                      } else {
+                        await saveMaterialReceiptForm();
+                      }
+                    },
               child: const Text('Submit'),
             ),
           ],
@@ -679,7 +719,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
       alignment: Alignment.center,
       child: Text(
         title,
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10), // Reduced font size
+        style: const TextStyle(
+            fontWeight: FontWeight.bold, fontSize: 10), // Reduced font size
         textAlign: TextAlign.center,
         overflow: TextOverflow.ellipsis,
         maxLines: 2,
@@ -718,7 +759,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
     );
   }
 
-  TableCell checkboxCell({required bool value, required Map<String, dynamic> learner}) {
+  TableCell checkboxCell(
+      {required bool value, required Map<String, dynamic> learner}) {
     return TableCell(
       child: Padding(
         padding: const EdgeInsets.all(4.0), // Reduced padding
@@ -742,10 +784,12 @@ class _POECollectionPageState extends State<POECollectionPage> {
         }),
         isExpanded: true,
         style: const TextStyle(fontSize: 12, color: Colors.black),
-        items: List.generate(10, (index) => DropdownMenuItem(
-          value: index == 0 ? 1 : index, // default min 1
-          child: Text((index == 0 ? 1 : index).toString()),
-        )),
+        items: List.generate(
+            10,
+            (index) => DropdownMenuItem(
+                  value: index == 0 ? 1 : index, // default min 1
+                  child: Text((index == 0 ? 1 : index).toString()),
+                )),
       ),
     );
   }
@@ -779,7 +823,9 @@ class _POECollectionPageState extends State<POECollectionPage> {
             ),
             alignment: Alignment.center,
             child: Text(
-              initialValue.isNotEmpty ? initialValue : DateTime.now().toString().split(' ').first,
+              initialValue.isNotEmpty
+                  ? initialValue
+                  : DateTime.now().toString().split(' ').first,
               style: const TextStyle(fontSize: 10), // Reduced font size
               overflow: TextOverflow.ellipsis,
             ),
@@ -791,13 +837,15 @@ class _POECollectionPageState extends State<POECollectionPage> {
 
   Widget _buildStatusIndicator(Map<String, dynamic> learner) {
     final poeStatus = learner['POEStatus'] ?? 'Not Submitted';
-    
-    print('🎯 Building status indicator for ${learner['FullName']} - Status: $poeStatus');
-    
+
+    print(
+        '🎯 Building status indicator for ${learner['FullName']} - Status: $poeStatus');
+
     switch (poeStatus) {
       case 'Collected':
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1), // Reduced padding
+          padding: const EdgeInsets.symmetric(
+              horizontal: 4, vertical: 1), // Reduced padding
           decoration: BoxDecoration(
             color: Colors.green.shade100,
             borderRadius: BorderRadius.circular(12),
@@ -812,10 +860,11 @@ class _POECollectionPageState extends State<POECollectionPage> {
             ),
           ),
         );
-        
+
       case 'Ready for Collection':
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1), // Reduced padding
+          padding: const EdgeInsets.symmetric(
+              horizontal: 4, vertical: 1), // Reduced padding
           decoration: BoxDecoration(
             color: Colors.orange.shade100,
             borderRadius: BorderRadius.circular(12),
@@ -830,11 +879,12 @@ class _POECollectionPageState extends State<POECollectionPage> {
             ),
           ),
         );
-        
+
       case 'Not Submitted':
       default:
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1), // Reduced padding
+          padding: const EdgeInsets.symmetric(
+              horizontal: 4, vertical: 1), // Reduced padding
           decoration: BoxDecoration(
             color: Colors.grey.shade100,
             borderRadius: BorderRadius.circular(12),
@@ -908,7 +958,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Description', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Description',
+                style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 4.0),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -934,9 +985,10 @@ class _POECollectionPageState extends State<POECollectionPage> {
 
   Widget _buildPOESubmissionButton(Map<String, dynamic> learner) {
     final poeStatus = learner['POEStatus'] ?? 'Not Submitted';
-    
-    print('🎯 Building submission button for ${learner['FullName']} - Status: $poeStatus');
-    
+
+    print(
+        '🎯 Building submission button for ${learner['FullName']} - Status: $poeStatus');
+
     switch (poeStatus) {
       case 'Collected':
         // POE has been collected - show green check (no action allowed)
@@ -948,7 +1000,7 @@ class _POECollectionPageState extends State<POECollectionPage> {
             size: 24,
           ),
         );
-        
+
       case 'Ready for Collection':
         // POE has been submitted - show "Already Submitted" (no action allowed)
         return Container(
@@ -967,7 +1019,7 @@ class _POECollectionPageState extends State<POECollectionPage> {
             ),
           ),
         );
-        
+
       case 'Not Submitted':
       default:
         // POE not submitted yet - show "Ready for POE Collection" (can submit)
@@ -992,7 +1044,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
     }
   }
 
-  Future<void> _showPOECollectionDialog(BuildContext context, Map<String, dynamic> learner) async {
+  Future<void> _showPOECollectionDialog(
+      BuildContext context, Map<String, dynamic> learner) async {
     final controller = SignatureController(
       penStrokeWidth: 2,
       penColor: Colors.black,
@@ -1103,7 +1156,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
     if (isCollected) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('POE collected successfully for ${learner['FullName']}'),
+          content:
+              Text('POE collected successfully for ${learner['FullName']}'),
           backgroundColor: Colors.green,
         ),
       );
@@ -1114,17 +1168,18 @@ class _POECollectionPageState extends State<POECollectionPage> {
     try {
       // Just update the local display status - don't change database
       // The database record remains as "POE Submission" but we track collection locally
-      print('✅ POE collected locally for ${learner['FullName']} - database status unchanged');
-      
+      print(
+          '✅ POE collected locally for ${learner['FullName']} - database status unchanged');
+
       // Optional: You could save collection info to a separate table if needed
       // For now, we just update the local UI state
-      
     } catch (e) {
       print('❌ Error updating local POE collection status: $e');
     }
   }
 
-  Future<void> _showPOESubmissionDialog(BuildContext context, Map<String, dynamic> learner) async {
+  Future<void> _showPOESubmissionDialog(
+      BuildContext context, Map<String, dynamic> learner) async {
     final controller = SignatureController(
       penStrokeWidth: 2,
       penColor: Colors.black,
@@ -1212,7 +1267,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
                 learner['Signature'] = signature;
                 learner['Received'] = true;
                 learner['Description'] = 'POE Submission';
-                learner['POEStatus'] = 'Ready for Collection'; // Update status to submitted
+                learner['POEStatus'] =
+                    'Ready for Collection'; // Update status to submitted
                 learner['POESubmissionDate'] = DateTime.now().toIso8601String();
                 isSubmitted = true;
 
@@ -1235,7 +1291,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
     if (isSubmitted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('POE submitted successfully for ${learner['FullName']}'),
+          content:
+              Text('POE submitted successfully for ${learner['FullName']}'),
           backgroundColor: Colors.green,
         ),
       );
@@ -1262,7 +1319,8 @@ class _POECollectionPageState extends State<POECollectionPage> {
         'created_at': DateTime.now().toIso8601String(),
       });
 
-      print('✅ POE submission saved to material_receipt_form for ${learner['FullName']}');
+      print(
+          '✅ POE submission saved to material_receipt_form for ${learner['FullName']}');
     } catch (e) {
       print('❌ Error saving POE submission locally: $e');
     }

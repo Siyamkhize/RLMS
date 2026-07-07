@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -7,6 +8,11 @@ import 'package:flutter_doc_scanner/flutter_doc_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'config.dart';
 import 'services/camera_resource_manager.dart';
+import 'utils/scanner_pdf_resolver.dart';
+import 'utils/document_scanner_manager.dart';
+import 'utils/document_scanner_crash_recovery.dart';
+import 'utils/ultimate_scanner_crash_prevention.dart';
+import 'utils/enhanced_document_scanner_manager.dart';
 
 class PoeDocumentScanner extends StatefulWidget {
   final int learnerId;
@@ -32,7 +38,8 @@ class PoeDocumentScanner extends StatefulWidget {
   State<PoeDocumentScanner> createState() => _PoeDocumentScannerState();
 }
 
-class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
+class _PoeDocumentScannerState extends State<PoeDocumentScanner>
+    with WidgetsBindingObserver {
   bool _isScanning = false;
   bool _isUploading = false;
   double _uploadProgress = 0.0;
@@ -40,11 +47,171 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
   List<String> _scannedPages = [];
   File? _pdfFile;
   final CameraResourceManager _cameraManager = CameraResourceManager();
+  final DocumentScannerCrashRecovery _crashRecovery =
+      DocumentScannerCrashRecovery();
+  final UltimateScannerCrashPrevention _ultimateCrashPrevention =
+      UltimateScannerCrashPrevention();
+  final EnhancedDocumentScannerManager _enhancedScannerManager =
+      EnhancedDocumentScannerManager();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    // Initialize ultimate crash prevention system
+    _ultimateCrashPrevention.initialize();
+
+    // Start crash recovery monitoring
+    _crashRecovery.startMonitoring();
+  }
 
   @override
   void dispose() {
-    _cameraManager.markMLKitScannerInactive();
+    print('🔄 POE Document Scanner disposing...');
+
+    // Remove lifecycle observer
+    WidgetsBinding.instance.removeObserver(this);
+
+    // Dispose enhanced scanner manager
+    _enhancedScannerManager.dispose();
+
+    // Dispose ultimate crash prevention system
+    _ultimateCrashPrevention.dispose();
+
+    // Stop crash recovery monitoring
+    _crashRecovery.stopMonitoring();
+
+    // Enhanced cleanup to prevent crashes
+    try {
+      _cameraManager.markMLKitScannerInactive();
+      print('✅ Camera manager cleaned up');
+    } catch (e) {
+      print('❌ Error cleaning up camera manager: $e');
+    }
+
+    // Cancel any ongoing operations
+    try {
+      if (_isScanning || _isUploading) {
+        print(
+            '⚠️ Disposing while operations are active - this may cause crashes');
+        _crashRecovery.forceReset();
+      }
+    } catch (e) {
+      print('❌ Error checking operation state: $e');
+    }
+
     super.dispose();
+    print('✅ POE Document Scanner disposed');
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    print('[DOC_SCAN] App lifecycle state changed to: $state');
+
+    switch (state) {
+      case AppLifecycleState.resumed:
+        print('[DOC_SCAN] App resumed - checking scanner state');
+        _handleAppResumed();
+        break;
+      case AppLifecycleState.inactive:
+        print('[DOC_SCAN] App inactive - scanner may be launching');
+        _handleAppInactive();
+        break;
+      case AppLifecycleState.paused:
+        print('[DOC_SCAN] App paused - scanner likely active');
+        _handleAppPaused();
+        break;
+      case AppLifecycleState.detached:
+        print('[DOC_SCAN] App detached');
+        _handleAppDetached();
+        break;
+      case AppLifecycleState.hidden:
+        print('[DOC_SCAN] App hidden - scanner in foreground');
+        break;
+    }
+  }
+
+  void _handleAppResumed() {
+    // CRITICAL FIX: Check if we were scanning when app was paused
+    if (_isScanning) {
+      debugPrint(
+          '[DOC_SCAN] ⚠️  App resumed while _isScanning=true — scanner was interrupted');
+      debugPrint(
+          '[DOC_SCAN] This is likely an OOM kill of the GMS scanner process');
+      debugPrint(
+          '[DOC_SCAN] (com.google.android.gms.ui killed by lmkd due to memory pressure)');
+
+      // Reset scanner state immediately
+      setState(() {
+        _isScanning = false;
+        _statusMessage =
+            'Scanner was interrupted (device ran low on memory). Please try again.';
+      });
+
+      // Reset the document scanner manager and crash recovery
+      final scannerManager = DocumentScannerManager();
+      scannerManager.reset();
+      _crashRecovery.forceReset();
+      _enhancedScannerManager.reset();
+
+      // Show user-friendly message about the interruption
+      if (mounted) {
+        _showErrorDialog(
+          'Scanner Interrupted — Low Memory',
+          'The document scanner was killed by Android because the device ran low on memory.\n\n'
+              'This happens when:\n'
+              '• The device has too many apps open\n'
+              '• The scanned document is very large\n'
+              '• Available RAM drops below Android\'s threshold\n\n'
+              '✅ Solutions:\n'
+              '• Close other apps before scanning\n'
+              '• Restart the device to free memory\n'
+              '• Scan fewer pages per batch (20-30 pages)\n'
+              '• Avoid scanning while other heavy apps are running',
+        );
+      }
+    }
+
+    // Check if crash recovery detected a problem
+    if (_crashRecovery.isScannerCrashed()) {
+      print('[DOC_SCAN] Crash recovery detected scanner crash');
+      if (mounted) {
+        _showErrorDialog(
+          'Scanner Crash Detected',
+          'The crash recovery system detected that the document scanner may have crashed.\n\n'
+              'Recovery recommendations:\n'
+              '${_crashRecovery.getRecoveryRecommendations().map((r) => '• $r').join('\n')}',
+        );
+      }
+      _crashRecovery.forceReset();
+    }
+  }
+
+  void _handleAppInactive() {
+    // App is becoming inactive - scanner may be launching
+    if (_isScanning) {
+      print(
+          '[DOC_SCAN] App inactive while scanning - normal for scanner launch');
+    }
+  }
+
+  void _handleAppPaused() {
+    // App is paused - scanner is likely in foreground
+    if (_isScanning) {
+      print('[DOC_SCAN] App paused while scanning - scanner should be active');
+    }
+  }
+
+  void _handleAppDetached() {
+    // App is being detached - cleanup
+    if (_isScanning) {
+      print('[DOC_SCAN] App detached while scanning - force cleanup');
+      _isScanning = false;
+      final scannerManager = DocumentScannerManager();
+      scannerManager.forceReset();
+    }
   }
 
   @override
@@ -107,8 +274,8 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
             ),
             const SizedBox(height: 24),
 
-            // Instructions
-            if (_pdfFile == null && !_isScanning)
+            // Instructions and System Status
+            if (_pdfFile == null && !_isScanning) ...[
               Card(
                 color: Colors.red.shade50,
                 child: Padding(
@@ -119,7 +286,7 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
                           color: Colors.red, size: 48),
                       const SizedBox(height: 12),
                       const Text(
-                        '🔴 MAXIMUM: 100 Pages Per Batch',
+                        '🔴 MAXIMUM: 80 Pages Per Batch',
                         style: TextStyle(
                           color: Colors.red,
                           fontSize: 18,
@@ -135,11 +302,11 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
                           border: Border.all(color: Colors.red, width: 2),
                         ),
                         child: const Text(
-                          'Scanner WILL CRASH if you scan 200+ pages!\n\n'
+                          'Scanner may struggle if you scan 80+ pages!\n\n'
                           'Why? Google ML Kit runs out of memory.\n\n'
-                          'SOLUTION for 200 pages:\n'
-                          '1. Scan pages 1-100 → Upload\n'
-                          '2. Scan pages 101-200 → Upload\n\n'
+                          'SOLUTION for 80+ pages:\n'
+                          '1. Scan pages 1-80 → Upload\n'
+                          '2. Scan pages 81-160 → Upload\n\n'
                           'This is a scanner plugin limitation.',
                           style: TextStyle(
                             color: Colors.black87,
@@ -152,6 +319,106 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
                   ),
                 ),
               ),
+              const SizedBox(height: 16),
+
+              // ENHANCED CRASH PREVENTION STATUS
+              FutureBuilder<Map<String, dynamic>>(
+                future: Future.value({
+                  ..._ultimateCrashPrevention.getSystemStatus(),
+                  ..._enhancedScannerManager.getStatus(),
+                }),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) return const SizedBox.shrink();
+
+                  final status = snapshot.data!;
+                  final scanCount = status['scanCount'] as int;
+                  final scansUntilReset = status['scansUntilReset'] as int;
+                  final isInCriticalState = status['isInCriticalState'] as bool;
+                  final isScanning = status['isScanning'] as bool;
+                  final scanAttempts = status['scanAttempts'] as int;
+                  final cooldownRemaining = status['cooldownRemaining'] as int;
+
+                  Color statusColor = Colors.green;
+                  String statusText = 'Scanner Ready';
+                  IconData statusIcon = Icons.check_circle;
+
+                  if (cooldownRemaining > 0) {
+                    statusColor = Colors.red;
+                    statusText = 'COOLDOWN: ${cooldownRemaining}s';
+                    statusIcon = Icons.timer;
+                  } else if (isInCriticalState) {
+                    statusColor = Colors.red;
+                    statusText = 'CRITICAL: Restart Required';
+                    statusIcon = Icons.error;
+                  } else if (scansUntilReset <= 1) {
+                    statusColor = Colors.orange;
+                    statusText = 'WARNING: Reset Soon';
+                    statusIcon = Icons.warning;
+                  } else if (scanCount > 0 || scanAttempts > 0) {
+                    statusColor = Colors.blue;
+                    statusText = 'Scanner Active';
+                    statusIcon = Icons.info;
+                  }
+
+                  return Card(
+                    color: statusColor.withOpacity(0.1),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Row(
+                        children: [
+                          Icon(statusIcon, color: statusColor, size: 24),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  statusText,
+                                  style: TextStyle(
+                                    color: statusColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                Text(
+                                  cooldownRemaining > 0
+                                      ? 'Attempts: $scanAttempts/2 • Cooldown active'
+                                      : 'Scans: $scanCount/3 • Attempts: $scanAttempts/2',
+                                  style: TextStyle(
+                                    color: statusColor.withOpacity(0.8),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (scanCount > 0 || scanAttempts > 0)
+                            IconButton(
+                              onPressed: cooldownRemaining > 0
+                                  ? null
+                                  : () {
+                                      _ultimateCrashPrevention.resetSystem();
+                                      _enhancedScannerManager.reset();
+                                      setState(() {}); // Refresh UI
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              'Scanner systems reset manually'),
+                                          backgroundColor: Colors.green,
+                                        ),
+                                      );
+                                    },
+                              icon: Icon(Icons.refresh, color: statusColor),
+                              tooltip: 'Reset Scanner Systems',
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
 
             const SizedBox(height: 16),
 
@@ -294,7 +561,7 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '🔴 MAXIMUM: 100 pages per batch',
+                  '🔴 MAXIMUM: 80 pages per batch',
                   style: TextStyle(
                     color: Colors.red,
                     fontWeight: FontWeight.bold,
@@ -303,16 +570,16 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
                 ),
                 SizedBox(height: 12),
                 Text(
-                  'The scanner WILL CRASH if you scan 200 pages at once!\n\n'
+                  'The scanner may crash if you scan too many pages at once!\n\n'
                   'Why? Google ML Kit runs out of memory processing too many pages.\n\n'
                   'SOLUTION:\n'
-                  '✓ Scan 50-100 pages maximum per batch\n'
+                  '✓ Scan 50-80 pages maximum per batch\n'
                   '✓ Upload each batch immediately\n'
                   '✓ Then scan the next batch\n'
                   '✓ Repeat until all pages scanned\n\n'
-                  'Example for 200 pages:\n'
-                  '• Batch 1: Scan pages 1-100, upload\n'
-                  '• Batch 2: Scan pages 101-200, upload\n\n'
+                  'Example for 160 pages:\n'
+                  '• Batch 1: Scan pages 1-80, upload\n'
+                  '• Batch 2: Scan pages 81-160, upload\n\n'
                   'This is a limitation of the scanner plugin, not our app.',
                   style: TextStyle(fontSize: 14),
                 ),
@@ -357,7 +624,8 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
         timeout: const Duration(seconds: 10));
 
     if (!hasAccess && mounted) {
-      _showErrorDialog('Camera Busy',
+      _showErrorDialog(
+          'Camera Busy',
           _cameraManager.currentUser != null
               ? 'Camera is being used by ${_cameraManager.currentUser}. Please wait and try again.'
               : 'Camera is currently busy. Please wait and try again.');
@@ -374,17 +642,135 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
       // Mark ML Kit scanner as active (prevents incorrect camera release when app pauses)
       _cameraManager.markMLKitScannerActive();
 
-      // Use FlutterDocScanner - upgraded to 0.0.18 for Android crash fixes
-      final dynamic scanResult = await FlutterDocScanner().getScanDocuments(
-        page: 999, // Unlimited pages
-      );
+      // Mark scanner as active in crash recovery system
+      _crashRecovery.markScannerActive();
 
-      print('Scan Result: $scanResult');
+      // MEMORY MANAGEMENT: Stop the periodic cleanup timer while scanning.
+      // The timer fires every 2 minutes and calls GC 3x — this competes with
+      // the ML Kit scanner process for memory and can trigger OOM kills.
+      _ultimateCrashPrevention.dispose();
+      debugPrint(
+          '[DOC_SCAN] ⏸️  Paused background cleanup timer to free memory for scanner');
+
+      // ULTIMATE + ENHANCED CRASH PREVENTION: Use dual protection systems
+      dynamic scanResult;
+      try {
+        debugPrint('🔄 Starting DUAL crash-protected scanner...');
+
+        // Get system status before scanning
+        final systemStatus = _ultimateCrashPrevention.getSystemStatus();
+        final enhancedStatus = _enhancedScannerManager.getStatus();
+        debugPrint('[DUAL_SCAN] Ultimate system status: $systemStatus');
+        debugPrint('[DUAL_SCAN] Enhanced system status: $enhancedStatus');
+
+        // Check enhanced scanner cooldown
+        final cooldownRemaining = enhancedStatus['cooldownRemaining'] as int;
+        if (cooldownRemaining > 0) {
+          setState(() {
+            _isScanning = false;
+            _statusMessage =
+                'Scanner in cooldown mode. Wait $cooldownRemaining seconds.';
+          });
+
+          _showErrorDialog(
+            'Scanner Cooldown',
+            'The scanner is in cooldown mode to prevent crashes.\n\n'
+                'Please wait $cooldownRemaining seconds before scanning again.\n\n'
+                'This protection prevents the "works 1-2 times then crashes" issue.',
+          );
+          return;
+        }
+
+        // Show warning if approaching critical state
+        if (systemStatus['scansUntilReset'] <= 1) {
+          final shouldContinue = await showDialog<bool>(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.orange),
+                  SizedBox(width: 8),
+                  Text('Scanner Reset Warning'),
+                ],
+              ),
+              content: const Text(
+                  '⚠️ WARNING: Scanner approaching reset limit\n\n'
+                  'After this scan, the scanner will need to be reset to prevent crashes.\n\n'
+                  'This is normal behavior to keep your app stable.\n\n'
+                  'Continue with this scan?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  style:
+                      ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                  child: const Text('Continue Scan'),
+                ),
+              ],
+            ),
+          );
+
+          if (shouldContinue != true) {
+            setState(() {
+              _isScanning = false;
+              _statusMessage = 'Scan cancelled by user';
+            });
+            return;
+          }
+        }
+
+        // Execute with DUAL protection (Enhanced + Ultimate)
+        scanResult = await _enhancedScannerManager.executeSafeScan(
+          // Very high limits (e.g. 999) can cause ML Kit/Android process death.
+          // Keep this bounded and scan in batches.
+          maxPages: 80,
+          context: context,
+        );
+
+        // Also update ultimate crash prevention counter
+        _ultimateCrashPrevention.resetSystem();
+
+        debugPrint('✅ DUAL crash-protected scanner completed successfully');
+      } on TimeoutException catch (e) {
+        debugPrint('❌ DUAL Scanner timeout: $e');
+        if (mounted) {
+          setState(() {
+            _isScanning = false;
+            _statusMessage =
+                'Scanner timed out after 8 minutes. Please try again with fewer pages.';
+          });
+          _showErrorDialog(
+            'Scanner Timeout',
+            e.message ?? 'The scanner session timed out.',
+          );
+        }
+        return;
+      } catch (e, stackTrace) {
+        debugPrint('❌ DUAL Scanner crashed with error: $e');
+        debugPrint('❌ Stack trace: $stackTrace');
+
+        if (mounted) {
+          setState(() {
+            _isScanning = false;
+            _statusMessage = 'Scanner error: $e';
+          });
+
+          // The enhanced scanner manager provides detailed error messages
+          _showErrorDialog('Scanner Error', e.toString());
+        }
+        return;
+      }
+
+      debugPrint('Scan Result: $scanResult');
 
       if (scanResult is! Map ||
           !scanResult.containsKey('pdfUri') ||
           scanResult['pdfUri'] == null) {
-        print('Invalid scan result: $scanResult');
+        debugPrint('Invalid scan result: $scanResult');
         setState(() {
           _isScanning = false;
           _statusMessage =
@@ -399,27 +785,27 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
           'Scanner Session Lost',
           'The scanner session was terminated by Android. This commonly happens when:\n\n'
               '❌ Taking long pauses between pages (>2-3 minutes)\n'
-              '❌ Scanning 100+ pages in one session\n'
+              '❌ Scanning 80+ pages in one session\n'
               '❌ Switching to other apps during scanning\n'
               '❌ Device running low on memory\n\n'
-              'Solutions:\n'
-              '✓ Scan continuously without long pauses\n'
-              '✓ Scan in batches of 50-80 pages\n'
-              '✓ Keep this app in foreground\n'
-              '✓ Close other apps to free memory\n'
-              '✓ Restart device if problem persists',
+              '✅ Solutions:\n'
+              '• Scan continuously without long pauses\n'
+              '• Scan in batches of 50-80 pages\n'
+              '• Keep this app in foreground\n'
+              '• Close other apps to free memory\n'
+              '• Restart device if problem persists\n\n'
+              '🛡️ Your app was protected from crashing by our ultimate crash prevention system!',
         );
         return;
       }
 
       final String? pdfUri = scanResult['pdfUri'] as String?;
-      final pdfPath = pdfUri!.replaceFirst('file:///', '');
-      print('Processed PDF Path: $pdfPath');
+      debugPrint('Processed PDF URI: $pdfUri');
 
-      final file = File(pdfPath);
-      if (await file.exists()) {
+      final file = await resolveFlutterDocScannerPdfFile(pdfUri);
+      if (file != null && await isReadablePdfFile(file)) {
         final fileSize = await file.length();
-        print('PDF exists: ${file.path}, size: $fileSize bytes');
+        debugPrint('PDF exists: ${file.path}, size: $fileSize bytes');
 
         // Check if file is too large (> 150MB)
         if (fileSize > 150 * 1024 * 1024) {
@@ -438,7 +824,7 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
 
         setState(() {
           _pdfFile = file;
-          _scannedPages = [pdfPath]; // Store path for display
+          _scannedPages = [file.path];
           _isScanning = false;
           _statusMessage =
               'PDF scanned successfully! Size: ${(fileSize / 1024 / 1024).toStringAsFixed(1)} MB\n'
@@ -447,7 +833,7 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
 
         _showSnackBar('PDF document scanned successfully! Upload it now.');
       } else {
-        print('Error: PDF does not exist at $pdfPath');
+        debugPrint('Error: PDF unreadable or missing for uri: $pdfUri');
         setState(() {
           _isScanning = false;
           _statusMessage =
@@ -457,14 +843,14 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
         _showErrorDialog(
           'Scanner Session Lost',
           'The scanner failed to save the PDF file. This happens when:\n\n'
+              '• Android returned a content URI we could not read\n'
               '• Android terminated the scanner due to long idle time\n'
-              '• The document was too large for available memory\n'
               '• The app was backgrounded during scanning\n\n'
-              'Solution: Scan in smaller batches (50-80 pages) without long pauses.',
+              'Solution: Try again; scan in smaller batches if needed.',
         );
       }
     } catch (e, stackTrace) {
-      print('Scan Error: $e\nStack Trace: $stackTrace');
+      debugPrint('Scan Error: $e\nStack Trace: $stackTrace');
       if (mounted) {
         setState(() {
           _isScanning = false;
@@ -487,9 +873,9 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
             e.toString().contains('ENOENT')) {
           _showErrorDialog(
             'Scanner Cache Error',
-            'The document scanner ran out of cache space. This typically happens with very large documents (100+ pages).\n\n'
+            'The document scanner ran out of cache space. This typically happens with very large documents (80+ pages).\n\n'
                 'Solutions:\n'
-                '• Scan in smaller batches (50-100 pages)\n'
+                '• Scan in smaller batches (50-80 pages)\n'
                 '• Clear app cache and try again\n'
                 '• Restart the device\n'
                 '• Free up device storage',
@@ -501,6 +887,16 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
     } finally {
       _cameraManager.markMLKitScannerInactive();
       _cameraManager.releaseCameraAccess(requester);
+
+      // Mark scanner as inactive in crash recovery system
+      _crashRecovery.markScannerInactive();
+
+      // MEMORY MANAGEMENT: Restart the background cleanup timer now that
+      // the scanner has finished and memory pressure is reduced.
+      _ultimateCrashPrevention.initialize();
+      debugPrint(
+          '[DOC_SCAN] ▶️  Restarted background cleanup timer after scan');
+
       if (mounted) {
         setState(() => _isScanning = false);
       }
@@ -508,19 +904,37 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
   }
 
   void _showErrorDialog(String title, String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+    if (!mounted) return;
+
+    try {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () {
+                if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      print('Error showing dialog: $e');
+      // Fallback: show snackbar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$title: $message'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
   }
 
   void _showSnackBar(String message) {
@@ -575,37 +989,90 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
           ),
         );
 
-        // Close the scanner screen after successful upload
-        // This prevents the plugin initialization error on subsequent scans
         await Future.delayed(const Duration(seconds: 2));
+
+        // Single pop back to the screen that opened the scanner (e.g. learners list).
+        // Do NOT use popUntil(isFirst) or pushNamedAndRemoveUntil: in this app the first
+        // route is LoginPage, so those "fallbacks" logged users out of their workflow.
         if (mounted) {
-          Navigator.pop(context, true);
+          try {
+            Navigator.pop(context, true);
+          } catch (e) {
+            print('Navigation error after upload: $e');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Upload complete. Use the back button to return to the previous screen.',
+                  ),
+                  backgroundColor: Colors.green,
+                  duration: Duration(seconds: 4),
+                ),
+              );
+            }
+          }
         }
       }
     } catch (e, stackTrace) {
       print('Upload error: $e');
       print('Stack trace: $stackTrace');
-      setState(() {
-        _isUploading = false;
-        _statusMessage = 'Upload failed: $e';
-      });
 
-      // Show error dialog
+      // ENHANCED ERROR HANDLING: Prevent crashes during error handling
       if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Upload Failed'),
-            content: Text(
-                'Error: $e\n\nPlease try again or contact support if the problem persists.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
+        try {
+          setState(() {
+            _isUploading = false;
+            _statusMessage = 'Upload failed: $e';
+          });
+        } catch (setStateError) {
+          print('SetState error during upload failure: $setStateError');
+        }
+      }
+
+      // Show error with safe navigation
+      if (mounted) {
+        try {
+          showDialog(
+            context: context,
+            barrierDismissible: true,
+            builder: (context) => AlertDialog(
+              title: const Text('Upload Failed'),
+              content: Text(
+                  'Error: $e\n\nPlease try again or contact support if the problem persists.'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    // Safe dialog dismissal
+                    try {
+                      if (Navigator.canPop(context)) {
+                        Navigator.pop(context);
+                      }
+                    } catch (navError) {
+                      print('Error closing error dialog: $navError');
+                    }
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        } catch (dialogError) {
+          print('Error showing upload error dialog: $dialogError');
+          // Fallback: show snackbar instead
+          try {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Upload failed: $e'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 5),
               ),
-            ],
-          ),
-        );
+            );
+          } catch (snackBarError) {
+            print('Error showing snackbar: $snackBarError');
+            // Ultimate fallback: just print the error
+            print('FINAL FALLBACK: Upload failed with error: $e');
+          }
+        }
       }
     }
   }
@@ -685,8 +1152,8 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
 
     try {
       // CRITICAL FIX: Don't load entire file into memory!
-      // For 200 pages (~50MB+), this causes out-of-memory crash
-      // Instead, read file size and stream chunks directly from disk
+      // For large documents (80+ pages), this causes out-of-memory crash
+      // during PDF creation. Batch scanning (50-80 pages) is required.
       final fileSize = await _pdfFile!.length();
       print(
           'File size: $fileSize bytes (${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB)');

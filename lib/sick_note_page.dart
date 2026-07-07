@@ -11,6 +11,7 @@ import 'package:intl/intl.dart';
 import 'package:sqflite/sqflite.dart';
 import 'database_helper.dart';
 import 'config.dart';
+import 'utils/scanner_pdf_resolver.dart';
 
 class SickNotePage extends StatefulWidget {
   final int learnerID;
@@ -202,17 +203,17 @@ class _SickNotePageState extends State<SickNotePage> {
     setState(() => _isScanning = true);
 
     try {
-      final scanResult = await FlutterDocScanner().getScanDocuments();
+      final scanResult =
+          await FlutterDocScanner().getScanDocuments(page: 80);
       if (scanResult is! Map ||
           !scanResult.containsKey('pdfUri') ||
           scanResult['pdfUri'] == null) {
         throw 'Invalid scan result';
       }
 
-      final pdfPath = (scanResult['pdfUri'] as String).replaceFirst('file:///', '');
-      final file = File(pdfPath);
-
-      if (!await file.exists() || !pdfPath.endsWith('.pdf')) {
+      final file = await resolveFlutterDocScannerPdfFile(
+          scanResult['pdfUri'] as String?);
+      if (file == null || !await isReadablePdfFile(file)) {
         throw 'Invalid or missing PDF file';
       }
 
@@ -237,6 +238,7 @@ class _SickNotePageState extends State<SickNotePage> {
       };
 
       final learnerIDString = widget.learnerID.toString();
+      final pdfPath = file.path;
       if (await _checkConnectivity()) {
         await _sendSickNoteToBackend(learnerIDString, pdfPath, details);
       } else {

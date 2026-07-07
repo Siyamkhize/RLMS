@@ -6,7 +6,8 @@ class TestFacilitatorSyncPage extends StatefulWidget {
   const TestFacilitatorSyncPage({super.key});
 
   @override
-  State<TestFacilitatorSyncPage> createState() => _TestFacilitatorSyncPageState();
+  State<TestFacilitatorSyncPage> createState() =>
+      _TestFacilitatorSyncPageState();
 }
 
 class _TestFacilitatorSyncPageState extends State<TestFacilitatorSyncPage> {
@@ -147,42 +148,72 @@ class _TestFacilitatorSyncPageState extends State<TestFacilitatorSyncPage> {
                                   ),
                                 ),
                                 title: Text(
-                                  '${facilitator['firstName'] ?? ''} ${facilitator['lastName'] ?? ''}'.trim().isEmpty
+                                  '${facilitator['firstName'] ?? ''} ${facilitator['lastName'] ?? ''}'
+                                          .trim()
+                                          .isEmpty
                                       ? '(No name)'
                                       : '${facilitator['firstName'] ?? ''} ${facilitator['lastName'] ?? ''}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
                                 ),
                                 subtitle: Text(
-                                  facilitator['email']?.toString() ?? '(No email)',
+                                  facilitator['email']?.toString() ??
+                                      '(No email)',
                                 ),
                                 children: [
                                   Padding(
                                     padding: const EdgeInsets.all(16),
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        _buildDetailRow('ID', facilitator['facilitator_id']),
-                                        _buildDetailRow('First Name', facilitator['firstName']),
-                                        _buildDetailRow('Last Name', facilitator['lastName']),
-                                        _buildDetailRow('Email', facilitator['email']),
-                                        _buildDetailRow('Role', facilitator['role']),
-                                        _buildDetailRow('Class ID', facilitator['classID']),
-                                        _buildDetailRow('Phone', facilitator['phoneNumber']),
-                                        _buildDetailRow('Assessor No', facilitator['assessorNo']),
-                                        _buildDetailRow('Password', 
-                                          facilitator['password']?.toString().isNotEmpty == true 
-                                              ? '${facilitator['password'].toString().substring(0, 20)}...' 
-                                              : null),
+                                        _buildDetailRow('ID',
+                                            facilitator['facilitator_id']),
+                                        _buildDetailRow('First Name',
+                                            facilitator['firstName']),
+                                        _buildDetailRow('Last Name',
+                                            facilitator['lastName']),
+                                        _buildDetailRow(
+                                            'Email', facilitator['email']),
+                                        _buildDetailRow(
+                                            'Role', facilitator['role']),
+                                        _buildDetailRow(
+                                            'Class ID', facilitator['classID']),
+                                        _buildDetailRow('Phone',
+                                            facilitator['phoneNumber']),
+                                        _buildDetailRow('Assessor No',
+                                            facilitator['assessorNo']),
+                                        _buildDetailRow(
+                                            'Password',
+                                            facilitator['password']
+                                                        ?.toString()
+                                                        .isNotEmpty ==
+                                                    true
+                                                ? '${facilitator['password'].toString().substring(0, 20)}...'
+                                                : null),
                                         const Divider(),
                                         const Text(
                                           'Fingerprint Templates:',
-                                          style: TextStyle(fontWeight: FontWeight.bold),
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold),
                                         ),
                                         const SizedBox(height: 4),
-                                        _buildTemplateStatus('ZKTeco Left', facilitator['zkteco_left_template']),
-                                        _buildTemplateStatus('ZKTeco Right', facilitator['zkteco_right_template']),
-                                        _buildTemplateStatus('Futronic Left', facilitator['futronic_left_template']),
-                                        _buildTemplateStatus('Futronic Right', facilitator['futronic_right_template']),
+                                        _buildTemplateStatus(
+                                            'ZKTeco Left',
+                                            facilitator[
+                                                'zkteco_left_template']),
+                                        _buildTemplateStatus(
+                                            'ZKTeco Right',
+                                            facilitator[
+                                                'zkteco_right_template']),
+                                        _buildTemplateStatus(
+                                            'Futronic Left',
+                                            facilitator[
+                                                'futronic_left_template']),
+                                        _buildTemplateStatus(
+                                            'Futronic Right',
+                                            facilitator[
+                                                'futronic_right_template']),
                                       ],
                                     ),
                                   ),
@@ -200,7 +231,7 @@ class _TestFacilitatorSyncPageState extends State<TestFacilitatorSyncPage> {
   Widget _buildDetailRow(String label, dynamic value) {
     final valueStr = value?.toString() ?? '';
     final isEmpty = valueStr.isEmpty || valueStr == 'null';
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -233,7 +264,7 @@ class _TestFacilitatorSyncPageState extends State<TestFacilitatorSyncPage> {
   Widget _buildTemplateStatus(String label, dynamic template) {
     final hasTemplate = template?.toString().isNotEmpty == true;
     final length = template?.toString().length ?? 0;
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
@@ -255,4 +286,3 @@ class _TestFacilitatorSyncPageState extends State<TestFacilitatorSyncPage> {
     );
   }
 }
-

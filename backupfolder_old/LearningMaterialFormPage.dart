@@ -10,10 +10,14 @@ import 'services/fingerprint_service.dart';
 
 class LearningMaterialFormPage extends StatefulWidget {
   final String classID;
+  final String? logisticsId;
+  final String? logisticsName;
 
   const LearningMaterialFormPage({
     super.key,
     required this.classID,
+    this.logisticsId,
+    this.logisticsName,
   });
 
   @override
@@ -33,6 +37,7 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
   // Selection interface variables
   String qualification = '';
   String facilitatorFullName = 'Unknown Facilitator';
+  String issuedByName = 'Unknown'; // The actual person issuing materials
   String selectedLearningMaterialType = 'Select';
 
   // Material type options
@@ -44,6 +49,17 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
     'Consumables',
   ];
 
+  // PPE sizes
+  final List<String> contiSuitSizes = List.generate(
+    41, // 66 - 26 + 1 = 41 items
+    (index) => (26 + index).toString(),
+  );
+
+  final List<String> bootsSizes = List.generate(
+    12, // 14 - 3 + 1 = 12 items
+    (index) => (3 + index).toString(),
+  );
+
   // Fingerprint services
   final FingerprintService _fingerprintService = FingerprintService();
   final FutronicService _futronicService = FutronicService();
@@ -53,6 +69,12 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
   @override
   void initState() {
     super.initState();
+
+    // Set who is issuing the materials (logistics or facilitator)
+    if (widget.logisticsName != null && widget.logisticsName!.isNotEmpty) {
+      issuedByName = widget.logisticsName!;
+    }
+
     _fetchClockedInLearners();
     _fetchUnitStandards();
     _fetchClassInfo();
@@ -124,6 +146,11 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
                   .trim();
           if (facilitatorFullName.isEmpty) {
             facilitatorFullName = 'Unknown Facilitator';
+          }
+
+          // If logistics name wasn't provided, use facilitator name
+          if (widget.logisticsName == null || widget.logisticsName!.isEmpty) {
+            issuedByName = facilitatorFullName;
           }
         });
       }
@@ -197,62 +224,50 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
 
     try {
       if (selectedLearningMaterialType == 'Learning Material') {
-        // For Learning Material, check if learner has ALL items for ALL unit standards
-        debugPrint('[FILTER] Fetching complete learners for Learning Material');
-
-        // Get unit standard IDs
-        final unitStandardIds = unitStandards
-            .map((us) => us['unitstandard_id'].toString())
-            .join(',');
-
-        if (unitStandardIds.isEmpty) {
-          debugPrint('[FILTER] No unit standards found');
-          setState(() {
-            issuedLearnerNames = [];
-          });
-          return;
-        }
-
-        debugPrint('[FILTER] Unit Standard IDs: $unitStandardIds');
-
+        // For Learning Material: NEVER hide learners
+        // Show ALL learners with checkboxes indicating what they've received
+        // The checkbox system (get_logistics_checkbox_status.php) handles showing what's received vs not received
+        debugPrint(
+            '[FILTER] Learning Material selected - showing ALL learners (no filtering)');
+        setState(() {
+          issuedLearnerNames = []; // Empty list = no learners filtered out
+        });
+      } else if (selectedLearningMaterialType == 'PPE') {
+        // For PPE, check if learner has received PPE (either Conti-Suit or Safety Boots)
+        debugPrint('[FILTER] Fetching learners who received PPE');
         final response = await http.get(
-          Uri.parse(AppConfig.buildUrl(
-              'get_complete_learners.php?classID=${widget.classID}&unitStandardIds=$unitStandardIds')),
+          Uri.parse(
+              '${AppConfig.baseUrl}/get_learners_with_ppe.php?classID=${widget.classID}'),
         );
 
         if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          if (data['success'] == true) {
-            setState(() {
-              issuedLearnerNames =
-                  List<String>.from(data['completeLearners'] ?? []);
-            });
-            debugPrint(
-                '[FILTER] Found ${issuedLearnerNames.length} learners who completed ALL unit standards');
-            debugPrint('[FILTER] Complete learners: $issuedLearnerNames');
-          }
+          final List<dynamic> ppeData = json.decode(response.body);
+          setState(() {
+            issuedLearnerNames = ppeData
+                .map((item) => '${item['Name']} ${item['Surname']}')
+                .toList()
+                .cast<String>();
+          });
+          debugPrint('[FILTER] Learners with PPE: $issuedLearnerNames');
         }
       } else {
-        // For PPE, ToolKit, Consumables - check if they received that specific item
+        // For other material types (ToolKit, Consumables)
         debugPrint(
-            '[FILTER] Fetching issued learners for: $selectedLearningMaterialType');
-
+            '[FILTER] Fetching learners who received $selectedLearningMaterialType');
         final response = await http.get(
           Uri.parse(AppConfig.buildUrl(
               'get_issued_learners.php?classID=${widget.classID}&materialType=$selectedLearningMaterialType')),
         );
 
         if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          if (data['success'] == true) {
-            setState(() {
-              issuedLearnerNames =
-                  List<String>.from(data['issuedLearners'] ?? []);
-            });
-            debugPrint(
-                '[FILTER] Found ${issuedLearnerNames.length} learners who already received $selectedLearningMaterialType');
-            debugPrint('[FILTER] Issued learners: $issuedLearnerNames');
-          }
+          final List<dynamic> issuedData = json.decode(response.body);
+          setState(() {
+            issuedLearnerNames = issuedData
+                .map((item) => '${item['Name']} ${item['Surname']}')
+                .toList()
+                .cast<String>();
+          });
+          debugPrint('[FILTER] Issued learners: $issuedLearnerNames');
         }
       }
     } catch (e) {
@@ -783,6 +798,24 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
           learner: learner,
           classID: widget.classID,
           unitStandards: unitStandards,
+          facilitatorFullName: facilitatorFullName,
+          issuedByName: issuedByName,
+        );
+      },
+    );
+  }
+
+  void _showPPEPopup(Map<String, dynamic> learner) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return _PPEDialog(
+          learner: learner,
+          classID: widget.classID,
+          contiSuitSizes: contiSuitSizes,
+          bootsSizes: bootsSizes,
+          facilitatorFullName: facilitatorFullName,
+          issuedByName: issuedByName,
         );
       },
     );
@@ -1085,6 +1118,29 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
                                     const SizedBox(width: 8),
                                   ],
 
+                                  // PPE Button (only for PPE material type)
+                                  if (selectedLearningMaterialType ==
+                                      'PPE') ...[
+                                    Expanded(
+                                      flex: 2,
+                                      child: ElevatedButton.icon(
+                                        onPressed: () => _showPPEPopup(learner),
+                                        icon: const Icon(Icons.security,
+                                            size: 18),
+                                        label: const Text('PPE'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.orange,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                  ],
+
                                   // All Materials Button / Verify Button
                                   if (showUnitStandards)
                                     IconButton(
@@ -1098,7 +1154,8 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
                                               learner),
                                       tooltip: 'All Materials',
                                     )
-                                  else
+                                  else if (selectedLearningMaterialType !=
+                                      'PPE')
                                     ElevatedButton.icon(
                                       onPressed: isVerifying
                                           ? null
@@ -1134,11 +1191,15 @@ class _UnitStandardsDialog extends StatefulWidget {
   final Map<String, dynamic> learner;
   final String classID;
   final List<Map<String, dynamic>> unitStandards;
+  final String facilitatorFullName;
+  final String issuedByName;
 
   const _UnitStandardsDialog({
     required this.learner,
     required this.classID,
     required this.unitStandards,
+    required this.facilitatorFullName,
+    required this.issuedByName,
   });
 
   @override
@@ -1236,7 +1297,7 @@ class _UnitStandardsDialogState extends State<_UnitStandardsDialog> {
       // Load from server what this specific learner has already received
       final response = await http.get(
         Uri.parse(AppConfig.buildUrl(
-            'get_learner_material_status.php?classID=${widget.classID}&learnerID=${widget.learner['IDNumber']}')),
+            'get_logistics_checkbox_status.php?classID=${widget.classID}&learnerID=${widget.learner['IDNumber']}')),
       );
 
       if (response.statusCode == 200) {
@@ -1434,15 +1495,20 @@ class _UnitStandardsDialogState extends State<_UnitStandardsDialog> {
       // Prepare submission data
       Map<String, dynamic> submissionData = {
         'classID': widget.classID,
-        'learnerID': widget.learner['IDNumber'],
+        'learnerID':
+            widget.learner['LearnerID'], // Send internal LearnerID (e.g., 70)
+        'IDNumber':
+            widget.learner['IDNumber'], // Also send IDNumber for reference
         'learnerName': widget.learner['FullName'],
+        'materialType': 'Learning Material',
+        'issuedBy': widget.issuedByName,
         'selections': selectedUnitStandards,
         'quantities': unitStandardQuantities,
         'timestamp': DateTime.now().toIso8601String(),
       };
 
       final response = await http.post(
-        Uri.parse(AppConfig.buildUrl('save_learner_materials.php')),
+        Uri.parse(AppConfig.buildUrl('save_logistics_learner_materials.php')),
         headers: {'Content-Type': 'application/json'},
         body: json.encode(submissionData),
       );
@@ -1964,6 +2030,494 @@ class _UnitStandardsDialogState extends State<_UnitStandardsDialog> {
           ),
         ],
       ],
+    );
+  }
+}
+
+// PPE Dialog Widget
+class _PPEDialog extends StatefulWidget {
+  final Map<String, dynamic> learner;
+  final String classID;
+  final List<String> contiSuitSizes;
+  final List<String> bootsSizes;
+  final String facilitatorFullName;
+  final String issuedByName;
+
+  const _PPEDialog({
+    required this.learner,
+    required this.classID,
+    required this.contiSuitSizes,
+    required this.bootsSizes,
+    required this.facilitatorFullName,
+    required this.issuedByName,
+  });
+
+  @override
+  State<_PPEDialog> createState() => _PPEDialogState();
+}
+
+class _PPEDialogState extends State<_PPEDialog> {
+  String? selectedContiSuitSize;
+  int contiSuitQuantity = 0;
+  String? selectedBootsSize;
+  int bootsQuantity = 0;
+  bool isLoading = false;
+
+  final FingerprintService _fingerprintService = FingerprintService();
+  final FutronicService _futronicService = FutronicService();
+  String activeScanner = 'none';
+
+  @override
+  void initState() {
+    super.initState();
+    _detectScanner();
+    _loadExistingPPE();
+  }
+
+  Future<void> _detectScanner() async {
+    try {
+      try {
+        final isZkConnected = await _fingerprintService.isSensorConnected();
+        if (isZkConnected == true) {
+          setState(() => activeScanner = 'zkteco');
+          return;
+        }
+      } catch (e) {
+        debugPrint('ZKTeco not available: $e');
+      }
+
+      try {
+        final isFutronicConnected =
+            await _futronicService.isFutronicConnected();
+        if (isFutronicConnected == true) {
+          setState(() => activeScanner = 'futronic');
+          return;
+        }
+      } catch (e) {
+        debugPrint('Futronic not available: $e');
+      }
+
+      setState(() => activeScanner = 'none');
+    } catch (e) {
+      debugPrint('Error detecting scanner: $e');
+      setState(() => activeScanner = 'none');
+    }
+  }
+
+  Future<void> _loadExistingPPE() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+            '${AppConfig.baseUrl}/get_learner_ppe.php?learnerID=${widget.learner['LearnerID']}'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          setState(() {
+            selectedContiSuitSize = data['data']['conti_suit_size'];
+            contiSuitQuantity = data['data']['conti_suit_quantity'] ?? 0;
+            selectedBootsSize = data['data']['boots_size'];
+            bootsQuantity = data['data']['boots_quantity'] ?? 0;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading existing PPE: $e');
+    }
+  }
+
+  Future<void> _submitPPE() async {
+    if (contiSuitQuantity == 0 && bootsQuantity == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Please select at least one PPE item with quantity > 0'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (contiSuitQuantity > 0 && selectedContiSuitSize == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select Conti-Suit size'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (bootsQuantity > 0 && selectedBootsSize == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select Safety Boots size'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (activeScanner == 'none') {
+      _showError(
+          'No fingerprint scanner detected. Please connect a scanner and try again.');
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Verifying fingerprint...'),
+              ],
+            ),
+          );
+        },
+      );
+
+      final dbHelper = DatabaseHelper();
+      final db = await dbHelper.database;
+
+      final learnerData = await db.query(
+        'learnerdetails',
+        where: 'IDNumber = ?',
+        whereArgs: [widget.learner['IDNumber']],
+      );
+
+      if (learnerData.isEmpty) {
+        Navigator.pop(context);
+        _showError('Learner not found in database');
+        setState(() => isLoading = false);
+        return;
+      }
+
+      final learnerRecord = learnerData.first;
+      String? enrolledTemplate;
+
+      if (activeScanner == 'futronic') {
+        enrolledTemplate = learnerRecord['futronic_left_template'] as String? ??
+            learnerRecord['futronic_right_template'] as String?;
+      } else {
+        enrolledTemplate = learnerRecord['zkteco_left_template'] as String? ??
+            learnerRecord['zkteco_right_template'] as String?;
+      }
+
+      if (enrolledTemplate == null || enrolledTemplate.isEmpty) {
+        Navigator.pop(context);
+        _showError('No fingerprint enrolled for ${widget.learner['FullName']}');
+        setState(() => isLoading = false);
+        return;
+      }
+
+      bool verified = await _captureAndVerifyFingerprint(enrolledTemplate);
+
+      Navigator.pop(context);
+
+      if (!verified) {
+        _showError('Fingerprint verification failed. PPE not issued.');
+        setState(() => isLoading = false);
+        return;
+      }
+
+      await _savePPEToServer();
+    } catch (e) {
+      Navigator.pop(context);
+      debugPrint('Error in fingerprint verification: $e');
+      _showError('Verification error: $e');
+      setState(() => isLoading = false);
+    }
+  }
+
+  Future<bool> _captureAndVerifyFingerprint(String enrolledTemplate) async {
+    try {
+      if (activeScanner == 'futronic') {
+        final result = await _futronicService.verifyBoth(
+          hintFinger: 'left',
+          leftTemplate: enrolledTemplate,
+          rightTemplate: enrolledTemplate,
+        );
+        return result == true;
+      } else {
+        try {
+          final result =
+              await _fingerprintService.verify('left', enrolledTemplate);
+          if (result == true) return true;
+        } catch (e) {
+          debugPrint('Left finger verification failed: $e');
+        }
+
+        final result =
+            await _fingerprintService.verify('right', enrolledTemplate);
+        return result == true;
+      }
+    } catch (e) {
+      debugPrint('Error capturing fingerprint: $e');
+      return false;
+    }
+  }
+
+  Future<void> _savePPEToServer() async {
+    try {
+      final ppeData = {
+        'LearnerID': widget.learner['LearnerID'],
+        'learner_name': widget.learner['FullName'],
+        'classID': widget.classID,
+        'conti_suit_size': selectedContiSuitSize,
+        'conti_suit_quantity': contiSuitQuantity,
+        'boots_size': selectedBootsSize,
+        'boots_quantity': bootsQuantity,
+        'issued_date': DateTime.now().toIso8601String(),
+        'issuedBy': widget.issuedByName,
+      };
+
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.baseUrl}/save_learner_ppe.php'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode(ppeData),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final result = json.decode(response.body);
+        if (result['success'] == true) {
+          _showSuccess('PPE issued successfully!');
+          Navigator.pop(context, true);
+        } else {
+          _showError(result['error'] ?? 'Failed to save PPE');
+        }
+      } else {
+        _showError('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error saving PPE: $e');
+      _showError('Error saving PPE: $e');
+    } finally {
+      setState(() => isLoading = false);
+    }
+  }
+
+  void _showError(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _showSuccess(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: Colors.orange,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.security, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Issue PPE',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          widget.learner['FullName'] ?? 'Unknown',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Conti-Suit',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<String>(
+                              value: selectedContiSuitSize,
+                              decoration: const InputDecoration(
+                                labelText: 'Size',
+                                border: OutlineInputBorder(),
+                              ),
+                              items: widget.contiSuitSizes.map((size) {
+                                return DropdownMenuItem(
+                                  value: size,
+                                  child: Text(size),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setState(() => selectedContiSuitSize = value);
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<int>(
+                              value: contiSuitQuantity,
+                              decoration: const InputDecoration(
+                                labelText: 'Quantity',
+                                border: OutlineInputBorder(),
+                              ),
+                              items: List.generate(11, (index) => index)
+                                  .map((qty) {
+                                return DropdownMenuItem(
+                                  value: qty,
+                                  child: Text(qty.toString()),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setState(() => contiSuitQuantity = value ?? 0);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Safety Boots',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<String>(
+                              value: selectedBootsSize,
+                              decoration: const InputDecoration(
+                                labelText: 'Size',
+                                border: OutlineInputBorder(),
+                              ),
+                              items: widget.bootsSizes.map((size) {
+                                return DropdownMenuItem(
+                                  value: size,
+                                  child: Text(size),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setState(() => selectedBootsSize = value);
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<int>(
+                              value: bootsQuantity,
+                              decoration: const InputDecoration(
+                                labelText: 'Quantity',
+                                border: OutlineInputBorder(),
+                              ),
+                              items: List.generate(11, (index) => index)
+                                  .map((qty) {
+                                return DropdownMenuItem(
+                                  value: qty,
+                                  child: Text(qty.toString()),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setState(() => bootsQuantity = value ?? 0);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: isLoading ? null : _submitPPE,
+                  icon: const Icon(Icons.fingerprint),
+                  label: Text(
+                    activeScanner == 'none'
+                        ? 'Submit (No Scanner)'
+                        : 'Verify & Submit',
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

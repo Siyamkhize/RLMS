@@ -1,0 +1,10 @@
+# POE Path Fix - Add this to your main .htaccess file
+# This redirects POE/ requests to mobile/POE/
+
+RewriteEngine On
+
+# Redirect POE/ to mobile/POE/
+RewriteRule ^POE/(.*)$ mobile/POE/$1 [L,R=301]
+
+# Alternative: Internal rewrite (no redirect)
+# RewriteRule ^POE/(.*)$ mobile/POE/$1 [L]

@@ -17,9 +17,10 @@ import 'ModeratorPage.dart';
 import 'facilitator_fingerprint_page.dart';
 import 'finance_dashboard.dart';
 import 'logistics_dashboard.dart';
-// MONITORING SYSTEM TEMPORARILY DISABLED - BUILD ISSUE
-// import 'services/random_prompt_service.dart';
-// import 'monitoring_prompt_page.dart';
+import 'utils/global_error_handler.dart';
+import 'utils/ultimate_scanner_crash_prevention.dart';
+import 'services/random_prompt_service.dart';
+import 'monitoring_prompt_page.dart';
 
 // Define unique task names for Workmanager
 const String syncTask = "com.example.rlmss.syncTask";
@@ -160,59 +161,77 @@ void callbackDispatcher() {
 }
 
 void main() async {
+  // Initialize global error handler FIRST to catch all errors
+  GlobalErrorHandler.initialize();
+
+  // Initialize ultimate scanner crash prevention system
+  UltimateScannerCrashPrevention().initialize();
+
   // Ensure bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
 
   // DEBUG-ONLY: Allow connecting to hosts with certificate hostname mismatch (development servers)
   if (kDebugMode) {
-    HttpOverrides.global = _DevHttpOverrides(allowedHosts: {"192.168.0.73"});
+    HttpOverrides.global = _DevHttpOverrides(allowedHosts: {"192.168.68.105"});
   }
 
   // Request permissions
   await requestNotificationPermission();
   await requestIgnoreBatteryOptimization();
 
-  // Initialize Workmanager
-  Workmanager().initialize(
-    callbackDispatcher,
-    isInDebugMode: false, // Set to false for production
-  );
+  final supportsWorkmanager = !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+  if (supportsWorkmanager) {
+    // Initialize Workmanager only on supported platforms.
+    Workmanager().initialize(
+      callbackDispatcher,
+      isInDebugMode: false, // Set to false for production
+    );
+  }
 
   // Initialize notifications
   const AndroidInitializationSettings initializationSettingsAndroid =
       AndroidInitializationSettings('@mipmap/ic_launcher');
   const DarwinInitializationSettings initializationSettingsIOS =
       DarwinInitializationSettings();
+  const WindowsInitializationSettings initializationSettingsWindows =
+      WindowsInitializationSettings(
+    appName: 'rlmss',
+    appUserModelId: 'com.example.rlmss',
+    guid: 'd49b0314-ee7c-4f34-95b1-3f01f9c4e9c3',
+  );
   const InitializationSettings initializationSettings = InitializationSettings(
     android: initializationSettingsAndroid,
     iOS: initializationSettingsIOS,
+    windows: initializationSettingsWindows,
   );
   await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
   // Schedule periodic sync task (every 15 minutes)
-  Workmanager().registerPeriodicTask(
-    "sync-task-1",
-    syncTask,
-    frequency: const Duration(minutes: 15),
-    constraints: Constraints(
-      networkType: NetworkType.connected,
-      requiresBatteryNotLow: true,
-      requiresCharging: false,
-    ),
-    initialDelay: const Duration(seconds: 10),
-  );
+  if (supportsWorkmanager) {
+    Workmanager().registerPeriodicTask(
+      "sync-task-1",
+      syncTask,
+      frequency: const Duration(minutes: 15),
+      constraints: Constraints(
+        networkType: NetworkType.connected,
+        requiresBatteryNotLow: true,
+        requiresCharging: false,
+      ),
+      initialDelay: const Duration(seconds: 10),
+    );
 
-  // Schedule initial connectivity check task (runs after 2 minutes, then reschedules itself)
-  Workmanager().registerOneOffTask(
-    "connectivity-check-initial",
-    connectivityCheckTask,
-    initialDelay: const Duration(minutes: 2),
-    constraints: Constraints(
-      networkType: NetworkType.unmetered,
-      requiresBatteryNotLow: false,
-      requiresCharging: false,
-    ),
-  );
+    // Schedule initial connectivity check task (runs after 2 minutes, then reschedules itself)
+    Workmanager().registerOneOffTask(
+      "connectivity-check-initial",
+      connectivityCheckTask,
+      initialDelay: const Duration(minutes: 2),
+      constraints: Constraints(
+        networkType: NetworkType.unmetered,
+        requiresBatteryNotLow: false,
+        requiresCharging: false,
+      ),
+    );
+  }
 
   final dbHelper = DatabaseHelper();
   dbHelper.initConnectivityListener();
@@ -293,9 +312,8 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _initializeRandomPromptService() async {
     try {
       debugPrint('[MAIN] Initializing random prompt service');
-      // MONITORING SYSTEM TEMPORARILY DISABLED - BUILD ISSUE
-      // await RandomPromptService().initialize();
-      debugPrint('[MAIN] Random prompt service initialized (DISABLED)');
+      await RandomPromptService().initialize();
+      debugPrint('[MAIN] Random prompt service initialized');
     } catch (e) {
       debugPrint('[MAIN] Error initializing random prompt service: $e');
     }

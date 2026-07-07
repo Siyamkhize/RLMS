@@ -1,10 +1,10 @@
 @echo off
 echo ========================================
-echo  Building APK with IP: 192.168.68.113
-echo ========================================
+echo  Building APK with IP: 192.168.68.112
+========================================
 echo.
 
-cd /d C:\temp\rlmss
+cd /d C:\projects\rlmss
 
 echo Cleaning previous build...
 call flutter clean
@@ -25,11 +25,11 @@ if exist "build\app\outputs\flutter-apk\app-debug.apk" (
     echo ========================================
     echo.
     echo APK Location: build\app\outputs\flutter-apk\app-debug.apk
-    echo IP Address: 192.168.68.113:8080
+    echo IP Address: 192.168.68.112:8080
     echo.
-    copy "build\app\outputs\flutter-apk\app-debug.apk" "app-debug-192.168.68.113.apk"
+    copy "build\app\outputs\flutter-apk\app-debug.apk" "app-debug-192.168.68.112.apk"
     echo.
-    echo APK also copied to: app-debug-192.168.68.113.apk
+    echo APK also copied to: app-debug-192.168.68.112.apk
     echo.
 ) else (
     echo.

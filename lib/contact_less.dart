@@ -74,7 +74,7 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
     try {
       final urls = [
         'http://10.0.2.2:5001', // Emulator
-        'http://192.168.0.53:5001', // Local network
+        'http://192.168.68.105:5001', // Local network (updated)
         'http://localhost:5001', // Localhost
         'http://127.0.0.1:5001', // Localhost IP
       ];

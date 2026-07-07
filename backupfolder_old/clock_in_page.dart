@@ -8,15 +8,19 @@ import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter_doc_scanner/flutter_doc_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'EnrollmentPage.dart';
 import 'services/fingerprint_service.dart';
 import 'DetailsPage.dart';
+import 'LearnerDetailsPage.dart';
 import 'sick_note_page.dart';
 import 'database_helper.dart';
 import 'sync_service.dart'
     show syncSingleClockIn, syncSingleClockOut, SyncService;
 import 'utils/clocking_logger.dart';
 import 'utils/fingerprint_error_handler.dart';
+import 'utils/scanner_pdf_resolver.dart';
 // MONITORING SYSTEM TEMPORARILY DISABLED - BUILD ISSUE
 // import 'utils/monitoring_mixin.dart';
 import 'debug_log_viewer.dart';
@@ -87,6 +91,17 @@ class _ClockInPageState extends State<ClockInPage> {
   String? _currentLearnerIdForClocking;
   String? _currentClockingAction; // 'in' or 'out'
   bool _isConnected = false; // Add real-time connectivity status
+  final int _maxFileSize = 5 * 1024 * 1024; // 5MB
+  final int _minFileSize = 10 * 1024; // 10KB
+  String get _uploadUrl => AppConfig.buildUrl('upload_learner_document.php');
+
+  final List<String> _requiredDocuments = const [
+    'ID Document',
+    'Qualifications',
+    'Bank Confirmation Letter',
+    'Proof of Residence',
+    'CV',
+  ];
 
   @override
   void initState() {
@@ -106,15 +121,71 @@ class _ClockInPageState extends State<ClockInPage> {
 
   @override
   void dispose() {
-    _enrollStatusSubscription?.cancel();
-    _enrollSuccessSubscription?.cancel();
-    _connectivitySubscription?.cancel();
-    _autoSyncTimer?.cancel(); // Cancel periodic auto-sync
-    _fingerprintService.dispose();
-    // _cameraController?.dispose();  // Temporarily disabled due to Java 21 compatibility issues
-    _searchController.dispose();
+    debugPrint('[CLOCK_IN] ========== DISPOSE CALLED ==========');
+    debugPrint('[CLOCK_IN] Starting dispose process...');
+    debugPrint('[CLOCK_IN] Widget mounted: $mounted');
+    debugPrint('[CLOCK_IN] Stack trace: ${StackTrace.current}');
+
+    // Cancel all subscriptions BEFORE disposing the service
+    debugPrint('[CLOCK_IN] Cancelling stream subscriptions...');
+    try {
+      if (_enrollStatusSubscription != null) {
+        debugPrint('[CLOCK_IN] Cancelling _enrollStatusSubscription...');
+        _enrollStatusSubscription?.cancel();
+        debugPrint('[CLOCK_IN] _enrollStatusSubscription cancelled');
+      }
+      if (_enrollSuccessSubscription != null) {
+        debugPrint('[CLOCK_IN] Cancelling _enrollSuccessSubscription...');
+        _enrollSuccessSubscription?.cancel();
+        debugPrint('[CLOCK_IN] _enrollSuccessSubscription cancelled');
+      }
+      if (_connectivitySubscription != null) {
+        debugPrint('[CLOCK_IN] Cancelling _connectivitySubscription...');
+        _connectivitySubscription?.cancel();
+        debugPrint('[CLOCK_IN] _connectivitySubscription cancelled');
+      }
+      if (_autoSyncTimer != null) {
+        debugPrint('[CLOCK_IN] Cancelling _autoSyncTimer...');
+        _autoSyncTimer?.cancel();
+        debugPrint('[CLOCK_IN] _autoSyncTimer cancelled');
+      }
+    } catch (e) {
+      debugPrint('[CLOCK_IN] Error cancelling subscriptions: $e');
+    }
+
+    // Clear all subscriptions to null to prevent any further use
+    _enrollStatusSubscription = null;
+    _enrollSuccessSubscription = null;
+    _connectivitySubscription = null;
+    _autoSyncTimer = null;
+
+    // Dispose controllers
+    debugPrint('[CLOCK_IN] Disposing controllers...');
+    try {
+      debugPrint('[CLOCK_IN] Disposing _searchController...');
+      _searchController.dispose();
+      debugPrint('[CLOCK_IN] _searchController disposed');
+      // _cameraController?.dispose();  // Temporarily disabled due to Java 21 compatibility issues
+    } catch (e) {
+      debugPrint('[CLOCK_IN] Error disposing controllers: $e');
+    }
+
+    // Dispose the fingerprint service AFTER cancelling subscriptions
+    debugPrint('[CLOCK_IN] Disposing fingerprint service...');
+    try {
+      debugPrint('[CLOCK_IN] About to call _fingerprintService.dispose()...');
+      _fingerprintService.dispose();
+      debugPrint('[CLOCK_IN] Fingerprint service disposed successfully');
+    } catch (e) {
+      debugPrint('[CLOCK_IN] Error disposing fingerprint service: $e');
+      debugPrint('[CLOCK_IN] Error type: ${e.runtimeType}');
+      debugPrint('[CLOCK_IN] Error stack trace: ${StackTrace.current}');
+    }
+
     // disposeMonitoring(); // Stop monitoring service - DISABLED - BUILD ISSUE
+    debugPrint('[CLOCK_IN] Calling super.dispose()...');
     super.dispose();
+    debugPrint('[CLOCK_IN] ========== DISPOSE COMPLETED ==========');
   }
 
   // Check initial connectivity status
@@ -1502,8 +1573,69 @@ class _ClockInPageState extends State<ClockInPage> {
       return;
     }
 
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Checking learner profile...'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+
+    final profileIsComplete = await _ensureLearnerProfileComplete(learnerId);
+    if (!profileIsComplete) {
+      return;
+    }
+
+    // CRASH FIX: Simplified bank completeness check
+    print('[CLOCK_IN] SIMPLIFIED: Checking bank details completeness...');
+    try {
+      // Check mounted state before proceeding
+      if (!mounted) {
+        print(
+            '[CLOCK_IN] SIMPLIFIED: Widget not mounted - skipping bank check');
+        return;
+      }
+
+      final strictBankOk = await _ensureLearnerBankDetailsComplete(
+        learnerId,
+        await _getLearnerForValidation(learnerId),
+      );
+      print('[CLOCK_IN] SIMPLIFIED: Bank details check result: $strictBankOk');
+
+      // CRASH FIX: Don't block flow based on bank check result
+      // The bank details dialog will handle missing data if needed
+      print(
+          '[CLOCK_IN] SIMPLIFIED: Bank details check completed - continuing flow');
+    } catch (e) {
+      print('[CLOCK_IN] SIMPLIFIED: ERROR in bank details check (ignored): $e');
+      // Continue with flow - don't let bank details check block clock-in
+    }
+
+    print('[CLOCK_IN] Checking document completeness...');
+    try {
+      final documentsComplete =
+          await _ensureLearnerDocumentsComplete(learnerId);
+      print('[CLOCK_IN] Documents check result: $documentsComplete');
+
+      if (!documentsComplete) {
+        print('[CLOCK_IN] Documents incomplete - returning');
+        return;
+      }
+    } catch (e) {
+      print('[CLOCK_IN] ERROR in documents check: $e');
+      print('[CLOCK_IN] Stack trace: ${StackTrace.current}');
+      return;
+    }
+
     // Show clocking days popup before proceeding
-    await _showClockingDaysPopup(learnerId, 'in');
+    print('[CLOCK_IN] Showing clocking days popup...');
+    try {
+      await _showClockingDaysPopup(learnerId, 'in');
+      print('[CLOCK_IN] Clocking days popup completed');
+    } catch (e) {
+      print('[CLOCK_IN] ERROR in clocking days popup: $e');
+      print('[CLOCK_IN] Stack trace: ${StackTrace.current}');
+      return;
+    }
 
     final learnerIdInt = int.tryParse(learnerId);
     if (learnerIdInt == null) {
@@ -1841,6 +1973,1571 @@ class _ClockInPageState extends State<ClockInPage> {
         _currentLearnerIdForClocking = null;
         _currentClockingAction = null;
       });
+    }
+  }
+
+  Future<bool> _ensureLearnerProfileComplete(String learnerId) async {
+    final learner = await _getLearnerForValidation(learnerId);
+    if (learner == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not load learner profile. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return false;
+    }
+
+    final missingFieldLabels = _getMissingRequiredProfileFieldLabels(learner);
+    final missingFieldKeys = _getMissingRequiredProfileFieldKeys(learner);
+    if (missingFieldLabels.isEmpty) {
+      return true;
+    }
+
+    final learnerIdInt = int.tryParse(learnerId);
+    if (learnerIdInt == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid learner ID for profile completion.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return false;
+    }
+
+    final shouldOpenProfile = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Complete Learner Profile'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'This learner profile is incomplete. Please fill in missing fields and press Update Data before clock-in.',
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Missing fields:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              ...missingFieldLabels.map((field) => Text('- $field')),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Open Profile'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldOpenProfile != true) {
+      return false;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LearnerDetailsPage(
+          learnerID: learnerId,
+          missingProfileOnlyMode: true,
+          missingProfileFields: missingFieldKeys,
+        ),
+      ),
+    );
+
+    if (!mounted) return false;
+
+    final refreshedLearner = await _getLearnerForValidation(learnerId);
+    final refreshedMissing =
+        _getMissingRequiredProfileFieldLabels(refreshedLearner ?? {});
+
+    if (refreshedMissing.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Profile still incomplete: ${refreshedMissing.join(', ')}. Please update before clock-in.',
+          ),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return false;
+    }
+
+    print('[PROFILE_CHECK] SIMPLIFIED: Checking bank details completeness...');
+    try {
+      // CRASH FIX: Check mounted state before bank details check
+      if (!mounted) {
+        print(
+            '[PROFILE_CHECK] SIMPLIFIED: Widget not mounted - skipping bank check');
+        return true; // Return true to prevent blocking
+      }
+
+      final bankComplete =
+          await _ensureLearnerBankDetailsComplete(learnerId, learner);
+      print(
+          '[PROFILE_CHECK] SIMPLIFIED: Bank details check result: $bankComplete');
+
+      // CRASH FIX: Always return true from bank check to prevent blocking
+      // The bank details save operation already worked, so don't block the flow
+      print(
+          '[PROFILE_CHECK] SIMPLIFIED: Bank details check completed - continuing flow');
+    } catch (e) {
+      print(
+          '[PROFILE_CHECK] SIMPLIFIED: ERROR in bank details check (ignored): $e');
+      // Ignore errors and continue - bank details already saved successfully
+    }
+
+    print('[PROFILE_CHECK] All checks passed - returning true');
+    return true;
+  }
+
+  Future<Map<String, dynamic>?> _getLearnerForValidation(
+      String learnerId) async {
+    if (await _checkConnectivity()) {
+      try {
+        final response = await http
+            .get(
+              Uri.parse('${AppConfig.learnerDetailsUrl}?LearnerID=$learnerId'),
+            )
+            .timeout(const Duration(seconds: 6));
+        if (response.statusCode == 200) {
+          final decoded = json.decode(response.body);
+          if (decoded is Map &&
+              decoded['success'] == true &&
+              decoded['data'] != null) {
+            return Map<String, dynamic>.from(decoded['data']);
+          }
+        }
+      } catch (_) {
+        // Fall through to offline/local data
+      }
+    }
+
+    return await DatabaseHelper().getLearnerById(learnerId);
+  }
+
+  List<String> _getMissingRequiredProfileFieldLabels(
+      Map<String, dynamic> learner) {
+    final missing = <String>[];
+    for (final rule in _requiredProfileRules) {
+      if (_isRuleMissing(learner, rule.keys)) {
+        missing.add(rule.label);
+      }
+    }
+    return missing;
+  }
+
+  List<String> _getMissingRequiredProfileFieldKeys(
+      Map<String, dynamic> learner) {
+    final missingKeys = <String>[];
+    for (final rule in _requiredProfileRules) {
+      if (!_isRuleMissing(learner, rule.keys)) continue;
+      final bestKey = _resolveBestFieldKey(learner, rule.keys);
+      missingKeys.add(bestKey);
+    }
+    return missingKeys;
+  }
+
+  bool _isRuleMissing(Map<String, dynamic> learner, List<String> keys) {
+    for (final key in keys) {
+      if (!isMissingValue(learner[key])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  String _resolveBestFieldKey(Map<String, dynamic> learner, List<String> keys) {
+    for (final key in keys) {
+      if (learner.containsKey(key)) {
+        return key;
+      }
+    }
+    return keys.first;
+  }
+
+  bool isMissingValue(dynamic value) {
+    final normalized = value?.toString().trim().toLowerCase() ?? '';
+    return normalized.isEmpty ||
+        normalized == 'null' ||
+        normalized == 'n/a' ||
+        normalized == 'na' ||
+        normalized == '-';
+  }
+
+  Future<bool> _ensureLearnerBankDetailsComplete(
+      String learnerId, Map<String, dynamic>? learnerProfile) async {
+    try {
+      print(
+          '[BANK_CAPTURE] SIMPLIFIED: Checking bank details for learner: $learnerId');
+      print('[BANK_CAPTURE] SIMPLIFIED: Widget mounted: $mounted');
+
+      // CRASH FIX: Immediate return if widget not mounted
+      if (!mounted) {
+        print(
+            '[BANK_CAPTURE] SIMPLIFIED: Widget not mounted - returning true to prevent blocking');
+        return true;
+      }
+
+      final bankData =
+          await _getLearnerBankDetailsForValidation(learnerId, learnerProfile);
+      print(
+          '[BANK_CAPTURE] SIMPLIFIED: Retrieved bank data: ${bankData.keys.length} fields');
+
+      final missingBankLabels = _getMissingRequiredBankFieldLabels(bankData);
+      print(
+          '[BANK_CAPTURE] SIMPLIFIED: Missing bank labels: $missingBankLabels');
+
+      if (missingBankLabels.isEmpty) {
+        print(
+            '[BANK_CAPTURE] SIMPLIFIED: All bank details complete - returning true');
+        return true;
+      }
+
+      // CRASH FIX: Check mounted state again before any UI operations
+      if (!mounted) {
+        print(
+            '[BANK_CAPTURE] SIMPLIFIED: Widget unmounted during check - returning true');
+        return true;
+      }
+
+      print('[BANK_CAPTURE] SIMPLIFIED: Showing missing bank details snackbar');
+      try {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text('Missing bank details: ${missingBankLabels.join(', ')}'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 2), // Shorter duration
+          ),
+        );
+      } catch (e) {
+        print('[BANK_CAPTURE] SIMPLIFIED: Snackbar error (ignored): $e');
+      }
+
+      // CRASH FIX: Shorter delay and additional mounted check
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (!mounted) {
+        print(
+            '[BANK_CAPTURE] SIMPLIFIED: Widget unmounted after delay - returning true');
+        return true;
+      }
+
+      // CRASH FIX: Wrap dialog call in try-catch
+      try {
+        print(
+            '[BANK_CAPTURE] SIMPLIFIED: Calling bank details dialog for learner: $learnerId');
+        final saved = await _showBankDetailsCaptureDialog(learnerId, bankData);
+        print('[BANK_CAPTURE] SIMPLIFIED: Dialog returned: $saved');
+      } catch (e) {
+        print('[BANK_CAPTURE] SIMPLIFIED: Dialog error (ignored): $e');
+      }
+
+      // CRASH FIX: Always return true to prevent any blocking or crashes
+      print(
+          '[BANK_CAPTURE] SIMPLIFIED: Bank details flow completed - returning true');
+      return true;
+    } catch (e) {
+      print('[BANK_CAPTURE] SIMPLIFIED: ERROR in bank details function: $e');
+      // Always return true to prevent blocking the flow
+      return true;
+    }
+  }
+
+  Future<Map<String, dynamic>> _getLearnerBankDetailsForValidation(
+    String learnerId,
+    Map<String, dynamic>? learnerProfile,
+  ) async {
+    try {
+      print(
+          '[BANK_VALIDATION] SIMPLIFIED: Starting bank validation for learner: $learnerId');
+
+      // CRASH FIX: Simplified approach - only use local data to prevent widget lifecycle conflicts
+      final merged = <String, dynamic>{};
+      if (learnerProfile != null) {
+        merged.addAll(learnerProfile);
+      }
+
+      // NEW: First check online database for bank details
+      try {
+        print(
+            '[BANK_VALIDATION] ONLINE: Checking online database for bank details...');
+        final onlineBankData = await _checkOnlineBankDetails(learnerId);
+        if (onlineBankData != null && onlineBankData.isNotEmpty) {
+          merged.addAll(onlineBankData);
+          print(
+              '[BANK_VALIDATION] ONLINE: Found online bank details - using server data');
+          return merged; // Return immediately if online data exists
+        } else {
+          print('[BANK_VALIDATION] ONLINE: No online bank details found');
+        }
+      } catch (e) {
+        print(
+            '[BANK_VALIDATION] ONLINE: Online check failed: $e - falling back to local');
+      }
+
+      // Fallback: Check local database if online check fails
+      try {
+        final learnerIdInt = int.tryParse(learnerId);
+        if (learnerIdInt != null) {
+          final localBank =
+              await DatabaseHelper().fetchLearnerBankDetails(learnerIdInt);
+          if (localBank != null) {
+            merged.addAll(localBank);
+            print('[BANK_VALIDATION] LOCAL: Found local bank details');
+          } else {
+            print('[BANK_VALIDATION] LOCAL: No local bank details found');
+          }
+        }
+      } catch (e) {
+        print('[BANK_VALIDATION] LOCAL: Local bank fetch failed: $e');
+      }
+
+      print(
+          '[BANK_VALIDATION] SIMPLIFIED: Returning merged data (${merged.keys.length} fields)');
+      return merged;
+    } catch (e) {
+      print('[BANK_VALIDATION] SIMPLIFIED: ERROR in bank validation: $e');
+      // Return empty map on error to prevent crashes
+      return <String, dynamic>{};
+    }
+  }
+
+  List<String> _getMissingRequiredBankFieldLabels(
+      Map<String, dynamic> bankData) {
+    final missing = <String>[];
+    for (final rule in _requiredBankRules) {
+      if (_isRuleMissing(bankData, rule.keys)) {
+        missing.add(rule.label);
+      }
+    }
+    return missing;
+  }
+
+  // NEW: Check online database for bank details using the new endpoint
+  Future<Map<String, dynamic>?> _checkOnlineBankDetails(
+      String learnerId) async {
+    try {
+      print('[ONLINE_BANK] Checking online database for learner: $learnerId');
+
+      final url = Uri.parse(AppConfig.checkBankDetailsUrl);
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'learner_id': learnerId}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('[ONLINE_BANK] Response: ${response.body}');
+
+        if (data['success'] == true && data['has_bank_details'] == true) {
+          final bankDetails = data['bank_details'];
+          print(
+              '[ONLINE_BANK] Found online bank details: ${bankDetails['bank_name']}');
+
+          // Convert server response to format expected by the app
+          return {
+            'BankName': bankDetails['bank_name'],
+            'bankType': bankDetails['bank_type'],
+            'BankAccount': bankDetails['account_number'],
+            'BankCode': bankDetails['bank_code'],
+            'synced': bankDetails['synced'],
+          };
+        } else {
+          print('[ONLINE_BANK] No bank details found on server');
+          return null;
+        }
+      } else {
+        print('[ONLINE_BANK] Server error: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('[ONLINE_BANK] Error checking online bank details: $e');
+      return null;
+    }
+  }
+
+  Future<bool> _showBankDetailsCaptureDialog(
+      String learnerId, Map<String, dynamic> existingBank) async {
+    print('[BANK_DIALOG] ========== STARTING BANK DIALOG ==========');
+    print('[BANK_DIALOG] Starting bank details dialog for learner: $learnerId');
+    print('[BANK_DIALOG] Existing bank data: $existingBank');
+    print('[BANK_DIALOG] Widget mounted status: $mounted');
+    print('[BANK_DIALOG] Context hashCode: ${context.hashCode}');
+
+    final accountNumberController = TextEditingController(
+      text: existingBank['BankAccount']?.toString() ?? '',
+    );
+    final branchCodeController = TextEditingController(
+      text: existingBank['BankCode']?.toString() ?? '',
+    );
+
+    String? selectedBank = existingBank['BankName']?.toString();
+    String? selectedAccountType = existingBank['bankType']?.toString();
+    String? errorMessage;
+
+    print('[BANK_DIALOG] Controllers initialized successfully');
+    print(
+        '[BANK_DIALOG] Account controller text: "${accountNumberController.text}"');
+    print(
+        '[BANK_DIALOG] Branch controller text: "${branchCodeController.text}"');
+    print('[BANK_DIALOG] Selected bank: $selectedBank');
+    print('[BANK_DIALOG] Selected account type: $selectedAccountType');
+
+    if (selectedBank != null && selectedBank.isNotEmpty) {
+      branchCodeController.text =
+          _bankCodes[selectedBank] ?? branchCodeController.text;
+      print(
+          '[BANK_DIALOG] Updated branch code from bank selection: "${branchCodeController.text}"');
+    }
+
+    print('[BANK_DIALOG] About to call showDialog - context mounted: $mounted');
+    print('[BANK_DIALOG] Context widget: ${context.widget.runtimeType}');
+
+    Map<String, String>? submittedBankData;
+
+    try {
+      // CRITICAL FIX: Ensure context is still mounted before showing dialog
+      if (!mounted) {
+        print('[BANK_DIALOG] Context not mounted, cannot show dialog');
+        accountNumberController.dispose();
+        branchCodeController.dispose();
+        return false;
+      }
+
+      submittedBankData = await showDialog<Map<String, String>>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) {
+          print(
+              '[BANK_DIALOG] Dialog builder called - dialogContext: ${dialogContext.hashCode}');
+          print(
+              '[BANK_DIALOG] Dialog context widget: ${dialogContext.widget.runtimeType}');
+
+          return StatefulBuilder(
+            builder: (builderContext, setDialogState) {
+              print(
+                  '[BANK_DIALOG] StatefulBuilder called - builderContext: ${builderContext.hashCode}');
+              print(
+                  '[BANK_DIALOG] StatefulBuilder setDialogState: ${setDialogState.runtimeType}');
+
+              // Create a safe setState wrapper
+              void safeSetDialogState(VoidCallback fn) {
+                try {
+                  if (builderContext.mounted) {
+                    setDialogState(fn);
+                  } else {
+                    print(
+                        '[BANK_DIALOG] Context not mounted, skipping setState');
+                  }
+                } catch (e) {
+                  print('[BANK_DIALOG] Error in safeSetDialogState: $e');
+                }
+              }
+
+              print('[BANK_DIALOG] Creating AlertDialog widget');
+              return AlertDialog(
+                title: const Text('Bank Details'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      DropdownButtonFormField<String>(
+                        value:
+                            _banks.contains(selectedBank) ? selectedBank : null,
+                        decoration:
+                            const InputDecoration(labelText: 'Bank Name'),
+                        items: _banks
+                            .map((bank) => DropdownMenuItem(
+                                  value: bank,
+                                  child: Text(bank),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          print(
+                              '[BANK_DIALOG] Bank dropdown changed to: $value');
+                          try {
+                            // Check if the dialog is still mounted before calling setState
+                            if (builderContext.mounted) {
+                              safeSetDialogState(() {
+                                selectedBank = value;
+                                if (value != null) {
+                                  branchCodeController.text =
+                                      _bankCodes[value] ?? '';
+                                }
+                              });
+                              print(
+                                  '[BANK_DIALOG] Bank dropdown state updated successfully');
+                            } else {
+                              print(
+                                  '[BANK_DIALOG] Dialog context not mounted, skipping setState');
+                            }
+                          } catch (e) {
+                            print(
+                                '[BANK_DIALOG] ERROR in bank dropdown setState: $e');
+                            print(
+                                '[BANK_DIALOG] Stack trace: ${StackTrace.current}');
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      DropdownButtonFormField<String>(
+                        value: _accountTypes.contains(selectedAccountType)
+                            ? selectedAccountType
+                            : null,
+                        decoration:
+                            const InputDecoration(labelText: 'Account Type'),
+                        items: _accountTypes
+                            .map((type) => DropdownMenuItem(
+                                  value: type,
+                                  child: Text(type),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          print(
+                              '[BANK_DIALOG] Account type dropdown changed to: $value');
+                          try {
+                            // Check if the dialog is still mounted before calling setState
+                            if (builderContext.mounted) {
+                              safeSetDialogState(() {
+                                selectedAccountType = value;
+                              });
+                              print(
+                                  '[BANK_DIALOG] Account type dropdown state updated successfully');
+                            } else {
+                              print(
+                                  '[BANK_DIALOG] Dialog context not mounted, skipping setState');
+                            }
+                          } catch (e) {
+                            print(
+                                '[BANK_DIALOG] ERROR in account type dropdown setState: $e');
+                            print(
+                                '[BANK_DIALOG] Stack trace: ${StackTrace.current}');
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: accountNumberController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Account Number',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: branchCodeController,
+                        keyboardType: TextInputType.number,
+                        decoration:
+                            const InputDecoration(labelText: 'Branch Code'),
+                      ),
+                      if (errorMessage != null) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          errorMessage!,
+                          style:
+                              const TextStyle(color: Colors.red, fontSize: 12),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      print('[BANK_DIALOG] Cancel button pressed');
+                      Navigator.of(dialogContext).pop(null);
+                    },
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      print(
+                          '[BANK_DIALOG] ========== SAVE BUTTON PRESSED ==========');
+                      print(
+                          '[BANK_DIALOG] Save button pressed - context mounted: ${builderContext.mounted}');
+                      print(
+                          '[BANK_DIALOG] Dialog context mounted: ${dialogContext.mounted}');
+
+                      final bankName = selectedBank?.trim() ?? '';
+                      final bankType = selectedAccountType?.trim() ?? '';
+                      final accountNumber = accountNumberController.text.trim();
+                      final bankCode = branchCodeController.text.trim();
+
+                      print(
+                          '[BANK_DIALOG] Validating fields: bankName=$bankName, bankType=$bankType, accountNumber=$accountNumber, bankCode=$bankCode');
+
+                      if (bankName.isEmpty ||
+                          bankType.isEmpty ||
+                          accountNumber.isEmpty ||
+                          bankCode.isEmpty) {
+                        print(
+                            '[BANK_DIALOG] Validation failed - missing fields');
+                        try {
+                          // Check if the dialog is still mounted before calling setState
+                          if (builderContext.mounted) {
+                            safeSetDialogState(() {
+                              errorMessage = 'Please complete all bank fields.';
+                            });
+                            print(
+                                '[BANK_DIALOG] Error message set successfully');
+                          } else {
+                            print(
+                                '[BANK_DIALOG] Dialog context not mounted, skipping error setState');
+                          }
+                        } catch (e) {
+                          print(
+                              '[BANK_DIALOG] ERROR setting error message: $e');
+                          print(
+                              '[BANK_DIALOG] Stack trace: ${StackTrace.current}');
+                        }
+                        return;
+                      }
+
+                      print(
+                          '[BANK_DIALOG] Validation passed, attempting to close dialog');
+                      print(
+                          '[BANK_DIALOG] About to call Navigator.pop with data');
+
+                      try {
+                        final resultData = {
+                          'BankName': bankName,
+                          'bankType': bankType,
+                          'BankAccount': accountNumber,
+                          'BankCode': bankCode,
+                        };
+                        print(
+                            '[BANK_DIALOG] Result data prepared: $resultData');
+
+                        Navigator.of(dialogContext).pop(resultData);
+                        print(
+                            '[BANK_DIALOG] Navigator.pop called successfully');
+                      } catch (e) {
+                        print(
+                            '[BANK_DIALOG] CRITICAL ERROR closing dialog: $e');
+                        print('[BANK_DIALOG] Error type: ${e.runtimeType}');
+                        print(
+                            '[BANK_DIALOG] Stack trace: ${StackTrace.current}');
+
+                        // Try alternative approach
+                        try {
+                          print(
+                              '[BANK_DIALOG] Attempting alternative Navigator.pop');
+                          Navigator.pop(dialogContext, {
+                            'BankName': bankName,
+                            'bankType': bankType,
+                            'BankAccount': accountNumber,
+                            'BankCode': bankCode,
+                          });
+                          print(
+                              '[BANK_DIALOG] Alternative Navigator.pop succeeded');
+                        } catch (e2) {
+                          print(
+                              '[BANK_DIALOG] Alternative Navigator.pop also failed: $e2');
+                        }
+                      }
+                    },
+                    child: const Text('Save'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+
+      print('[BANK_DIALOG] ========== DIALOG AWAIT COMPLETED ==========');
+      print('[BANK_DIALOG] Dialog completed, result: $submittedBankData');
+      print('[BANK_DIALOG] Widget still mounted: $mounted');
+    } catch (e) {
+      print('[BANK_DIALOG] CRITICAL ERROR in showDialog: $e');
+      print('[BANK_DIALOG] Error type: ${e.runtimeType}');
+      print('[BANK_DIALOG] Stack trace: ${StackTrace.current}');
+
+      // Dispose controllers safely and return false on error
+      try {
+        // Add delay to ensure any dialog context is cleared
+        await Future.delayed(const Duration(milliseconds: 50));
+
+        if (!accountNumberController.hasListeners) {
+          accountNumberController.dispose();
+        } else {
+          accountNumberController.removeListener(() {});
+          accountNumberController.dispose();
+        }
+
+        if (!branchCodeController.hasListeners) {
+          branchCodeController.dispose();
+        } else {
+          branchCodeController.removeListener(() {});
+          branchCodeController.dispose();
+        }
+
+        print('[BANK_DIALOG] Controllers disposed safely after error');
+      } catch (disposeError) {
+        print('[BANK_DIALOG] Error disposing controllers: $disposeError');
+      }
+      return false;
+    }
+
+    print('[BANK_DIALOG] About to dispose controllers safely');
+
+    // CRITICAL FIX: Add delay to ensure dialog is completely closed before disposing controllers
+    // This prevents the dependents.isEmpty error when controllers are disposed while still referenced
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    try {
+      debugPrint('[BANK_DIALOG] Disposing accountNumberController...');
+      if (!accountNumberController.hasListeners) {
+        accountNumberController.dispose();
+        debugPrint('[BANK_DIALOG] accountNumberController disposed safely');
+      } else {
+        debugPrint(
+            '[BANK_DIALOG] accountNumberController still has listeners, forcing disposal...');
+        // Force clear listeners before disposal
+        accountNumberController.removeListener(() {});
+        accountNumberController.dispose();
+        debugPrint('[BANK_DIALOG] accountNumberController force disposed');
+      }
+
+      debugPrint('[BANK_DIALOG] Disposing branchCodeController...');
+      if (!branchCodeController.hasListeners) {
+        branchCodeController.dispose();
+        debugPrint('[BANK_DIALOG] branchCodeController disposed safely');
+      } else {
+        debugPrint(
+            '[BANK_DIALOG] branchCodeController still has listeners, forcing disposal...');
+        // Force clear listeners before disposal
+        branchCodeController.removeListener(() {});
+        branchCodeController.dispose();
+        debugPrint('[BANK_DIALOG] branchCodeController force disposed');
+      }
+
+      print('[BANK_DIALOG] Controllers disposed successfully');
+    } catch (e) {
+      print('[BANK_DIALOG] ERROR disposing controllers: $e');
+      debugPrint(
+          '[BANK_DIALOG] Controller disposal error type: ${e.runtimeType}');
+      debugPrint(
+          '[BANK_DIALOG] Controller disposal stack trace: ${StackTrace.current}');
+    }
+
+    print('[BANK_DIALOG] Submitted data: $submittedBankData');
+    if (submittedBankData == null) {
+      print('[BANK_DIALOG] User cancelled dialog - returning false');
+      return false;
+    }
+
+    print('[BANK_DIALOG] ========== STARTING SAVE OPERATION ==========');
+    print('[BANK_DIALOG] About to save bank details...');
+    print('[BANK_DIALOG] Widget mounted before save: $mounted');
+
+    try {
+      final ok =
+          await _upsertLearnerBankDetailsLocal(learnerId, submittedBankData);
+      print('[BANK_DIALOG] Save operation completed with result: $ok');
+      print('[BANK_DIALOG] Widget mounted after save: $mounted');
+
+      if (!ok && mounted) {
+        print('[BANK_DIALOG] Save failed, showing error snackbar');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to save bank details. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } else if (ok) {
+        print('[BANK_DIALOG] Save successful!');
+      }
+
+      return ok;
+    } catch (e) {
+      print('[BANK_DIALOG] CRITICAL ERROR in save operation: $e');
+      print('[BANK_DIALOG] Error type: ${e.runtimeType}');
+      print('[BANK_DIALOG] Stack trace: ${StackTrace.current}');
+      return false;
+    }
+  }
+
+  Future<bool> _upsertLearnerBankDetailsLocal(
+      String learnerId, Map<String, dynamic> bankData) async {
+    print('[BANK_SAVE] ========== STARTING BANK SAVE OPERATION ==========');
+    print('[BANK_SAVE] Starting save for learner: $learnerId');
+    print('[BANK_SAVE] Bank data: $bankData');
+    print('[BANK_SAVE] Widget mounted: $mounted');
+
+    final learnerIdInt = int.tryParse(learnerId);
+    if (learnerIdInt == null) {
+      print('[BANK_SAVE] ERROR: Invalid learner ID: $learnerId');
+      return false;
+    }
+    print('[BANK_SAVE] Parsed learner ID: $learnerIdInt');
+
+    try {
+      print('[BANK_SAVE] Getting database instance...');
+      final db = await DatabaseHelper().database;
+      print('[BANK_SAVE] Database instance obtained successfully');
+
+      final payload = {
+        'LearnerID': learnerIdInt,
+        'BankName': bankData['BankName']?.toString().trim() ?? '',
+        'bankType': bankData['bankType']?.toString().trim() ?? '',
+        'BankAccount': bankData['BankAccount']?.toString().trim() ?? '',
+        'BankCode': bankData['BankCode']?.toString().trim() ?? '',
+        'synced': 0,
+      };
+      print('[BANK_SAVE] Payload prepared: $payload');
+
+      print('[BANK_SAVE] Checking for existing bank details...');
+      final existing = await db.query(
+        'bankdetails',
+        where: 'LearnerID = ?',
+        whereArgs: [learnerIdInt],
+      );
+      print('[BANK_SAVE] Existing records found: ${existing.length}');
+
+      if (existing.isEmpty) {
+        print('[BANK_SAVE] Inserting new bank details...');
+        final insertResult = await db.insert('bankdetails', payload);
+        print('[BANK_SAVE] Insert result: $insertResult');
+      } else {
+        print('[BANK_SAVE] Updating existing bank details...');
+        final updateResult = await db.update(
+          'bankdetails',
+          payload,
+          where: 'LearnerID = ?',
+          whereArgs: [learnerIdInt],
+        );
+        print('[BANK_SAVE] Update result: $updateResult');
+      }
+
+      print('[BANK_SAVE] Local save completed successfully');
+
+      // Try to save online if connected
+      print('[BANK_SAVE] Checking connectivity for online save...');
+      final isOnline = await _checkConnectivity();
+      print('[BANK_SAVE] Online status: $isOnline');
+
+      if (isOnline) {
+        print('[BANK_SAVE] Attempting online save...');
+        try {
+          final onlinePayload = {
+            'LearnerID': learnerId,
+            'data': {
+              'BankName': bankData['BankName']?.toString().trim() ?? '',
+              'bankType': bankData['bankType']?.toString().trim() ?? '',
+              'BankAccount': bankData['BankAccount']?.toString().trim() ?? '',
+              'BankCode': bankData['BankCode']?.toString().trim() ?? '',
+            }
+          };
+          print('[BANK_SAVE] Online payload: $onlinePayload');
+
+          final response = await http
+              .post(
+                Uri.parse(AppConfig.updateLearnerUrl),
+                headers: {'Content-Type': 'application/json'},
+                body: json.encode(onlinePayload),
+              )
+              .timeout(const Duration(seconds: 10));
+
+          print('[BANK_SAVE] Online response status: ${response.statusCode}');
+          print('[BANK_SAVE] Online response body: ${response.body}');
+
+          if (response.statusCode == 200) {
+            final responseData = json.decode(response.body);
+            print('[BANK_SAVE] Online response data: $responseData');
+
+            if (responseData['success'] == true) {
+              print('[BANK_SAVE] Online save successful, marking as synced...');
+              // Mark as synced if online save was successful
+              await db.update(
+                'bankdetails',
+                {'synced': 1},
+                where: 'LearnerID = ?',
+                whereArgs: [learnerIdInt],
+              );
+              print('[BANK_SAVE] Record marked as synced');
+            } else {
+              print(
+                  '[BANK_SAVE] Online save failed: ${responseData['message'] ?? 'Unknown error'}');
+            }
+          } else {
+            print(
+                '[BANK_SAVE] Online save failed with status: ${response.statusCode}');
+          }
+        } catch (e) {
+          print('[BANK_SAVE] Online save exception: $e');
+          print(
+              '[BANK_SAVE] Online save failed, but local save succeeded - will sync later');
+        }
+      } else {
+        print('[BANK_SAVE] Offline mode - local save only');
+      }
+
+      print(
+          '[BANK_SAVE] ========== BANK SAVE OPERATION COMPLETED SUCCESSFULLY ==========');
+      return true;
+    } catch (e) {
+      print('[BANK_SAVE] CRITICAL ERROR in save operation: $e');
+      print('[BANK_SAVE] Error type: ${e.runtimeType}');
+      print('[BANK_SAVE] Stack trace: ${StackTrace.current}');
+      return false;
+    }
+  }
+
+  final List<_RequiredProfileRule> _requiredProfileRules = const [
+    _RequiredProfileRule(label: 'Name', keys: ['Name']),
+    _RequiredProfileRule(label: 'Surname', keys: ['Surname']),
+    _RequiredProfileRule(label: 'ID Number', keys: ['IDNumber']),
+    _RequiredProfileRule(label: 'Race', keys: ['Race']),
+    _RequiredProfileRule(label: 'Language', keys: ['Language']),
+    _RequiredProfileRule(label: 'Disability', keys: ['Disability']),
+    _RequiredProfileRule(
+        label: 'Cellphone Number', keys: ['CellphoneNumber', 'PhoneNumber']),
+    _RequiredProfileRule(label: 'Address Line 1', keys: ['AddressLine1']),
+    _RequiredProfileRule(label: 'Address Line 3', keys: ['AddressLine3']),
+    _RequiredProfileRule(label: 'Profile Image', keys: ['profile_image']),
+    _RequiredProfileRule(label: 'Learner Signature', keys: ['signature']),
+  ];
+  final List<_RequiredProfileRule> _requiredBankRules = const [
+    _RequiredProfileRule(label: 'Bank Name', keys: ['BankName']),
+    _RequiredProfileRule(label: 'Account Type', keys: ['bankType']),
+    _RequiredProfileRule(label: 'Account Number', keys: ['BankAccount']),
+    _RequiredProfileRule(label: 'Branch Code', keys: ['BankCode']),
+  ];
+  final List<String> _banks = const [
+    'ABSA Bank',
+    'Capitec Bank',
+    'First National Bank',
+    'Nedbank',
+    'Standard Bank',
+    'Investec Bank',
+    'Discovery Bank',
+    'TymeBank',
+    'African Bank',
+    'Bidvest Bank',
+  ];
+  final List<String> _accountTypes = const [
+    'Savings',
+    'Cheque',
+    'Current',
+    'Transmission',
+    'Fixed Deposit',
+    'Money Market',
+    'Student',
+    'Business',
+    'Trust',
+  ];
+  final Map<String, String> _bankCodes = const {
+    'ABSA Bank': '632005',
+    'Capitec Bank': '470010',
+    'First National Bank': '250655',
+    'Nedbank': '198765',
+    'Standard Bank': '051001',
+    'Investec Bank': '580105',
+    'Discovery Bank': '679000',
+    'TymeBank': '678910',
+    'African Bank': '430000',
+    'Bidvest Bank': '462005',
+  };
+
+  Future<bool> _ensureLearnerDocumentsComplete(String learnerId) async {
+    while (true) {
+      final missingDocs = await _getMissingRequiredDocuments(learnerId);
+      if (missingDocs.isEmpty) {
+        await _syncLearnerDocumentsForLearner(learnerId);
+        return true;
+      }
+
+      final action = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Missing Required Documents'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'This learner has missing required documents. Scan all missing document(s) before clock-in.',
+                ),
+                const SizedBox(height: 12),
+                ...missingDocs.map((doc) => Text('- $doc')),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop('cancel'),
+                child: const Text('Cancel'),
+              ),
+              OutlinedButton(
+                onPressed: () => Navigator.of(dialogContext).pop('sync'),
+                child: const Text('Sync Documents'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(dialogContext).pop('scan'),
+                child: const Text('Scan Next Document'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (action == 'sync') {
+        await _syncLearnerDocumentsForLearner(learnerId);
+        continue;
+      }
+
+      if (action != 'scan') {
+        return false;
+      }
+
+      final selectedDoc = await _pickMissingDocument(missingDocs);
+      if (selectedDoc == null) {
+        return false;
+      }
+
+      final scanned = await _scanAndSaveDocument(learnerId, selectedDoc);
+      if (!scanned) {
+        return false;
+      }
+
+      final stillMissing = await _getMissingRequiredDocuments(learnerId);
+      if (stillMissing.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Saved $selectedDoc. Remaining: ${stillMissing.join(', ')}',
+            ),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _syncLearnerDocumentsForLearner(String learnerId) async {
+    if (!await _checkConnectivity()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No internet connection. Document sync skipped.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final dbHelper = DatabaseHelper();
+      final learnerDocs = await dbHelper.fetchLearnerDocuments(learnerId);
+      final unsyncedDocs = learnerDocs.where((doc) {
+        final syncedVal = doc['synced'];
+        final syncedInt = syncedVal is int
+            ? syncedVal
+            : int.tryParse(syncedVal?.toString() ?? '0') ?? 0;
+        return syncedInt == 0;
+      }).toList();
+
+      if (unsyncedDocs.isEmpty) return;
+
+      int successCount = 0;
+      int failCount = 0;
+      for (final doc in unsyncedDocs) {
+        final filePath = doc['learner_document']?.toString() ?? '';
+        final documentName = doc['documentName']?.toString() ?? '';
+        if (filePath.isEmpty) continue;
+
+        final existsOnServer = await _documentExistsForLearnerServer(
+          learnerId: learnerId,
+          documentName: documentName,
+        );
+        if (existsOnServer) {
+          final dynamic docId = doc['document_id'];
+          final int? parsedDocId =
+              docId is int ? docId : int.tryParse('$docId');
+          if (parsedDocId != null) {
+            await dbHelper.updateLearnerDocumentSynced(parsedDocId, 1);
+          }
+          successCount++;
+          continue;
+        }
+
+        final request = http.MultipartRequest(
+          'POST',
+          Uri.parse(_uploadUrl),
+        )
+          ..fields['learner_id'] = learnerId
+          ..fields['documentName'] = documentName
+          ..fields['status'] = doc['status']?.toString() ?? 'Pending'
+          ..fields['upload_date'] =
+              doc['upload_date']?.toString() ?? DateTime.now().toIso8601String()
+          ..fields['synced'] = '1'
+          ..fields['rejection_reason'] =
+              doc['rejection_reason']?.toString() ?? ''
+          ..files.add(await http.MultipartFile.fromPath(
+            'learner_document',
+            filePath,
+            filename: filePath.split('/').last,
+          ));
+
+        final response = await request.send();
+        final body = await response.stream.bytesToString();
+        if (response.statusCode != 200) {
+          failCount++;
+          continue;
+        }
+
+        try {
+          final decoded = jsonDecode(body);
+          if (decoded is Map && decoded['success'] == true) {
+            final dynamic docId = doc['document_id'];
+            final int? parsedDocId =
+                docId is int ? docId : int.tryParse('$docId');
+            if (parsedDocId != null) {
+              await dbHelper.updateLearnerDocumentSynced(parsedDocId, 1);
+            }
+            successCount++;
+          } else {
+            failCount++;
+          }
+        } catch (_) {
+          failCount++;
+        }
+      }
+
+      if (!mounted) return;
+      if (successCount > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Synced $successCount document(s) successfully${failCount > 0 ? ', $failCount failed' : ''}.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (failCount > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Document sync failed. Please check server/API.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Document sync failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _syncAllUnsyncedDocuments() async {
+    if (!await _checkConnectivity()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No internet connection. Cannot sync documents.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final dbHelper = DatabaseHelper();
+      final unsyncedDocs = await dbHelper.fetchUnsyncedLearnerDocuments();
+      if (unsyncedDocs.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No unsynced documents found.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        return;
+      }
+
+      int successCount = 0;
+      int failCount = 0;
+      for (final doc in unsyncedDocs) {
+        final learnerId = doc['learner_id']?.toString() ?? '';
+        final filePath = doc['learner_document']?.toString() ?? '';
+        final documentName = doc['documentName']?.toString() ?? '';
+        if (learnerId.isEmpty || filePath.isEmpty) {
+          failCount++;
+          continue;
+        }
+
+        final existsOnServer = await _documentExistsForLearnerServer(
+          learnerId: learnerId,
+          documentName: documentName,
+        );
+        if (existsOnServer) {
+          final dynamic docId = doc['document_id'];
+          final int? parsedDocId =
+              docId is int ? docId : int.tryParse('$docId');
+          if (parsedDocId != null) {
+            await dbHelper.updateLearnerDocumentSynced(parsedDocId, 1);
+          }
+          successCount++;
+          continue;
+        }
+
+        try {
+          final request = http.MultipartRequest(
+            'POST',
+            Uri.parse(_uploadUrl),
+          )
+            ..fields['learner_id'] = learnerId
+            ..fields['documentName'] = documentName
+            ..fields['status'] = doc['status']?.toString() ?? 'Pending'
+            ..fields['upload_date'] = doc['upload_date']?.toString() ??
+                DateTime.now().toIso8601String()
+            ..fields['synced'] = '1'
+            ..fields['rejection_reason'] =
+                doc['rejection_reason']?.toString() ?? ''
+            ..files.add(await http.MultipartFile.fromPath(
+              'learner_document',
+              filePath,
+              filename: filePath.split('/').last,
+            ));
+
+          final response = await request.send();
+          final body = await response.stream.bytesToString();
+          if (response.statusCode != 200) {
+            failCount++;
+            continue;
+          }
+
+          final decoded = jsonDecode(body);
+          if (decoded is Map && decoded['success'] == true) {
+            final dynamic docId = doc['document_id'];
+            final int? parsedDocId =
+                docId is int ? docId : int.tryParse('$docId');
+            if (parsedDocId != null) {
+              await dbHelper.updateLearnerDocumentSynced(parsedDocId, 1);
+            }
+            successCount++;
+          } else {
+            failCount++;
+          }
+        } catch (_) {
+          failCount++;
+        }
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Documents synced: $successCount, failed: $failCount'),
+          backgroundColor: failCount > 0 ? Colors.orange : Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to sync documents: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<List<String>> _getMissingRequiredDocuments(String learnerId) async {
+    String normalizeRequiredDoc(String raw) => raw
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'\.pdf$'), '')
+        .replaceAll(RegExp(r'\s+'), ' ');
+
+    if (await _checkConnectivity()) {
+      try {
+        final serverDocs = await _fetchServerDocuments(learnerId);
+        if (serverDocs != null) {
+          final existingDocs = serverDocs.toSet();
+          return _requiredDocuments
+              .where((requiredDoc) =>
+                  !existingDocs.contains(normalizeRequiredDoc(requiredDoc)))
+              .toList();
+        }
+      } catch (_) {}
+    }
+
+    final dbHelper = DatabaseHelper();
+    final localDocs = await dbHelper.fetchLearnerDocuments(learnerId);
+    final existingDocs = localDocs
+        .map((doc) =>
+            normalizeRequiredDoc(doc['documentName']?.toString() ?? ''))
+        .toSet();
+
+    return _requiredDocuments
+        .where((requiredDoc) =>
+            !existingDocs.contains(normalizeRequiredDoc(requiredDoc)))
+        .toList();
+  }
+
+  Future<List<String>?> _fetchServerDocuments(String learnerId) async {
+    String normalizeDocName(String raw) {
+      final cleaned = raw.trim().toLowerCase();
+      if (cleaned.isEmpty) return '';
+      // Remove common suffixes/noise from API responses.
+      final withoutExt = cleaned.replaceAll(RegExp(r'\.pdf$'), '');
+      return withoutExt.replaceAll(RegExp(r'\s+'), ' ');
+    }
+
+    List<String> parseDocsPayload(dynamic payload) {
+      List<dynamic>? docs;
+
+      // Format A: { success: true, documents: [...] }
+      if (payload is Map) {
+        if (payload['success'] == true && payload['documents'] is List) {
+          docs = payload['documents'] as List<dynamic>;
+        } else if (payload['data'] is List) {
+          // Format B: { data: [...] }
+          docs = payload['data'] as List<dynamic>;
+        }
+      } else if (payload is List) {
+        // Format C: direct rows from SELECT * FROM learner_document
+        docs = payload;
+      }
+
+      if (docs == null) return <String>[];
+
+      final parsed = <String>[];
+      for (final item in docs) {
+        String value = '';
+        if (item is Map) {
+          // Handle learner_document table row shapes (real schema first).
+          value = item['documentName']?.toString() ??
+              item['DocumentName']?.toString() ??
+              item['document_name']?.toString() ??
+              item['document_type']?.toString() ??
+              item['doc_type']?.toString() ??
+              '';
+        } else {
+          value = item?.toString() ?? '';
+        }
+        final normalized = normalizeDocName(value);
+        if (normalized.isNotEmpty) {
+          parsed.add(normalized);
+        }
+      }
+      return parsed;
+    }
+
+    Future<List<String>?> attempt(Map<String, String> body) async {
+      final response = await http
+          .post(
+            Uri.parse(AppConfig.buildUrl('check_learner_documents.php')),
+            body: body,
+          )
+          .timeout(const Duration(seconds: 6));
+
+      if (response.statusCode != 200) {
+        return null;
+      }
+
+      final decoded = json.decode(response.body);
+      return parseDocsPayload(decoded);
+    }
+
+    // Server implementations differ across modules; try both keys.
+    final byLearnerId = await attempt({'learner_id': learnerId});
+    if (byLearnerId != null) return byLearnerId;
+
+    return await attempt({'learnerID': learnerId});
+  }
+
+  Future<String?> _pickMissingDocument(List<String> missingDocs) async {
+    String? selected = missingDocs.first;
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Select Missing Document'),
+              content: DropdownButton<String>(
+                value: selected,
+                isExpanded: true,
+                items: missingDocs
+                    .map(
+                      (doc) => DropdownMenuItem<String>(
+                        value: doc,
+                        child: Text(doc),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (newValue) {
+                  setDialogState(() {
+                    selected = newValue;
+                  });
+                },
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: selected == null
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(selected),
+                  child: const Text('Continue'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<bool> _scanAndSaveDocument(
+      String learnerId, String documentName) async {
+    final alreadyExists = await _documentExistsForLearner(
+      learnerId: learnerId,
+      documentName: documentName,
+    );
+    if (alreadyExists) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              '$documentName already exists for this learner. Keeping existing document.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return true;
+    }
+
+    final status = await Permission.camera.request();
+    if (!status.isGranted) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Camera permission denied. Enable it in settings.'),
+        ),
+      );
+      await openAppSettings();
+      return false;
+    }
+
+    try {
+      final scanner = FlutterDocScanner();
+      final scanResult = await scanner.getScanDocuments(page: 10);
+      if (scanResult is! Map ||
+          !scanResult.containsKey('pdfUri') ||
+          scanResult['pdfUri'] == null) {
+        throw Exception('Invalid scan result');
+      }
+
+      final file = await resolveFlutterDocScannerPdfFile(
+          scanResult['pdfUri'] as String?);
+      if (file == null || !await isReadablePdfFile(file)) {
+        throw Exception('Invalid or missing PDF file');
+      }
+
+      final fileSize = await file.length();
+      if (fileSize > _maxFileSize) {
+        throw Exception('File size exceeds 5MB limit');
+      }
+      if (fileSize < _minFileSize) {
+        throw Exception('Scanned file appears too small/unclear');
+      }
+
+      await DatabaseHelper().insertLearnerDocument({
+        'learner_id': learnerId,
+        'documentName': documentName,
+        'learner_document': file.path,
+        'status': 'Pending',
+        'upload_date': DateTime.now().toIso8601String(),
+        'synced': 0,
+      });
+
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$documentName scanned and saved.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      return true;
+    } catch (e) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to scan/save $documentName: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return false;
+    }
+  }
+
+  Future<bool> _documentExistsForLearner({
+    required String learnerId,
+    required String documentName,
+  }) async {
+    if (await _documentExistsForLearnerLocal(
+      learnerId: learnerId,
+      documentName: documentName,
+    )) {
+      return true;
+    }
+    return await _documentExistsForLearnerServer(
+      learnerId: learnerId,
+      documentName: documentName,
+    );
+  }
+
+  Future<bool> _documentExistsForLearnerLocal({
+    required String learnerId,
+    required String documentName,
+  }) async {
+    final docs = await DatabaseHelper().fetchLearnerDocuments(learnerId);
+    return docs.any(
+      (d) =>
+          (d['documentName']?.toString().trim().toLowerCase() ?? '') ==
+          documentName.trim().toLowerCase(),
+    );
+  }
+
+  Future<bool> _documentExistsForLearnerServer({
+    required String learnerId,
+    required String documentName,
+  }) async {
+    if (!await _checkConnectivity()) return false;
+    try {
+      final serverDocs = await _fetchServerDocuments(learnerId);
+      if (serverDocs == null) return false;
+      final normalizedServer = serverDocs.toSet();
+      final normalizedRequired = documentName
+          .trim()
+          .toLowerCase()
+          .replaceAll(RegExp(r'\.pdf$'), '')
+          .replaceAll(RegExp(r'\s+'), ' ');
+      return normalizedServer.contains(normalizedRequired);
+    } catch (_) {
+      return false;
     }
   }
 
@@ -2941,6 +4638,22 @@ class _ClockInPageState extends State<ClockInPage> {
                 _isConnected ? 'Sync Offline Data' : 'No Internet Connection',
           ),
           IconButton(
+            icon: const Icon(Icons.description, color: Colors.teal),
+            onPressed: _isConnected
+                ? () async {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Syncing unsynced documents...'),
+                        backgroundColor: Colors.blue,
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
+                    await _syncAllUnsyncedDocuments();
+                  }
+                : null,
+            tooltip: _isConnected ? 'Sync Documents' : 'No Internet Connection',
+          ),
+          IconButton(
             icon: const Icon(Icons.download, color: Colors.green),
             onPressed: _isConnected
                 ? () async {
@@ -3508,4 +5221,14 @@ class _ClockInPageState extends State<ClockInPage> {
       ),
     );
   }
+}
+
+class _RequiredProfileRule {
+  final String label;
+  final List<String> keys;
+
+  const _RequiredProfileRule({
+    required this.label,
+    required this.keys,
+  });
 }

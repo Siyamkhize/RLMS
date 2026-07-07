@@ -8,7 +8,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dashboard_page.dart';
-import 'admin.dart';
+import 'sdp_projects_page.dart';
 import 'database_helper.dart';
 import 'sync_service.dart';
 import 'config.dart';
@@ -17,7 +17,6 @@ import 'ModeratorPage.dart';
 import 'facilitator_fingerprint_page.dart';
 import 'finance_dashboard.dart';
 import 'logistics_dashboard.dart';
-import 'site_admin_dashboard.dart';
 // MONITORING SYSTEM TEMPORARILY DISABLED - BUILD ISSUE
 // import 'services/random_prompt_service.dart';
 // import 'monitoring_prompt_page.dart';
@@ -173,47 +172,60 @@ void main() async {
   await requestNotificationPermission();
   await requestIgnoreBatteryOptimization();
 
-  // Initialize Workmanager
-  Workmanager().initialize(
-    callbackDispatcher,
-    isInDebugMode: false, // Set to false for production
-  );
+  final supportsWorkmanager =
+      !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+  if (supportsWorkmanager) {
+    // Initialize Workmanager only on supported platforms.
+    Workmanager().initialize(
+      callbackDispatcher,
+      isInDebugMode: false, // Set to false for production
+    );
+  }
 
   // Initialize notifications
   const AndroidInitializationSettings initializationSettingsAndroid =
       AndroidInitializationSettings('@mipmap/ic_launcher');
   const DarwinInitializationSettings initializationSettingsIOS =
       DarwinInitializationSettings();
+  const WindowsInitializationSettings initializationSettingsWindows =
+      WindowsInitializationSettings(
+    appName: 'rlmss',
+    appUserModelId: 'com.example.rlmss',
+    guid: 'd49b0314-ee7c-4f34-95b1-3f01f9c4e9c3',
+  );
   const InitializationSettings initializationSettings = InitializationSettings(
     android: initializationSettingsAndroid,
     iOS: initializationSettingsIOS,
+    windows: initializationSettingsWindows,
   );
   await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
   // Schedule periodic sync task (every 15 minutes)
-  Workmanager().registerPeriodicTask(
-    "sync-task-1",
-    syncTask,
-    frequency: const Duration(minutes: 15),
-    constraints: Constraints(
-      networkType: NetworkType.connected,
-      requiresBatteryNotLow: true,
-      requiresCharging: false,
-    ),
-    initialDelay: const Duration(seconds: 10),
-  );
+  if (supportsWorkmanager) {
+    Workmanager().registerPeriodicTask(
+      "sync-task-1",
+      syncTask,
+      frequency: const Duration(minutes: 15),
+      constraints: Constraints(
+        networkType: NetworkType.connected,
+        requiresBatteryNotLow: true,
+        requiresCharging: false,
+      ),
+      initialDelay: const Duration(seconds: 10),
+    );
 
-  // Schedule initial connectivity check task (runs after 2 minutes, then reschedules itself)
-  Workmanager().registerOneOffTask(
-    "connectivity-check-initial",
-    connectivityCheckTask,
-    initialDelay: const Duration(minutes: 2),
-    constraints: Constraints(
-      networkType: NetworkType.unmetered,
-      requiresBatteryNotLow: false,
-      requiresCharging: false,
-    ),
-  );
+    // Schedule initial connectivity check task (runs after 2 minutes, then reschedules itself)
+    Workmanager().registerOneOffTask(
+      "connectivity-check-initial",
+      connectivityCheckTask,
+      initialDelay: const Duration(minutes: 2),
+      constraints: Constraints(
+        networkType: NetworkType.unmetered,
+        requiresBatteryNotLow: false,
+        requiresCharging: false,
+      ),
+    );
+  }
 
   final dbHelper = DatabaseHelper();
   dbHelper.initConnectivityListener();
@@ -255,6 +267,9 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
+      routes: {
+        '/login': (context) => const LoginPage(),
+      },
       home: const LoginPage(),
     );
   }
@@ -523,55 +538,65 @@ class _LoginPageState extends State<LoginPage> {
       String password = _passwordController.text;
 
       try {
-        Map<String, dynamic>? facilitator =
-            await dbHelper.getFacilitator(username, password);
+        // Check SDP FIRST before checking facilitators
+        Map<String, dynamic>? sdpEntry =
+            await dbHelper.getSdp(username, password);
 
-        if (facilitator != null) {
-          String role = facilitator['role'];
-          if (role == 'Moderator') {
-            role = 'Moderator'; // Ensure case consistency with PHP
+        if (sdpEntry != null) {
+          String role = 'sdp';
+          String siteID = sdpEntry['siteID']?.toString() ?? '';
+          String classID = sdpEntry['classID']?.toString() ?? '';
+          // Try multiple fields for SDP identifier
+          String sdp = sdpEntry['sdp_id']?.toString() ??
+              sdpEntry['sdp_name']?.toString() ??
+              sdpEntry['Reg_number']?.toString() ??
+              '';
+          String facilitatorId = sdpEntry['facilitator_id']?.toString() ?? '';
+          List classes = sdpEntry['classes'] ?? [];
+
+          int siteIDInt = int.tryParse(siteID) ?? 0;
+          List classData = await dbHelper.getClassData(classID);
+
+          // Try to sync learners from server if we have a classID
+          if (classID.isNotEmpty) {
+            try {
+              await dbHelper.syncLearnersFromServer(classID);
+              print('Successfully synced learners for classID: $classID');
+            } catch (e) {
+              print('Failed to sync learners for classID $classID: $e');
+              // Continue with local data even if sync fails
+            }
           }
-          String classID = facilitator['classID']?.toString() ?? '';
-          String sdp = facilitator['sdp_name'] ?? '';
-          List classData = [];
-          List learners = [];
-          String facilitatorId =
-              facilitator['facilitator_id']?.toString() ?? '';
-          List classes = facilitator['classes'] ?? [];
+
+          List learners = await dbHelper.getLearnersForClass(siteIDInt);
+
+          // Create data map with sdp_name for offline login
+          Map<String, dynamic> offlineData = {
+            'sdp_name': sdpEntry['sdp_name']?.toString() ??
+                sdpEntry['client_name']?.toString() ??
+                '',
+            'sdp_id': sdp,
+          };
 
           _navigateBasedOnRole(role, classID, sdp, classData, learners,
-              facilitatorId, classes, {});
+              facilitatorId, classes, offlineData);
         } else {
-          Map<String, dynamic>? sdpEntry =
-              await dbHelper.getSdp(username, password);
+          // Check facilitator table only if not found in SDP
+          Map<String, dynamic>? facilitator =
+              await dbHelper.getFacilitator(username, password);
 
-          if (sdpEntry != null) {
-            String role = 'sdp';
-            String siteID = sdpEntry['siteID']?.toString() ?? '';
-            String classID = sdpEntry['classID']?.toString() ?? '';
-            // Try multiple fields for SDP identifier
-            String sdp = sdpEntry['sdp_id']?.toString() ??
-                sdpEntry['sdp_name']?.toString() ??
-                sdpEntry['Reg_number']?.toString() ??
-                '';
-            String facilitatorId = sdpEntry['facilitator_id']?.toString() ?? '';
-            List classes = sdpEntry['classes'] ?? [];
-
-            int siteIDInt = int.tryParse(siteID) ?? 0;
-            List classData = await dbHelper.getClassData(classID);
-
-            // Try to sync learners from server if we have a classID
-            if (classID.isNotEmpty) {
-              try {
-                await dbHelper.syncLearnersFromServer(classID);
-                print('Successfully synced learners for classID: $classID');
-              } catch (e) {
-                print('Failed to sync learners for classID $classID: $e');
-                // Continue with local data even if sync fails
-              }
+          if (facilitator != null) {
+            String role = facilitator['role'];
+            if (role == 'Moderator') {
+              role = 'Moderator'; // Ensure case consistency with PHP
             }
-
-            List learners = await dbHelper.getLearnersForClass(siteIDInt);
+            String classID = facilitator['classID']?.toString() ?? '';
+            String sdp = facilitator['sdp_name'] ?? '';
+            List classData = [];
+            List learners = [];
+            String facilitatorId =
+                facilitator['facilitator_id']?.toString() ?? '';
+            List classes = facilitator['classes'] ?? [];
 
             _navigateBasedOnRole(role, classID, sdp, classData, learners,
                 facilitatorId, classes, {});
@@ -632,16 +657,25 @@ class _LoginPageState extends State<LoginPage> {
     // Normalize role to lowercase for consistent comparison
     final normalizedRole = role.toLowerCase().trim();
 
-    debugPrint(
-        '[NAVIGATION] Role: "$normalizedRole", classID: "$classID", facilitator_id: "$facilitatorId"');
+    debugPrint('[NAVIGATION] ===== NAVIGATION DEBUG =====');
+    debugPrint('[NAVIGATION] Role: "$normalizedRole"');
+    debugPrint('[NAVIGATION] classID: "$classID"');
+    debugPrint('[NAVIGATION] sdp: "$sdp"');
+    debugPrint('[NAVIGATION] facilitator_id: "$facilitatorId"');
+    debugPrint('[NAVIGATION] data keys: ${data.keys.toList()}');
+    debugPrint('[NAVIGATION] =============================');
 
     if (normalizedRole == 'sdp') {
+      // SDP users navigate to Projects page with full hierarchical data
+      debugPrint('[NAVIGATION] Navigating SDP to Projects Page');
+      final projects = data['projects'] ?? [];
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => AdminPage(
-            sdp: sdp,
-            data: classData,
+          builder: (context) => SdpProjectsPage(
+            sdpIdentifier: sdp,
+            sdpDisplayName: data['sdp_name']?.toString(),
+            projects: List<Map<String, dynamic>>.from(projects),
           ),
         ),
       );
@@ -671,23 +705,6 @@ class _LoginPageState extends State<LoginPage> {
           builder: (context) => LogisticsDashboard(
             logisticsId: logisticsId,
             logisticsName: logisticsName,
-          ),
-        ),
-      );
-    } else if (normalizedRole == 'site admin') {
-      // Site Admin role - Navigate to Site Admin Dashboard
-      debugPrint('[NAVIGATION] Navigating to Site Admin Dashboard');
-      // Use account_id for site admin users, fallback to facilitator_id if not available
-      final siteAdminId = data['account_id']?.toString() ?? facilitatorId;
-      final siteAdminName = data['account_name']?.toString() ??
-          _usernameController.text.split('@')[0];
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => SiteAdminDashboard(
-            accountId: int.parse(siteAdminId),
-            username: siteAdminName,
           ),
         ),
       );

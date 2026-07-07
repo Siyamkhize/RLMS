@@ -26,14 +26,16 @@ class FacilitatorMaterialIssuancePage extends StatefulWidget {
   });
 
   @override
-  _FacilitatorMaterialIssuancePageState createState() => _FacilitatorMaterialIssuancePageState();
+  _FacilitatorMaterialIssuancePageState createState() =>
+      _FacilitatorMaterialIssuancePageState();
 }
 
-class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIssuancePage> {
+class _FacilitatorMaterialIssuancePageState
+    extends State<FacilitatorMaterialIssuancePage> {
   final _formKey = GlobalKey<FormState>();
   final _notesController = TextEditingController();
   final _searchController = TextEditingController();
-  
+
   List<Map<String, dynamic>> availableMaterials = [];
   List<Map<String, dynamic>> filteredMaterials = [];
   List<Map<String, dynamic>> selectedMaterials = [];
@@ -53,7 +55,14 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
     {'id': '15003', 'name': 'Quality Control'},
   ];
 
-  final List<String> categories = ['All', 'Learning Material', 'PPE', 'Consumable', 'Tools', 'Equipment'];
+  final List<String> categories = [
+    'All',
+    'Learning Material',
+    'PPE',
+    'Consumable',
+    'Tools',
+    'Equipment'
+  ];
 
   @override
   void initState() {
@@ -79,14 +88,18 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
   void _filterMaterials() {
     setState(() {
       filteredMaterials = availableMaterials.where((material) {
-        final matchesCategory = selectedCategory == 'All' || 
-                               (material['category']?.toString().toLowerCase() ?? '') == selectedCategory.toLowerCase();
-        
+        final matchesCategory = selectedCategory == 'All' ||
+            (material['category']?.toString().toLowerCase() ?? '') ==
+                selectedCategory.toLowerCase();
+
         final matchesSearch = searchQuery.isEmpty ||
-                             (material['material_name']?.toString().toLowerCase() ?? '').contains(searchQuery.toLowerCase()) ||
-                             (material['material_code']?.toString().toLowerCase() ?? '').contains(searchQuery.toLowerCase()) ||
-                             (material['description']?.toString().toLowerCase() ?? '').contains(searchQuery.toLowerCase());
-        
+            (material['material_name']?.toString().toLowerCase() ?? '')
+                .contains(searchQuery.toLowerCase()) ||
+            (material['material_code']?.toString().toLowerCase() ?? '')
+                .contains(searchQuery.toLowerCase()) ||
+            (material['description']?.toString().toLowerCase() ?? '')
+                .contains(searchQuery.toLowerCase());
+
         return matchesCategory && matchesSearch;
       }).toList();
     });
@@ -108,7 +121,8 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
         final data = json.decode(response.body);
         if (data['success'] == true) {
           setState(() {
-            availableMaterials = List<Map<String, dynamic>>.from(data['materials'] ?? []);
+            availableMaterials =
+                List<Map<String, dynamic>>.from(data['materials'] ?? []);
             _filterMaterials();
             isLoadingMaterials = false;
           });
@@ -238,7 +252,8 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
         if (data['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Materials successfully issued to ${widget.facilitatorName}'),
+              content: Text(
+                  'Materials successfully issued to ${widget.facilitatorName}'),
               backgroundColor: Colors.green,
               duration: const Duration(seconds: 3),
             ),
@@ -292,7 +307,8 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.info_outline, color: Colors.blue[800]),
+                                Icon(Icons.info_outline,
+                                    color: Colors.blue[800]),
                                 const SizedBox(width: 8),
                                 Text(
                                   'Issuance Details',
@@ -305,16 +321,20 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                               ],
                             ),
                             const Divider(),
-                            _buildInfoRow(Icons.location_on, 'Site', widget.siteName),
-                            _buildInfoRow(Icons.class_, 'Class', widget.className),
-                            _buildInfoRow(Icons.person, 'Facilitator', widget.facilitatorName),
-                            _buildInfoRow(Icons.person_outline, 'Issued By', widget.logisticsName),
+                            _buildInfoRow(
+                                Icons.location_on, 'Site', widget.siteName),
+                            _buildInfoRow(
+                                Icons.class_, 'Class', widget.className),
+                            _buildInfoRow(Icons.person, 'Facilitator',
+                                widget.facilitatorName),
+                            _buildInfoRow(Icons.person_outline, 'Issued By',
+                                widget.logisticsName),
                           ],
                         ),
                       ),
                     ),
                   ),
-                  
+
                   // Error Message
                   if (errorMessage.isNotEmpty)
                     Container(
@@ -361,20 +381,25 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                                     ),
                                   ),
                                   const SizedBox(height: 16),
-                                  
+
                                   // Date Selection
                                   Row(
                                     children: [
-                                      Icon(Icons.calendar_today, color: Colors.grey[600]),
+                                      Icon(Icons.calendar_today,
+                                          color: Colors.grey[600]),
                                       const SizedBox(width: 8),
-                                      const Text('Issue Date: ', style: TextStyle(fontWeight: FontWeight.w500)),
+                                      const Text('Issue Date: ',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.w500)),
                                       TextButton.icon(
                                         onPressed: () async {
                                           final date = await showDatePicker(
                                             context: context,
                                             initialDate: selectedDate,
-                                            firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                                            lastDate: DateTime.now().add(const Duration(days: 30)),
+                                            firstDate: DateTime.now().subtract(
+                                                const Duration(days: 30)),
+                                            lastDate: DateTime.now()
+                                                .add(const Duration(days: 30)),
                                           );
                                           if (date != null) {
                                             setState(() {
@@ -385,7 +410,8 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                                         icon: const Icon(Icons.edit_calendar),
                                         label: Text(
                                           '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold),
                                         ),
                                       ),
                                     ],
@@ -406,12 +432,14 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                                     items: [
                                       const DropdownMenuItem<String>(
                                         value: null,
-                                        child: Text('Select Unit Standard (Optional)'),
+                                        child: Text(
+                                            'Select Unit Standard (Optional)'),
                                       ),
                                       ...unitStandards.map((us) {
                                         return DropdownMenuItem<String>(
                                           value: us['id'],
-                                          child: Text('${us['id']} - ${us['name']}'),
+                                          child: Text(
+                                              '${us['id']} - ${us['name']}'),
                                         );
                                       }),
                                     ],
@@ -437,7 +465,8 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                                 children: [
                                   Row(
                                     children: [
-                                      Icon(Icons.inventory, color: Colors.blue[800]),
+                                      Icon(Icons.inventory,
+                                          color: Colors.blue[800]),
                                       const SizedBox(width: 8),
                                       Text(
                                         'Available Materials',
@@ -456,7 +485,7 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                                     ],
                                   ),
                                   const SizedBox(height: 16),
-                                  
+
                                   // Search and Filter
                                   Row(
                                     children: [
@@ -466,17 +495,22 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                                           controller: _searchController,
                                           decoration: InputDecoration(
                                             hintText: 'Search materials...',
-                                            prefixIcon: const Icon(Icons.search),
+                                            prefixIcon:
+                                                const Icon(Icons.search),
                                             suffixIcon: searchQuery.isNotEmpty
                                                 ? IconButton(
-                                                    icon: const Icon(Icons.clear),
+                                                    icon:
+                                                        const Icon(Icons.clear),
                                                     onPressed: () {
                                                       _searchController.clear();
                                                     },
                                                   )
                                                 : null,
                                             border: const OutlineInputBorder(),
-                                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 8),
                                           ),
                                         ),
                                       ),
@@ -487,7 +521,10 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                                           decoration: const InputDecoration(
                                             labelText: 'Category',
                                             border: OutlineInputBorder(),
-                                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                            contentPadding:
+                                                EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 8),
                                           ),
                                           items: categories.map((category) {
                                             return DropdownMenuItem<String>(
@@ -505,28 +542,35 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                                       ),
                                     ],
                                   ),
-                                  
+
                                   const SizedBox(height: 16),
-                                  
+
                                   // Available Materials List
                                   Container(
                                     height: 300,
                                     decoration: BoxDecoration(
-                                      border: Border.all(color: Colors.grey[300]!),
+                                      border:
+                                          Border.all(color: Colors.grey[300]!),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: filteredMaterials.isEmpty
                                         ? Center(
                                             child: Column(
-                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
                                               children: [
-                                                Icon(Icons.inventory_2_outlined, size: 48, color: Colors.grey[400]),
+                                                Icon(Icons.inventory_2_outlined,
+                                                    size: 48,
+                                                    color: Colors.grey[400]),
                                                 const SizedBox(height: 8),
                                                 Text(
-                                                  searchQuery.isNotEmpty || selectedCategory != 'All'
+                                                  searchQuery.isNotEmpty ||
+                                                          selectedCategory !=
+                                                              'All'
                                                       ? 'No materials match your filters'
                                                       : 'No materials available',
-                                                  style: TextStyle(color: Colors.grey[600]),
+                                                  style: TextStyle(
+                                                      color: Colors.grey[600]),
                                                 ),
                                               ],
                                             ),
@@ -534,55 +578,103 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                                         : ListView.builder(
                                             itemCount: filteredMaterials.length,
                                             itemBuilder: (context, index) {
-                                              final material = filteredMaterials[index];
-                                              final isSelected = selectedMaterials.any(
-                                                (selected) => selected['material_id'] == material['inventory_id']
-                                              );
-                                              final stockQuantity = int.tryParse(material['current_stock']?.toString() ?? '0') ?? 0;
-                                              final category = material['category']?.toString() ?? 'Unknown';
-                                              
+                                              final material =
+                                                  filteredMaterials[index];
+                                              final isSelected =
+                                                  selectedMaterials.any(
+                                                      (selected) =>
+                                                          selected[
+                                                              'material_id'] ==
+                                                          material[
+                                                              'inventory_id']);
+                                              final stockQuantity = int.tryParse(
+                                                      material['current_stock']
+                                                              ?.toString() ??
+                                                          '0') ??
+                                                  0;
+                                              final category =
+                                                  material['category']
+                                                          ?.toString() ??
+                                                      'Unknown';
+
                                               return Card(
-                                                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                margin:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 4),
                                                 child: ListTile(
                                                   leading: CircleAvatar(
-                                                    backgroundColor: _getCategoryColor(category),
+                                                    backgroundColor:
+                                                        _getCategoryColor(
+                                                            category),
                                                     child: Icon(
-                                                      _getCategoryIcon(category),
+                                                      _getCategoryIcon(
+                                                          category),
                                                       color: Colors.white,
                                                       size: 20,
                                                     ),
                                                   ),
                                                   title: Text(
-                                                    material['material_name'] ?? 'Unknown Material',
-                                                    style: const TextStyle(fontWeight: FontWeight.w500),
+                                                    material['material_name'] ??
+                                                        'Unknown Material',
+                                                    style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w500),
                                                   ),
                                                   subtitle: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
                                                     children: [
-                                                      Text('Code: ${material['material_code'] ?? 'N/A'}'),
+                                                      Text(
+                                                          'Code: ${material['material_code'] ?? 'N/A'}'),
                                                       Row(
                                                         children: [
                                                           Container(
-                                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                            decoration: BoxDecoration(
-                                                              color: _getCategoryColor(category),
-                                                              borderRadius: BorderRadius.circular(10),
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .symmetric(
+                                                                    horizontal:
+                                                                        6,
+                                                                    vertical:
+                                                                        2),
+                                                            decoration:
+                                                                BoxDecoration(
+                                                              color:
+                                                                  _getCategoryColor(
+                                                                      category),
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          10),
                                                             ),
                                                             child: Text(
                                                               category,
-                                                              style: const TextStyle(
-                                                                color: Colors.white,
+                                                              style:
+                                                                  const TextStyle(
+                                                                color: Colors
+                                                                    .white,
                                                                 fontSize: 10,
-                                                                fontWeight: FontWeight.bold,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
                                                               ),
                                                             ),
                                                           ),
-                                                          const SizedBox(width: 8),
+                                                          const SizedBox(
+                                                              width: 8),
                                                           Text(
                                                             'Stock: $stockQuantity ${material['unit_of_measure'] ?? 'pieces'}',
                                                             style: TextStyle(
-                                                              color: stockQuantity > 0 ? Colors.green[700] : Colors.red[700],
-                                                              fontWeight: FontWeight.w500,
+                                                              color: stockQuantity >
+                                                                      0
+                                                                  ? Colors.green[
+                                                                      700]
+                                                                  : Colors
+                                                                      .red[700],
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w500,
                                                             ),
                                                           ),
                                                         ],
@@ -590,13 +682,23 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                                                     ],
                                                   ),
                                                   trailing: isSelected
-                                                      ? const Icon(Icons.check_circle, color: Colors.green)
+                                                      ? const Icon(
+                                                          Icons.check_circle,
+                                                          color: Colors.green)
                                                       : IconButton(
-                                                          icon: const Icon(Icons.add_circle_outline),
-                                                          onPressed: stockQuantity > 0 ? () => _addMaterial(material) : null,
-                                                          color: Colors.blue[800],
+                                                          icon: const Icon(Icons
+                                                              .add_circle_outline),
+                                                          onPressed: stockQuantity >
+                                                                  0
+                                                              ? () =>
+                                                                  _addMaterial(
+                                                                      material)
+                                                              : null,
+                                                          color:
+                                                              Colors.blue[800],
                                                         ),
-                                                  enabled: !isSelected && stockQuantity > 0,
+                                                  enabled: !isSelected &&
+                                                      stockQuantity > 0,
                                                 ),
                                               );
                                             },
@@ -618,7 +720,8 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                                 children: [
                                   Row(
                                     children: [
-                                      Icon(Icons.shopping_cart, color: Colors.green[800]),
+                                      Icon(Icons.shopping_cart,
+                                          color: Colors.green[800]),
                                       const SizedBox(width: 8),
                                       Text(
                                         'Selected Materials (${selectedMaterials.length})',
@@ -631,49 +734,63 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                                     ],
                                   ),
                                   const SizedBox(height: 16),
-                                  
                                   if (selectedMaterials.isEmpty)
                                     Container(
                                       padding: const EdgeInsets.all(32),
                                       child: Center(
                                         child: Column(
                                           children: [
-                                            Icon(Icons.shopping_cart_outlined, size: 48, color: Colors.grey[400]),
+                                            Icon(Icons.shopping_cart_outlined,
+                                                size: 48,
+                                                color: Colors.grey[400]),
                                             const SizedBox(height: 8),
                                             Text(
                                               'No materials selected',
-                                              style: TextStyle(color: Colors.grey[600]),
+                                              style: TextStyle(
+                                                  color: Colors.grey[600]),
                                             ),
                                             const SizedBox(height: 4),
                                             Text(
                                               'Add materials from the list above',
-                                              style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                                              style: TextStyle(
+                                                  color: Colors.grey[500],
+                                                  fontSize: 12),
                                             ),
                                           ],
                                         ),
                                       ),
                                     )
                                   else
-                                    ...selectedMaterials.asMap().entries.map((entry) {
+                                    ...selectedMaterials
+                                        .asMap()
+                                        .entries
+                                        .map((entry) {
                                       final index = entry.key;
                                       final material = entry.value;
-                                      final category = material['category']?.toString() ?? 'Unknown';
-                                      
+                                      final category =
+                                          material['category']?.toString() ??
+                                              'Unknown';
+
                                       return Card(
-                                        margin: const EdgeInsets.only(bottom: 8),
+                                        margin:
+                                            const EdgeInsets.only(bottom: 8),
                                         color: Colors.green[50],
                                         child: Padding(
                                           padding: const EdgeInsets.all(12),
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Row(
                                                 children: [
                                                   CircleAvatar(
-                                                    backgroundColor: _getCategoryColor(category),
+                                                    backgroundColor:
+                                                        _getCategoryColor(
+                                                            category),
                                                     radius: 16,
                                                     child: Icon(
-                                                      _getCategoryIcon(category),
+                                                      _getCategoryIcon(
+                                                          category),
                                                       color: Colors.white,
                                                       size: 16,
                                                     ),
@@ -681,19 +798,25 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                                                   const SizedBox(width: 12),
                                                   Expanded(
                                                     child: Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
                                                       children: [
                                                         Text(
-                                                          material['material_name'],
-                                                          style: const TextStyle(
-                                                            fontWeight: FontWeight.bold,
+                                                          material[
+                                                              'material_name'],
+                                                          style:
+                                                              const TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.bold,
                                                             fontSize: 14,
                                                           ),
                                                         ),
                                                         Text(
                                                           'Code: ${material['material_code']}',
                                                           style: TextStyle(
-                                                            color: Colors.grey[600],
+                                                            color: Colors
+                                                                .grey[600],
                                                             fontSize: 12,
                                                           ),
                                                         ),
@@ -701,8 +824,11 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                                                     ),
                                                   ),
                                                   IconButton(
-                                                    icon: const Icon(Icons.remove_circle, color: Colors.red),
-                                                    onPressed: () => _removeMaterial(index),
+                                                    icon: const Icon(
+                                                        Icons.remove_circle,
+                                                        color: Colors.red),
+                                                    onPressed: () =>
+                                                        _removeMaterial(index),
                                                     tooltip: 'Remove Material',
                                                   ),
                                                 ],
@@ -722,34 +848,55 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                                                   SizedBox(
                                                     width: 80,
                                                     child: TextFormField(
-                                                      initialValue: material['quantity_requested'].toString(),
-                                                      keyboardType: TextInputType.number,
-                                                      decoration: const InputDecoration(
-                                                        border: OutlineInputBorder(),
-                                                        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                      initialValue: material[
+                                                              'quantity_requested']
+                                                          .toString(),
+                                                      keyboardType:
+                                                          TextInputType.number,
+                                                      decoration:
+                                                          const InputDecoration(
+                                                        border:
+                                                            OutlineInputBorder(),
+                                                        contentPadding:
+                                                            EdgeInsets
+                                                                .symmetric(
+                                                                    horizontal:
+                                                                        8,
+                                                                    vertical:
+                                                                        4),
                                                         isDense: true,
                                                       ),
                                                       validator: (value) {
-                                                        if (value == null || value.isEmpty) {
+                                                        if (value == null ||
+                                                            value.isEmpty) {
                                                           return 'Required';
                                                         }
-                                                        final quantity = int.tryParse(value);
-                                                        if (quantity == null || quantity <= 0) {
+                                                        final quantity =
+                                                            int.tryParse(value);
+                                                        if (quantity == null ||
+                                                            quantity <= 0) {
                                                           return 'Invalid';
                                                         }
-                                                        if (quantity > material['available_stock']) {
+                                                        if (quantity >
+                                                            material[
+                                                                'available_stock']) {
                                                           return 'Exceeds stock';
                                                         }
                                                         return null;
                                                       },
                                                       onChanged: (value) {
-                                                        final quantity = int.tryParse(value) ?? 0;
-                                                        _updateQuantity(index, quantity);
+                                                        final quantity =
+                                                            int.tryParse(
+                                                                    value) ??
+                                                                0;
+                                                        _updateQuantity(
+                                                            index, quantity);
                                                       },
                                                     ),
                                                   ),
                                                   const SizedBox(width: 8),
-                                                  Text(material['unit_of_measure']),
+                                                  Text(material[
+                                                      'unit_of_measure']),
                                                 ],
                                               ),
                                             ],
@@ -773,7 +920,8 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                                 children: [
                                   Row(
                                     children: [
-                                      Icon(Icons.note_add, color: Colors.grey[700]),
+                                      Icon(Icons.note_add,
+                                          color: Colors.grey[700]),
                                       const SizedBox(width: 8),
                                       Text(
                                         'Additional Notes',
@@ -790,7 +938,8 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                                     controller: _notesController,
                                     decoration: const InputDecoration(
                                       labelText: 'Notes (Optional)',
-                                      hintText: 'Add any additional notes about this material issuance...',
+                                      hintText:
+                                          'Add any additional notes about this material issuance...',
                                       border: OutlineInputBorder(),
                                       alignLabelWithHint: true,
                                     ),
@@ -807,11 +956,14 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
-                              onPressed: isSaving || selectedMaterials.isEmpty ? null : _submitIssuance,
+                              onPressed: isSaving || selectedMaterials.isEmpty
+                                  ? null
+                                  : _submitIssuance,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.blue[800],
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -819,7 +971,8 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                               ),
                               child: isSaving
                                   ? const Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         SizedBox(
                                           width: 20,
@@ -834,13 +987,16 @@ class _FacilitatorMaterialIssuancePageState extends State<FacilitatorMaterialIss
                                       ],
                                     )
                                   : Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         const Icon(Icons.send),
                                         const SizedBox(width: 8),
                                         Text(
                                           'Issue Materials to ${widget.facilitatorName}',
-                                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                          style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold),
                                         ),
                                       ],
                                     ),

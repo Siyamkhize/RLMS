@@ -87,7 +87,8 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
             headers: {'Content-Type': 'application/json'},
           ).timeout(const Duration(seconds: 5));
 
-          debugPrint('[CONTACTLESS] Response: ${response.statusCode} ${response.body}');
+          debugPrint(
+              '[CONTACTLESS] Response: ${response.statusCode} ${response.body}');
           if (response.statusCode == 200) {
             final result = jsonDecode(response.body);
             if (result['status'] == 'healthy') {
@@ -108,10 +109,8 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
     }
   }
 
-  Future<bool> _verifyWithSiameseModel(
-      String capturedImageBase64,
-      String storedTemplateBase64,
-      String learnerId) async {
+  Future<bool> _verifyWithSiameseModel(String capturedImageBase64,
+      String storedTemplateBase64, String learnerId) async {
     try {
       if (learnerId.isEmpty || learnerId == 'REPLACE_WITH_LEARNER_ID') {
         debugPrint('[CONTACTLESS] Invalid LearnerID: $learnerId');
@@ -121,7 +120,8 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
         return false;
       }
 
-      if (!isValidBase64(capturedImageBase64) || !isValidBase64(storedTemplateBase64)) {
+      if (!isValidBase64(capturedImageBase64) ||
+          !isValidBase64(storedTemplateBase64)) {
         debugPrint('[CONTACTLESS] Invalid base64 data');
         setState(() {
           _statusMessage = 'Invalid image data';
@@ -146,7 +146,8 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
         return false;
       }
 
-      debugPrint('[CONTACTLESS] Sending verification request: learnerId=$learnerId');
+      debugPrint(
+          '[CONTACTLESS] Sending verification request: learnerId=$learnerId');
       final url = '$_workingServerUrl/verify';
       final headers = {'Content-Type': 'application/json'};
       final body = jsonEncode({
@@ -157,28 +158,34 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
       });
 
       debugPrint('[CONTACTLESS] Request URL: $url');
-      debugPrint('[CONTACTLESS] Request body preview: image_base64.length=${capturedImageBase64.length}, stored_features_base64.length=${storedTemplateBase64.length}');
+      debugPrint(
+          '[CONTACTLESS] Request body preview: image_base64.length=${capturedImageBase64.length}, stored_features_base64.length=${storedTemplateBase64.length}');
 
-      final response = await http.post(
-        Uri.parse(url),
-        headers: headers,
-        body: body,
-      ).timeout(const Duration(seconds: 30));
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: headers,
+            body: body,
+          )
+          .timeout(const Duration(seconds: 30));
 
-      debugPrint('[CONTACTLESS] Response: ${response.statusCode} ${response.body}');
+      debugPrint(
+          '[CONTACTLESS] Response: ${response.statusCode} ${response.body}');
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
         if (result['success'] == true) {
           final isMatch = result['is_match'] == true;
           final distance = result['distance'];
           final threshold = result['threshold'];
-          debugPrint('[CONTACTLESS] Result - Distance: $distance, IsMatch: $isMatch, Threshold: $threshold');
+          debugPrint(
+              '[CONTACTLESS] Result - Distance: $distance, IsMatch: $isMatch, Threshold: $threshold');
           return isMatch;
         } else {
           setState(() {
             _statusMessage = result['message'] ?? 'Verification failed';
           });
-          debugPrint('[CONTACTLESS] Server error: ${result['message'] ?? result['error']}');
+          debugPrint(
+              '[CONTACTLESS] Server error: ${result['message'] ?? result['error']}');
           return false;
         }
       } else {
@@ -209,7 +216,8 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
         _currentLearnerIdForClocking = null;
         _currentClockingAction = null;
       });
-      debugPrint('[CONTACTLESS] Invalid learner ID: $_currentLearnerIdForClocking');
+      debugPrint(
+          '[CONTACTLESS] Invalid learner ID: $_currentLearnerIdForClocking');
       return;
     }
 
@@ -225,15 +233,19 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
       final capturedBase64 = base64Encode(capturedPngBytes);
 
       // Get stored templates (use the working method that returns the right data type)
-      final storedTemplates = await DatabaseHelper().getFingerprints(int.parse(learnerId));
+      final storedTemplates =
+          await DatabaseHelper().getFingerprints(int.parse(learnerId));
       final sourceafisTemplate = storedTemplates['left'];
       final isLeftHandTemplate = storedTemplates['right'];
 
       debugPrint('[CONTACTLESS] Learner ID: $learnerId');
-      debugPrint('[CONTACTLESS] sourceafisTemplate: ${sourceafisTemplate != null ? "${sourceafisTemplate.length} bytes" : "NULL"}');
-      debugPrint('[CONTACTLESS] isLeftHandTemplate: ${isLeftHandTemplate != null ? "${isLeftHandTemplate.length} bytes" : "NULL"}');
+      debugPrint(
+          '[CONTACTLESS] sourceafisTemplate: ${sourceafisTemplate != null ? "${sourceafisTemplate.length} bytes" : "NULL"}');
+      debugPrint(
+          '[CONTACTLESS] isLeftHandTemplate: ${isLeftHandTemplate != null ? "${isLeftHandTemplate.length} bytes" : "NULL"}');
 
-      if ((sourceafisTemplate == null || sourceafisTemplate.isEmpty) && (isLeftHandTemplate == null || isLeftHandTemplate.isEmpty)) {
+      if ((sourceafisTemplate == null || sourceafisTemplate.isEmpty) &&
+          (isLeftHandTemplate == null || isLeftHandTemplate.isEmpty)) {
         setState(() {
           _statusMessage = 'No fingerprint template found for this learner';
           _isCapturing = false;
@@ -260,7 +272,8 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
             }
           }
           if (hasNaN) {
-            debugPrint('[CONTACTLESS] WARNING: sourceafis_template contains NaN/Inf');
+            debugPrint(
+                '[CONTACTLESS] WARNING: sourceafis_template contains NaN/Inf');
             _showCorruptionDialog(learnerId);
             return;
           }
@@ -269,13 +282,16 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
         }
 
         // sourceafisTemplate is already base64 encoded
-        matchFound = await _verifyWithSiameseModel(capturedBase64, sourceafisTemplate, learnerId);
+        matchFound = await _verifyWithSiameseModel(
+            capturedBase64, sourceafisTemplate, learnerId);
         debugPrint('[CONTACTLESS] Match with sourceafis_template: $matchFound');
       }
 
-      if (!matchFound && isLeftHandTemplate != null && isLeftHandTemplate.isNotEmpty) {
+      if (!matchFound &&
+          isLeftHandTemplate != null &&
+          isLeftHandTemplate.isNotEmpty) {
         try {
-          // isLeftHandTemplate is already base64 encoded from getFingerprints  
+          // isLeftHandTemplate is already base64 encoded from getFingerprints
           final templateBytes = base64Decode(isLeftHandTemplate);
           final features = Float32List.view(templateBytes.buffer);
           bool hasNaN = false;
@@ -286,7 +302,8 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
             }
           }
           if (hasNaN) {
-            debugPrint('[CONTACTLESS] WARNING: isLeftHand_template contains NaN/Inf');
+            debugPrint(
+                '[CONTACTLESS] WARNING: isLeftHand_template contains NaN/Inf');
             _showCorruptionDialog(learnerId);
             return;
           }
@@ -295,7 +312,8 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
         }
 
         // isLeftHandTemplate is already base64 encoded
-        matchFound = await _verifyWithSiameseModel(capturedBase64, isLeftHandTemplate, learnerId);
+        matchFound = await _verifyWithSiameseModel(
+            capturedBase64, isLeftHandTemplate, learnerId);
         debugPrint('[CONTACTLESS] Match with isLeftHand_template: $matchFound');
       }
 
@@ -355,9 +373,11 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              await DatabaseHelper().clearFingerprintTemplates(int.parse(learnerId));
+              await DatabaseHelper()
+                  .clearFingerprintTemplates(int.parse(learnerId));
               setState(() {
-                _statusMessage = 'Templates cleared. Please re-enroll using the Enroll button.';
+                _statusMessage =
+                    'Templates cleared. Please re-enroll using the Enroll button.';
               });
               _showMessage('Templates cleared. Please re-enroll.');
             },
@@ -373,7 +393,11 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
       SnackBar(
         content: Text(message),
         duration: const Duration(seconds: 4),
-        backgroundColor: message.startsWith('✅') ? Colors.green : message.startsWith('❌') ? Colors.red : Colors.blue,
+        backgroundColor: message.startsWith('✅')
+            ? Colors.green
+            : message.startsWith('❌')
+                ? Colors.red
+                : Colors.blue,
       ),
     );
   }
@@ -397,9 +421,12 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
       await DatabaseHelper().insertClocking(attendance);
       debugPrint('[CONTACTLESS] Clock-in successful for learner $learnerId');
     } else if (action == 'out') {
-      final existingAttendance = await DatabaseHelper().getAttendanceForDay(learnerId, date);
-      if (existingAttendance == null || existingAttendance['clock_in_time'] == null) {
-        debugPrint('[CONTACTLESS] Cannot clock out. No prior clock-in for learner $learnerId');
+      final existingAttendance =
+          await DatabaseHelper().getAttendanceForDay(learnerId, date);
+      if (existingAttendance == null ||
+          existingAttendance['clock_in_time'] == null) {
+        debugPrint(
+            '[CONTACTLESS] Cannot clock out. No prior clock-in for learner $learnerId');
         setState(() {
           _statusMessage = 'Cannot clock out: No prior clock-in found';
         });
@@ -411,9 +438,11 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
           'synced': 0,
         };
         try {
-          final clockingId = int.parse(existingAttendance['clocking_id'].toString());
+          final clockingId =
+              int.parse(existingAttendance['clocking_id'].toString());
           await DatabaseHelper().updateClocking(clockingId, updatedAttendance);
-          debugPrint('[CONTACTLESS] Clock-out successful for learner $learnerId');
+          debugPrint(
+              '[CONTACTLESS] Clock-out successful for learner $learnerId');
         } catch (e) {
           debugPrint('[CONTACTLESS] Error updating clocking: $e');
         }
@@ -447,7 +476,9 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
   }
 
   Future<void> _verifyAndClockIn(String learnerId) async {
-    if (learnerId.isEmpty || learnerId == 'N/A' || learnerId == 'REPLACE_WITH_LEARNER_ID') {
+    if (learnerId.isEmpty ||
+        learnerId == 'N/A' ||
+        learnerId == 'REPLACE_WITH_LEARNER_ID') {
       setState(() {
         _statusMessage = 'Invalid learner ID';
       });
@@ -462,7 +493,9 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
   }
 
   Future<void> _verifyAndClockOut(String learnerId) async {
-    if (learnerId.isEmpty || learnerId == 'N/A' || learnerId == 'REPLACE_WITH_LEARNER_ID') {
+    if (learnerId.isEmpty ||
+        learnerId == 'N/A' ||
+        learnerId == 'REPLACE_WITH_LEARNER_ID') {
       setState(() {
         _statusMessage = 'Invalid learner ID';
       });
@@ -530,13 +563,19 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
 
   Future<void> _generateFeaturesFromWSQ(int learnerId) async {
     try {
-      debugPrint('[CONTACTLESS] Generating neural features for learner $learnerId');
+      debugPrint(
+          '[CONTACTLESS] Generating neural features for learner $learnerId');
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
 
       final result = await db.query(
         'learnerdetails',
-        columns: ['zkteco_left_template', 'zkteco_right_template', 'futronic_left_template', 'futronic_right_template'],
+        columns: [
+          'zkteco_left_template',
+          'zkteco_right_template',
+          'futronic_left_template',
+          'futronic_right_template'
+        ],
         where: 'LearnerID = ?',
         whereArgs: [learnerId],
       );
@@ -562,27 +601,36 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
         wsqTemplate = zkLeft;
         templateSource = 'zkteco_left_template';
         debugPrint('[CONTACTLESS] Using zkteco_left_template');
-      } else if (zkRight != null && zkRight.isNotEmpty && !zkRight.startsWith('{')) {
+      } else if (zkRight != null &&
+          zkRight.isNotEmpty &&
+          !zkRight.startsWith('{')) {
         wsqTemplate = zkRight;
         templateSource = 'zkteco_right_template';
         debugPrint('[CONTACTLESS] Using zkteco_right_template');
-      } else if (futronicLeft != null && futronicLeft.isNotEmpty && !futronicLeft.startsWith('{')) {
+      } else if (futronicLeft != null &&
+          futronicLeft.isNotEmpty &&
+          !futronicLeft.startsWith('{')) {
         wsqTemplate = futronicLeft;
         templateSource = 'futronic_left_template';
         debugPrint('[CONTACTLESS] Using futronic_left_template');
-      } else if (futronicRight != null && futronicRight.isNotEmpty && !futronicRight.startsWith('{')) {
+      } else if (futronicRight != null &&
+          futronicRight.isNotEmpty &&
+          !futronicRight.startsWith('{')) {
         wsqTemplate = futronicRight;
         templateSource = 'futronic_right_template';
         debugPrint('[CONTACTLESS] Using futronic_right_template');
       }
 
       if (wsqTemplate == null) {
-        debugPrint('[CONTACTLESS] No WSQ templates found for learner $learnerId');
-        _showMessage('❌ No scanner templates found. Please re-enroll using the fingerprint scanner.');
+        debugPrint(
+            '[CONTACTLESS] No WSQ templates found for learner $learnerId');
+        _showMessage(
+            '❌ No scanner templates found. Please re-enroll using the fingerprint scanner.');
         return;
       }
 
-      debugPrint('[CONTACTLESS] WSQ template from $templateSource, length: ${wsqTemplate.length}');
+      debugPrint(
+          '[CONTACTLESS] WSQ template from $templateSource, length: ${wsqTemplate.length}');
 
       await _checkServerHealth();
       if (_workingServerUrl == null) {
@@ -606,14 +654,16 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
         ),
       );
 
-      final response = await http.post(
-        Uri.parse('$_workingServerUrl/extract'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'LearnerID': learnerId,
-          'image_base64': wsqTemplate,
-        }),
-      ).timeout(const Duration(seconds: 30));
+      final response = await http
+          .post(
+            Uri.parse('$_workingServerUrl/extract'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'LearnerID': learnerId,
+              'image_base64': wsqTemplate,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
 
       Navigator.pop(context);
 
@@ -624,14 +674,17 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
           debugPrint('[CONTACTLESS] Neural features generated');
           final featuresBase64 = responseData['features_base64'] as String;
           final featuresBytes = base64Decode(featuresBase64);
-          await DatabaseHelper().saveFingerprintFeatures(learnerId, featuresBytes);
+          await DatabaseHelper()
+              .saveFingerprintFeatures(learnerId, featuresBytes);
           _showMessage('✅ Neural network features generated and saved');
         } else {
           debugPrint('[CONTACTLESS] Server error: ${responseData['error']}');
-          _showMessage('❌ Failed to generate features: ${responseData['error']}');
+          _showMessage(
+              '❌ Failed to generate features: ${responseData['error']}');
         }
       } else {
-        debugPrint('[CONTACTLESS] Server error ${response.statusCode}: ${response.body}');
+        debugPrint(
+            '[CONTACTLESS] Server error ${response.statusCode}: ${response.body}');
         _showMessage('❌ Server error (${response.statusCode})');
       }
     } catch (e) {
@@ -642,7 +695,8 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
   }
 
   Future<void> _initializeData() async {
-    debugPrint('[CONTACTLESS] Initializing data for classID: ${widget.classID}');
+    debugPrint(
+        '[CONTACTLESS] Initializing data for classID: ${widget.classID}');
     await _loadLearnersFromLocalDatabase();
     _startPeriodicRefresh();
   }
@@ -659,26 +713,39 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
   Future<void> _refreshDataWithoutClearingState() async {
     try {
       final dbHelper = DatabaseHelper();
-      final learnersWithClockingData = await dbHelper.getLearnersWithClockingData(widget.classID);
+      final learnersWithClockingData =
+          await dbHelper.getLearnersWithClockingData(widget.classID);
       setState(() {
         for (var learner in learnersWithClockingData) {
           String learnerId = learner['LearnerID']?.toString() ?? 'N/A';
           String clockInTime = learner['clock_in_time']?.toString() ?? '';
           String clockOutTime = learner['clock_out_time']?.toString() ?? '';
           String contactTime = learner['contact_time']?.toString() ?? '';
-          if (clockInTime.isNotEmpty && clockInTime != 'N/A' && clockInTime != 'null') {
+          if (clockInTime.isNotEmpty &&
+              clockInTime != 'N/A' &&
+              clockInTime != 'null') {
             clockInTimes[learnerId] = clockInTime;
           }
-          if (clockOutTime.isNotEmpty && clockOutTime != 'N/A' && clockOutTime != 'null') {
+          if (clockOutTime.isNotEmpty &&
+              clockOutTime != 'N/A' &&
+              clockOutTime != 'null') {
             clockOutTimes[learnerId] = clockOutTime;
           }
-          if (contactTime.isNotEmpty && contactTime != 'N/A' && contactTime != 'null') {
+          if (contactTime.isNotEmpty &&
+              contactTime != 'N/A' &&
+              contactTime != 'null') {
             contactTimes[learnerId] = contactTime;
           }
         }
         widget.learners.clear();
         widget.learners.addAll(learnersWithClockingData.map((learner) {
-          return Map<String, String>.from(learner.map((key, value) => MapEntry(key, value?.toString() ?? '')));
+          // Convert QueryRow to Map<String, dynamic> first, then to Map<String, String>
+          final Map<String, dynamic> learnerMap = <String, dynamic>{};
+          learner.forEach((key, value) {
+            learnerMap[key] = value;
+          });
+          return Map<String, String>.from(learnerMap
+              .map((key, value) => MapEntry(key, value?.toString() ?? '')));
         }).toList());
       });
     } catch (e) {
@@ -692,7 +759,8 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
   Future<void> _loadLearnersFromLocalDatabase() async {
     try {
       final dbHelper = DatabaseHelper();
-      final learnersWithClockingData = await dbHelper.getLearnersWithClockingData(widget.classID);
+      final learnersWithClockingData =
+          await dbHelper.getLearnersWithClockingData(widget.classID);
       setState(() {
         widget.learners.clear();
         for (var learner in learnersWithClockingData) {
@@ -700,13 +768,19 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
           String clockInTime = learner['clock_in_time']?.toString() ?? '';
           String clockOutTime = learner['clock_out_time']?.toString() ?? '';
           String contactTime = learner['contact_time']?.toString() ?? '';
-          if (clockInTime.isNotEmpty && clockInTime != 'N/A' && clockInTime != 'null') {
+          if (clockInTime.isNotEmpty &&
+              clockInTime != 'N/A' &&
+              clockInTime != 'null') {
             clockInTimes[learnerId] = clockInTime;
           }
-          if (clockOutTime.isNotEmpty && clockOutTime != 'N/A' && clockOutTime != 'null') {
+          if (clockOutTime.isNotEmpty &&
+              clockOutTime != 'N/A' &&
+              clockOutTime != 'null') {
             clockOutTimes[learnerId] = clockOutTime;
           }
-          if (contactTime.isNotEmpty && contactTime != 'N/A' && contactTime != 'null') {
+          if (contactTime.isNotEmpty &&
+              contactTime != 'N/A' &&
+              contactTime != 'null') {
             contactTimes[learnerId] = contactTime;
           }
           widget.learners.add({
@@ -719,7 +793,8 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
           });
         }
       });
-      debugPrint('[CONTACTLESS] Loaded learners: ${widget.learners.map((l) => l['LearnerID']).toList()}');
+      debugPrint(
+          '[CONTACTLESS] Loaded learners: ${widget.learners.map((l) => l['LearnerID']).toList()}');
     } catch (e) {
       debugPrint('[CONTACTLESS] Error loading learners: $e');
       setState(() {
@@ -740,7 +815,8 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
               child: Text(
                 _statusMessage,
                 style: TextStyle(
-                  color: _statusMessage.contains('Error') || _statusMessage.contains('failed')
+                  color: _statusMessage.contains('Error') ||
+                          _statusMessage.contains('failed')
                       ? Colors.red
                       : Colors.green,
                   fontWeight: FontWeight.bold,
@@ -751,108 +827,133 @@ class _ContactlessClockInPageState extends State<ContactlessClockInPage> {
             child: widget.learners.isEmpty
                 ? const Center(child: Text('No data available for this class'))
                 : SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.vertical,
-                child: DataTable(
-                  columns: const [
-                    DataColumn(label: Text('Name')),
-                    DataColumn(label: Text('Surname')),
-                    DataColumn(label: Text('ID Number')),
-                    DataColumn(label: Text('Clock In')),
-                    DataColumn(label: Text('Clock Out')),
-                    DataColumn(label: Text('Contact Time')),
-                    DataColumn(label: Text('Enroll (Debug)')),
-                  ],
-                  rows: widget.learners
-                      .where((learner) =>
-                  learner['LearnerID'] != null &&
-                      learner['LearnerID'].toString() != 'N/A' &&
-                      learner['LearnerID'].toString() != 'REPLACE_WITH_LEARNER_ID' &&
-                      learner['LearnerID'].toString().isNotEmpty)
-                      .map((learner) {
-                    String learnerId = learner['LearnerID']?.toString() ?? 'N/A';
-                    String name = learner['Name']?.toString() ?? 'N/A';
-                    String surname = learner['Surname']?.toString() ?? 'N/A';
-                    String clockInTime = clockInTimes[learnerId] ?? '';
-                    String clockOutTime = clockOutTimes[learnerId] ?? '';
-                    String contactTime = contactTimes[learnerId] ?? '';
-                    return DataRow(
-                      cells: [
-                        DataCell(Text(name)),
-                        DataCell(Text(surname)),
-                        DataCell(Text(learner['IDNumber']?.toString() ?? 'N/A')),
-                        DataCell(
-                          clockInTime.isEmpty
-                              ? ElevatedButton(
-                            onPressed: _isClockingIn[learnerId] == true
-                                ? null
-                                : () async {
-                              await _verifyAndClockIn(learnerId);
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                            ),
-                            child: const Text('Clock In'),
-                          )
-                              : Text(
-                            clockInTime,
-                            style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        DataCell(
-                          clockInTime.isNotEmpty && clockOutTime.isEmpty
-                              ? ElevatedButton(
-                            onPressed: _isClockingIn[learnerId] == true
-                                ? null
-                                : () async {
-                              await _verifyAndClockOut(learnerId);
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                            ),
-                            child: const Text('Clock Out'),
-                          )
-                              : Text(
-                            clockOutTime.isNotEmpty ? clockOutTime : '-',
-                            style: TextStyle(
-                              color: clockOutTime.isNotEmpty ? Colors.red : Colors.grey,
-                              fontWeight: clockOutTime.isNotEmpty ? FontWeight.bold : FontWeight.normal,
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          Text(
-                            contactTime.isNotEmpty ? contactTime : '-',
-                            style: TextStyle(
-                              color: contactTime.isNotEmpty ? Colors.blue : Colors.grey,
-                              fontWeight: contactTime.isNotEmpty ? FontWeight.bold : FontWeight.normal,
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          ElevatedButton(
-                            onPressed: (_isCapturing)
-                                ? null
-                                : () async {
-                              debugPrint('[CONTACTLESS] Enroll button for learner $learnerId');
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => EnrollmentPage(learnerId: int.parse(learnerId)),
+                    scrollDirection: Axis.horizontal,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.vertical,
+                      child: DataTable(
+                        columns: const [
+                          DataColumn(label: Text('Name')),
+                          DataColumn(label: Text('Surname')),
+                          DataColumn(label: Text('ID Number')),
+                          DataColumn(label: Text('Clock In')),
+                          DataColumn(label: Text('Clock Out')),
+                          DataColumn(label: Text('Contact Time')),
+                          DataColumn(label: Text('Enroll (Debug)')),
+                        ],
+                        rows: widget.learners
+                            .where((learner) =>
+                                learner['LearnerID'] != null &&
+                                learner['LearnerID'].toString() != 'N/A' &&
+                                learner['LearnerID'].toString() !=
+                                    'REPLACE_WITH_LEARNER_ID' &&
+                                learner['LearnerID'].toString().isNotEmpty)
+                            .map((learner) {
+                          String learnerId =
+                              learner['LearnerID']?.toString() ?? 'N/A';
+                          String name = learner['Name']?.toString() ?? 'N/A';
+                          String surname =
+                              learner['Surname']?.toString() ?? 'N/A';
+                          String clockInTime = clockInTimes[learnerId] ?? '';
+                          String clockOutTime = clockOutTimes[learnerId] ?? '';
+                          String contactTime = contactTimes[learnerId] ?? '';
+                          return DataRow(
+                            cells: [
+                              DataCell(Text(name)),
+                              DataCell(Text(surname)),
+                              DataCell(Text(
+                                  learner['IDNumber']?.toString() ?? 'N/A')),
+                              DataCell(
+                                clockInTime.isEmpty
+                                    ? ElevatedButton(
+                                        onPressed:
+                                            _isClockingIn[learnerId] == true
+                                                ? null
+                                                : () async {
+                                                    await _verifyAndClockIn(
+                                                        learnerId);
+                                                  },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green,
+                                        ),
+                                        child: const Text('Clock In'),
+                                      )
+                                    : Text(
+                                        clockInTime,
+                                        style: const TextStyle(
+                                            color: Colors.green,
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                              ),
+                              DataCell(
+                                clockInTime.isNotEmpty && clockOutTime.isEmpty
+                                    ? ElevatedButton(
+                                        onPressed:
+                                            _isClockingIn[learnerId] == true
+                                                ? null
+                                                : () async {
+                                                    await _verifyAndClockOut(
+                                                        learnerId);
+                                                  },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.red,
+                                        ),
+                                        child: const Text('Clock Out'),
+                                      )
+                                    : Text(
+                                        clockOutTime.isNotEmpty
+                                            ? clockOutTime
+                                            : '-',
+                                        style: TextStyle(
+                                          color: clockOutTime.isNotEmpty
+                                              ? Colors.red
+                                              : Colors.grey,
+                                          fontWeight: clockOutTime.isNotEmpty
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                        ),
+                                      ),
+                              ),
+                              DataCell(
+                                Text(
+                                  contactTime.isNotEmpty ? contactTime : '-',
+                                  style: TextStyle(
+                                    color: contactTime.isNotEmpty
+                                        ? Colors.blue
+                                        : Colors.grey,
+                                    fontWeight: contactTime.isNotEmpty
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
                                 ),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-                            child: const Text('Enroll'),
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
+                              ),
+                              DataCell(
+                                ElevatedButton(
+                                  onPressed: (_isCapturing)
+                                      ? null
+                                      : () async {
+                                          debugPrint(
+                                              '[CONTACTLESS] Enroll button for learner $learnerId');
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  EnrollmentPage(
+                                                      learnerId:
+                                                          int.parse(learnerId)),
+                                            ),
+                                          );
+                                        },
+                                  style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.blue),
+                                  child: const Text('Enroll'),
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
           ),
         ],
       ),

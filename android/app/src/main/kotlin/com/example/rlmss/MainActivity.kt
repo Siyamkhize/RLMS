@@ -24,9 +24,12 @@ import com.zkteco.android.biometric.module.fingerprint.FingerprintSensor
 import com.zkteco.android.biometric.module.fingerprint.exception.FingerprintSensorException
 import com.zkteco.android.biometric.module.fingerprintreader.ZKFingerService
 // Server-side inference - no TensorFlow Lite imports needed
+import android.net.Uri
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 // Import Futronic SDK classes
 import com.futronictech.AnsiSDKLib
@@ -140,6 +143,43 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // Copy ML Kit / document-scanner PDFs from content:// URIs to cache (Flutter File API cannot read them).
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.example.rlmss/scanner_pdf")
+            .setMethodCallHandler { call, result ->
+                if (call.method == "copyPdfToCache") {
+                    val uriString = call.arguments as? String
+                    if (uriString.isNullOrEmpty()) {
+                        result.error("INVALID", "Missing uri", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        val uri = Uri.parse(uriString)
+                        // Run I/O in a background thread to prevent ANR/crash for large documents
+                        Thread {
+                            try {
+                                val input = contentResolver.openInputStream(uri)
+                                if (input == null) {
+                                    Handler(Looper.getMainLooper()).post { result.error("OPEN_FAILED", "Cannot open URI", null) }
+                                    return@Thread
+                                }
+                                input.use { inp ->
+                                    val outFile = File(cacheDir, "doc_scan_${System.currentTimeMillis()}.pdf")
+                                    FileOutputStream(outFile).use { out -> inp.copyTo(out) }
+                                    Handler(Looper.getMainLooper()).post { result.success(outFile.absolutePath) }
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "copyPdfToCache async failed", e)
+                                Handler(Looper.getMainLooper()).post { result.error("COPY_FAILED", e.message, null) }
+                            }
+                        }.start()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "copyPdfToCache setup failed", e)
+                        result.error("COPY_FAILED", e.message, null)
+                    }
+                } else {
+                    result.notImplemented()
+                }
+            }
         // Existing ZKTeco channel setup (if any)
         flutterEngine.dartExecutor.binaryMessenger.let { messenger ->
             methodChannel = MethodChannel(messenger, METHOD_CHANNEL)

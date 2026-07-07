@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import 'package:signature/signature.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
@@ -12,21 +13,42 @@ import 'database_helper.dart';
 import 'config.dart';
 import 'GuardianDetailsPage.dart';
 import 'WorkExperienceForm.dart';
-import 'package:intl/intl.dart';
-import 'package:archive/archive.dart';
-import 'package:xml/xml.dart' as xml;
+import 'services/camera_resource_manager.dart';
 
 class LearnerDetailsPage extends StatefulWidget {
   final String learnerID;
+  final bool missingProfileOnlyMode;
+  final List<String>? missingProfileFields;
 
-  const LearnerDetailsPage({super.key, required this.learnerID});
+  const LearnerDetailsPage({
+    super.key,
+    required this.learnerID,
+    this.missingProfileOnlyMode = false,
+    this.missingProfileFields,
+  });
 
   @override
   _LearnerDetailsPageState createState() => _LearnerDetailsPageState();
 }
 
 class _LearnerDetailsPageState extends State<LearnerDetailsPage>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
+  bool get _isMissingProfileOnlyMode => widget.missingProfileOnlyMode;
+  Set<String> get _missingProfileFieldSet =>
+      (widget.missingProfileFields ?? const <String>[]).toSet();
+  bool get _needsProfileImageCapture =>
+      _missingProfileFieldSet.contains('profile_image');
+  bool get _needsSignatureCapture =>
+      _missingProfileFieldSet.contains('signature') ||
+      _missingProfileFieldSet.contains('witness_signature');
+  bool get _hasMissingDetailsFields {
+    const nonDetailsFields = {'signature', 'witness_signature', 'profile_image'};
+    return _missingProfileFieldSet.any((field) => !nonDetailsFields.contains(field));
+  }
+
+  // Camera resource manager for preventing conflicts
+  final CameraResourceManager _cameraManager = CameraResourceManager();
+
   Map<String, dynamic>? learnerData;
   Map<String, dynamic>? bankDetails;
   XFile? capturedImage;
@@ -41,21 +63,358 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
   final TextEditingController _witnessInitialsController =
       TextEditingController();
   CameraController? _cameraController;
-  bool _isCameraInitialized = false;
-  final bool _isWitnessSignatureCompleted = false;
   late Map<String, TextEditingController> _controllers;
 
   // Guardian fields
   bool _isMinor = false;
 
+  // Dropdown field definitions
+  final Map<String, List<String>> _dropdownOptions = {
+    'Title': ['Mr', 'Mrs', 'Miss', 'Ms', 'Dr', 'Prof'],
+    'Gender': ['Male', 'Female', 'Other'],
+    'Race': ['African', 'Coloured', 'Indian', 'Asian', 'White', 'Other'],
+    'Language': [
+      'Afrikaans',
+      'English',
+      'isiNdebele',
+      'isiXhosa',
+      'isiZulu',
+      'Sepedi',
+      'Sesotho',
+      'Setswana',
+      'siSwati',
+      'Tshivenda',
+      'Xitsonga'
+    ],
+    'Disability': [
+      'None',
+      'Visual Impairment',
+      'Hearing Impairment',
+      'Physical Disability',
+      'Mental Disability',
+      'Other'
+    ],
+  };
+
+  // Required dropdown fields
+  final Set<String> _requiredDropdownFields = {
+    'Race',
+    'Language',
+    'Disability'
+  };
+
   @override
   void initState() {
     super.initState();
+    // Add observer for app lifecycle changes
+    WidgetsBinding.instance.addObserver(this);
+
     _tabController = TabController(
         length: 5, vsync: this); // Will be updated after data loads
     _controllers = {};
     fetchLearnerDetails();
     syncLocalData();
+
+    // Add listeners to controllers for real-time dropdown updates
+    _setupControllerListeners();
+  }
+
+  @override
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    print('[LIFECYCLE] App state changed to: $state');
+
+    // Handle different app lifecycle states
+    switch (state) {
+      case AppLifecycleState.paused:
+        // App is going to background - could be ML Kit scanner launching
+        print('[LIFECYCLE] App paused - checking if ML Kit scanner is active');
+        if (_cameraManager.isMLKitScannerActive) {
+          print(
+              '[LIFECYCLE] ML Kit scanner is active - app paused for document scanning');
+        } else {
+          // Normal pause - release camera resources
+          _cameraManager.forceReleaseCameraAccess('App lifecycle: paused');
+        }
+        break;
+
+      case AppLifecycleState.resumed:
+        // App is coming back to foreground
+        print('[LIFECYCLE] App resumed');
+        // If ML Kit was active and we're resuming, it likely finished
+        if (_cameraManager.isMLKitScannerActive) {
+          print(
+              '[LIFECYCLE] App resumed after ML Kit scanner - marking scanner inactive');
+          _cameraManager.markMLKitScannerInactive();
+        }
+        break;
+
+      case AppLifecycleState.detached:
+        // App is being terminated
+        print(
+            '[LIFECYCLE] App detached - force releasing all camera resources');
+        _cameraManager.forceReleaseCameraAccess('App lifecycle: detached');
+        break;
+
+      case AppLifecycleState.inactive:
+        // App is inactive (e.g., phone call, notification panel)
+        print('[LIFECYCLE] App inactive');
+        break;
+
+      case AppLifecycleState.hidden:
+        // App is hidden
+        print('[LIFECYCLE] App hidden');
+        break;
+    }
+  }
+
+  void _setupControllerListeners() {
+    // Add listeners for dropdown fields to update UI when cleared
+    // Will be set up after controllers are initialized in fetchLearnerDetails
+  }
+
+  void _addControllerListeners() {
+    // Add listeners to dropdown field controllers for real-time UI updates
+    for (String field in _dropdownOptions.keys) {
+      if (_controllers[field] != null) {
+        _controllers[field]!.addListener(() {
+          if (mounted) {
+            setState(() {}); // Refresh UI when text changes
+          }
+        });
+      }
+    }
+
+    // Add listener to ID number field for automatic age, gender, and DOB calculation
+    if (_controllers['IDNumber'] != null) {
+      _controllers['IDNumber']!.addListener(() {
+        if (mounted) {
+          // Use Future.microtask to handle async call in listener
+          Future.microtask(() => _calculateAndUpdateFromIDNumber());
+        }
+      });
+    }
+  }
+
+  // Check if dropdown should be used
+  bool _shouldUseDropdown(String fieldName) {
+    // Use dropdown when controller text is empty
+    return (_controllers[fieldName]?.text.trim().isEmpty ?? true);
+  }
+
+  // Calculate and update age, gender, and DOB when ID number changes
+  Future<void> _calculateAndUpdateFromIDNumber() async {
+    // Try to get ID number from controller first, then fallback to learnerData
+    String? idNumber = _controllers['IDNumber']?.text.trim();
+    if (idNumber == null || idNumber.isEmpty) {
+      idNumber = learnerData?['IDNumber']?.toString().trim();
+    }
+
+    print('[ID_CALC] ===== CALCULATE FROM ID NUMBER =====');
+    print(
+        '[ID_CALC] IDNumber controller text: "${_controllers['IDNumber']?.text}"');
+    print('[ID_CALC] IDNumber from learnerData: "${learnerData?['IDNumber']}"');
+    print('[ID_CALC] Final IDNumber used: "$idNumber"');
+
+    if (idNumber == null || idNumber.length < 6) {
+      // Need at least 6 characters for date calculation
+      print('[ID_CALC] ❌ ID number too short or null: "$idNumber"');
+      return;
+    }
+
+    try {
+      // Calculate values from ID number
+      final age = _calculateAgeFromID(idNumber);
+      final dob = _calculateDOBFromID(idNumber);
+
+      // Gender requires 10 characters (7th digit)
+      final gender =
+          idNumber.length >= 10 ? _calculateGenderFromID(idNumber) : null;
+
+      print('[ID_CALC] Calculated values: Age=$age, Gender=$gender, DOB=$dob');
+
+      // Check if we should update (always update if offline or if values are wrong)
+      bool shouldUpdate = false;
+
+      // Get current values
+      final currentAge = learnerData?['Age']?.toString();
+      final currentGender = learnerData?['Gender']?.toString();
+
+      print(
+          '[ID_CALC] Current values: Age="$currentAge", Gender="$currentGender"');
+
+      // Always update if:
+      // 1. Age is null, empty, "0", or obviously wrong
+      // 2. Gender is null, empty, "Unknown", or doesn't match calculation
+      // 3. Date of Birth is default/wrong (1900-01-01)
+      // 4. We're offline (to fix any wrong values)
+
+      final currentDOB = learnerData?['DateOfBirth']?.toString();
+      final isDefaultDOB = currentDOB == null ||
+          currentDOB.isEmpty ||
+          currentDOB.startsWith('1900-01-01');
+
+      if (age != null &&
+          (currentAge == null ||
+              currentAge.isEmpty ||
+              currentAge == '0' ||
+              int.tryParse(currentAge) != age)) {
+        shouldUpdate = true;
+        print('[ID_CALC] 🔄 Age needs update: "$currentAge" → "$age"');
+      }
+
+      if (gender != null &&
+          (currentGender == null ||
+              currentGender.isEmpty ||
+              currentGender == 'Unknown' ||
+              currentGender != gender)) {
+        shouldUpdate = true;
+        print('[ID_CALC] 🔄 Gender needs update: "$currentGender" → "$gender"');
+      }
+
+      if (dob != null && isDefaultDOB) {
+        shouldUpdate = true;
+        print('[ID_CALC] 🔄 DOB needs update: "$currentDOB" → calculated DOB');
+      }
+
+      // Force update if we're offline (to fix any wrong cached values)
+      final isOffline = !await _checkConnectivity();
+      if (isOffline && (age != null || gender != null)) {
+        shouldUpdate = true;
+        print('[ID_CALC] 🔄 Forcing update because offline mode');
+      }
+
+      // Also force update if any value is obviously wrong (regardless of online/offline)
+      if ((currentAge == '0' || currentGender == 'Unknown' || isDefaultDOB) &&
+          (age != null || gender != null)) {
+        shouldUpdate = true;
+        print('[ID_CALC] 🔄 Forcing update because values are obviously wrong');
+      }
+
+      if (shouldUpdate) {
+        setState(() {
+          // Update Age field
+          if (age != null) {
+            learnerData!['Age'] = age.toString();
+            if (_controllers['Age'] != null) {
+              _controllers['Age']!.text = age.toString();
+            }
+            print('[ID_CALC] ✅ Updated Age to: $age');
+          }
+
+          // Update Gender field (only if we have enough digits)
+          if (gender != null) {
+            learnerData!['Gender'] = gender;
+            if (_controllers['Gender'] != null) {
+              _controllers['Gender']!.text = gender;
+            }
+            print('[ID_CALC] ✅ Updated Gender to: $gender');
+          }
+
+          // Update Date of Birth field (DateOfBirth is visible, DOB is hidden)
+          if (dob != null) {
+            final dobString =
+                '${dob.year}-${dob.month.toString().padLeft(2, '0')}-${dob.day.toString().padLeft(2, '0')}';
+            learnerData!['DateOfBirth'] = dobString;
+            if (_controllers['DateOfBirth'] != null) {
+              _controllers['DateOfBirth']!.text = dobString;
+            }
+            // Also store in DOB field for database compatibility (but DOB field is hidden from UI)
+            learnerData!['DOB'] = dobString;
+            print('[ID_CALC] ✅ Updated DOB to: $dobString');
+          }
+
+          // Update minor status
+          _isMinor = age != null && age < 18;
+        });
+
+        print(
+            '[ID_CALC] ✅ Auto-calculated from ID $idNumber: Age=$age, Gender=$gender, DOB=$dob, IsMinor=$_isMinor');
+
+        // CRITICAL: Save calculated values to database for offline persistence
+        if (age != null || gender != null || dob != null) {
+          _saveCalculatedValuesToDatabase(age, gender, dob);
+        }
+      } else {
+        print('[ID_CALC] ℹ️ No update needed - current values are correct');
+      }
+    } catch (e) {
+      print('[ID_CALC] ❌ Error calculating from ID number: $e');
+    }
+  }
+
+  // Save calculated age, gender, and DOB to database for offline persistence
+  Future<void> _saveCalculatedValuesToDatabase(
+      int? age, String? gender, DateTime? dob) async {
+    try {
+      Map<String, dynamic> updateData = {};
+
+      if (age != null) {
+        updateData['Age'] = age.toString();
+      }
+
+      if (gender != null) {
+        updateData['Gender'] = gender;
+      }
+
+      if (dob != null) {
+        final dobString =
+            '${dob.year}-${dob.month.toString().padLeft(2, '0')}-${dob.day.toString().padLeft(2, '0')}';
+        updateData['DateOfBirth'] = dobString;
+        updateData['DOB'] =
+            dobString; // Also update DOB field for compatibility
+      }
+
+      if (updateData.isNotEmpty) {
+        await DatabaseHelper()
+            .updateLearnerLocally(widget.learnerID, updateData);
+        print('[ID_CALC] 💾 Saved calculated values to database: $updateData');
+      }
+    } catch (e) {
+      print('[ID_CALC] ❌ Error saving calculated values to database: $e');
+    }
+  }
+
+  // Get user-friendly field labels
+  String _getFieldLabel(String fieldName) {
+    switch (fieldName) {
+      case 'AddressLine1':
+        return 'Street Name';
+      case 'AddressLine2':
+        return 'Suburb';
+      case 'AddressLine3':
+        return 'City/Town';
+      case 'PostalCode':
+        return 'Postal Code';
+      case 'classID':
+        return 'Class ID';
+      case 'IDNumber':
+        return 'ID Number';
+      case 'CellphoneNumber':
+        return 'Cellphone Number';
+      case 'DateOfBirth':
+        return 'Date of Birth';
+      case 'Title':
+        return 'Title';
+      case 'Grade':
+        return 'School Grade';
+      case 'SchoolGrade':
+        return 'School Grade';
+      case 'EducationLevel':
+        return 'Education Level';
+      case 'Qualification':
+        return 'Qualification';
+      case 'SchoolLocation':
+        return 'School Location';
+      case 'School':
+        return 'School';
+      case 'Institution':
+        return 'Institution';
+      default:
+        return fieldName;
+    }
   }
 
   void _updateTabController() {
@@ -88,11 +447,29 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       final month = int.parse(idNumber.substring(2, 4));
       final day = int.parse(idNumber.substring(4, 6));
 
+      // Validate month and day
+      if (month < 1 || month > 12) {
+        print('[GUARDIAN] Invalid month: $month');
+        return null;
+      }
+      if (day < 1 || day > 31) {
+        print('[GUARDIAN] Invalid day: $day');
+        return null;
+      }
+
       // Determine century (00-24 = 2000s, 25-99 = 1900s)
       final year = yearPrefix <= 24 ? 2000 + yearPrefix : 1900 + yearPrefix;
 
+      // Validate the date can be created
       final birthDate = DateTime(year, month, day);
       final today = DateTime.now();
+
+      // Check if birth date is not in the future
+      if (birthDate.isAfter(today)) {
+        print('[GUARDIAN] Birth date is in the future: $birthDate');
+        return null;
+      }
+
       int age = today.year - birthDate.year;
 
       if (today.month < birthDate.month ||
@@ -104,6 +481,69 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       return age;
     } catch (e) {
       print('[GUARDIAN] Error calculating age from ID: $e');
+      return null;
+    }
+  }
+
+  // Calculate gender from South African ID number
+  String? _calculateGenderFromID(String? idNumber) {
+    print('[GENDER] Calculating gender from ID: $idNumber');
+
+    if (idNumber == null || idNumber.length < 10) {
+      print('[GENDER] ID number is null or too short (need 10 digits)');
+      return null;
+    }
+
+    try {
+      // Gender digit is at position 6 (0-indexed)
+      final genderDigit = int.parse(idNumber.substring(6, 7));
+      print('[GENDER] Gender digit: $genderDigit');
+
+      // 0-4 = Female, 5-9 = Male
+      final gender = genderDigit < 5 ? 'Female' : 'Male';
+      print('[GENDER] Calculated gender: $gender');
+      return gender;
+    } catch (e) {
+      print('[GENDER] Error calculating gender from ID: $e');
+      return null;
+    }
+  }
+
+  // Calculate DOB from ID number
+  DateTime? _calculateDOBFromID(String? idNumber) {
+    if (idNumber == null || idNumber.length < 6) {
+      return null;
+    }
+
+    try {
+      final yearPrefix = int.parse(idNumber.substring(0, 2));
+      final month = int.parse(idNumber.substring(2, 4));
+      final day = int.parse(idNumber.substring(4, 6));
+
+      // Validate month and day
+      if (month < 1 || month > 12) {
+        print('[DOB] Invalid month: $month');
+        return null;
+      }
+      if (day < 1 || day > 31) {
+        print('[DOB] Invalid day: $day');
+        return null;
+      }
+
+      // Determine century (00-24 = 2000s, 25-99 = 1900s)
+      final year = yearPrefix <= 24 ? 2000 + yearPrefix : 1900 + yearPrefix;
+
+      final birthDate = DateTime(year, month, day);
+
+      // Check if birth date is not in the future
+      if (birthDate.isAfter(DateTime.now())) {
+        print('[DOB] Birth date is in the future: $birthDate');
+        return null;
+      }
+
+      return birthDate;
+    } catch (e) {
+      print('[DOB] Error calculating DOB from ID: $e');
       return null;
     }
   }
@@ -159,13 +599,22 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
           final jsonResponse = jsonDecode(response.body);
           if (jsonResponse['success'] == true) {
             setState(() {
-              learnerData = jsonResponse['data'];
+              learnerData = Map<String, dynamic>.from(
+                  jsonResponse['data']); // Create mutable copy
               isLoading = false;
               // Initialize controllers with fetched data
               learnerData!.forEach((key, value) {
                 _controllers[key] =
                     TextEditingController(text: value?.toString() ?? '');
               });
+              // Set up controller listeners after controllers are initialized
+              _addControllerListeners();
+            });
+
+            // Perform initial calculations from ID number (outside setState)
+            await _calculateAndUpdateFromIDNumber();
+
+            setState(() {
               // Check if learner is a minor - use Age field from data or calculate from ID
               int? age;
               if (learnerData!['Age'] != null) {
@@ -207,6 +656,14 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
             _controllers[key] =
                 TextEditingController(text: value?.toString() ?? '');
           });
+          // Set up controller listeners after controllers are initialized
+          _addControllerListeners();
+        });
+
+        // Perform initial calculations from ID number (outside setState)
+        await _calculateAndUpdateFromIDNumber();
+
+        setState(() {
           // Check if learner is a minor - use Age field from data or calculate from ID
           int? age;
           if (learnerData!['Age'] != null) {
@@ -270,6 +727,12 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
   @override
   void dispose() {
+    // Remove observer
+    WidgetsBinding.instance.removeObserver(this);
+
+    // Release camera resources on dispose
+    _cameraManager.releaseCameraAccess('LearnerDetailsPage dispose');
+
     _tabController.dispose();
     _learnerSignatureController.dispose();
     _witnessSignatureController.dispose();
@@ -280,6 +743,82 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
     super.dispose();
   }
 
+  // Update Age and Gender based on ID number
+  Future<void> _updateAgeRelatedFields() async {
+    try {
+      final idNumber = learnerData?['IDNumber']?.toString();
+      if (idNumber == null || idNumber.length < 6) {
+        print('[AGE_UPDATE] ID number not available or invalid: $idNumber');
+        return;
+      }
+
+      final age = _calculateAgeFromID(idNumber);
+      final gender = _calculateGenderFromID(idNumber);
+
+      if (age != null || gender != null) {
+        Map<String, dynamic> updateData = {};
+
+        if (age != null) {
+          updateData['Age'] = age.toString();
+          print('[AGE_UPDATE] Calculated age: $age');
+        }
+
+        if (gender != null) {
+          updateData['Gender'] = gender;
+          print('[AGE_UPDATE] Calculated gender: $gender');
+        }
+
+        // Update local data first
+        setState(() {
+          if (age != null) {
+            learnerData!['Age'] = age.toString();
+            _controllers['Age']?.text = age.toString();
+          }
+          if (gender != null) {
+            learnerData!['Gender'] = gender;
+            _controllers['Gender']?.text = gender;
+          }
+        });
+
+        // Update database
+        bool isConnected = await _checkConnectivity();
+        if (isConnected) {
+          final response = await http.post(
+            Uri.parse(AppConfig.updateLearnerUrl),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'LearnerID': widget.learnerID,
+              'data': updateData,
+            }),
+          );
+
+          if (response.statusCode == 200) {
+            final jsonResponse = jsonDecode(response.body);
+            if (jsonResponse['success'] == true) {
+              print('[AGE_UPDATE] Age/Gender updated successfully online');
+            } else {
+              print(
+                  '[AGE_UPDATE] Failed to update online: ${jsonResponse['message']}');
+              await DatabaseHelper()
+                  .updateLearnerLocally(widget.learnerID, updateData);
+            }
+          } else {
+            print('[AGE_UPDATE] Server error: ${response.statusCode}');
+            await DatabaseHelper()
+                .updateLearnerLocally(widget.learnerID, updateData);
+          }
+        } else {
+          await DatabaseHelper()
+              .updateLearnerLocally(widget.learnerID, updateData);
+          print('[AGE_UPDATE] Age/Gender updated locally (offline)');
+        }
+      }
+    } catch (e) {
+      print('[AGE_UPDATE] Error updating age/gender: $e');
+    }
+  }
+
+  // Initialize camera for direct camera capture
   Future<void> _initializeCamera() async {
     try {
       final cameras = await availableCameras();
@@ -287,14 +826,154 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       _cameraController =
           CameraController(firstCamera, ResolutionPreset.medium);
       await _cameraController!.initialize();
-      setState(() {
-        _isCameraInitialized = true;
-      });
+      print('[CAMERA] Camera initialized successfully');
     } catch (e) {
-      print("Camera initialization failed: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Camera initialization failed: $e')),
-      );
+      print('[CAMERA] Camera initialization failed: $e');
+      throw Exception('Camera initialization failed: $e');
+    }
+  }
+
+  // Force update Age and Gender (guaranteed update)
+  Future<void> _forceUpdateAgeAndGender() async {
+    try {
+      final idNumber = learnerData?['IDNumber']?.toString();
+      if (idNumber == null || idNumber.length < 6) {
+        print('[FORCE_UPDATE] ID number not available: $idNumber');
+        return;
+      }
+
+      final age = _calculateAgeFromID(idNumber);
+      final gender = _calculateGenderFromID(idNumber);
+
+      if (age != null || gender != null) {
+        Map<String, dynamic> forceUpdateData = {};
+
+        if (age != null) {
+          forceUpdateData['Age'] = age.toString();
+        }
+        if (gender != null) {
+          forceUpdateData['Gender'] = gender;
+        }
+
+        print('[FORCE_UPDATE] Force updating Age: $age, Gender: $gender');
+
+        // Update local data first
+        setState(() {
+          if (age != null) {
+            learnerData!['Age'] = age.toString();
+            _controllers['Age']?.text = age.toString();
+          }
+          if (gender != null) {
+            learnerData!['Gender'] = gender;
+            _controllers['Gender']?.text = gender;
+          }
+        });
+
+        // Always update database regardless of current values
+        bool isConnected = await _checkConnectivity();
+        if (isConnected) {
+          final response = await http.post(
+            Uri.parse(AppConfig.updateLearnerUrl),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'LearnerID': widget.learnerID,
+              'data': forceUpdateData,
+            }),
+          );
+
+          if (response.statusCode == 200) {
+            print('[FORCE_UPDATE] Force update successful online');
+          } else {
+            print('[FORCE_UPDATE] Online force update failed, saving locally');
+            await DatabaseHelper()
+                .updateLearnerLocally(widget.learnerID, forceUpdateData);
+          }
+        } else {
+          await DatabaseHelper()
+              .updateLearnerLocally(widget.learnerID, forceUpdateData);
+          print('[FORCE_UPDATE] Force update saved locally');
+        }
+      }
+    } catch (e) {
+      print('[FORCE_UPDATE] Error in force update: $e');
+    }
+  }
+
+  Future<void> _updateLearnerInformation() async {
+    try {
+      // Prepare the data to update
+      Map<String, dynamic> updateData = {};
+
+      // Add all the form fields that have been modified
+      _controllers.forEach((key, controller) {
+        if (controller.text.isNotEmpty) {
+          // For dropdown fields (Title, Race, Language, Disability), always include if not empty
+          // For other fields, only include if different from original database value
+          if (_dropdownOptions.containsKey(key)) {
+            // This is a dropdown field - include if controller has a value
+            updateData[key] = controller.text;
+          } else {
+            // Regular field - only include if different from original database value
+            if (controller.text != learnerData?[key]?.toString()) {
+              updateData[key] = controller.text;
+            }
+          }
+        }
+      });
+
+      // Always update Age and Gender if calculable from ID number
+      await _updateAgeRelatedFields();
+      await _forceUpdateAgeAndGender();
+
+      // If there's data to update, send it to the server
+      if (updateData.isNotEmpty) {
+        bool isConnected = await _checkConnectivity();
+        if (isConnected) {
+          final response = await http.post(
+            Uri.parse(AppConfig.updateLearnerUrl),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'LearnerID': widget.learnerID,
+              'data': updateData,
+            }),
+          );
+
+          if (response.statusCode == 200) {
+            final jsonResponse = jsonDecode(response.body);
+            if (jsonResponse['success'] == true) {
+              print('Learner information updated successfully');
+              // Update local learnerData map with the new values
+              setState(() {
+                updateData.forEach((key, value) {
+                  learnerData![key] = value;
+                });
+              });
+            } else {
+              print(
+                  'Failed to update learner information: ${jsonResponse['message']}');
+              throw Exception(jsonResponse['message']);
+            }
+          } else {
+            print(
+                'Failed to update learner information: HTTP ${response.statusCode}');
+            throw Exception('Server error: ${response.statusCode}');
+          }
+        } else {
+          // Save locally if no internet connection
+          await DatabaseHelper()
+              .updateLearnerLocally(widget.learnerID, updateData);
+          print('Learner information saved locally');
+          // Update local learnerData map with the new values
+          setState(() {
+            updateData.forEach((key, value) {
+              learnerData![key] = value;
+            });
+          });
+        }
+      }
+    } catch (e) {
+      print('Error updating learner information: $e');
+      rethrow;
     }
   }
 
@@ -309,10 +988,24 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       // Update learner information if any fields have changed
       await _updateLearnerInformation();
 
-      // Handle image upload
+      // Handle image - save locally when offline, upload when online
       if (capturedImage != null) {
-        print('Uploading captured image...');
-        await _uploadImage(capturedImage!.path);
+        final isConnected = await _checkConnectivity();
+        if (isConnected) {
+          print('Uploading captured image...');
+          await _uploadImage(capturedImage!.path);
+        } else {
+          await saveImageLocally(capturedImage!.path);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content:
+                    Text('Profile image saved locally (will sync when online)'),
+                backgroundColor: Colors.blue,
+              ),
+            );
+          }
+        }
       }
 
       // Handle learner signature
@@ -384,401 +1077,75 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       // Refresh the data to show updated information
       await fetchLearnerDetails();
 
-      print('Learner data update completed');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Learner data updated successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      print('Error updating learner details: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error updating data: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  Future<void> _updateLearnerInformation() async {
-    try {
-      // Prepare the data to update
-      Map<String, dynamic> updateData = {};
-
-      // Add all the form fields that have been modified
-      _controllers.forEach((key, controller) {
-        if (controller.text.isNotEmpty &&
-            controller.text != learnerData?[key]?.toString()) {
-          updateData[key] = controller.text;
-        }
-      });
-
-      // If there's data to update, send it to the server
-      if (updateData.isNotEmpty) {
-        bool isConnected = await _checkConnectivity();
-        if (isConnected) {
-          final response = await http.post(
-            Uri.parse(AppConfig.updateLearnerUrl),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'LearnerID': widget.learnerID,
-              'data': updateData,
-            }),
-          );
-
-          if (response.statusCode == 200) {
-            final jsonResponse = jsonDecode(response.body);
-            if (jsonResponse['success'] == true) {
-              print('Learner information updated successfully');
-            } else {
-              print(
-                  'Failed to update learner information: ${jsonResponse['message']}');
-              throw Exception(jsonResponse['message']);
-            }
-          } else {
-            print(
-                'Failed to update learner information: HTTP ${response.statusCode}');
-            throw Exception('Server error: ${response.statusCode}');
-          }
-        } else {
-          // Save locally if no internet connection
-          await DatabaseHelper()
-              .updateLearnerLocally(widget.learnerID, updateData);
-          print('Learner information saved locally');
-        }
-      }
-    } catch (e) {
-      print('Error updating learner information: $e');
-      rethrow;
-    }
-  }
-
-  Future<void> _captureImage(bool isPhoto) async {
-    if (!_isCameraInitialized) await _initializeCamera();
-    final imagePath = await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => CameraPreviewScreen(
-          cameraController: _cameraController!,
-          learnerID: widget.learnerID,
-        ),
-      ),
-    );
-
-    if (imagePath != null) {
-      print('Image captured: $imagePath');
-      final directory = await getApplicationDocumentsDirectory();
-      final savedImagePath =
-          '${directory.path}/learnerImages_${widget.learnerID}.png';
-      try {
-        final capturedFile = File(imagePath);
-        final savedImageFile = await capturedFile.copy(savedImagePath);
-        print('Image saved to: $savedImagePath');
-        bool isConnected = await _checkConnectivity();
-        if (isConnected) {
-          await saveImagePathToDatabase(savedImagePath);
-        } else {
-          await saveImageLocally(savedImagePath);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Image saved locally')),
-          );
-        }
-        setState(() {
-          capturedImage = XFile(savedImagePath);
-        });
-      } catch (e) {
-        print('Error saving image: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving image: $e')),
-        );
-      }
-    } else {
-      print('No image captured');
-    }
-  }
-
-  Future<void> saveImagePathToDatabase(String imagePath) async {
-    final imageName = imagePath.split('/').last;
-    try {
-      final response = await http.post(
-        Uri.parse(AppConfig.saveImageUrl),
-        body: {
-          'profile_image': imageName,
-          'LearnerID': widget.learnerID.trim(),
-        },
-      );
-      if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
-        if (jsonResponse['success']) {
-          print('Image path saved to server');
-        } else {
-          print('Failed to save image path: ${jsonResponse['message']}');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(
-                    'Failed to save image path: ${jsonResponse['message']}')),
-          );
-          await saveImageLocally(imagePath);
-        }
-      } else {
-        print('Failed to save image path: HTTP ${response.statusCode}');
+      final isConnected = await _checkConnectivity();
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(
-                  'Failed to save image path: Server error (${response.statusCode})')),
+            content: Text(isConnected
+                ? 'Data updated successfully'
+                : 'Data saved locally. Will sync when online.'),
+            backgroundColor: isConnected ? Colors.green : Colors.blue,
+          ),
         );
-        await saveImageLocally(imagePath);
       }
     } catch (e) {
-      print('Error saving image path: $e');
+      print('Error updating data: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving image path: $e')),
+        SnackBar(content: Text('Error updating data: $e')),
       );
-      await saveImageLocally(imagePath);
-    }
-  }
-
-  Future<void> saveImageLocally(String imagePath) async {
-    try {
-      await DatabaseHelper().saveImageLocally(widget.learnerID, imagePath);
-      print('Image saved locally for learner_id: ${widget.learnerID}');
-    } catch (e) {
-      print('Error saving image locally: $e');
-    }
-  }
-
-  Future<String> _saveSignatureImage(
-      Uint8List signatureBytes, String fileNamePrefix) async {
-    final tempDir = await getTemporaryDirectory();
-    final signatureFilePath =
-        '${tempDir.path}/${fileNamePrefix}_${widget.learnerID}.png';
-    final signatureFile = File(signatureFilePath);
-    await signatureFile.writeAsBytes(signatureBytes);
-    return signatureFilePath;
-  }
-
-  Future<void> _uploadSignature(String signaturePath, String fieldName) async {
-    final imageName = signaturePath.split('/').last;
-    final imageBytes = await File(signaturePath).readAsBytes();
-    try {
-      print('Uploading $fieldName for learner_id: ${widget.learnerID}');
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse(AppConfig.saveSignatureUrl),
-      );
-      request.files.add(http.MultipartFile.fromBytes(
-        fieldName,
-        imageBytes,
-        filename: imageName,
-      ));
-      request.fields['learner_id'] = widget.learnerID.trim();
-      var response = await request.send();
-      var responseBody = await response.stream.bytesToString();
-      print('$fieldName upload response: $responseBody');
-      if (response.statusCode == 200) {
-        var jsonResponse = jsonDecode(responseBody);
-        if (jsonResponse['success']) {
-          print('$fieldName uploaded successfully');
-        } else {
-          print('$fieldName upload failed: ${jsonResponse['message']}');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(
-                    'Failed to upload $fieldName: ${jsonResponse['message']}')),
-          );
-          await DatabaseHelper()
-              .saveSignatureLocally(widget.learnerID, signaturePath, fieldName);
-        }
-      } else {
-        print('Failed to upload $fieldName: HTTP ${response.statusCode}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  'Failed to upload $fieldName: Server error (${response.statusCode})')),
-        );
-        await DatabaseHelper()
-            .saveSignatureLocally(widget.learnerID, signaturePath, fieldName);
-      }
-    } catch (e) {
-      print('Error uploading $fieldName: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error uploading $fieldName: $e')),
-      );
-      await DatabaseHelper()
-          .saveSignatureLocally(widget.learnerID, signaturePath, fieldName);
-    }
-  }
-
-  Future<void> _uploadInitialsToServer(
-      String initials, String fieldName) async {
-    try {
-      print('Uploading $fieldName for learner_id: ${widget.learnerID}');
-      final response = await http.post(
-        Uri.parse(AppConfig.saveInitialsUrl),
-        body: {
-          'learner_id': widget.learnerID.trim(),
-          'field': fieldName,
-          'value': initials,
-        },
-      );
-      print('$fieldName upload response: ${response.body}');
-      if (response.statusCode == 200) {
-        var jsonResponse = jsonDecode(response.body);
-        if (jsonResponse['success']) {
-          print('$fieldName uploaded successfully');
-        } else {
-          print('$fieldName upload failed: ${jsonResponse['message']}');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(
-                    'Failed to upload $fieldName: ${jsonResponse['message']}')),
-          );
-          await DatabaseHelper()
-              .saveInitialsLocally(widget.learnerID, initials, fieldName);
-        }
-      } else {
-        print('Failed to upload $fieldName: HTTP ${response.statusCode}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  'Failed to upload $fieldName: Server error (${response.statusCode})')),
-        );
-        await DatabaseHelper()
-            .saveInitialsLocally(widget.learnerID, initials, fieldName);
-      }
-    } catch (e) {
-      print('Error uploading $fieldName: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error uploading $fieldName: $e')),
-      );
-      await DatabaseHelper()
-          .saveInitialsLocally(widget.learnerID, initials, fieldName);
-    }
-  }
-
-  Future<bool> _promptSignature(
-      String title, SignatureController controller, String fieldName) async {
-    bool saved = false;
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: SizedBox(
-          width: 300,
-          height: 200,
-          child:
-              Signature(controller: controller, backgroundColor: Colors.white),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => controller.clear(), child: const Text('Clear')),
-          TextButton(
-            onPressed: () async {
-              if (controller.isNotEmpty) {
-                final signatureBytes = await controller.toPngBytes();
-                if (signatureBytes != null) {
-                  final signaturePath =
-                      await _saveSignatureImage(signatureBytes, fieldName);
-                  bool isConnected = await _checkConnectivity();
-                  if (isConnected) {
-                    await _uploadSignature(signaturePath, fieldName);
-                  } else {
-                    await DatabaseHelper().saveSignatureLocally(
-                        widget.learnerID, signaturePath, fieldName);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('$fieldName saved locally')),
-                    );
-                  }
-                  saved = true;
-                  Navigator.pop(context);
-                }
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    return saved;
-  }
-
-  Future<bool> _promptInitials(
-      String title, TextEditingController controller, String fieldName) async {
-    bool saved = false;
-    final formKey = GlobalKey<FormState>();
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Enter $title'),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: controller,
-            decoration: const InputDecoration(hintText: 'e.g., JD'),
-            validator: (value) => value == null || value.trim().isEmpty
-                ? 'Field cannot be empty'
-                : null,
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel')),
-          TextButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                bool isConnected = await _checkConnectivity();
-                if (isConnected) {
-                  await _uploadInitialsToServer(controller.text, fieldName);
-                } else {
-                  await DatabaseHelper().saveInitialsLocally(
-                      widget.learnerID, controller.text, fieldName);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('$fieldName saved locally')),
-                  );
-                }
-                saved = true;
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    return saved;
-  }
-
-  Future<void> _openWitnessSignaturePad() async {
-    final witnessSignatureSaved = await _promptSignature(
-        'Witness Signature', _witnessSignatureController, 'witness_signature');
-    if (witnessSignatureSaved) {
-      await _promptInitials(
-          'Witness Initials', _witnessInitialsController, 'witness_initials');
-    }
-  }
-
-  Future<void> _openInitialsDialog() async {
-    final learnerInitialsSaved = await _promptInitials(
-        'Learner Initials', _learnerInitialsController, 'learner_initials');
-    if (learnerInitialsSaved) {
-      await _promptInitials(
-          'Witness Initials', _witnessInitialsController, 'witness_initials');
-    }
-  }
-
-  Future<void> _openSignaturePad() async {
-    final signatureSaved = await _promptSignature(
-        'Learner Signature', _learnerSignatureController, 'signature');
-    if (signatureSaved) {
-      await _promptInitials(
-          'Learner Initials', _learnerInitialsController, 'learner_initials');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isMissingProfileOnlyMode) {
+      final tabs = <Tab>[];
+      final views = <Widget>[];
+      final tabKeys = <String>[];
+
+      if (_hasMissingDetailsFields || _needsProfileImageCapture) {
+        tabs.add(const Tab(text: 'Profile'));
+        views.add(_buildDetailsTab());
+        tabKeys.add('profile');
+      }
+      if (_needsSignatureCapture) {
+        tabs.add(const Tab(text: 'Signature'));
+        views.add(_buildSignatureTab());
+        tabKeys.add('signature');
+      }
+
+      if (tabs.isEmpty) {
+        tabs.add(const Tab(text: 'Profile'));
+        views.add(_buildDetailsTab());
+        tabKeys.add('profile');
+      }
+
+      int initialIndex = 0;
+      final onlySignatureMissing = _needsSignatureCapture &&
+          !_hasMissingDetailsFields &&
+          !_needsProfileImageCapture;
+      if (onlySignatureMissing) {
+        final sigIdx = tabKeys.indexOf('signature');
+        if (sigIdx >= 0) initialIndex = sigIdx;
+      }
+
+      return DefaultTabController(
+        length: tabs.length,
+        initialIndex: initialIndex,
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Complete Profile'),
+            bottom: tabs.length > 1 ? TabBar(tabs: tabs) : null,
+          ),
+          body: isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : tabs.length == 1
+                  ? views.first
+                  : TabBarView(children: views),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Learner Details'),
@@ -824,127 +1191,348 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
   }
 
   Widget _buildDetailsTab() {
-    return learnerData != null && !learnerData!.containsKey('message')
-        ? Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  // Profile Image Section
-                  GestureDetector(
-                    onTap: () => _captureImage(true),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.blue, width: 3),
-                      ),
-                      child: CircleAvatar(
-                        radius: 60,
-                        backgroundColor: Colors.grey[200],
-                        child: ClipOval(
-                          child: _buildProfileImage(),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8.0),
-                  Text(
-                    'Tap to update profile image',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 16.0),
-                  // Age Display
-                  _buildAgeDisplay(),
-                  const SizedBox(height: 16.0),
-                  // Bank Details
-                  _buildBankDetails(),
-                  const SizedBox(height: 16.0),
-                  _buildDataList(learnerData!.entries.toList()),
-                  const SizedBox(height: 16.0),
-                  ElevatedButton(
-                    onPressed: _updateData,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 32.0, vertical: 12.0),
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('Update Learner Data'),
-                  ),
-                ],
+    if (learnerData == null || learnerData!.isEmpty) {
+      return const Center(child: Text('No learner data available'));
+    }
+
+    // Create custom field ordering and filter out unwanted fields
+    final allEntries = learnerData!.entries.toList();
+
+    // Fields to hide
+    final hiddenFields = {'DOB'};
+
+    // Define field order - school grade below school location, classID below school grade
+    final fieldOrder = [
+      'LearnerID',
+      'Title', // Title goes below Learner ID
+      'Name',
+      'Surname',
+      'IDNumber',
+      'Age',
+      'Gender',
+      'DateOfBirth', // DateOfBirth field (DOB is hidden)
+      'Race',
+      'Language',
+      'Disability',
+      'PhoneNumber',
+      'CellphoneNumber', // Phone number above email
+      'Email',
+      'AddressLine1', // Street Name
+      'AddressLine2', // Suburb
+      'AddressLine3', // City/Town
+      'PostalCode', // Postal Code
+      'SchoolLocation', // School location (if it exists)
+      'School', // Alternative school field name
+      'Institution', // Institution field
+      'Grade', // School grade below school location
+      'SchoolGrade', // Alternative school grade field name
+      'EducationLevel', // Education level field
+      'Qualification', // Qualification field
+      'classID', // classID comes after school grade
+    ];
+
+    // Create ordered entries list
+    final orderedEntries = <MapEntry<String, dynamic>>[];
+
+    // First add fields in the specified order
+    for (final fieldName in fieldOrder) {
+      final entry = allEntries
+          .where((e) => e.key == fieldName)
+          .firstWhere((e) => true, orElse: () => const MapEntry('', null));
+      if (entry.key.isNotEmpty && !hiddenFields.contains(entry.key)) {
+        orderedEntries.add(entry);
+      }
+    }
+
+    // Then add any remaining fields that weren't in the order list
+    for (final entry in allEntries) {
+      if (!fieldOrder.contains(entry.key) &&
+          !hiddenFields.contains(entry.key)) {
+        orderedEntries.add(entry);
+      }
+    }
+
+    List<MapEntry<String, dynamic>> entries = orderedEntries;
+    if (_isMissingProfileOnlyMode) {
+      final onlyFields = (widget.missingProfileFields ?? const <String>[])
+          .map((f) => f.trim())
+          .where((f) => f.isNotEmpty)
+          .toSet();
+      entries = orderedEntries
+          .where((entry) => onlyFields.contains(entry.key))
+          .where((entry) => _isEntryCurrentlyMissing(entry))
+          .toList();
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_isMissingProfileOnlyMode) ...[
+            Text(
+              _needsSignatureCapture && !_hasMissingDetailsFields && !_needsProfileImageCapture
+                  ? 'Capture the missing signature, then press Update Data.'
+                  : _needsProfileImageCapture && !_hasMissingDetailsFields
+                      ? 'Capture the missing profile image, then press Update Data.'
+                      : 'Fill in the missing profile fields below, then press Update Data.',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            if (_needsProfileImageCapture) ...[
+              Center(
+                child: _buildProfileImage(),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ] else ...[
+            // Profile Image Section
+            Center(
+              child: _buildProfileImage(),
+            ),
+            const SizedBox(height: 20),
+
+            // Age Display
+            _buildAgeDisplay(),
+            const SizedBox(height: 20),
+
+            // Bank Details (if available)
+            if (bankDetails != null) ...[
+              _buildBankDetails(),
+              const SizedBox(height: 20),
+            ],
+          ],
+
+          // Learner Data Fields
+          if (entries.isEmpty && _isMissingProfileOnlyMode)
+            const Text(
+              'No missing profile fields found.',
+              style: TextStyle(color: Colors.green),
+            )
+          else
+            _buildDataList(entries),
+
+          const SizedBox(height: 20),
+
+          // Update Button
+          Center(
+            child: ElevatedButton.icon(
+              onPressed: _updateData,
+              icon: const Icon(Icons.save),
+              label: const Text('Update Data'),
+              style: ElevatedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
               ),
             ),
-          )
-        : Center(child: Text(learnerData?['message'] ?? 'No data available'));
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _isEntryCurrentlyMissing(MapEntry<String, dynamic> entry) {
+    final controllerValue = _controllers[entry.key]?.text;
+    if (controllerValue != null && !_isMissingValue(controllerValue)) {
+      return false;
+    }
+    return _isMissingValue(entry.value);
+  }
+
+  bool _isMissingValue(dynamic value) {
+    final normalized = value?.toString().trim().toLowerCase() ?? '';
+    return normalized.isEmpty ||
+        normalized == 'null' ||
+        normalized == 'n/a' ||
+        normalized == 'na' ||
+        normalized == '-';
   }
 
   Widget _buildProfileImage() {
-    // First check if there's a captured image
-    if (capturedImage != null) {
-      return Image.file(
-        File(capturedImage!.path),
-        fit: BoxFit.cover,
-        width: 120,
-        height: 120,
-        errorBuilder: (context, error, stackTrace) {
-          return _buildDefaultImage();
-        },
-      );
-    }
+    // Check for profile image in learner data
+    String? imagePath = learnerData?['profile_image']?.toString();
 
-    // Then check if there's a profile image from the database
-    if (learnerData != null &&
-        learnerData!['profile_image'] != null &&
-        learnerData!['profile_image'].toString().isNotEmpty) {
-      return Image.network(
-        '${AppConfig.learnerImagesUrl}/${learnerData!['profile_image']}',
-        fit: BoxFit.cover,
-        width: 120,
-        height: 120,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return Container(
+    return GestureDetector(
+      onTap: _showImageCaptureOptions,
+      child: Stack(
+        children: [
+          Container(
             width: 120,
             height: 120,
-            color: Colors.grey[300],
-            child: Center(
-              child: CircularProgressIndicator(
-                value: loadingProgress.expectedTotalBytes != null
-                    ? loadingProgress.cumulativeBytesLoaded /
-                        loadingProgress.expectedTotalBytes!
-                    : null,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.grey[300]!, width: 2),
+            ),
+            child: ClipOval(
+              child: _getImageWidget(imagePath),
+            ),
+          ),
+          // Camera icon overlay
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.blue,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
               ),
+              child: const Icon(
+                Icons.camera_alt,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _getImageWidget(String? imagePath) {
+    if (imagePath != null && imagePath.isNotEmpty && imagePath != 'null') {
+      return Image.network(
+        '${AppConfig.learnerImagesUrl}/$imagePath',
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Center(
+            child: CircularProgressIndicator(
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded /
+                      loadingProgress.expectedTotalBytes!
+                  : null,
             ),
           );
         },
         errorBuilder: (context, error, stackTrace) {
-          print('Error loading profile image: $error');
-          return _buildDefaultImage();
+          return _buildDefaultImageContent();
         },
       );
     }
 
-    // Finally, show default image
-    return _buildDefaultImage();
+    // Check for captured image
+    if (capturedImage != null) {
+      return Image.file(
+        File(capturedImage!.path),
+        fit: BoxFit.cover,
+      );
+    }
+
+    // Finally, show default image content
+    return _buildDefaultImageContent();
   }
 
-  Widget _buildDefaultImage() {
+  Widget _buildDefaultImageContent() {
     return Container(
-      width: 120,
-      height: 120,
-      decoration: BoxDecoration(
-        color: Colors.grey[300],
-        shape: BoxShape.circle,
-      ),
+      color: Colors.grey[300],
       child: Icon(
         Icons.person,
         size: 60,
         color: Colors.grey[600],
       ),
     );
+  }
+
+  Future<void> _showImageCaptureOptions() async {
+    // Check if camera is already in use
+    if (_cameraManager.isCameraInUse) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_cameraManager.currentUser != null
+                ? 'Camera is being used by ${_cameraManager.currentUser}. Please wait and try again.'
+                : 'Camera is currently in use. Please wait and try again.'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        isDismissible: true,
+        enableDrag: true,
+        builder: (BuildContext context) {
+          return SafeArea(
+            child: Wrap(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    'Profile Photo Options',
+                    style: Theme.of(context).textTheme.titleLarge,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.camera_alt, color: Colors.blue),
+                  title: const Text('Take Photo'),
+                  subtitle: const Text('Use camera to capture new photo'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    // Add small delay to ensure modal is closed
+                    await Future.delayed(const Duration(milliseconds: 300));
+                    await _capturePhotoFromCamera();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library, color: Colors.green),
+                  title: const Text('Choose from Gallery'),
+                  subtitle: const Text('Select existing photo from gallery'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    // Add small delay to ensure modal is closed
+                    await Future.delayed(const Duration(milliseconds: 300));
+                    await _pickImageFromGallery();
+                  },
+                ),
+                if (capturedImage != null ||
+                    (learnerData?['profile_image']?.toString().isNotEmpty ==
+                            true &&
+                        learnerData?['profile_image']?.toString() != 'null'))
+                  ListTile(
+                    leading: const Icon(Icons.delete, color: Colors.red),
+                    title: const Text('Remove Photo',
+                        style: TextStyle(color: Colors.red)),
+                    subtitle: const Text('Delete current profile photo'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _removePhoto();
+                    },
+                  ),
+                ListTile(
+                  leading: const Icon(Icons.cancel, color: Colors.grey),
+                  title: const Text('Cancel'),
+                  onTap: () {
+                    Navigator.pop(context);
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      print('Error showing image capture options: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening photo options: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildAgeDisplay() {
@@ -1094,6 +1682,9 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       'futronic_left_template',
       'futronic_right_template',
       'profile_image',
+      'Age', // Age is calculated from ID, so read-only in UI
+      'Gender', // Gender is calculated from ID, so read-only in UI
+      'DateOfBirth', // DateOfBirth is calculated from ID, so read-only in UI
     ];
 
     return Column(
@@ -1104,6 +1695,10 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
         // Check if this field should be read-only
         final bool isReadOnly = readOnlyFields.contains(entry.key);
+        final bool isDropdownField = _dropdownOptions.containsKey(entry.key);
+        final bool shouldUseDropdown =
+            isDropdownField && _shouldUseDropdown(entry.key);
+        final bool isRequired = _requiredDropdownFields.contains(entry.key);
 
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -1119,10 +1714,29 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                     children: [
                       Expanded(
                         child: Text(
-                          entry.key,
+                          _getFieldLabel(entry.key),
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
+                      if (isRequired) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.red[100],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Required',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.red[800],
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
                       if (isReadOnly) ...[
                         const SizedBox(width: 8),
                         Icon(
@@ -1143,35 +1757,133 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                     ],
                   ),
                   const SizedBox(height: 8.0),
-                  TextFormField(
-                    controller: _controllers[entry.key],
-                    enabled: !isReadOnly,
-                    readOnly: isReadOnly,
-                    maxLines:
-                        isReadOnly && (entry.value?.toString().length ?? 0) > 50
-                            ? 3
-                            : 1,
-                    decoration: InputDecoration(
-                      labelText: entry.key,
-                      border: const OutlineInputBorder(),
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: 8.0,
-                        horizontal: 8.0,
+
+                  // Show dropdown or text field based on conditions
+                  if (shouldUseDropdown) ...[
+                    // Dropdown widget
+                    DropdownButtonFormField<String>(
+                      value: null, // Always start with null for empty dropdowns
+                      decoration: InputDecoration(
+                        labelText: _getFieldLabel(entry.key),
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 8.0,
+                          horizontal: 8.0,
+                        ),
+                        isDense: true,
+                        hintText: 'Select ${_getFieldLabel(entry.key)}',
+                        suffixIcon: isRequired
+                            ? const Icon(Icons.star,
+                                color: Colors.red, size: 16)
+                            : null,
                       ),
-                      isDense: true,
-                      filled: isReadOnly,
-                      fillColor: isReadOnly ? Colors.grey[100] : null,
-                      helperText: isReadOnly ? 'System-managed field' : null,
-                      helperStyle: TextStyle(
+                      items: _dropdownOptions[entry.key]!.map((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        if (newValue != null) {
+                          setState(() {
+                            _controllers[entry.key]!.text = newValue;
+                            // Don't update learnerData here - let _updateLearnerInformation handle it
+                          });
+                        }
+                      },
+                      validator: isRequired
+                          ? (value) {
+                              if (value == null || value.isEmpty) {
+                                return '${_getFieldLabel(entry.key)} is required';
+                              }
+                              return null;
+                            }
+                          : null,
+                    ),
+                  ] else ...[
+                    // Regular text field
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _controllers[entry.key],
+                            enabled: !isReadOnly,
+                            readOnly: isReadOnly,
+                            maxLines: isReadOnly &&
+                                    (entry.value?.toString().length ?? 0) > 50
+                                ? 3
+                                : 1,
+                            decoration: InputDecoration(
+                              labelText: _getFieldLabel(entry.key),
+                              border: const OutlineInputBorder(),
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 8.0,
+                                horizontal: 8.0,
+                              ),
+                              isDense: true,
+                              filled: isReadOnly,
+                              fillColor: isReadOnly ? Colors.grey[100] : null,
+                              helperText:
+                                  isReadOnly ? 'System-managed field' : null,
+                              helperStyle: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey[600],
+                              ),
+                              suffixIcon: isRequired
+                                  ? const Icon(Icons.star,
+                                      color: Colors.red, size: 16)
+                                  : null,
+                            ),
+                            style: TextStyle(
+                              color:
+                                  isReadOnly ? Colors.grey[700] : Colors.black,
+                              fontSize: isReadOnly ? 12 : 14,
+                            ),
+                            validator: isRequired
+                                ? (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return '${_getFieldLabel(entry.key)} is required';
+                                    }
+                                    return null;
+                                  }
+                                : null,
+                          ),
+                        ),
+                        // Clear button for dropdown fields when they have content
+                        if (isDropdownField &&
+                            !_shouldUseDropdown(entry.key)) ...[
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.clear, size: 20),
+                            onPressed: () {
+                              setState(() {
+                                _controllers[entry.key]!.clear();
+                              });
+                            },
+                            tooltip: 'Clear to show dropdown',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+
+                  // Helper text for dropdown fields
+                  if (isDropdownField && shouldUseDropdown) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Select from dropdown or type to search',
+                      style: TextStyle(
                         fontSize: 10,
                         color: Colors.grey[600],
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
-                    style: TextStyle(
-                      color: isReadOnly ? Colors.grey[700] : Colors.black,
-                      fontSize: isReadOnly ? 12 : 14,
-                    ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -1563,54 +2275,6 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
     return WorkExperienceForm(learnerID: widget.learnerID);
   }
 
-  Future<void> _uploadImage(String imagePath) async {
-    final imageName = imagePath.split('/').last;
-    final imageBytes = await File(imagePath).readAsBytes();
-    try {
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse(AppConfig.saveImageUrl),
-      );
-      request.files.add(http.MultipartFile.fromBytes(
-        'image',
-        imageBytes,
-        filename: imageName,
-      ));
-      request.fields['learner_id'] = widget.learnerID.trim();
-      var response = await request.send();
-      var responseBody = await response.stream.bytesToString();
-      print('Image upload response: $responseBody');
-      if (response.statusCode == 200) {
-        var jsonResponse = jsonDecode(responseBody);
-        if (jsonResponse['success']) {
-          print('Image uploaded successfully');
-        } else {
-          print('Image upload failed: ${jsonResponse['message']}');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content:
-                    Text('Failed to upload image: ${jsonResponse['message']}')),
-          );
-          await saveImageLocally(imagePath);
-        }
-      } else {
-        print('Failed to upload image: HTTP ${response.statusCode}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  'Failed to upload image: Server error (${response.statusCode})')),
-        );
-        await saveImageLocally(imagePath);
-      }
-    } catch (e) {
-      print('Error uploading image: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error uploading image: $e')),
-      );
-      await saveImageLocally(imagePath);
-    }
-  }
-
   Widget _buildAgreementTab() {
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -1649,79 +2313,6 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                         color: Colors.grey[600],
                         fontSize: 14,
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Agreement Status Section
-            Card(
-              elevation: 4,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Agreement Status',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[800],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildStatusIndicator('Learner Signature', 'signature'),
-                    const SizedBox(height: 12),
-                    _buildStatusIndicator(
-                        'Learner Initials', 'learner_initials'),
-                    const SizedBox(height: 12),
-                    _buildStatusIndicator(
-                        'Witness Signature', 'witness_signature'),
-                    const SizedBox(height: 12),
-                    _buildStatusIndicator(
-                        'Witness Initials', 'witness_initials'),
-                    const SizedBox(height: 16),
-                    _buildOverallStatus(),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Signatures Display Section
-            Card(
-              elevation: 4,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Captured Signatures',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[800],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildSignatureCard(
-                              'Learner Signature', 'signature', Colors.blue),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildSignatureCard('Witness Signature',
-                              'witness_signature', Colors.green),
-                        ),
-                      ],
                     ),
                   ],
                 ),
@@ -1780,244 +2371,12 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _openInitialsDialog,
-                            icon: const Icon(Icons.text_fields),
-                            label: const Text('Update Initials'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.orange,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              setState(() {
-                                isLoading = true;
-                              });
-                              fetchLearnerDetails();
-                            },
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Refresh Data'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.purple,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildStatusIndicator(String title, String field) {
-    bool isCompleted = _isFieldCompleted(field);
-    return Row(
-      children: [
-        Icon(
-          isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
-          color: isCompleted ? Colors.green : Colors.grey,
-          size: 24,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            title,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: isCompleted ? FontWeight.bold : FontWeight.normal,
-              color: isCompleted ? Colors.green : Colors.grey[600],
-            ),
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: isCompleted ? Colors.green[100] : Colors.grey[100],
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            isCompleted ? 'Completed' : 'Pending',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: isCompleted ? Colors.green[800] : Colors.grey[600],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOverallStatus() {
-    bool isComplete = _isAgreementComplete();
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isComplete ? Colors.green[50] : Colors.orange[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isComplete ? Colors.green : Colors.orange,
-          width: 2,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            isComplete ? Icons.check_circle : Icons.warning,
-            color: isComplete ? Colors.green : Colors.orange,
-            size: 32,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isComplete ? 'Agreement Ready' : 'Agreement Incomplete',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: isComplete ? Colors.green[800] : Colors.orange[800],
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  isComplete
-                      ? 'All required signatures and initials have been captured. You can now download the agreement.'
-                      : 'Please complete all required signatures and initials to generate the agreement.',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isComplete ? Colors.green[700] : Colors.orange[700],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSignatureCard(String title, String field, Color color) {
-    String? signaturePath = learnerData?[field]?.toString();
-    bool hasSignature = signaturePath != null && signaturePath.isNotEmpty;
-
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: hasSignature ? color : Colors.grey[300]!),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: hasSignature ? color : Colors.grey[100],
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(8),
-                topRight: Radius.circular(8),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  hasSignature ? Icons.check : Icons.edit,
-                  color: hasSignature ? Colors.white : Colors.grey[600],
-                  size: 16,
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: hasSignature ? Colors.white : Colors.grey[600],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(
-            height: 120,
-            child: hasSignature
-                ? ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(8),
-                      bottomRight: Radius.circular(8),
-                    ),
-                    child: Image.network(
-                      '${AppConfig.signaturesUrl}/$signaturePath',
-                      fit: BoxFit.contain,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Center(
-                          child: CircularProgressIndicator(
-                            value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded /
-                                    loadingProgress.expectedTotalBytes!
-                                : null,
-                          ),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey[100],
-                          child: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.error,
-                                    color: Colors.grey[600], size: 24),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Not found',
-                                  style: TextStyle(
-                                      color: Colors.grey[600], fontSize: 10),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  )
-                : Container(
-                    color: Colors.grey[50],
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.edit, color: Colors.grey[400], size: 32),
-                          const SizedBox(height: 4),
-                          Text(
-                            'No signature',
-                            style: TextStyle(
-                                color: Colors.grey[400], fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-          ),
-        ],
       ),
     );
   }
@@ -2103,351 +2462,576 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
     }
   }
 
-  String _updatePlaceholdersInDocument(
-      String documentXml, Map<String, String> replacements) {
-    var updatedXml = documentXml;
-    for (final entry in replacements.entries) {
-      updatedXml = updatedXml.replaceAll(entry.key, entry.value);
-    }
-    return updatedXml;
+  Future<String> _saveSignatureImage(
+      Uint8List signatureBytes, String fileNamePrefix) async {
+    // Use app documents directory so signatures persist for offline sync
+    final appDir = await getApplicationDocumentsDirectory();
+    final signatureFilePath =
+        '${appDir.path}/${fileNamePrefix}_${widget.learnerID}.png';
+    final signatureFile = File(signatureFilePath);
+    await signatureFile.writeAsBytes(signatureBytes);
+    return signatureFilePath;
   }
 
-  int _getNextRelationshipId(String relsXml) {
-    final document = xml.XmlDocument.parse(relsXml);
-    final relationships = document.findAllElements('Relationship');
-    final ids = relationships
-        .map((e) =>
-            int.tryParse(e.getAttribute('Id')?.replaceAll('rId', '') ?? '0') ??
-            0)
-        .toList();
-    return (ids.isEmpty ? 0 : ids.reduce((a, b) => a > b ? a : b)) + 1;
-  }
-
-  String _addRelationship(String relsXml, String relId, String target) {
-    final document = xml.XmlDocument.parse(relsXml);
-    final relationships = document.findElements('Relationships').first;
-    relationships.children.add(
-      xml.XmlElement(
-        xml.XmlName('Relationship'),
-        [
-          xml.XmlAttribute(xml.XmlName('Id'), relId),
-          xml.XmlAttribute(xml.XmlName('Type'),
-              'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image'),
-          xml.XmlAttribute(xml.XmlName('Target'), target),
-        ],
-      ),
-    );
-    return document.toXmlString();
-  }
-
-  String _replaceSignaturePlaceholder(
-      String documentXml, String placeholder, String relId) {
-    final document = xml.XmlDocument.parse(documentXml);
-    final textNodes = document.findAllElements('w:t');
-    for (final node in textNodes) {
-      if (node.text.contains(placeholder)) {
-        final parent = node.parent;
-        if (parent != null) {
-          final drawing = xml.XmlElement(
-            xml.XmlName('w:drawing'),
-            [],
-            [
-              xml.XmlElement(
-                xml.XmlName('wp:inline'),
-                [],
-                [
-                  xml.XmlElement(
-                    xml.XmlName('wp:extent'),
-                    [
-                      xml.XmlAttribute(xml.XmlName('cx'), '914400'),
-                      xml.XmlAttribute(xml.XmlName('cy'), '914400'),
-                    ],
-                  ),
-                  xml.XmlElement(
-                    xml.XmlName('wp:docPr'),
-                    [
-                      xml.XmlAttribute(xml.XmlName('id'), '1'),
-                      xml.XmlAttribute(xml.XmlName('name'), 'Picture 1'),
-                    ],
-                  ),
-                  xml.XmlElement(
-                    xml.XmlName('a:graphic'),
-                    [],
-                    [
-                      xml.XmlElement(
-                        xml.XmlName('a:graphicData'),
-                        [
-                          xml.XmlAttribute(xml.XmlName('uri'),
-                              'http://schemas.openxmlformats.org/drawingml/2006/picture')
-                        ],
-                        [
-                          xml.XmlElement(
-                            xml.XmlName('pic:pic'),
-                            [],
-                            [
-                              xml.XmlElement(xml.XmlName('pic:nvPicPr')),
-                              xml.XmlElement(
-                                xml.XmlName('pic:blipFill'),
-                                [],
-                                [
-                                  xml.XmlElement(
-                                    xml.XmlName('a:blip'),
-                                    [
-                                      xml.XmlAttribute(
-                                          xml.XmlName('r:embed'), relId)
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              xml.XmlElement(xml.XmlName('pic:spPr')),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          );
-          parent.children.clear();
-          parent.children.add(drawing);
-        }
-      }
-    }
-    return document.toXmlString();
-  }
-
-  Future<void> _generateAndOpenOfflineAgreement() async {
+  Future<void> _uploadSignature(String signaturePath, String fieldName) async {
+    final imageName = signaturePath.split('/').last;
+    final imageBytes = await File(signaturePath).readAsBytes();
     try {
-      final tempDir = await getTemporaryDirectory();
-      final docDir = await getApplicationDocumentsDirectory();
-      final templatePath = '${tempDir.path}/Cleaned_Updated_Agreement_V4.docx';
-      final templateFile = File(templatePath);
-
-      // Load the template from assets
-      if (!await templateFile.exists()) {
-        final byteData =
-            await rootBundle.load('assets/Cleaned_Updated_Agreement_V4.docx');
-        await templateFile.writeAsBytes(byteData.buffer.asUint8List());
-      }
-
-      final bytes = await templateFile.readAsBytes();
-      final originalArchive = ZipDecoder().decodeBytes(bytes);
-      final documentXmlFile = originalArchive.firstWhere(
-        (file) => file.name == 'word/document.xml',
-        orElse: () => throw 'document.xml not found',
+      print('Uploading $fieldName for learner_id: ${widget.learnerID}');
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse(AppConfig.saveSignatureUrl),
       );
-      var documentXml =
-          String.fromCharCodes(documentXmlFile.content as List<int>);
-      final relsFile = originalArchive.firstWhere(
-        (file) => file.name == 'word/_rels/document.xml.rels',
-        orElse: () => throw 'document.xml.rels not found',
-      );
-      var relsXml = String.fromCharCodes(relsFile.content as List<int>);
-
-      final learnerData =
-          await DatabaseHelper().fetchLearnerByID(widget.learnerID);
-      if (learnerData == null) throw 'Learner data not found';
-
-      final replacements = <String, String>{
-        r'${Name}': learnerData['Name']?.toString() ?? 'N/A',
-        r'${Surname}': learnerData['Surname']?.toString() ?? 'N/A',
-        r'${IDNumber}': learnerData['IDNumber']?.toString() ?? 'N/A',
-        r'${PhoneNumber}': learnerData['PhoneNumber']?.toString() ?? 'N/A',
-        r'${Date}': DateFormat('yyyy-MM-dd').format(DateTime.now()),
-        r'${Project_name}': learnerData['Project_name']?.toString() ?? 'N/A',
-        r'${Start_date}': learnerData['Start_date']?.toString() ?? 'N/A',
-        r'${End_date}': learnerData['End_date']?.toString() ?? 'N/A',
-        r'${sdp_name}': learnerData['sdp_name']?.toString() ?? 'N/A',
-        r'${sdp_logo}': learnerData['sdp_logo']?.toString() ?? 'N/A',
-        r'${learner_initials}':
-            learnerData['learner_initials']?.toString() ?? 'N/A',
-        r'${witness_initials}':
-            learnerData['witness_initials']?.toString() ?? 'N/A',
-        r'${qualification_name}':
-            learnerData['qualification_name']?.toString() ?? 'N/A',
-        r'${qualification_id}':
-            learnerData['qualification_id']?.toString() ?? 'N/A',
-        r'${pathway_name}': learnerData['pathway_name']?.toString() ?? 'N/A',
-        r'${Project_pathway}':
-            learnerData['Project_pathway']?.toString() ?? 'N/A',
-      };
-      documentXml = _updatePlaceholdersInDocument(documentXml, replacements);
-
-      final newArchive = Archive();
-      int nextRelId = _getNextRelationshipId(relsXml);
-      final imagePlaceholders = {
-        r'${learner_signature}': learnerData['signature']?.toString() ?? 'N/A',
-        r'${witness_signature}':
-            learnerData['witness_signature']?.toString() ?? 'N/A',
-      };
-
-      for (final entry in imagePlaceholders.entries) {
-        final placeholder = entry.key;
-        var filePath = entry.value;
-        if (filePath != 'N/A') {
-          final fullImagePath =
-              filePath.startsWith('/') ? filePath : '${docDir.path}/$filePath';
-          final imageFile = File(fullImagePath);
-          if (await imageFile.exists()) {
-            final imageBytes = await imageFile.readAsBytes();
-            final imageRelId = 'rId$nextRelId';
-            final imageName =
-                placeholder.replaceAll(r'${', '').replaceAll('}', '');
-            newArchive.addFile(ArchiveFile(
-                'word/media/$imageName.png', imageBytes.length, imageBytes));
-            relsXml =
-                _addRelationship(relsXml, imageRelId, 'media/$imageName.png');
-            documentXml = _replaceSignaturePlaceholder(
-                documentXml, placeholder, imageRelId);
-            nextRelId++;
-          }
-        }
-      }
-
-      for (final file in originalArchive) {
-        if (file.name == 'word/document.xml') {
-          newArchive.addFile(ArchiveFile(
-              'word/document.xml', documentXml.length, documentXml.codeUnits));
-        } else if (file.name == 'word/_rels/document.xml.rels') {
-          newArchive.addFile(ArchiveFile('word/_rels/document.xml.rels',
-              relsXml.length, relsXml.codeUnits));
-        } else {
-          newArchive.addFile(file);
-        }
-      }
-
-      final updatedDocxBytes = ZipEncoder().encode(newArchive);
-      if (updatedDocxBytes == null) throw 'Failed to encode DOCX';
-      final updatedDocxPath =
-          '${tempDir.path}/Learner_Agreement_${widget.learnerID}.docx';
-      final updatedDocxFile = File(updatedDocxPath);
-      await updatedDocxFile.writeAsBytes(updatedDocxBytes);
-
-      final uploadDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      await DatabaseHelper().saveLearnerDocumentToDatabase(
-        widget.learnerID,
-        'Learner_Agreement_${widget.learnerID}.docx',
-        updatedDocxPath,
-        'pending',
-        uploadDate,
-      );
-
-      final result = await OpenFile.open(updatedDocxPath);
-      if (result.type != ResultType.done) {
-        throw 'Failed to open file: ${result.message}';
-      }
-    } catch (e) {
-      print('Error generating offline agreement: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error generating agreement: $e')),
-      );
-    }
-  }
-}
-
-class FacialRecognitionPage extends StatefulWidget {
-  const FacialRecognitionPage({super.key});
-
-  @override
-  _FacialRecognitionPageState createState() => _FacialRecognitionPageState();
-}
-
-class _FacialRecognitionPageState extends State<FacialRecognitionPage> {
-  CameraController? _controller;
-  bool _isCameraReady = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializeCamera();
-  }
-
-  Future<void> _initializeCamera() async {
-    try {
-      final cameras = await availableCameras();
-      final camera = cameras.first;
-      _controller = CameraController(camera, ResolutionPreset.high);
-      await _controller!.initialize();
-      setState(() {
-        _isCameraReady = true;
-      });
-    } catch (e) {
-      print('Camera initialization failed: $e');
-    }
-  }
-
-  Future<void> _captureFaceImage() async {
-    if (_controller != null && _controller!.value.isInitialized) {
-      try {
-        final image = await _controller!.takePicture();
-        final bytes = await image.readAsBytes();
-        await _sendImageToBackend(bytes);
-      } catch (e) {
-        print('Error capturing face image: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error capturing face image: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _sendImageToBackend(Uint8List imageBytes) async {
-    try {
-      final uri = Uri.parse(AppConfig.uploadImageUrl);
-      final request = http.MultipartRequest('POST', uri)
-        ..files.add(http.MultipartFile.fromBytes('face_image', imageBytes,
-            filename: 'face_image.jpg'));
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-      print('Face image upload response: $responseBody');
+      request.files.add(http.MultipartFile.fromBytes(
+        fieldName,
+        imageBytes,
+        filename: imageName,
+      ));
+      request.fields['learner_id'] = widget.learnerID.trim();
+      var response = await request.send();
+      var responseBody = await response.stream.bytesToString();
+      print('$fieldName upload response: $responseBody');
       if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(responseBody);
+        var jsonResponse = jsonDecode(responseBody);
         if (jsonResponse['success']) {
-          print('Face image uploaded successfully');
+          print('$fieldName uploaded successfully');
         } else {
-          print('Face image upload failed: ${jsonResponse['message']}');
+          print('$fieldName upload failed: ${jsonResponse['message']}');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
                 content: Text(
-                    'Failed to upload face image: ${jsonResponse['message']}')),
+                    'Failed to upload $fieldName: ${jsonResponse['message']}')),
           );
+          await DatabaseHelper()
+              .saveSignatureLocally(widget.learnerID, signaturePath, fieldName);
         }
       } else {
-        print('Failed to upload face image: HTTP ${response.statusCode}');
+        print('Failed to upload $fieldName: HTTP ${response.statusCode}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(
-                  'Failed to upload face image: Server error (${response.statusCode})')),
+                  'Failed to upload $fieldName: Server error (${response.statusCode})')),
         );
+        await DatabaseHelper()
+            .saveSignatureLocally(widget.learnerID, signaturePath, fieldName);
       }
     } catch (e) {
-      print('Error uploading face image: $e');
+      print('Error uploading $fieldName: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error uploading face image: $e')),
+        SnackBar(content: Text('Error uploading $fieldName: $e')),
       );
+      await DatabaseHelper()
+          .saveSignatureLocally(widget.learnerID, signaturePath, fieldName);
     }
   }
 
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
+  Future<void> _uploadInitialsToServer(
+      String initials, String fieldName) async {
+    try {
+      print('Uploading $fieldName for learner_id: ${widget.learnerID}');
+      final response = await http.post(
+        Uri.parse(AppConfig.saveInitialsUrl),
+        body: {
+          'learner_id': widget.learnerID.trim(),
+          'field': fieldName,
+          'value': initials,
+        },
+      );
+      print('$fieldName upload response: ${response.body}');
+      if (response.statusCode == 200) {
+        var jsonResponse = jsonDecode(response.body);
+        if (jsonResponse['success']) {
+          print('$fieldName uploaded successfully');
+        } else {
+          print('$fieldName upload failed: ${jsonResponse['message']}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(
+                    'Failed to upload $fieldName: ${jsonResponse['message']}')),
+          );
+          await DatabaseHelper()
+              .saveInitialsLocally(widget.learnerID, initials, fieldName);
+        }
+      } else {
+        print('Failed to upload $fieldName: HTTP ${response.statusCode}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  'Failed to upload $fieldName: Server error (${response.statusCode})')),
+        );
+        await DatabaseHelper()
+            .saveInitialsLocally(widget.learnerID, initials, fieldName);
+      }
+    } catch (e) {
+      print('Error uploading $fieldName: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error uploading $fieldName: $e')),
+      );
+      await DatabaseHelper()
+          .saveInitialsLocally(widget.learnerID, initials, fieldName);
+    }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Facial Recognition")),
-      body: const Center(
-        child: Text('Camera functionality temporarily disabled'),
+  Future<bool> _promptSignature(
+      String title, SignatureController controller, String fieldName) async {
+    bool saved = false;
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: SizedBox(
+          width: 300,
+          height: 200,
+          child:
+              Signature(controller: controller, backgroundColor: Colors.white),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => controller.clear(), child: const Text('Clear')),
+          TextButton(
+            onPressed: () async {
+              if (controller.isNotEmpty) {
+                final signatureBytes = await controller.toPngBytes();
+                if (signatureBytes != null) {
+                  final signaturePath =
+                      await _saveSignatureImage(signatureBytes, fieldName);
+                  bool isConnected = await _checkConnectivity();
+                  if (isConnected) {
+                    await _uploadSignature(signaturePath, fieldName);
+                  } else {
+                    await DatabaseHelper().saveSignatureLocally(
+                        widget.learnerID, signaturePath, fieldName);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('$fieldName saved locally')),
+                    );
+                  }
+                  saved = true;
+                  Navigator.pop(context);
+                }
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    return saved;
+  }
+
+  Future<bool> _promptInitials(
+      String title, TextEditingController controller, String fieldName) async {
+    bool saved = false;
+    final formKey = GlobalKey<FormState>();
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Enter $title'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: controller,
+            decoration: const InputDecoration(hintText: 'e.g., JD'),
+            validator: (value) => value == null || value.trim().isEmpty
+                ? 'Field cannot be empty'
+                : null,
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              if (formKey.currentState!.validate()) {
+                bool isConnected = await _checkConnectivity();
+                if (isConnected) {
+                  await _uploadInitialsToServer(controller.text, fieldName);
+                } else {
+                  await DatabaseHelper().saveInitialsLocally(
+                      widget.learnerID, controller.text, fieldName);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('$fieldName saved locally')),
+                  );
+                }
+                saved = true;
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    return saved;
+  }
+
+  Future<void> _openWitnessSignaturePad() async {
+    final witnessSignatureSaved = await _promptSignature(
+        'Witness Signature', _witnessSignatureController, 'witness_signature');
+    if (witnessSignatureSaved) {
+      await _promptInitials(
+          'Witness Initials', _witnessInitialsController, 'witness_initials');
+    }
+  }
+
+  Future<void> _openInitialsDialog() async {
+    final learnerInitialsSaved = await _promptInitials(
+        'Learner Initials', _learnerInitialsController, 'learner_initials');
+    if (learnerInitialsSaved) {
+      await _promptInitials(
+          'Witness Initials', _witnessInitialsController, 'witness_initials');
+    }
+  }
+
+  Future<void> _openSignaturePad() async {
+    final signatureSaved = await _promptSignature(
+        'Learner Signature', _learnerSignatureController, 'signature');
+    if (signatureSaved) {
+      await _promptInitials(
+          'Learner Initials', _learnerInitialsController, 'learner_initials');
+    }
+  }
+
+  Future<void> _uploadImage(String imagePath) async {
+    try {
+      // Validate image file exists and is readable
+      final File imageFile = File(imagePath);
+      if (!await imageFile.exists()) {
+        throw Exception('Image file does not exist: $imagePath');
+      }
+
+      final int fileSize = await imageFile.length();
+      if (fileSize == 0) {
+        throw Exception('Image file is empty');
+      }
+
+      print('Uploading image: $imagePath ($fileSize bytes)');
+
+      final imageName = imagePath.split('/').last;
+      final imageBytes = await imageFile.readAsBytes();
+
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse(AppConfig.saveImageUrl),
+      );
+
+      request.files.add(http.MultipartFile.fromBytes(
+        'image',
+        imageBytes,
+        filename: imageName,
+      ));
+
+      request.fields['learner_id'] = widget.learnerID.trim();
+
+      // Add timeout to prevent hanging
+      var response = await request.send().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception(
+              'Upload timeout - please check your internet connection');
+        },
+      );
+
+      var responseBody = await response.stream.bytesToString();
+      print('Image upload response: $responseBody');
+
+      if (response.statusCode == 200) {
+        var jsonResponse = jsonDecode(responseBody);
+        if (jsonResponse['success']) {
+          print('Image uploaded successfully');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Profile image uploaded successfully!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        } else {
+          print('Image upload failed: ${jsonResponse['message']}');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content:
+                    Text('Failed to upload image: ${jsonResponse['message']}'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          await saveImageLocally(imagePath);
+        }
+      } else {
+        print('Failed to upload image: HTTP ${response.statusCode}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'Failed to upload image: Server error (${response.statusCode})'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        await saveImageLocally(imagePath);
+      }
+    } catch (e) {
+      print('Error uploading image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error uploading image: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+
+      // Try to save locally as fallback
+      try {
+        await saveImageLocally(imagePath);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Image saved locally for later sync'),
+              backgroundColor: Colors.blue,
+            ),
+          );
+        }
+      } catch (localError) {
+        print('Error saving image locally: $localError');
+      }
+    }
+  }
+
+  Future<void> _capturePhotoFromCamera() async {
+    const String requester = 'ProfileImageCapture';
+
+    // Request camera access with timeout
+    final bool hasAccess = await _cameraManager.requestCameraAccess(requester,
+        timeout: const Duration(seconds: 5));
+
+    if (!hasAccess) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_cameraManager.currentUser != null
+                ? 'Camera is being used by ${_cameraManager.currentUser}. Please wait and try again.'
+                : 'Camera is currently busy. Please wait and try again.'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      // Initialize camera if needed
+      if (_cameraController == null ||
+          !_cameraController!.value.isInitialized) {
+        await _initializeCamera();
+      }
+
+      if (_cameraController == null ||
+          !_cameraController!.value.isInitialized) {
+        throw Exception('Camera initialization failed');
+      }
+
+      // Use direct camera navigation - no external app launch
+      final imagePath = await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => CameraPreviewScreen(
+            cameraController: _cameraController!,
+            learnerID: widget.learnerID,
+          ),
+        ),
+      );
+
+      if (imagePath != null) {
+        print('Image captured: $imagePath');
+        final directory = await getApplicationDocumentsDirectory();
+        final savedImagePath =
+            '${directory.path}/learnerImages_${widget.learnerID}.png';
+
+        final capturedFile = File(imagePath);
+        await capturedFile.copy(savedImagePath);
+        print('Image saved to: $savedImagePath');
+
+        if (!mounted) return;
+        setState(() {
+          capturedImage = XFile(savedImagePath);
+        });
+
+        // Save to local DB immediately (offline-first - never lose the image)
+        await saveImageLocally(savedImagePath);
+
+        if (mounted) {
+          final isConnected = await _checkConnectivity();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(isConnected
+                  ? 'Photo captured and saved!'
+                  : 'Photo saved locally (will sync when online)'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        print('No image captured - user cancelled');
+      }
+    } catch (e) {
+      print('Error capturing photo: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error capturing photo: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      // Always release camera access
+      _cameraManager.releaseCameraAccess(requester);
+    }
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    const String requester = 'ProfileGalleryPicker';
+
+    // Request camera access with timeout (gallery picker might use camera resources)
+    final bool hasAccess = await _cameraManager.requestCameraAccess(requester,
+        timeout: const Duration(seconds: 5));
+
+    if (!hasAccess) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_cameraManager.currentUser != null
+                ? 'Camera is being used by ${_cameraManager.currentUser}. Please wait and try again.'
+                : 'Camera resources are busy. Please wait and try again.'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        // Verify the image file exists and is valid
+        final File imageFile = File(image.path);
+        if (await imageFile.exists()) {
+          final int fileSize = await imageFile.length();
+          print('Selected image size: $fileSize bytes');
+
+          if (fileSize > 0) {
+            // Copy to app directory so file persists (gallery path may be temporary)
+            final directory = await getApplicationDocumentsDirectory();
+            final savedPath =
+                '${directory.path}/learnerImages_${widget.learnerID}.png';
+            await imageFile.copy(savedPath);
+
+            if (!mounted) return;
+            setState(() => capturedImage = XFile(savedPath));
+
+            // Save to local DB immediately (offline-first)
+            await saveImageLocally(savedPath);
+
+            if (mounted) {
+              final isConnected = await _checkConnectivity();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(isConnected
+                      ? 'Image selected and saved!'
+                      : 'Image saved locally (will sync when online)'),
+                  backgroundColor: Colors.green,
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            }
+          } else {
+            throw Exception('Selected image file is empty');
+          }
+        } else {
+          throw Exception('Selected image file does not exist');
+        }
+      } else {
+        // User cancelled - not an error
+        print('User cancelled image selection');
+      }
+    } catch (e) {
+      print('Error picking image: $e');
+
+      // Clear any partial state
+      if (!mounted) return;
+      setState(() => capturedImage = null);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error selecting image: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      // Always release camera access
+      _cameraManager.releaseCameraAccess(requester);
+    }
+  }
+
+  Future<void> _removePhoto() async {
+    setState(() {
+      capturedImage = null;
+      if (learnerData != null) {
+        learnerData!['profile_image'] = null;
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Photo removed'),
+        backgroundColor: Colors.orange,
       ),
     );
   }
+
+  Future<void> saveImageLocally(String imagePath) async {
+    try {
+      // Validate image file exists before saving
+      final File imageFile = File(imagePath);
+      if (!await imageFile.exists()) {
+        throw Exception('Image file does not exist: $imagePath');
+      }
+
+      final int fileSize = await imageFile.length();
+      if (fileSize == 0) {
+        throw Exception('Image file is empty');
+      }
+
+      await DatabaseHelper().saveImageLocally(widget.learnerID, imagePath);
+      print(
+          'Image saved locally for learner_id: ${widget.learnerID} ($fileSize bytes)');
+    } catch (e) {
+      print('Error saving image locally: $e');
+      rethrow; // Re-throw so caller can handle
+    }
+  }
 }
 
-class CameraPreviewScreen extends StatelessWidget {
+// Camera Preview Screen for image capture
+class CameraPreviewScreen extends StatefulWidget {
   final CameraController cameraController;
   final String learnerID;
 
@@ -2457,41 +3041,48 @@ class CameraPreviewScreen extends StatelessWidget {
     required this.learnerID,
   });
 
-  Future<String?> _takePicture() async {
-    try {
-      final tempDir = await getTemporaryDirectory();
-      final imageFile = await cameraController.takePicture();
-      final imagePath = '${tempDir.path}/learner_${learnerID}_photo.jpg';
-      await imageFile.saveTo(imagePath);
-      return imagePath;
-    } catch (e) {
-      print('Error taking picture: $e');
-      return null;
-    }
-  }
+  @override
+  _CameraPreviewScreenState createState() => _CameraPreviewScreenState();
+}
 
+class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Capture Photo'),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+      ),
       body: Stack(
         children: [
-          CameraPreview(cameraController),
+          CameraPreview(widget.cameraController),
           Positioned(
-            bottom: 20,
+            bottom: 50,
             left: 0,
             right: 0,
             child: Center(
               child: FloatingActionButton(
-                onPressed: () async {
-                  final imagePath = await _takePicture();
-                  Navigator.pop(context, imagePath);
-                },
-                child: const Icon(Icons.camera_alt),
+                onPressed: _capturePhoto,
+                backgroundColor: Colors.white,
+                child: const Icon(Icons.camera_alt, color: Colors.black),
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _capturePhoto() async {
+    try {
+      final image = await widget.cameraController.takePicture();
+      Navigator.pop(context, image.path);
+    } catch (e) {
+      print('Error capturing photo: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error capturing photo: $e')),
+      );
+    }
   }
 }

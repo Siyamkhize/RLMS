@@ -12,19 +12,24 @@ import 'package:intl/intl.dart';
 import 'services/camera_resource_manager.dart';
 
 import 'config.dart';
+import 'utils/scanner_pdf_resolver.dart';
 
 class CameraScanPage extends StatefulWidget {
   final String type;
   final String exercise;
+  final String? unitStandard;
   final int learnerID;
   final String? logbookText;
+  final bool autoUpload;
 
   const CameraScanPage({
     super.key,
     required this.type,
     required this.exercise,
+    this.unitStandard,
     required this.learnerID,
     this.logbookText,
+    this.autoUpload = true,
   });
 
   @override
@@ -36,22 +41,6 @@ class _CameraScanPageState extends State<CameraScanPage> {
   List<File> scannedImages = [];
   final TextEditingController _logbookTextController = TextEditingController();
   final CameraResourceManager _cameraManager = CameraResourceManager();
-
-  String? _tryUriToFilePath(String raw) {
-    try {
-      final uri = Uri.parse(raw);
-      if (uri.scheme == 'file') {
-        return uri.toFilePath(windows: false);
-      }
-      // Some scanners return plain paths (no scheme) or other schemes.
-      // We only handle file paths here; other schemes must be resolved by plugin/native side.
-      if (uri.scheme.isEmpty) return raw;
-      return null;
-    } catch (_) {
-      // Not a valid URI; treat as a raw file path.
-      return raw;
-    }
-  }
 
   @override
   void initState() {
@@ -114,10 +103,10 @@ class _CameraScanPageState extends State<CameraScanPage> {
       _cameraManager.markMLKitScannerActive();
 
       // All types (including LogBook) now use FlutterDocScanner for multi-page scanning with edge detection
-      // IMPORTANT: keep a reasonable page limit.
-      // Very high values (e.g. 999) can cause native scanner crashes / OOM on some devices.
+      // IMPORTANT: Updated page limit from 10 to 80.
+      // 80 is the recommended maximum to avoid GMS memory crashes on some devices.
       final dynamic scanResult =
-          await FlutterDocScanner().getScanDocuments(page: 25);
+          await FlutterDocScanner().getScanDocuments(page: 80);
       print('Scan Result: $scanResult');
       if (scanResult is! Map ||
           !scanResult.containsKey('pdfUri') ||
@@ -128,25 +117,18 @@ class _CameraScanPageState extends State<CameraScanPage> {
         return;
       }
       final String? pdfUri = scanResult['pdfUri'] as String?;
-      final resolvedPath = pdfUri == null ? null : _tryUriToFilePath(pdfUri);
-      if (resolvedPath == null || resolvedPath.trim().isEmpty) {
-        print('Unable to resolve pdfUri to file path: $pdfUri');
-        _showErrorSnackBar(
-            'Scanner returned an unsupported file location', retryable: true);
+      final file = await resolveFlutterDocScannerPdfFile(pdfUri);
+      if (file == null || !await isReadablePdfFile(file)) {
+        print('Unable to resolve pdfUri to readable PDF: $pdfUri');
+        _showErrorSnackBar('Scanner returned an unreadable file (try again)',
+            retryable: true);
         return;
       }
 
-      print('Processed PDF Path: $resolvedPath');
-      final file = File(resolvedPath);
-      if (await file.exists()) {
-        print('PDF exists: ${file.path}, size: ${await file.length()} bytes');
-        if (!mounted) return;
-        setState(() => scannedImages = [file]);
-        _showSnackBar('PDF document scanned successfully!');
-      } else {
-        print('Error: PDF does not exist at $resolvedPath');
-        _showErrorSnackBar('PDF file not found or invalid', retryable: true);
-      }
+      print('PDF exists: ${file.path}, size: ${await file.length()} bytes');
+      if (!mounted) return;
+      setState(() => scannedImages = [file]);
+      _showSnackBar('PDF document scanned successfully!');
     } catch (e, stackTrace) {
       print('Scan Error: $e\nStack Trace: $stackTrace');
       _showErrorSnackBar('Document scan error: $e', retryable: true);
@@ -179,10 +161,15 @@ class _CameraScanPageState extends State<CameraScanPage> {
       final String logbookText =
           widget.type == 'LogBook' ? _logbookTextController.text : '';
 
-      if (await _checkConnectivity()) {
-        await _uploadImages(filePaths, logbookText);
+      if (widget.autoUpload) {
+        if (await _checkConnectivity()) {
+          await _uploadImages(filePaths, logbookText);
+        } else {
+          await _saveLocally(filePaths, logbookText);
+        }
       } else {
-        await _saveLocally(filePaths, logbookText);
+        print(
+            'Auto-upload disabled for CameraScanPage. Returning results to caller.');
       }
 
       if (mounted) {
@@ -262,6 +249,7 @@ class _CameraScanPageState extends State<CameraScanPage> {
                   'learnerID': widget.learnerID,
                   'exercise': widget.exercise,
                   'type': widget.type,
+                  'unitStandard': (widget.unitStandard ?? '').trim(),
                   'filePath': path,
                   'logbook_text': widget.type == 'LogBook' ? logbookText : '',
                   'submitted_at': timestamp,
@@ -325,6 +313,7 @@ class _CameraScanPageState extends State<CameraScanPage> {
               'learnerID': widget.learnerID,
               'exercise': widget.exercise,
               'type': widget.type,
+              'unitStandard': (widget.unitStandard ?? '').trim(),
               'filePath': savedPath,
               'logbook_text': widget.type == 'LogBook' ? logbookText : '',
               'submitted_at': dateFormatter.format(DateTime.now()),

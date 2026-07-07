@@ -1,0 +1,10 @@
+Options +Indexes
+<Files "*.pdf">
+    Header set Content-Type application/pdf
+</Files>
+
+# Allow PDF access
+<FilesMatch "\.(pdf)$">
+    Order allow,deny
+    Allow from all
+</FilesMatch>

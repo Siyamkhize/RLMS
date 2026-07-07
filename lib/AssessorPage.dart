@@ -14,6 +14,7 @@ import 'package:flutter_doc_scanner/flutter_doc_scanner.dart';
 import 'PotholeChecklistPage.dart';
 import 'database_helper.dart';
 import 'config.dart';
+import 'utils/scanner_pdf_resolver.dart';
 
 class AssessorPage extends StatefulWidget {
   final String facilitator_id;
@@ -2109,7 +2110,13 @@ class _POETabState extends State<POETab> {
   @override
   void initState() {
     super.initState();
-    _poeData = fetchPOE(widget.learnerId);
+    _refreshData();
+  }
+
+  void _refreshData() {
+    setState(() {
+      _poeData = fetchPOE(widget.learnerId);
+    });
   }
 
   Future<Map<String, dynamic>> fetchPOE(String learnerId) async {
@@ -2138,47 +2145,55 @@ class _POETabState extends State<POETab> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('POE Details')),
-      body: Column(
-        children: [
-          FutureBuilder<Map<String, dynamic>>(
-            future: _poeData,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              } else if (snapshot.hasError) {
-                return Center(child: Text('Error: ${snapshot.error}'));
-              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return const Center(child: Text('No POE data found.'));
-              }
-
-              Map<String, dynamic> poeData = snapshot.data!;
-              Map<String, dynamic> pathways = poeData['pathways'] ?? {};
-
+    return Column(
+      children: [
+        FutureBuilder<Map<String, dynamic>>(
+          future: _poeData,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Expanded(
+                  child: Center(child: CircularProgressIndicator()));
+            } else if (snapshot.hasError) {
               return Expanded(
-                child: ListView(
-                  children: [
-                    // Build pathway/qualification/unit standard structure
-                    ...pathways.entries.map((entry) {
-                      return ExpansionTile(
-                        title: Text(entry.key,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.bold)),
-                        children: _buildQualificationTiles(entry.value),
-                      );
-                    }),
+                  child: Center(child: Text('Error: ${snapshot.error}')));
+            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Expanded(
+                  child: Center(child: Text('No POE data found.')));
+            }
 
-                    // Separate LogBook Section
-                    _buildLogBookSection(poeData),
+            Map<String, dynamic> poeData = snapshot.data!;
+            Map<String, dynamic> pathways = poeData['pathways'] ?? {};
 
-                    // Separate Pothole Checklist Section
-                    _buildPotholeChecklistMainSection(),
-                  ],
-                ),
-              );
-            },
-          ),
+            return Expanded(
+              child: ListView(
+                children: [
+                  // Refresh button at the top of the list
+                  ListTile(
+                    leading: const Icon(Icons.refresh, color: Colors.blue),
+                    title: const Text('Refresh POE Data'),
+                    onTap: _refreshData,
+                  ),
+                  const Divider(),
+                  // Build pathway/qualification/unit standard structure
+                  ...pathways.entries.map((entry) {
+                    return ExpansionTile(
+                      title: Text(entry.key,
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                      children: _buildQualificationTiles(entry.value),
+                    );
+                  }),
+
+                  // Separate LogBook Section
+                  _buildLogBookSection(poeData),
+
+                  // Separate Pothole Checklist Section
+                  _buildPotholeChecklistMainSection(),
+                ],
+              ),
+            );
+          },
+        ),
+        if (_responseMessage.isNotEmpty)
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Text(
@@ -2192,8 +2207,7 @@ class _POETabState extends State<POETab> {
               ),
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -2224,6 +2238,46 @@ class _POETabState extends State<POETab> {
       Map<String, dynamic> unitStandardData) {
     List<dynamic> summative = unitStandardData['summative'] ?? [];
     List<dynamic> formative = unitStandardData['formative'] ?? [];
+    List<dynamic> formativeRemedial =
+        unitStandardData['formativeremedial'] ?? [];
+    List<dynamic> summativeRemedial =
+        unitStandardData['summativeremedial'] ?? [];
+
+    // Defensive: some backends place remedial items inside the main buckets
+    // (e.g. type == SummativeRemedial but stored under 'summative').
+    // Split them out here so the UI always shows Remedial sections when present.
+    bool _isRemedial(dynamic ex, String kind) {
+      final t = (ex is Map ? (ex['type'] ?? ex['assessment_type']) : null)
+          ?.toString()
+          .toLowerCase()
+          .replaceAll(RegExp(r'[\s_-]'), '');
+      if (t != null && t.contains('${kind}remedial')) return true;
+
+      final e = (ex is Map ? (ex['exercise'] ?? ex['exercise_name']) : null)
+          ?.toString()
+          .toLowerCase();
+      if (e == null) return false;
+      return e.startsWith('${kind.toLowerCase()}remedial');
+    }
+
+    if (formative.isNotEmpty) {
+      final moved =
+          formative.where((ex) => _isRemedial(ex, 'formative')).toList();
+      if (moved.isNotEmpty) {
+        formative =
+            formative.where((ex) => !_isRemedial(ex, 'formative')).toList();
+        formativeRemedial = [...formativeRemedial, ...moved];
+      }
+    }
+    if (summative.isNotEmpty) {
+      final moved =
+          summative.where((ex) => _isRemedial(ex, 'summative')).toList();
+      if (moved.isNotEmpty) {
+        summative =
+            summative.where((ex) => !_isRemedial(ex, 'summative')).toList();
+        summativeRemedial = [...summativeRemedial, ...moved];
+      }
+    }
     // Note: logbook is now handled separately
 
     List<Widget> assessmentTiles = [];
@@ -2304,6 +2358,102 @@ class _POETabState extends State<POETab> {
       );
     }
 
+    // Formative Remedial Assessments
+    if (formativeRemedial.isNotEmpty) {
+      TextEditingController commentController = TextEditingController();
+      String existingComment = formativeRemedial.first['a_comment'] ?? '';
+      commentController.text = existingComment;
+
+      // Check if any marks have been submitted
+      bool hasMarks = formativeRemedial.any((exercise) =>
+          exercise['marks_scored'] != null &&
+          exercise['marks_scored'].toString().isNotEmpty &&
+          exercise['marks_scored'].toString() != '0');
+
+      assessmentTiles.add(
+        ExpansionTile(
+          title: Row(
+            children: [
+              const Text('Formative Remedial'),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.purple,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'REMEDIAL',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          children: [
+            ..._buildExerciseTiles(formativeRemedial),
+            if (!hasMarks)
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Container(
+                  padding: const EdgeInsets.all(12.0),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    border: Border.all(color: Colors.orange),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Submit marks first before adding comments',
+                          style: TextStyle(color: Colors.orange),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: TextFormField(
+                controller: commentController,
+                decoration: InputDecoration(
+                  labelText: 'Comments',
+                  border: const OutlineInputBorder(),
+                  hintText:
+                      'Enter your comments for formative remedial assessments',
+                  helperText: existingComment.isNotEmpty
+                      ? 'Editing existing comment'
+                      : (hasMarks ? null : 'Marks required before commenting'),
+                ),
+                maxLines: 3,
+                enabled: hasMarks,
+              ),
+            ),
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: ElevatedButton(
+                onPressed: hasMarks
+                    ? () => saveComment('formativeremedial',
+                        commentController.text, existingComment.isNotEmpty)
+                    : null,
+                child: Text(existingComment.isEmpty
+                    ? 'Submit Comment'
+                    : 'Update Comment'),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     // Summative Assessments
     if (summative.isNotEmpty) {
       TextEditingController commentController = TextEditingController();
@@ -2369,6 +2519,102 @@ class _POETabState extends State<POETab> {
                 onPressed: hasMarks
                     ? () => saveComment('summative', commentController.text,
                         existingComment.isNotEmpty)
+                    : null,
+                child: Text(existingComment.isEmpty
+                    ? 'Submit Comment'
+                    : 'Update Comment'),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Summative Remedial Assessments
+    if (summativeRemedial.isNotEmpty) {
+      TextEditingController commentController = TextEditingController();
+      String existingComment = summativeRemedial.first['a_comment'] ?? '';
+      commentController.text = existingComment;
+
+      // Check if any marks have been submitted
+      bool hasMarks = summativeRemedial.any((exercise) =>
+          exercise['marks_scored'] != null &&
+          exercise['marks_scored'].toString().isNotEmpty &&
+          exercise['marks_scored'].toString() != '0');
+
+      assessmentTiles.add(
+        ExpansionTile(
+          title: Row(
+            children: [
+              const Text('Summative Remedial'),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.deepPurple,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'REMEDIAL',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          children: [
+            ..._buildExerciseTiles(summativeRemedial),
+            if (!hasMarks)
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Container(
+                  padding: const EdgeInsets.all(12.0),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    border: Border.all(color: Colors.orange),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Submit marks first before adding comments',
+                          style: TextStyle(color: Colors.orange),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: TextFormField(
+                controller: commentController,
+                decoration: InputDecoration(
+                  labelText: 'Comments',
+                  border: const OutlineInputBorder(),
+                  hintText:
+                      'Enter your comments for summative remedial assessments',
+                  helperText: existingComment.isNotEmpty
+                      ? 'Editing existing comment'
+                      : (hasMarks ? null : 'Marks required before commenting'),
+                ),
+                maxLines: 3,
+                enabled: hasMarks,
+              ),
+            ),
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: ElevatedButton(
+                onPressed: hasMarks
+                    ? () => saveComment('summativeremedial',
+                        commentController.text, existingComment.isNotEmpty)
                     : null,
                 child: Text(existingComment.isEmpty
                     ? 'Submit Comment'
@@ -2804,8 +3050,29 @@ class _POETabState extends State<POETab> {
   }
 
   List<Widget> _buildExerciseTiles(List<dynamic> exercises) {
-    return exercises.map((exercise) {
+    // Keys must be unique among siblings. Some POE items arrive without stable IDs,
+    // so we include the index as a fallback to avoid duplicate-key crashes.
+    return exercises.asMap().entries.map((entry) {
+      final idx = entry.key;
+      final exercise = entry.value as dynamic;
+
+      final primaryId = exercise['id'] ??
+          exercise['assessment_id'] ??
+          exercise['filePath'] ??
+          exercise['file_url'] ??
+          exercise['fileUrl'];
+
+      final exerciseIdentity = [
+        // Always include idx because backend can legitimately return duplicated
+        // rows (same question text/filePath) which would otherwise collide.
+        'idx:$idx',
+        primaryId ?? '',
+        exercise['exercise_name'] ?? exercise['exercise'] ?? '',
+        exercise['specific_outcome'] ?? '',
+      ].join('|');
+
       return ExerciseTile(
+        key: ValueKey(exerciseIdentity),
         exercise: exercise,
         learnerId: widget.learnerId,
         onSubmitMarks: submitMarks,
@@ -2972,22 +3239,69 @@ class _POETabState extends State<POETab> {
       bool hasExistingMarks = exercise['marks_scored'] != null &&
           exercise['marks_scored'].toString().isNotEmpty;
 
+      // Normalize assessment type so backend duplicate-check uses consistent values.
+      // Backend expects: formative, summative, logbook, formativeremedial, summativeremedial
+      String rawType = (exercise['type'] ?? '').toString();
+      String normalizedType = rawType.trim().toLowerCase();
+      normalizedType = normalizedType.replaceAll(' ', '');
+      normalizedType = normalizedType.replaceAll('_', '');
+      normalizedType = normalizedType.replaceAll('-', '');
+
+      if (normalizedType == 'formative') {
+        normalizedType = 'formative';
+      } else if (normalizedType == 'summative') {
+        normalizedType = 'summative';
+      } else if (normalizedType == 'logbook') {
+        normalizedType = 'logbook';
+      } else if (normalizedType == 'formativeremedial') {
+        normalizedType = 'formativeremedial';
+      } else if (normalizedType == 'summativeremedial') {
+        normalizedType = 'summativeremedial';
+      } else {
+        // Fallback: try to infer from keys we already use in POE
+        final exerciseName =
+            (exercise['exercise'] ?? '').toString().toLowerCase();
+        if (exerciseName.contains('summative') &&
+            exerciseName.contains('remedial')) {
+          normalizedType = 'summativeremedial';
+        } else if (exerciseName.contains('formative') &&
+            exerciseName.contains('remedial')) {
+          normalizedType = 'formativeremedial';
+        } else if (exerciseName.contains('summative')) {
+          normalizedType = 'summative';
+        } else if (exerciseName.contains('logbook')) {
+          normalizedType = 'logbook';
+        } else {
+          normalizedType = 'formative';
+        }
+      }
+
+      final exerciseForPayload = Map<String, dynamic>.from(exercise);
+      exerciseForPayload['type'] = normalizedType;
+
       final payload = {
         'learnerId': learnerId,
-        'exercise': exercise,
+        'exercise': exerciseForPayload,
         'marksScored': scoredMarks,
-        'assessmentType': exercise['type'] ?? 'POE', // Use a valid default
+        'assessmentType': normalizedType,
         'specific_outcome': specificOutcomeArray,
         'isUpdate': hasExistingMarks, // Tell backend this is an update
       };
       print(
           "Submitting payload (isUpdate: $hasExistingMarks): ${jsonEncode(payload)}");
 
-      final response = await http.post(
-        Uri.parse('https://rlms.rlms.co.za/mobile/save_marks.php'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(payload),
-      );
+      final saveMarksUrl = AppConfig.buildUrl('save_marks.php');
+      print('[POETab] Saving marks to: $saveMarksUrl');
+
+      final response = await http
+          .post(
+            Uri.parse(saveMarksUrl),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 15));
+      print('[POETab] save_marks.php status: ${response.statusCode}');
+      print('[POETab] save_marks.php body: ${response.body}');
 
       if (response.statusCode == 200) {
         var responseData = jsonDecode(response.body);
@@ -2999,17 +3313,25 @@ class _POETabState extends State<POETab> {
           successMessage = 'Marks saved successfully!';
         }
 
-        setState(() {
-          _responseMessage = responseData['status'] == 'success'
-              ? successMessage
-              : 'Failed to save marks: ${responseData['message']}';
-          if (responseData['status'] == 'success') {
-            exercise['marks_scored'] = marksScored;
-            if (responseData['filePath'] != null) {
-              exercise['filePath'] = responseData['filePath'];
-            }
+        if (responseData['status'] == 'success') {
+          // Update the local exercise data immediately
+          exercise['marks_scored'] = int.tryParse(marksScored) ?? 0;
+          if (responseData['filePath'] != null) {
+            exercise['filePath'] = responseData['filePath'];
           }
-        });
+
+          // Refresh the entire POE data to ensure UI consistency
+          _refreshData();
+
+          setState(() {
+            _responseMessage = successMessage;
+          });
+        } else {
+          setState(() {
+            _responseMessage =
+                'Failed to save marks: ${responseData['message']}';
+          });
+        }
 
         if (responseData['status'] == 'error') {
           // Check if it's a duplicate that can be updated
@@ -3040,23 +3362,37 @@ class _POETabState extends State<POETab> {
                       final updatePayload = Map<String, dynamic>.from(payload);
                       updatePayload['isUpdate'] = true;
 
-                      final updateResponse = await http.post(
-                        Uri.parse(
-                            'https://rlms.rlms.co.za/mobile/save_marks.php'),
-                        headers: {'Content-Type': 'application/json'},
-                        body: jsonEncode(updatePayload),
-                      );
+                      final updateResponse = await http
+                          .post(
+                            Uri.parse(saveMarksUrl),
+                            headers: {'Content-Type': 'application/json'},
+                            body: jsonEncode(updatePayload),
+                          )
+                          .timeout(const Duration(seconds: 15));
+                      print(
+                          '[POETab] save_marks.php(update) status: ${updateResponse.statusCode}');
+                      print(
+                          '[POETab] save_marks.php(update) body: ${updateResponse.body}');
 
                       if (updateResponse.statusCode == 200) {
                         var updateData = jsonDecode(updateResponse.body);
-                        setState(() {
-                          _responseMessage = updateData['status'] == 'success'
-                              ? 'Marks updated successfully!'
-                              : 'Failed to update marks: ${updateData['message']}';
-                          if (updateData['status'] == 'success') {
-                            exercise['marks_scored'] = marksScored;
-                          }
-                        });
+                        if (updateData['status'] == 'success') {
+                          // Update the local exercise data immediately
+                          exercise['marks_scored'] =
+                              int.tryParse(marksScored) ?? 0;
+
+                          // Refresh the entire POE data to ensure UI consistency
+                          _refreshData();
+
+                          setState(() {
+                            _responseMessage = 'Marks updated successfully!';
+                          });
+                        } else {
+                          setState(() {
+                            _responseMessage =
+                                'Failed to update marks: ${updateData['message']}';
+                          });
+                        }
                       }
                     },
                     child: const Text('Update Marks'),
@@ -3065,17 +3401,10 @@ class _POETabState extends State<POETab> {
               ),
             );
           } else {
-            showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('Error'),
-                content: Text(responseData['message']),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('OK'),
-                  ),
-                ],
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error: ${responseData['message']}'),
+                backgroundColor: Colors.red,
               ),
             );
           }
@@ -3120,13 +3449,35 @@ class ExerciseTile extends StatefulWidget {
 class _ExerciseTileState extends State<ExerciseTile> {
   late String marksScored;
   late TextEditingController controller;
-  bool showInputField = false;
+  bool isSaving = false;
+
+  String _displayExerciseName(String raw) {
+    var s = raw.trim();
+    final re = RegExp(
+      r'^(FormativeRemedial|SummativeRemedial)\s*[-–—]\s*\d+\s*[-–—]\s*',
+      caseSensitive: false,
+    );
+    s = s.replaceFirst(re, '');
+    return s.isEmpty ? raw : s;
+  }
 
   @override
   void initState() {
     super.initState();
     marksScored = widget.exercise['marks_scored']?.toString() ?? '';
     controller = TextEditingController(text: marksScored);
+  }
+
+  @override
+  void didUpdateWidget(ExerciseTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    String newMarksScored = widget.exercise['marks_scored']?.toString() ?? '';
+    if (newMarksScored != marksScored && !isSaving) {
+      setState(() {
+        marksScored = newMarksScored;
+        controller.text = marksScored;
+      });
+    }
   }
 
   @override
@@ -3137,183 +3488,170 @@ class _ExerciseTileState extends State<ExerciseTile> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.exercise['filePath'] == null ||
-        widget.exercise['filePath'].isEmpty) {
-      return const SizedBox.shrink();
-    }
+    final String filePath = (widget.exercise['filePath'] ?? '').toString();
+    final String fileUrl = (widget.exercise['fileUrl'] ?? '').toString();
+    final bool isManualMark = filePath.contains('MANUALLY_MARKED');
+    final bool hasFile =
+        (filePath.isNotEmpty || fileUrl.isNotEmpty) && !isManualMark;
 
     String maxMarks = widget.exercise['marks']?.toString() ?? '0';
     int maxAllowedMarks = int.tryParse(maxMarks) ?? 0;
     String specificOutcome =
         widget.exercise['specific_outcome']?.toString() ?? 'N/A';
-    String specificOutcomeLabel = 'SO: $specificOutcome';
-    String displayTitle = marksScored.isNotEmpty
-        ? 'Exercise: ${widget.exercise['exercise'] ?? 'N/A'} $marksScored/$maxMarks'
-        : 'Exercise: ${widget.exercise['exercise'] ?? 'N/A'}';
+    final String rawExerciseName =
+        (widget.exercise['exercise'] ?? 'N/A').toString();
+    final String displayExerciseName = _displayExerciseName(rawExerciseName);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ListTile(
-          title: Text('$displayTitle ($specificOutcomeLabel)'),
-          subtitle: Text('Marks: $maxMarks'),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (marksScored.isEmpty) ...[
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.red, size: 24),
-                  onPressed: () {
-                    print('Red X clicked');
-                    setState(() {
-                      controller.text = '0';
-                      showInputField = true;
-                    });
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.check, color: Colors.green, size: 24),
-                  onPressed: () {
-                    print('Green Tick clicked');
-                    setState(() {
-                      controller.text = '';
-                      showInputField = true;
-                    });
-                  },
-                ),
-              ],
-              ElevatedButton(
-                onPressed: () {
-                  String fileUrl = widget.exercise['fileUrl'];
-                  if (fileUrl.isNotEmpty) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => PdfViewerScreen(pdfUrl: fileUrl),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('View File'),
-              ),
-            ],
-          ),
-        ),
-        if (marksScored.isNotEmpty && !showInputField)
-          Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Row(
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: TextFormField(
-                    controller: controller,
-                    enabled: false,
-                    decoration: const InputDecoration(
-                      labelText: 'Scored Marks',
-                      border: OutlineInputBorder(),
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        displayExerciseName,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      const SizedBox(height: 4),
+                      Text('Max Marks: $maxMarks | SO: $specificOutcome',
+                          style:
+                              TextStyle(color: Colors.grey[600], fontSize: 13)),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 8.0),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      showInputField = true;
-                    });
-                  },
-                  icon: const Icon(Icons.edit, size: 16),
-                  label: const Text('Edit'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
+                if (hasFile)
+                  IconButton(
+                    icon:
+                        const Icon(Icons.picture_as_pdf, color: Colors.purple),
+                    onPressed: () {
+                      if (fileUrl.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                PdfViewerScreen(pdfUrl: fileUrl),
+                          ),
+                        );
+                      }
+                    },
+                    tooltip: 'View File',
                   ),
-                ),
               ],
             ),
-          ),
-        if (showInputField)
-          Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Column(
-              children: [
-                TextFormField(
-                  controller: controller,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Enter Scored Marks',
-                    border: OutlineInputBorder(),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(8.0),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Scored Marks',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blueGrey),
                   ),
-                  onChanged: (value) {
-                    int? enteredMarks = int.tryParse(value);
-                    if (enteredMarks != null &&
-                        enteredMarks > maxAllowedMarks) {
-                      setState(() {
-                        controller.text = maxAllowedMarks.toString();
-                      });
-                    }
-                  },
-                ),
-                const SizedBox(height: 8.0),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          String enteredMarks = controller.text;
-                          if (enteredMarks.isNotEmpty) {
-                            int scoredMarks = int.tryParse(enteredMarks) ?? 0;
-                            if (scoredMarks <= maxAllowedMarks) {
-                              setState(() {
-                                marksScored = enteredMarks;
-                                showInputField = false;
-                              });
-                              await widget.onSubmitMarks(
-                                learnerId: widget.learnerId,
-                                exercise: widget.exercise,
-                                marksScored: enteredMarks,
-                                specificOutcome: specificOutcome,
-                              );
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: controller,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            hintText: 'Enter marks',
+                            border: const OutlineInputBorder(),
+                            isDense: true,
+                            suffixText: '/ $maxMarks',
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          onChanged: (value) {
+                            int? enteredMarks = int.tryParse(value);
+                            if (enteredMarks != null &&
+                                enteredMarks > maxAllowedMarks) {
+                              controller.text = maxAllowedMarks.toString();
+                              controller.selection = TextSelection.fromPosition(
+                                  TextPosition(offset: controller.text.length));
                             }
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Please enter a valid mark')),
-                            );
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: marksScored.isNotEmpty
-                              ? Colors.orange
-                              : Colors.green,
-                          foregroundColor: Colors.white,
+                          },
                         ),
-                        child:
-                            Text(marksScored.isNotEmpty ? 'Update' : 'Submit'),
                       ),
-                    ),
-                    const SizedBox(width: 8.0),
-                    ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          controller.text =
-                              marksScored; // Reset to original value
-                          showInputField = false;
-                        });
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey,
-                        foregroundColor: Colors.white,
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: isSaving
+                            ? null
+                            : () async {
+                                String enteredMarks = controller.text.trim();
+                                if (enteredMarks.isNotEmpty) {
+                                  setState(() => isSaving = true);
+                                  await widget.onSubmitMarks(
+                                    learnerId: widget.learnerId,
+                                    exercise: widget.exercise,
+                                    marksScored: enteredMarks,
+                                    specificOutcome: specificOutcome,
+                                  );
+                                  setState(() {
+                                    marksScored = enteredMarks;
+                                    isSaving = false;
+                                  });
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text('Please enter a mark')),
+                                  );
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                        ),
+                        child: isSaving
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white))
+                            : Text(marksScored.isEmpty ? 'Save' : 'Update'),
                       ),
-                      child: const Text('Cancel'),
-                    ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            if (isManualMark)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline,
+                        size: 14, color: Colors.orange[700]),
+                    const SizedBox(width: 4),
+                    Text('Manually marked - No scanned document',
+                        style:
+                            TextStyle(color: Colors.orange[700], fontSize: 12)),
                   ],
                 ),
-              ],
-            ),
-          ),
-      ],
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -5852,7 +6190,7 @@ class _PotholeChecklistLearnerListPageState
       final docScanner = FlutterDocScanner();
 
       // Open document scanner
-      final scannedDoc = await docScanner.getScanDocuments();
+      final scannedDoc = await docScanner.getScanDocuments(page: 10);
 
       if (scannedDoc != null) {
         // Prepare permanent storage location BEFORE processing
@@ -5861,40 +6199,27 @@ class _PotholeChecklistLearnerListPageState
         final fileName = 'pothole_checklist_${learnerId}_$timestamp.pdf';
         final permanentPath = '${appDir.path}/$fileName';
 
-        // Extract path from scanner result
-        String? scannedPath;
-        if (scannedDoc is String) {
-          scannedPath = scannedDoc;
+        String? pdfUri;
+        if (scannedDoc is Map) {
+          pdfUri = scannedDoc['pdfUri']?.toString();
+        } else if (scannedDoc is String) {
+          pdfUri = scannedDoc;
         } else if (scannedDoc is List && scannedDoc.isNotEmpty) {
-          scannedPath = scannedDoc.first.toString();
-        } else if (scannedDoc is Map) {
-          scannedPath = scannedDoc['path']?.toString() ??
-              scannedDoc['scannedPath']?.toString() ??
-              scannedDoc.values.first?.toString();
+          pdfUri = scannedDoc.first.toString();
         }
 
-        if (scannedPath != null && scannedPath.isNotEmpty) {
-          // Remove file:// prefix if present
-          if (scannedPath.startsWith('file://')) {
-            scannedPath = scannedPath.substring(7);
-          }
+        final sourceFile = await resolveFlutterDocScannerPdfFile(pdfUri);
 
+        if (sourceFile != null && await isReadablePdfFile(sourceFile)) {
           try {
-            // CRITICAL: Read file SYNCHRONOUSLY and IMMEDIATELY
-            final sourceFile = File(scannedPath);
-
-            // Use synchronous read to get bytes before file is deleted
             Uint8List? bytes;
             try {
               bytes = sourceFile.readAsBytesSync();
             } catch (e) {
-              // If sync fails, try async immediately
-              if (await sourceFile.exists()) {
-                bytes = await sourceFile.readAsBytes();
-              }
+              bytes = await sourceFile.readAsBytes();
             }
 
-            if (bytes != null && bytes.isNotEmpty) {
+            if (bytes.isNotEmpty) {
               // Write to permanent location synchronously
               final permanentFile = File(permanentPath);
               permanentFile.writeAsBytesSync(bytes);
@@ -5939,7 +6264,7 @@ class _PotholeChecklistLearnerListPageState
             _showError(context, 'Error processing scan: $e');
           }
         } else {
-          _showError(context, 'No valid path from scanner');
+          _showError(context, 'No valid PDF from scanner');
         }
       } else {
         // User cancelled

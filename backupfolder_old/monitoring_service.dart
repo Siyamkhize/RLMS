@@ -22,11 +22,28 @@ class MonitoringService {
 
   // Monitoring state
   bool _isMonitoringActive = false;
-  bool _isLunchBreak = false;
-  bool _isAfternoonSession = false;
   Map<String, dynamic>? _currentPerson;
-  List<String> _verifiedToday = [];
-  List<Map<String, dynamic>> _availablePeople = [];
+
+  // Track selected learners and their prompt status
+  final List<String> _morningSelectedLearners = []; // 2 learners for morning
+  final List<String> _afternoonSelectedLearners =
+      []; // 2 learners for afternoon
+  final Map<String, int> _promptAttempts =
+      {}; // Track prompt attempts per learner
+  final Map<String, DateTime> _lastPromptTime =
+      {}; // Track when learner was last prompted
+  final Map<String, bool> _learnerResponded = {}; // Track if learner responded
+
+  // Scheduled monitoring times with random windows
+  final Map<String, DateTime?> _scheduledPromptTimes = {
+    'morning_learner_1': null, // Random between 9:00-9:30 AM
+    'morning_learner_2': null, // Random between 10:30-11:00 AM
+    'afternoon_learner_1': null, // Random between 13:15-13:45 (1:15-1:45 PM)
+    'afternoon_learner_2': null, // Random between 14:00-15:15 (2:00-3:15 PM)
+  };
+
+  bool _learnersSelected =
+      false; // Track if learners have been selected for the day
 
   // Random generator
   final Random _random = Random();
@@ -41,8 +58,8 @@ class MonitoringService {
     debugPrint(
         '[MONITORING_SERVICE] Starting background monitoring service for class: $classID');
 
-    // Check every 30 seconds for monitoring triggers
-    _backgroundTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+    // Check every 1 minute for monitoring triggers
+    _backgroundTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
       _checkAndTriggerMonitoring();
     });
 
@@ -50,15 +67,45 @@ class MonitoringService {
     _checkAndTriggerMonitoring();
   }
 
+  /// Update the context reference (useful when navigating between pages)
+  void updateContext(BuildContext context) {
+    if (_isServiceRunning) {
+      _context = context;
+      debugPrint('[MONITORING_SERVICE] Context updated');
+    }
+  }
+
   void stopService() {
     _backgroundTimer?.cancel();
     _isServiceRunning = false;
     _isMonitoringActive = false;
+    _learnersSelected = false;
+
+    // Clear all selections and tracking for next day
+    _morningSelectedLearners.clear();
+    _afternoonSelectedLearners.clear();
+    _promptAttempts.clear();
+    _lastPromptTime.clear();
+    _learnerResponded.clear();
+    _scheduledPromptTimes.clear();
+
     debugPrint('[MONITORING_SERVICE] Stopped background monitoring service');
   }
 
   Future<void> _checkAndTriggerMonitoring() async {
-    if (!_isServiceRunning || _currentClassID == null || _context == null) {
+    if (!_isServiceRunning || _currentClassID == null) {
+      return;
+    }
+
+    // Check if context is available and mounted
+    if (_context == null) {
+      debugPrint('[MONITORING_SERVICE] ⚠️ Context is null - monitoring paused');
+      return;
+    }
+
+    if (!_context!.mounted) {
+      debugPrint(
+          '[MONITORING_SERVICE] ⚠️ Context not mounted - monitoring paused');
       return;
     }
 
@@ -67,164 +114,266 @@ class MonitoringService {
       final hour = now.hour;
       final minute = now.minute;
 
-      // Update session status
-      _isLunchBreak = (hour == 12) || (hour == 13 && minute == 0);
-      _isAfternoonSession =
-          (hour == 13 && minute >= 15) || (hour >= 14 && hour < 16);
-      bool isMorningSession = hour < 12;
+      debugPrint(
+          '[MONITORING_SERVICE] Checking time: $hour:${minute.toString().padLeft(2, '0')}');
 
-      // TIME RESTRICTIONS RESTORED
-      // Skip if lunch break (12:00 PM - 1:15 PM)
-      if (_isLunchBreak) {
-        debugPrint('[MONITORING_SERVICE] Lunch break - monitoring paused');
-        return;
-      }
-
-      // Skip if outside monitoring hours (before 12 PM or after 4 PM)
-      if (!isMorningSession && !_isAfternoonSession) {
-        return;
-      }
-
-      // Skip if already monitoring
+      // Skip if already showing a popup
       if (_isMonitoringActive) {
         return;
       }
 
-      // Load available people (learners + facilitators)
-      await _loadAvailablePeople();
-
-      // Get total class size and calculate 30% requirement
-      final totalClassSize = await _getTotalClassSize();
-      final requiredVerifications = (totalClassSize * 0.3).ceil();
-
-      debugPrint(
-          '[MONITORING_SERVICE] Class size: $totalClassSize, Required verifications: $requiredVerifications, Verified today: ${_verifiedToday.length}');
-
-      // Check if we need to start monitoring
-      bool shouldStartMonitoring = false;
-
-      if (isMorningSession) {
-        // Morning: Start if haven't reached 30% yet and people are available
-        shouldStartMonitoring = _verifiedToday.length < requiredVerifications &&
-            _availablePeople.isNotEmpty;
-
-        if (shouldStartMonitoring) {
-          debugPrint(
-              '[MONITORING_SERVICE] Morning session - need ${requiredVerifications - _verifiedToday.length} more verifications to reach 30%');
-        }
-      } else if (_isAfternoonSession) {
-        // Afternoon: Continue until 30% requirement is met
-        shouldStartMonitoring = _verifiedToday.length < requiredVerifications &&
-            _availablePeople.isNotEmpty;
-
-        if (shouldStartMonitoring) {
-          debugPrint(
-              '[MONITORING_SERVICE] Afternoon session - need ${requiredVerifications - _verifiedToday.length} more verifications to reach 30%');
-        } else if (_verifiedToday.length >= requiredVerifications) {
-          debugPrint(
-              '[MONITORING_SERVICE] 30% verification requirement met (${_verifiedToday.length}/$requiredVerifications) - monitoring complete for today');
-        }
+      // Select learners for the day if not already done
+      if (!_learnersSelected) {
+        await _selectLearnersForDay();
+        _setupScheduledTimes(now);
+        _learnersSelected = true;
       }
 
-      if (shouldStartMonitoring) {
-        await _triggerMonitoringPopup();
-      }
+      // Check each scheduled time slot
+      await _checkScheduledPrompts(now);
     } catch (e) {
       debugPrint('[MONITORING_SERVICE] Error in background check: $e');
     }
   }
 
-  /// Get total class size (registered learners)
-  Future<int> _getTotalClassSize() async {
-    try {
-      final db = await _dbHelper.database;
-      final result = await db.rawQuery(
-        'SELECT COUNT(*) as count FROM learnerdetails WHERE classID = ?',
-        [_currentClassID],
-      );
+  /// Setup random scheduled times within specified windows for the day
+  void _setupScheduledTimes(DateTime now) {
+    final today = DateTime(now.year, now.month, now.day);
 
-      final count = result.first['count'] as int;
-      debugPrint('[MONITORING_SERVICE] Total class size: $count');
-      return count;
-    } catch (e) {
-      debugPrint('[MONITORING_SERVICE] Error getting class size: $e');
-      return 0;
-    }
-  }
+    // Morning Learner 1: Random time between 9:00-9:30 AM
+    final morning1Start = today.add(const Duration(hours: 9)); // 9:00 AM
+    final morning1RandomMinutes = _random.nextInt(31); // 0-30 minutes
+    _scheduledPromptTimes['morning_learner_1'] =
+        morning1Start.add(Duration(minutes: morning1RandomMinutes));
 
-  Future<void> _loadAvailablePeople() async {
-    try {
-      // Get all people who clocked in today (learners + facilitators)
-      _availablePeople =
-          await _dbHelper.getAllClockedInPeopleForClass(_currentClassID!);
+    // Morning Learner 2: Random time between 10:30-11:00 AM
+    final morning2Start =
+        today.add(const Duration(hours: 10, minutes: 30)); // 10:30 AM
+    final morning2RandomMinutes = _random.nextInt(31); // 0-30 minutes
+    _scheduledPromptTimes['morning_learner_2'] =
+        morning2Start.add(Duration(minutes: morning2RandomMinutes));
 
-      // Load today's verified people
-      await _loadVerifiedToday();
+    // Afternoon Learner 1: Random time between 13:15-13:45 (1:15-1:45 PM)
+    final afternoon1Start =
+        today.add(const Duration(hours: 13, minutes: 15)); // 1:15 PM
+    final afternoon1RandomMinutes = _random.nextInt(31); // 0-30 minutes
+    _scheduledPromptTimes['afternoon_learner_1'] =
+        afternoon1Start.add(Duration(minutes: afternoon1RandomMinutes));
 
-      // Filter out already verified people
-      _availablePeople = _availablePeople.where((person) {
-        String personKey = person['person_type'] == 'facilitator'
-            ? 'F${person['person_id']}'
-            : person['person_id'].toString();
-        return !_verifiedToday.contains(personKey);
-      }).toList();
+    // Afternoon Learner 2: Random time between 14:00-15:15 (2:00-3:15 PM)
+    final afternoon2Start = today.add(const Duration(hours: 14)); // 2:00 PM
+    final afternoon2RandomMinutes =
+        _random.nextInt(76); // 0-75 minutes (1 hour 15 minutes)
+    _scheduledPromptTimes['afternoon_learner_2'] =
+        afternoon2Start.add(Duration(minutes: afternoon2RandomMinutes));
 
-      debugPrint(
-          '[MONITORING_SERVICE] Available people: ${_availablePeople.length}');
-    } catch (e) {
-      debugPrint('[MONITORING_SERVICE] Error loading available people: $e');
-    }
-  }
-
-  Future<void> _loadVerifiedToday() async {
-    try {
-      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      final db = await _dbHelper.database;
-
-      // IMPORTANT: Filter by class_id to track 30% per class
-      final records = await db.query(
-        'monitoring_records',
-        where: 'monitoring_date = ? AND class_id = ? AND final_status = ?',
-        whereArgs: [today, _currentClassID, 'PRESENT'],
-      );
-
-      _verifiedToday =
-          records.map((record) => record['learner_id'].toString()).toList();
-
-      debugPrint(
-          '[MONITORING_SERVICE] Verified today in class $_currentClassID: ${_verifiedToday.length}');
-    } catch (e) {
-      debugPrint('[MONITORING_SERVICE] Error loading verified people: $e');
-    }
-  }
-
-  Future<void> _triggerMonitoringPopup() async {
-    if (_availablePeople.isEmpty || _context == null) return;
-
-    // Select random person
-    final randomIndex = _random.nextInt(_availablePeople.length);
-    _currentPerson = _availablePeople[randomIndex];
-    _isMonitoringActive = true;
-
-    // Vibrate to alert
-    await _vibrateAlert();
-
-    // Show popup dialog
-    if (_context != null && _context!.mounted) {
-      showDialog(
-        context: _context!,
-        barrierDismissible: false,
-        builder: (context) => MonitoringPopupDialog(
-          person: _currentPerson!,
-          onPresent: _handlePresent,
-          onAbsent: _handleAbsent,
-          classID: _currentClassID!,
-        ),
-      );
-    }
-
+    debugPrint('[MONITORING_SERVICE] 🎲 Random monitoring times generated:');
     debugPrint(
-        '[MONITORING_SERVICE] Triggered monitoring for: ${_currentPerson!['person_name']}');
+        '[MONITORING_SERVICE] Morning Learner 1: ${DateFormat('HH:mm').format(_scheduledPromptTimes['morning_learner_1']!)} (9:00-9:30 window)');
+    debugPrint(
+        '[MONITORING_SERVICE] Morning Learner 2: ${DateFormat('HH:mm').format(_scheduledPromptTimes['morning_learner_2']!)} (10:30-11:00 window)');
+    debugPrint(
+        '[MONITORING_SERVICE] Afternoon Learner 1: ${DateFormat('HH:mm').format(_scheduledPromptTimes['afternoon_learner_1']!)} (13:15-13:45 window)');
+    debugPrint(
+        '[MONITORING_SERVICE] Afternoon Learner 2: ${DateFormat('HH:mm').format(_scheduledPromptTimes['afternoon_learner_2']!)} (14:00-15:15 window)');
+  }
+
+  /// Check if any scheduled prompts should be triggered
+  Future<void> _checkScheduledPrompts(DateTime now) async {
+    // Check morning learner 1 (9:00 AM)
+    if (_morningSelectedLearners.isNotEmpty) {
+      await _checkAndPromptLearner(
+          'morning_learner_1', _morningSelectedLearners[0], now);
+    }
+
+    // Check morning learner 2 (10:00 AM)
+    if (_morningSelectedLearners.length > 1) {
+      await _checkAndPromptLearner(
+          'morning_learner_2', _morningSelectedLearners[1], now);
+    }
+
+    // Check afternoon learner 1 (1:00 PM)
+    if (_afternoonSelectedLearners.isNotEmpty) {
+      await _checkAndPromptLearner(
+          'afternoon_learner_1', _afternoonSelectedLearners[0], now);
+    }
+
+    // Check afternoon learner 2 (2:00 PM)
+    if (_afternoonSelectedLearners.length > 1) {
+      await _checkAndPromptLearner(
+          'afternoon_learner_2', _afternoonSelectedLearners[1], now);
+    }
+  }
+
+  /// Check if a specific learner should be prompted at their scheduled time
+  Future<void> _checkAndPromptLearner(
+      String timeSlot, String learnerId, DateTime now) async {
+    final scheduledTime = _scheduledPromptTimes[timeSlot];
+    if (scheduledTime == null) return;
+
+    // Skip if learner already responded
+    if (_learnerResponded[learnerId] == true) {
+      return;
+    }
+
+    final attempts = _promptAttempts[learnerId] ?? 0;
+    final lastPrompt = _lastPromptTime[learnerId];
+
+    // Check if it's time for the first prompt (within 1 minute of scheduled time)
+    if (attempts == 0) {
+      final timeDiff = now.difference(scheduledTime).inMinutes.abs();
+      if (timeDiff <= 1 && now.isAfter(scheduledTime)) {
+        debugPrint(
+            '[MONITORING_SERVICE] ⏰ Time for $timeSlot - prompting learner $learnerId');
+        await _promptLearner(learnerId);
+        return;
+      }
+    }
+
+    // Check for second prompt (10-15 minutes after first prompt)
+    if (attempts == 1 && lastPrompt != null) {
+      final timeSinceLastPrompt = now.difference(lastPrompt);
+      final waitTime = 10 + _random.nextInt(6); // Random 10-15 minutes
+
+      if (timeSinceLastPrompt.inMinutes >= waitTime) {
+        debugPrint(
+            '[MONITORING_SERVICE] 🔄 $waitTime minutes passed - second prompt for learner $learnerId');
+        await _promptLearner(learnerId);
+        return;
+      }
+    }
+
+    // After 2 attempts, mark as non-responsive
+    if (attempts >= 2 && lastPrompt != null) {
+      final timeSinceLastPrompt = now.difference(lastPrompt);
+      if (timeSinceLastPrompt.inMinutes >= 20) {
+        // Give 20 minutes total
+        debugPrint(
+            '[MONITORING_SERVICE] ❌ Learner $learnerId did not respond after 2 attempts');
+        _learnerResponded[learnerId] = false;
+        await _saveMonitoringRecord(learnerId, 'ABSENT');
+      }
+    }
+  }
+
+  /// Select 4 random learners for the entire day (2 morning + 2 afternoon)
+  Future<void> _selectLearnersForDay() async {
+    try {
+      final db = await _dbHelper.database;
+      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+      // Get all learners who clocked in today for this class
+      final result = await db.rawQuery('''
+        SELECT DISTINCT ld.LearnerID, ld.Name, ld.Surname
+        FROM learner_clocking lc
+        INNER JOIN learnerdetails ld ON lc.LearnerID = ld.LearnerID
+        WHERE lc.clock_date = ? AND ld.classID = ?
+        AND lc.clock_in_time IS NOT NULL AND lc.clock_in_time != ''
+      ''', [today, _currentClassID]);
+
+      if (result.isEmpty) {
+        debugPrint('[MONITORING_SERVICE] No learners clocked in today');
+        return;
+      }
+
+      if (result.length < 4) {
+        debugPrint(
+            '[MONITORING_SERVICE] Only ${result.length} learners available (need 4 for full schedule)');
+      }
+
+      // Randomly shuffle all available learners
+      final shuffledLearners = List.from(result)..shuffle(_random);
+
+      // Select up to 4 learners total
+      final numToSelect =
+          shuffledLearners.length >= 4 ? 4 : shuffledLearners.length;
+
+      // Clear previous selections
+      _morningSelectedLearners.clear();
+      _afternoonSelectedLearners.clear();
+
+      // Assign learners to sessions
+      for (int i = 0; i < numToSelect; i++) {
+        final learnerId = shuffledLearners[i]['LearnerID'].toString();
+        final learnerName =
+            '${shuffledLearners[i]['Name']} ${shuffledLearners[i]['Surname']}';
+
+        // Initialize tracking
+        _promptAttempts[learnerId] = 0;
+        _learnerResponded[learnerId] = false;
+
+        if (i < 2) {
+          // First 2 learners go to morning session
+          _morningSelectedLearners.add(learnerId);
+          debugPrint(
+              '[MONITORING_SERVICE] 🌅 Morning Learner ${i + 1}: $learnerName (ID: $learnerId)');
+        } else {
+          // Next 2 learners go to afternoon session
+          _afternoonSelectedLearners.add(learnerId);
+          debugPrint(
+              '[MONITORING_SERVICE] 🌇 Afternoon Learner ${i - 1}: $learnerName (ID: $learnerId)');
+        }
+      }
+
+      debugPrint(
+          '[MONITORING_SERVICE] 📋 Selected ${_morningSelectedLearners.length} morning + ${_afternoonSelectedLearners.length} afternoon learners');
+    } catch (e) {
+      debugPrint('[MONITORING_SERVICE] Error selecting learners for day: $e');
+    }
+  }
+
+  /// Prompt a specific learner
+  Future<void> _promptLearner(String learnerId) async {
+    try {
+      final db = await _dbHelper.database;
+
+      // Get learner details
+      final result = await db.query(
+        'learnerdetails',
+        where: 'LearnerID = ?',
+        whereArgs: [int.parse(learnerId)],
+      );
+
+      if (result.isEmpty) {
+        debugPrint('[MONITORING_SERVICE] Learner $learnerId not found');
+        return;
+      }
+
+      final learner = result.first;
+      _currentPerson = {
+        'person_id': learnerId,
+        'person_name': '${learner['Name']} ${learner['Surname']}',
+        'person_type': 'learner',
+      };
+
+      // Update prompt tracking
+      _promptAttempts[learnerId] = (_promptAttempts[learnerId] ?? 0) + 1;
+      _lastPromptTime[learnerId] = DateTime.now();
+      _isMonitoringActive = true;
+
+      debugPrint(
+          '[MONITORING_SERVICE] Prompting learner: ${_currentPerson!['person_name']} (Attempt ${_promptAttempts[learnerId]})');
+
+      // Vibrate to alert
+      await _vibrateAlert();
+
+      // Show popup dialog
+      if (_context != null && _context!.mounted) {
+        showDialog(
+          context: _context!,
+          barrierDismissible: false,
+          builder: (context) => MonitoringPopupDialog(
+            person: _currentPerson!,
+            onPresent: _handlePresent,
+            onAbsent: _handleAbsent,
+            classID: _currentClassID!,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('[MONITORING_SERVICE] Error prompting learner: $e');
+      _isMonitoringActive = false;
+    }
   }
 
   Future<void> _vibrateAlert() async {
@@ -245,284 +394,111 @@ class MonitoringService {
   Future<void> _handlePresent() async {
     if (_currentPerson == null) return;
 
-    // Add to verified list
-    String personKey =
-        (_currentPerson!['person_type']?.toString() ?? '') == 'facilitator'
-            ? 'F${_currentPerson!['person_id']}'
-            : _currentPerson!['person_id'].toString();
-    _verifiedToday.add(personKey);
+    final learnerId = _currentPerson!['person_id'].toString();
 
-    // Remove from available list
-    _availablePeople.removeWhere((person) =>
-        person['person_id'] == _currentPerson!['person_id'] &&
-        person['person_type'] == _currentPerson!['person_type']);
-
+    // Mark learner as responded
+    _learnerResponded[learnerId] = true;
     _isMonitoringActive = false;
 
-    // Get total class size and calculate 30% requirement
-    final totalClassSize = await _getTotalClassSize();
-    final requiredVerifications = (totalClassSize * 0.3).ceil();
+    debugPrint('[MONITORING_SERVICE] Learner $learnerId marked as PRESENT');
 
-    debugPrint(
-        '[MONITORING_SERVICE] Person marked as PRESENT: ${_currentPerson!['person_name']}');
-    debugPrint(
-        '[MONITORING_SERVICE] Verified today: ${_verifiedToday.length}/$requiredVerifications (30% requirement)');
-    debugPrint(
-        '[MONITORING_SERVICE] Available people count: ${_availablePeople.length}');
-
-    // Save to database BEFORE clearing _currentPerson - AWAIT the operation
-    await _saveMonitoringRecord('PRESENT');
+    // Save to database
+    await _saveMonitoringRecord(learnerId, 'PRESENT');
 
     _currentPerson = null;
-
-    // Check if 30% requirement is met
-    if (_verifiedToday.length >= requiredVerifications) {
-      debugPrint(
-          '[MONITORING_SERVICE] ✅ 30% verification requirement met! Monitoring complete for today.');
-      return;
-    }
-
-    // Continue monitoring if requirement not met and people available
-    if (_availablePeople.isNotEmpty && !_isLunchBreak) {
-      final now = DateTime.now();
-      final hour = now.hour;
-      final minute = now.minute;
-      final isMorningSession = hour < 12;
-      final isAfternoonSession =
-          (hour == 13 && minute >= 15) || (hour >= 14 && hour < 16);
-
-      // Continue in both morning and afternoon until 30% is reached
-      if (isMorningSession || isAfternoonSession) {
-        Timer(const Duration(seconds: 3), () {
-          debugPrint(
-              '[MONITORING_SERVICE] Triggering next person - need ${requiredVerifications - _verifiedToday.length} more verifications');
-          _triggerMonitoringPopup();
-        });
-      }
-    } else {
-      debugPrint(
-          '[MONITORING_SERVICE] No more people available for monitoring');
-    }
   }
 
   Future<void> _handleAbsent() async {
     if (_currentPerson == null) return;
 
-    // Remove from available list
-    _availablePeople.removeWhere((person) =>
-        person['person_id'] == _currentPerson!['person_id'] &&
-        person['person_type'] == _currentPerson!['person_type']);
+    final learnerId = _currentPerson!['person_id'].toString();
 
+    // Mark learner as responded (but absent)
+    _learnerResponded[learnerId] = false;
     _isMonitoringActive = false;
 
-    debugPrint(
-        '[MONITORING_SERVICE] Person marked as ABSENT: ${_currentPerson!['person_name']}');
+    debugPrint('[MONITORING_SERVICE] Learner $learnerId marked as ABSENT');
 
-    // Save to database BEFORE clearing _currentPerson - AWAIT the operation
-    await _saveMonitoringRecord('ABSENT');
+    // Save to database
+    await _saveMonitoringRecord(learnerId, 'ABSENT');
 
     _currentPerson = null;
-
-    // Get total class size and calculate 30% requirement
-    final totalClassSize = await _getTotalClassSize();
-    final requiredVerifications = (totalClassSize * 0.3).ceil();
-
-    // Check if 30% requirement is met
-    if (_verifiedToday.length >= requiredVerifications) {
-      debugPrint(
-          '[MONITORING_SERVICE] ✅ 30% verification requirement met! Monitoring complete for today.');
-      return;
-    }
-
-    // Continue monitoring if requirement not met and people available
-    if (_availablePeople.isNotEmpty && !_isLunchBreak) {
-      final now = DateTime.now();
-      final hour = now.hour;
-      final minute = now.minute;
-      final isMorningSession = hour < 12;
-      final isAfternoonSession =
-          (hour == 13 && minute >= 15) || (hour >= 14 && hour < 16);
-
-      // Continue in both morning and afternoon until 30% is reached
-      if (isMorningSession || isAfternoonSession) {
-        Timer(const Duration(seconds: 2), () {
-          debugPrint(
-              '[MONITORING_SERVICE] Triggering next person after ABSENT - need ${requiredVerifications - _verifiedToday.length} more verifications');
-          _triggerMonitoringPopup();
-        });
-      }
-    }
   }
 
-  Future<void> _saveMonitoringRecord(String status) async {
-    debugPrint(
-        '[MONITORING_SERVICE] _saveMonitoringRecord called with status: $status');
-    debugPrint('[MONITORING_SERVICE] _currentPerson: $_currentPerson');
-
-    if (_currentPerson == null) {
-      debugPrint(
-          '[MONITORING_SERVICE] ERROR: Cannot save record - _currentPerson is null');
-      return;
-    }
-
+  Future<void> _saveMonitoringRecord(String learnerId, String status) async {
     try {
       final db = await _dbHelper.database;
 
-      // First, verify the table exists and has correct structure
-      try {
-        final tableInfo =
-            await db.rawQuery("PRAGMA table_info(monitoring_records)");
-        debugPrint('[MONITORING_SERVICE] Table structure: $tableInfo');
-
-        if (tableInfo.isEmpty) {
-          debugPrint(
-              '[MONITORING_SERVICE] ERROR: monitoring_records table does not exist!');
-          // Try to create the table
-          await db.execute('''
-            CREATE TABLE IF NOT EXISTS monitoring_records (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              learner_id TEXT NOT NULL,
-              learner_name TEXT NOT NULL,
-              monitoring_date DATE NOT NULL,
-              attempt_1_time DATETIME,
-              attempt_1_status TEXT,
-              attempt_2_time DATETIME,
-              attempt_2_status TEXT,
-              attempt_3_time DATETIME,
-              attempt_3_status TEXT,
-              final_status TEXT NOT NULL DEFAULT 'IN_PROGRESS',
-              verification_time DATETIME,
-              created_at DATETIME NOT NULL
-            )
-          ''');
-          debugPrint('[MONITORING_SERVICE] Created monitoring_records table');
-        }
-      } catch (e) {
-        debugPrint('[MONITORING_SERVICE] Error checking/creating table: $e');
-      }
+      // Create table if doesn't exist
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS monitoring_records (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          learner_id TEXT NOT NULL,
+          learner_name TEXT NOT NULL,
+          person_type TEXT DEFAULT 'learner',
+          class_id TEXT NOT NULL,
+          monitoring_date DATE NOT NULL,
+          attempt_1_time DATETIME,
+          attempt_1_status TEXT,
+          attempt_2_time DATETIME,
+          attempt_2_status TEXT,
+          final_status TEXT NOT NULL,
+          verification_time DATETIME,
+          verification_method TEXT,
+          scanner_type TEXT,
+          fingerprint_matched INTEGER DEFAULT 0,
+          session_type TEXT,
+          created_at DATETIME NOT NULL,
+          synced INTEGER DEFAULT 0
+        )
+      ''');
 
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
       final now = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
+      final sessionType = _getSessionTypeForLearner(learnerId);
 
-      // Add comprehensive null safety checks
-      if (_currentPerson == null) {
-        debugPrint('[MONITORING_SERVICE] ERROR: _currentPerson is null');
-        return;
+      // Get learner name
+      final learnerResult = await db.query(
+        'learnerdetails',
+        where: 'LearnerID = ?',
+        whereArgs: [int.parse(learnerId)],
+      );
+
+      String learnerName = 'Unknown';
+      if (learnerResult.isNotEmpty) {
+        learnerName =
+            '${learnerResult.first['Name']} ${learnerResult.first['Surname']}';
       }
 
-      if (_currentPerson!['person_id'] == null) {
-        debugPrint(
-            '[MONITORING_SERVICE] ERROR: person_id is null in _currentPerson: $_currentPerson');
-        return;
-      }
-
-      String personKey =
-          (_currentPerson!['person_type']?.toString() ?? '') == 'facilitator'
-              ? 'F${_currentPerson!['person_id']}'
-              : _currentPerson!['person_id'].toString();
-
-      // Ensure person_name is not null - for facilitators, combine firstName + lastName if needed
-      String personName;
-      if (_currentPerson!['person_name']?.toString().isNotEmpty == true) {
-        personName = _currentPerson!['person_name'].toString();
-      } else if ((_currentPerson!['person_type']?.toString() ?? '') ==
-          'facilitator') {
-        // For facilitators, try to get firstName + lastName from database
-        try {
-          final facilitatorId =
-              int.parse(_currentPerson!['person_id'].toString());
-          final db = await _dbHelper.database;
-          final facilitatorData = await db.query(
-            'facilitator',
-            columns: ['firstName', 'lastName'],
-            where: 'facilitator_id = ?',
-            whereArgs: [facilitatorId],
-          );
-
-          if (facilitatorData.isNotEmpty) {
-            final firstName =
-                facilitatorData.first['firstName']?.toString() ?? '';
-            final lastName =
-                facilitatorData.first['lastName']?.toString() ?? '';
-            personName = '$firstName $lastName'.trim();
-            if (personName.isEmpty) personName = 'Facilitator $facilitatorId';
-          } else {
-            personName = 'Facilitator ${_currentPerson!['person_id']}';
-          }
-        } catch (e) {
-          debugPrint('[MONITORING_SERVICE] Error getting facilitator name: $e');
-          personName = 'Facilitator ${_currentPerson!['person_id']}';
-        }
-      } else {
-        // For learners, try to get Name + Surname from database
-        try {
-          final learnerId = int.parse(_currentPerson!['person_id'].toString());
-          final db = await _dbHelper.database;
-          final learnerData = await db.query(
-            'learnerdetails',
-            columns: ['Name', 'Surname'],
-            where: 'LearnerID = ?',
-            whereArgs: [learnerId],
-          );
-
-          if (learnerData.isNotEmpty) {
-            final name = learnerData.first['Name']?.toString() ?? '';
-            final surname = learnerData.first['Surname']?.toString() ?? '';
-            personName = '$name $surname'.trim();
-            if (personName.isEmpty) personName = 'Learner $learnerId';
-          } else {
-            personName = 'Learner ${_currentPerson!['person_id']}';
-          }
-        } catch (e) {
-          debugPrint('[MONITORING_SERVICE] Error getting learner name: $e');
-          personName = 'Learner ${_currentPerson!['person_id']}';
-        }
-      }
+      final attempts = _promptAttempts[learnerId] ?? 1;
 
       final recordData = {
-        'learner_id': personKey,
-        'learner_name': personName,
-        'person_type': _currentPerson!['person_type'] ?? 'learner',
+        'learner_id': learnerId,
+        'learner_name': learnerName,
+        'person_type': 'learner',
         'class_id': _currentClassID,
         'monitoring_date': today,
-        'attempt_1_time': now,
-        'attempt_1_status': status,
+        'attempt_1_time': attempts >= 1 ? now : null,
+        'attempt_1_status': attempts >= 1 ? status : null,
+        'attempt_2_time': attempts >= 2 ? now : null,
+        'attempt_2_status': attempts >= 2 ? status : null,
         'final_status': status,
         'verification_time': now,
         'verification_method':
-            _currentPerson!['verification_method'] ?? 'fingerprint',
-        'scanner_type': _currentPerson!['scanner_type'] ?? 'unknown',
-        'fingerprint_matched': _currentPerson!['fingerprint_matched'] ?? 0,
-        'session_type': _isAfternoonSession ? 'afternoon' : 'morning',
+            _currentPerson?['verification_method'] ?? 'fingerprint',
+        'scanner_type': _currentPerson?['scanner_type'] ?? 'unknown',
+        'fingerprint_matched': _currentPerson?['fingerprint_matched'] ?? 0,
+        'session_type': sessionType,
         'created_at': now,
         'synced': 0,
       };
 
-      debugPrint('[MONITORING_SERVICE] Attempting to save monitoring record:');
-      debugPrint('[MONITORING_SERVICE] _currentPerson data: $_currentPerson');
-      debugPrint('[MONITORING_SERVICE] Resolved person name: $personName');
-      debugPrint('[MONITORING_SERVICE] Record data: $recordData');
+      debugPrint('[MONITORING_SERVICE] Saving monitoring record: $recordData');
 
-      // Use database helper's insertMonitoringClockin which has online-first logic
-      final result = await _dbHelper.insertMonitoringClockin(recordData);
+      await db.insert('monitoring_records', recordData);
 
-      debugPrint(
-          '[MONITORING_SERVICE] ✅ Successfully saved monitoring record with ID: $result');
-      debugPrint('[MONITORING_SERVICE] Status: $status for $personName');
-
-      // Verify the record was saved
-      final savedRecords = await db.query(
-        'monitoring_records',
-        where: 'learner_id = ? AND monitoring_date = ?',
-        whereArgs: [personKey, today],
-      );
-      debugPrint(
-          '[MONITORING_SERVICE] Verification: Found ${savedRecords.length} records for $personKey today');
-
-      // Try to sync to server immediately (online-first)
+      // Try to sync to server
       try {
-        debugPrint(
-            '[MONITORING_SERVICE] 🌐 Attempting online-first save to server...');
         final response = await http
             .post(
               Uri.parse(AppConfig.saveMonitoringRecordsUrl),
@@ -532,11 +508,15 @@ class MonitoringService {
             .timeout(const Duration(seconds: 10));
 
         if (response.statusCode == 200) {
-          final serverResult = json.decode(response.body);
-          if (serverResult['success'] == true) {
+          final result = json.decode(response.body);
+          if (result['success'] == true) {
             debugPrint('[MONITORING_SERVICE] ✅ Saved to server successfully');
-            // Mark as synced
-            await _dbHelper.markMonitoringClockinAsSynced(result);
+            await db.update(
+              'monitoring_records',
+              {'synced': 1},
+              where: 'learner_id = ? AND monitoring_date = ?',
+              whereArgs: [learnerId, today],
+            );
           }
         }
       } catch (e) {
@@ -549,9 +529,33 @@ class MonitoringService {
     }
   }
 
+  /// Get session type for a specific learner
+  String _getSessionTypeForLearner(String learnerId) {
+    if (_morningSelectedLearners.contains(learnerId)) {
+      return 'morning';
+    } else if (_afternoonSelectedLearners.contains(learnerId)) {
+      return 'afternoon';
+    }
+    // Fallback to time-based detection
+    final hour = DateTime.now().hour;
+    return hour < 12 ? 'morning' : 'afternoon';
+  }
+
   // Getters for external access
   bool get isServiceRunning => _isServiceRunning;
   bool get isMonitoringActive => _isMonitoringActive;
-  int get availablePeopleCount => _availablePeople.length;
-  int get verifiedTodayCount => _verifiedToday.length;
+  bool get learnersSelected => _learnersSelected;
+  int get morningLearnersCount => _morningSelectedLearners.length;
+  int get afternoonLearnersCount => _afternoonSelectedLearners.length;
+
+  // Get scheduled times for debugging
+  Map<String, String> get scheduledTimes {
+    final times = <String, String>{};
+    _scheduledPromptTimes.forEach((key, dateTime) {
+      if (dateTime != null) {
+        times[key] = DateFormat('HH:mm').format(dateTime);
+      }
+    });
+    return times;
+  }
 }

@@ -1307,17 +1307,7 @@ class _LogisticsLearningMaterialFormPageState
                                   // All Materials Button / Verify Button
                                   // Hide Verify button when PPE is selected (verification is in PPE dialog)
                                   if (showUnitStandards)
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.arrow_forward_ios,
-                                        size: 16,
-                                        color: Colors.blue,
-                                      ),
-                                      onPressed: () =>
-                                          _navigateToLearnerMaterialSelection(
-                                              learner),
-                                      tooltip: 'All Materials',
-                                    )
+                                    const SizedBox.shrink()
                                   else if (!showPPE)
                                     ElevatedButton.icon(
                                       onPressed: isVerifying

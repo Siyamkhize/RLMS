@@ -54,7 +54,13 @@ class _InductionPageState extends State<InductionPage> {
 
   @override
   void dispose() {
+    // Cancel all subscriptions BEFORE disposing the service
+    _enrollStatusSubscription?.cancel();
+    _enrollSuccessSubscription?.cancel();
+
+    // Dispose the fingerprint service AFTER cancelling subscriptions
     _fingerprintService.dispose();
+
     super.dispose();
   }
 

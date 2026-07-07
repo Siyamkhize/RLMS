@@ -238,14 +238,18 @@ class _PoeBulkScanPageState extends State<PoeBulkScanPage> {
       debugPrint(
           '[POE_BULK] Syncing exercise ${poeRecord['exercise']} to server...');
 
-      final response = await request.send();
+      final response = await request.send().timeout(
+            const Duration(seconds: 30),
+            onTimeout: () => throw Exception('Upload timeout'),
+          );
       final responseBody = await response.stream.bytesToString();
 
       debugPrint('[POE_BULK] Response (${response.statusCode}): $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = json.decode(responseBody);
-        if (responseData['success'] == true) {
+        if (responseData['status'] == 'success' ||
+            responseData['success'] == true) {
           debugPrint('[POE_BULK] ✅ Synced exercise ${poeRecord['exercise']}');
           return true;
         }

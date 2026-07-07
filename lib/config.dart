@@ -2,18 +2,16 @@ class AppConfig {
   // ========================================
   // LIVE SERVER CONFIGURATION
   // ========================================
-  // static const String serverHost = 'tesing.mtltechnical.co.za';
-  static const String serverHost = 'rlms.rlms.co.za'; // Live server domain
-  static const int serverPort = 443; // HTTPS port
-  static const String serverProtocol = 'https';
-  // Live server uses HTTPS
-  static const String basePath = '/mobile';
+  // static const String serverHost = 'rlms.rlms.co.za'; // Live server domain
+  // static const int serverPort = 443; // HTTPS port
+  // static const String serverProtocol = 'https';
+  // // Live server uses HTTPS
+  // static const String basePath = '/mobile';
 
-  // static const String serverHost =
-  //     '192.168.68.115'; // Updated production hostname
-  // static const int serverPort = 8080; // HTTP poj   ``rt 8080
-  // static const String serverProtocol = 'http'; // Local server uses HTTP
-  // static const String basePath = '/assessorReport2/mobile';
+  static const String serverHost = '192.168.68.143'; // Local server IP
+  static const int serverPort = 80; // Local server port
+  static const String serverProtocol = 'http'; // Local server uses HTTP
+  static const String basePath = '/mobile'; // Local base path
 
   // Base URL for all API calls
   // Result: https://rlms.rlms.co.za/mobile
@@ -109,6 +107,7 @@ class AppConfig {
   static String get ppeSizesUrl => '$baseUrl/ppe_sizes.php';
   static String get addLearnerUrl => '$baseUrl/add_learner.php';
   static String get getAttendanceUrl => '$baseUrl/get_attendance.php';
+  static String get checkBankDetailsUrl => '$baseUrl/check_bank_details.php';
 
   // Logistics Management Endpoints
   static String get getLogisticsSitesUrl => '$baseUrl/get_logistics_sites.php';

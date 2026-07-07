@@ -7,7 +7,7 @@ import 'config.dart';
 /// Complete database repair tool for facilitator sync issues
 class DatabaseRepairTool {
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  
+
   /// Complete repair: Drop table, recreate, and sync
   Future<Map<String, dynamic>> repairFacilitatorTable() async {
     print('\n');
@@ -15,39 +15,40 @@ class DatabaseRepairTool {
     print('║       DATABASE REPAIR TOOL - FACILITATOR TABLE           ║');
     print('╚═══════════════════════════════════════════════════════════╝');
     print('\n');
-    
+
     try {
       final db = await _dbHelper.database;
-      
+
       // Step 1: Check current state
       print('┌─────────────────────────────────────────────────────────┐');
       print('│ STEP 1: Analyzing Current Database State               │');
       print('└─────────────────────────────────────────────────────────┘');
-      
+
       try {
-        final currentCount = await db.rawQuery('SELECT COUNT(*) as count FROM facilitator');
+        final currentCount =
+            await db.rawQuery('SELECT COUNT(*) as count FROM facilitator');
         print('✓ Current records: ${currentCount.first['count']}');
-        
+
         final tableInfo = await db.rawQuery('PRAGMA table_info(facilitator)');
         print('✓ Current columns: ${tableInfo.length}');
         print('  Columns: ${tableInfo.map((c) => c['name']).join(', ')}');
       } catch (e) {
         print('⚠ Table may not exist or is corrupted: $e');
       }
-      
+
       // Step 2: Drop existing table
       print('\n┌─────────────────────────────────────────────────────────┐');
       print('│ STEP 2: Dropping Old Table                             │');
       print('└─────────────────────────────────────────────────────────┘');
-      
+
       await db.execute('DROP TABLE IF EXISTS facilitator');
       print('✓ Old table dropped');
-      
+
       // Step 3: Create fresh table with correct schema
       print('\n┌─────────────────────────────────────────────────────────┐');
       print('│ STEP 3: Creating Fresh Table                           │');
       print('└─────────────────────────────────────────────────────────┘');
-      
+
       await db.execute('''
         CREATE TABLE facilitator (
           facilitator_id INTEGER PRIMARY KEY,
@@ -71,33 +72,34 @@ class DatabaseRepairTool {
         )
       ''');
       print('✓ Fresh table created with correct schema');
-      
+
       // Verify table creation
       final newTableInfo = await db.rawQuery('PRAGMA table_info(facilitator)');
       print('✓ Verified columns: ${newTableInfo.length}');
       for (var col in newTableInfo) {
         print('  - ${col['name']} (${col['type']})');
       }
-      
+
       // Step 4: Fetch data from server
       print('\n┌─────────────────────────────────────────────────────────┐');
       print('│ STEP 4: Fetching Data from Server                      │');
       print('└─────────────────────────────────────────────────────────┘');
-      
+
       print('URL: ${AppConfig.syncFacilitatorUrl}');
-      final response = await http.get(Uri.parse(AppConfig.syncFacilitatorUrl))
+      final response = await http
+          .get(Uri.parse(AppConfig.syncFacilitatorUrl))
           .timeout(const Duration(seconds: 30));
-      
+
       print('✓ Server response: ${response.statusCode}');
       print('✓ Response size: ${response.body.length} bytes');
-      
+
       if (response.statusCode != 200) {
         throw Exception('Server error: ${response.statusCode}');
       }
-      
+
       final List<dynamic> serverData = json.decode(response.body);
       print('✓ Parsed ${serverData.length} facilitator records');
-      
+
       if (serverData.isEmpty) {
         return {
           'success': false,
@@ -105,7 +107,7 @@ class DatabaseRepairTool {
           'step_failed': 'fetch',
         };
       }
-      
+
       // Show first record
       print('\nFirst record from server:');
       final first = serverData[0];
@@ -114,22 +116,22 @@ class DatabaseRepairTool {
       print('  lastName: "${first['lastName']}"');
       print('  email: "${first['email']}"');
       print('  classID: ${first['classID']}');
-      
+
       // Step 5: Insert data with explicit SQL
       print('\n┌─────────────────────────────────────────────────────────┐');
       print('│ STEP 5: Inserting Data (Direct SQL)                    │');
       print('└─────────────────────────────────────────────────────────┘');
-      
+
       int successCount = 0;
       int errorCount = 0;
-      
+
       for (var i = 0; i < serverData.length; i++) {
         final facilitator = serverData[i];
-        
+
         print('\nRecord ${i + 1}/${serverData.length}:');
         print('  ID: ${facilitator['facilitator_id']}');
         print('  Name: ${facilitator['firstName']} ${facilitator['lastName']}');
-        
+
         try {
           // Use direct SQL INSERT to ensure data goes in exactly as-is
           await db.rawInsert('''
@@ -160,15 +162,14 @@ class DatabaseRepairTool {
             facilitator['futronic_left_template'],
             facilitator['futronic_right_template'],
           ]);
-          
+
           print('  ✓ Inserted successfully');
-          
+
           // IMMEDIATE VERIFICATION
           final verify = await db.rawQuery(
-            'SELECT facilitator_id, firstName, lastName, email FROM facilitator WHERE facilitator_id = ?',
-            [facilitator['facilitator_id']]
-          );
-          
+              'SELECT facilitator_id, firstName, lastName, email FROM facilitator WHERE facilitator_id = ?',
+              [facilitator['facilitator_id']]);
+
           if (verify.isNotEmpty) {
             final row = verify.first;
             print('  ✓ Verified in DB:');
@@ -176,7 +177,7 @@ class DatabaseRepairTool {
             print('    firstName: "${row['firstName']}"');
             print('    lastName: "${row['lastName']}"');
             print('    email: "${row['email']}"');
-            
+
             // Check for data integrity
             if (row['firstName'] == facilitator['firstName'] &&
                 row['lastName'] == facilitator['lastName']) {
@@ -184,7 +185,8 @@ class DatabaseRepairTool {
               successCount++;
             } else {
               print('  ✗ DATA INTEGRITY FAILED!');
-              print('    Expected: ${facilitator['firstName']} ${facilitator['lastName']}');
+              print(
+                  '    Expected: ${facilitator['firstName']} ${facilitator['lastName']}');
               print('    Got: ${row['firstName']} ${row['lastName']}');
               errorCount++;
             }
@@ -192,47 +194,51 @@ class DatabaseRepairTool {
             print('  ✗ VERIFICATION FAILED: Not found in DB');
             errorCount++;
           }
-          
         } catch (e) {
           print('  ✗ Insert error: $e');
           errorCount++;
         }
       }
-      
+
       // Step 6: Final verification
       print('\n┌─────────────────────────────────────────────────────────┐');
       print('│ STEP 6: Final Database Verification                    │');
       print('└─────────────────────────────────────────────────────────┘');
-      
-      final finalCount = await db.rawQuery('SELECT COUNT(*) as count FROM facilitator');
-      final allRecords = await db.rawQuery('SELECT facilitator_id, firstName, lastName, email FROM facilitator');
-      
+
+      final finalCount =
+          await db.rawQuery('SELECT COUNT(*) as count FROM facilitator');
+      final allRecords = await db.rawQuery(
+          'SELECT facilitator_id, firstName, lastName, email FROM facilitator');
+
       print('✓ Total records in database: ${finalCount.first['count']}');
       print('\nAll facilitators:');
       for (var record in allRecords) {
-        print('  - ID ${record['facilitator_id']}: ${record['firstName']} ${record['lastName']} (${record['email']})');
+        print(
+            '  - ID ${record['facilitator_id']}: ${record['firstName']} ${record['lastName']} (${record['email']})');
       }
-      
+
       // Summary
       print('\n╔═══════════════════════════════════════════════════════════╗');
       print('║                    REPAIR SUMMARY                         ║');
       print('╠═══════════════════════════════════════════════════════════╣');
-      print('║ ✓ Successful inserts: ${successCount.toString().padLeft(3)}                             ║');
-      print('║ ✗ Failed inserts: ${errorCount.toString().padLeft(3)}                                 ║');
-      print('║ 📊 Total in database: ${(finalCount.first['count'] as int).toString().padLeft(3)}                             ║');
+      print(
+          '║ ✓ Successful inserts: ${successCount.toString().padLeft(3)}                             ║');
+      print(
+          '║ ✗ Failed inserts: ${errorCount.toString().padLeft(3)}                                 ║');
+      print(
+          '║ 📊 Total in database: ${(finalCount.first['count'] as int).toString().padLeft(3)}                             ║');
       print('╚═══════════════════════════════════════════════════════════╝');
       print('\n');
-      
+
       return {
         'success': errorCount == 0 && successCount > 0,
-        'message': errorCount == 0 
-            ? 'Database repair successful! All data synced.' 
+        'message': errorCount == 0
+            ? 'Database repair successful! All data synced.'
             : 'Repair completed with $errorCount errors',
         'records_synced': successCount,
         'errors': errorCount,
         'total_in_db': finalCount.first['count'],
       };
-      
     } catch (e, stackTrace) {
       print('\n╔═══════════════════════════════════════════════════════════╗');
       print('║                    REPAIR FAILED                          ║');
@@ -240,7 +246,7 @@ class DatabaseRepairTool {
       print('Error: $e');
       print('Stack trace: $stackTrace');
       print('\n');
-      
+
       return {
         'success': false,
         'message': 'Database repair failed: $e',
@@ -248,19 +254,18 @@ class DatabaseRepairTool {
       };
     }
   }
-  
+
   /// Quick diagnostic check
   Future<Map<String, dynamic>> diagnose() async {
     print('\n🔍 Running diagnostics...\n');
-    
+
     try {
       final db = await _dbHelper.database;
-      
+
       // Check table exists
       final tables = await db.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='facilitator'"
-      );
-      
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='facilitator'");
+
       if (tables.isEmpty) {
         return {
           'table_exists': false,
@@ -268,17 +273,17 @@ class DatabaseRepairTool {
           'action': 'Run repair to create table',
         };
       }
-      
+
       // Check schema
       final schema = await db.rawQuery('PRAGMA table_info(facilitator)');
       final columns = schema.map((c) => c['name']).toList();
-      
+
       // Check data
-      final count = await db.rawQuery('SELECT COUNT(*) as count FROM facilitator');
+      final count =
+          await db.rawQuery('SELECT COUNT(*) as count FROM facilitator');
       final records = await db.rawQuery(
-        'SELECT facilitator_id, firstName, lastName, email FROM facilitator LIMIT 5'
-      );
-      
+          'SELECT facilitator_id, firstName, lastName, email FROM facilitator LIMIT 5');
+
       return {
         'table_exists': true,
         'column_count': columns.length,
@@ -287,7 +292,6 @@ class DatabaseRepairTool {
         'sample_records': records,
         'message': 'Table exists with ${count.first['count']} records',
       };
-      
     } catch (e) {
       return {
         'error': true,
@@ -332,13 +336,11 @@ class _DatabaseRepairPageState extends State<DatabaseRepairPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('⚠️ Confirm Repair'),
-        content: const Text(
-          'This will:\n'
-          '1. Drop the existing facilitator table\n'
-          '2. Create a fresh table\n'
-          '3. Download and insert data from server\n\n'
-          'Continue?'
-        ),
+        content: const Text('This will:\n'
+            '1. Drop the existing facilitator table\n'
+            '2. Create a fresh table\n'
+            '3. Download and insert data from server\n\n'
+            'Continue?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -369,7 +371,8 @@ class _DatabaseRepairPageState extends State<DatabaseRepairPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(result['message'] ?? 'Repair completed'),
-          backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+          backgroundColor:
+              result['success'] == true ? Colors.green : Colors.red,
           duration: const Duration(seconds: 5),
         ),
       );
@@ -395,7 +398,8 @@ class _DatabaseRepairPageState extends State<DatabaseRepairPage> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    Icon(Icons.warning, size: 48, color: Colors.orange.shade700),
+                    Icon(Icons.warning,
+                        size: 48, color: Colors.orange.shade700),
                     const SizedBox(height: 8),
                     Text(
                       'Database Not Syncing',
@@ -415,9 +419,9 @@ class _DatabaseRepairPageState extends State<DatabaseRepairPage> {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Diagnostic results
             if (_diagnosing)
               const Center(child: CircularProgressIndicator())
@@ -433,11 +437,14 @@ class _DatabaseRepairPageState extends State<DatabaseRepairPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildStatusRow('Table Exists', _diagnosticResult!['table_exists'] == true),
+                      _buildStatusRow('Table Exists',
+                          _diagnosticResult!['table_exists'] == true),
                       if (_diagnosticResult!['column_count'] != null)
-                        _buildInfoRow('Columns', '${_diagnosticResult!['column_count']}'),
+                        _buildInfoRow(
+                            'Columns', '${_diagnosticResult!['column_count']}'),
                       if (_diagnosticResult!['record_count'] != null)
-                        _buildInfoRow('Records', '${_diagnosticResult!['record_count']}'),
+                        _buildInfoRow(
+                            'Records', '${_diagnosticResult!['record_count']}'),
                       const Divider(),
                       Text(
                         _diagnosticResult!['message'] ?? 'Unknown status',
@@ -448,35 +455,37 @@ class _DatabaseRepairPageState extends State<DatabaseRepairPage> {
                 ),
               ),
             ],
-            
+
             const SizedBox(height: 24),
-            
+
             // Repair button
             ElevatedButton.icon(
               onPressed: _repairing ? null : _runRepair,
-              icon: _repairing 
+              icon: _repairing
                   ? const SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
                     )
                   : const Icon(Icons.build),
               label: Text(_repairing ? 'REPAIRING...' : 'REPAIR DATABASE NOW'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red.shade700,
                 padding: const EdgeInsets.symmetric(vertical: 20),
-                textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                textStyle:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             TextButton.icon(
               onPressed: _diagnosing ? null : _runDiagnostics,
               icon: const Icon(Icons.refresh),
               label: const Text('Refresh Diagnostics'),
             ),
-            
+
             // Repair result
             if (_repairResult != null) ...[
               const SizedBox(height: 24),
@@ -486,8 +495,8 @@ class _DatabaseRepairPageState extends State<DatabaseRepairPage> {
               ),
               const SizedBox(height: 8),
               Card(
-                color: _repairResult!['success'] == true 
-                    ? Colors.green.shade50 
+                color: _repairResult!['success'] == true
+                    ? Colors.green.shade50
                     : Colors.red.shade50,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -497,38 +506,42 @@ class _DatabaseRepairPageState extends State<DatabaseRepairPage> {
                       Row(
                         children: [
                           Icon(
-                            _repairResult!['success'] == true 
-                                ? Icons.check_circle 
+                            _repairResult!['success'] == true
+                                ? Icons.check_circle
                                 : Icons.error,
-                            color: _repairResult!['success'] == true 
-                                ? Colors.green 
+                            color: _repairResult!['success'] == true
+                                ? Colors.green
                                 : Colors.red,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _repairResult!['message'] ?? 'Completed',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ),
                         ],
                       ),
                       if (_repairResult!['records_synced'] != null) ...[
                         const Divider(),
-                        _buildInfoRow('✓ Synced', '${_repairResult!['records_synced']}'),
+                        _buildInfoRow(
+                            '✓ Synced', '${_repairResult!['records_synced']}'),
                         if (_repairResult!['errors'] != null)
-                          _buildInfoRow('✗ Errors', '${_repairResult!['errors']}'),
+                          _buildInfoRow(
+                              '✗ Errors', '${_repairResult!['errors']}'),
                         if (_repairResult!['total_in_db'] != null)
-                          _buildInfoRow('📊 Total', '${_repairResult!['total_in_db']}'),
+                          _buildInfoRow(
+                              '📊 Total', '${_repairResult!['total_in_db']}'),
                       ],
                     ],
                   ),
                 ),
               ),
             ],
-            
+
             const SizedBox(height: 24),
-            
+
             // Instructions
             Card(
               color: Colors.blue.shade50,
@@ -597,4 +610,3 @@ class _DatabaseRepairPageState extends State<DatabaseRepairPage> {
     );
   }
 }
-

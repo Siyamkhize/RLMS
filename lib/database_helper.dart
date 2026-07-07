@@ -418,6 +418,71 @@ class DatabaseHelper {
     return null;
   }
 
+  // --- MONITORING METHODS ---
+
+  Future<int> saveMonitoringRecordLocally(Map<String, dynamic> record) async {
+    try {
+      final db = await database;
+
+      // Check if a record already exists for this learner and date to prevent duplicates
+      final existing = await db.query(
+        'monitoring_records',
+        where: 'learner_id = ? AND monitoring_date = ?',
+        whereArgs: [record['learner_id'], record['monitoring_date']],
+        limit: 1,
+      );
+
+      if (existing.isNotEmpty) {
+        final id = existing.first['id'] as int;
+        debugPrint(
+            '[DB_HELPER] Updating existing monitoring record for learner ${record['learner_id']} on ${record['monitoring_date']}');
+        await db.update(
+          'monitoring_records',
+          record,
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+        return id;
+      }
+
+      final id = await db.insert('monitoring_records', record);
+      debugPrint('[DB_HELPER] Monitoring record saved locally with ID: $id');
+      return id;
+    } catch (e) {
+      debugPrint('[DB_HELPER] Error saving monitoring record locally: $e');
+      return -1;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getUnsyncedMonitoringRecords() async {
+    try {
+      final db = await database;
+      return await db.query(
+        'monitoring_records',
+        where: 'synced = ?',
+        whereArgs: [0],
+      );
+    } catch (e) {
+      debugPrint('[DB_HELPER] Error fetching unsynced monitoring records: $e');
+      return [];
+    }
+  }
+
+  Future<void> markMonitoringRecordAsSynced(int id) async {
+    try {
+      final db = await database;
+      await db.update(
+        'monitoring_records',
+        {'synced': 1},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      debugPrint('[DB_HELPER] Monitoring record $id marked as synced');
+    } catch (e) {
+      debugPrint('[DB_HELPER] Error marking monitoring record as synced: $e');
+    }
+  }
+
   String? _sanitizeDate(dynamic value) {
     if (value == null) return null;
     if (value is String && value.isNotEmpty) {
@@ -558,9 +623,48 @@ class DatabaseHelper {
     );
   }
 
+  /// Check if a learner has missed all monitoring attempts for the current day
+  /// Returns true if the learner was selected for monitoring but missed 3 attempts
+  Future<bool> hasMissedAllMonitoring(String learnerId) async {
+    try {
+      final db = await database;
+      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+      // Check for 'MISSED' status in monitoring_records for today
+      // Also check if they were prompted 3 times but never responded
+      final result = await db.query(
+        'monitoring_records',
+        where: 'learner_id = ? AND monitoring_date = ?',
+        whereArgs: [learnerId, today],
+        limit: 1,
+      );
+
+      if (result.isNotEmpty) {
+        final record = result.first;
+        final finalStatus = record['final_status']?.toString().toUpperCase();
+
+        // If status is 'MISSED' or 'ABSENT', check if it was after 3 attempts
+        if (finalStatus == 'MISSED' || finalStatus == 'ABSENT') {
+          // If attempt_3_time is set but they still missed, it's a hard block
+          // Note: Older records might only have 2 attempts, so we check for both
+          if (record['attempt_3_time'] != null ||
+              record['attempt_2_time'] != null) {
+            debugPrint(
+                '[DB_HELPER] Learner $learnerId MISSED monitoring for today. Blocking clock-out.');
+            return true;
+          }
+        }
+      }
+      return false;
+    } catch (e) {
+      debugPrint('[DB_HELPER] Error checking monitoring status: $e');
+      return false;
+    }
+  }
+
   Future<Database> _initDatabase() async {
     final path = await getDatabasesPath();
-    return openDatabase(join(path, _dbName), version: 7,
+    return openDatabase(join(path, _dbName), version: 9,
         onUpgrade: (db, oldVersion, newVersion) async {
       debugPrint(
           '[DB] Upgrading database from version $oldVersion to $newVersion');
@@ -709,6 +813,20 @@ class DatabaseHelper {
       }
 
       if (oldVersion < 8) {
+        // Add unitStandard column to poe table (prevents exercise key collisions
+        // across unit standards, which can cause "wrong tick" behaviour).
+        try {
+          final columns = await db.rawQuery("PRAGMA table_info('poe')");
+          final hasUnitStandard = columns.any(
+              (c) => (c['name']?.toString().toLowerCase() == 'unitstandard'));
+          if (!hasUnitStandard) {
+            await db.execute('ALTER TABLE poe ADD COLUMN unitStandard TEXT');
+            debugPrint('[DB] Added unitStandard column to poe table');
+          }
+        } catch (e) {
+          debugPrint('[DB] Error adding unitStandard column to poe: $e');
+        }
+
         // Create facilitator_material_issues table
         try {
           await db.execute('''
@@ -737,6 +855,40 @@ class DatabaseHelper {
         } catch (e) {
           debugPrint(
               '[DB] Error creating facilitator_material_issues table: $e');
+        }
+      }
+
+      if (oldVersion < 9) {
+        // Create monitoring_records table for offline monitoring support
+        try {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS monitoring_records (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              learner_id TEXT NOT NULL,
+              learner_name TEXT NOT NULL,
+              person_type TEXT DEFAULT 'learner',
+              class_id TEXT NOT NULL,
+              monitoring_date DATE NOT NULL,
+              attempt_1_time DATETIME,
+              attempt_1_status TEXT,
+              attempt_2_time DATETIME,
+              attempt_2_status TEXT,
+              attempt_3_time DATETIME,
+              attempt_3_status TEXT,
+              final_status TEXT NOT NULL,
+              verification_time DATETIME,
+              verification_method TEXT,
+              scanner_type TEXT,
+              fingerprint_matched INTEGER DEFAULT 0,
+              session_type TEXT,
+              created_at DATETIME NOT NULL,
+              synced INTEGER DEFAULT 0,
+              UNIQUE(learner_id, monitoring_date)
+            )
+          ''');
+          debugPrint('[DB] Created monitoring_records table for version 9');
+        } catch (e) {
+          debugPrint('[DB] Error creating monitoring_records table: $e');
         }
       }
     }, onCreate: (db, dbVersion) async {
@@ -922,7 +1074,7 @@ class DatabaseHelper {
             Municipality VARCHAR(50),
             Category VARCHAR(50),
             project_id INTEGER(20),
-            Project_pathway VARCHAR(50),
+            Project_pathway VARCHAR(255),
             first_name VARCHAR(255),
             last_name VARCHAR(255),
             cell_phone VARCHAR(15),
@@ -1039,6 +1191,7 @@ class DatabaseHelper {
          learnerID INTEGER,
          exercise TEXT,
          type TEXT,
+         unitStandard TEXT,
          filePath TEXT,
          submitted_at timestamp,
          synced INTEGER DEFAULT 0,
@@ -1096,6 +1249,34 @@ updated_at TIMESTAMP
       synced INTEGER NOT NULL DEFAULT 0
     )
     ''');
+
+      // Create monitoring_records table for offline monitoring support
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS monitoring_records (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          learner_id TEXT NOT NULL,
+          learner_name TEXT NOT NULL,
+          person_type TEXT DEFAULT 'learner',
+          class_id TEXT NOT NULL,
+          monitoring_date DATE NOT NULL,
+          attempt_1_time DATETIME,
+          attempt_1_status TEXT,
+          attempt_2_time DATETIME,
+          attempt_2_status TEXT,
+          attempt_3_time DATETIME,
+          attempt_3_status TEXT,
+          final_status TEXT NOT NULL,
+          verification_time DATETIME,
+          verification_method TEXT,
+          scanner_type TEXT,
+          fingerprint_matched INTEGER DEFAULT 0,
+          session_type TEXT,
+          created_at DATETIME NOT NULL,
+          synced INTEGER DEFAULT 0,
+          UNIQUE(learner_id, monitoring_date)
+        )
+      ''');
+
       // Create the project table
       await db.execute('''
       CREATE TABLE project (
@@ -1149,6 +1330,26 @@ updated_at TIMESTAMP
     upload_date TEXT,
     status TEXT DEFAULT 'PENDING',
     rejection_reason TEXT,
+    synced INTEGER DEFAULT 0
+  )
+''');
+
+      await db.execute('''
+  CREATE TABLE manual_clocking (
+    manual_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    clocking_id INTEGER,
+    LearnerID INTEGER NOT NULL,
+    clock_date TEXT NOT NULL,
+    clock_in_time TEXT,
+    clock_out_time TEXT,
+    contact_time TEXT,
+    manual_reason TEXT,
+    fdp_document TEXT,
+    status TEXT DEFAULT 'Pending',
+    reviewed_by TEXT,
+    reviewed_at TEXT,
+    rejection_reason TEXT,
+    is_manual_attendance INTEGER DEFAULT 1,
     synced INTEGER DEFAULT 0
   )
 ''');
@@ -1550,6 +1751,33 @@ updated_at TIMESTAMP
         print('[DB_INSERT]   All keys: ${mappedData.keys.toList()}');
       }
 
+      // learnerdetails has strict NOT NULL columns in local schema.
+      // Some sync payloads are partial and omit these fields, so ensure
+      // defaults to prevent SQLITE_CONSTRAINT_NOTNULL failures.
+      if (tableName == 'learnerdetails') {
+        mappedData['LearnerID'] = mappedData['LearnerID'] ?? 0;
+        mappedData['Title'] =
+            (mappedData['Title']?.toString().trim().isNotEmpty ?? false)
+                ? mappedData['Title']
+                : 'N/A';
+        mappedData['Name'] =
+            (mappedData['Name']?.toString().trim().isNotEmpty ?? false)
+                ? mappedData['Name']
+                : 'N/A';
+        mappedData['Surname'] =
+            (mappedData['Surname']?.toString().trim().isNotEmpty ?? false)
+                ? mappedData['Surname']
+                : 'N/A';
+        mappedData['IDNumber'] =
+            (mappedData['IDNumber']?.toString().trim().isNotEmpty ?? false)
+                ? mappedData['IDNumber']
+                : 'UNKNOWN';
+        mappedData['DateOfBirth'] =
+            (mappedData['DateOfBirth']?.toString().trim().isNotEmpty ?? false)
+                ? mappedData['DateOfBirth']
+                : '1900-01-01';
+      }
+
       // Insert data as-is (with mappings only for learnerdetails)
       await db.insert(tableName, mappedData,
           conflictAlgorithm: ConflictAlgorithm.replace);
@@ -1706,8 +1934,15 @@ updated_at TIMESTAMP
       lc.clock_out_time,
       lc.contact_time
     FROM learnerdetails l
-    LEFT JOIN learner_clocking lc ON l.LearnerID = lc.LearnerID 
-    AND lc.clock_date = ?
+    LEFT JOIN (
+      SELECT LearnerID, clock_date, 
+             MIN(clock_in_time) as clock_in_time, 
+             MAX(clock_out_time) as clock_out_time,
+             MAX(contact_time) as contact_time
+      FROM learner_clocking
+      WHERE clock_date = ?
+      GROUP BY LearnerID
+    ) lc ON l.LearnerID = lc.LearnerID 
     WHERE l.classID = ?
   ''', [
       currentDate, // Current date in SAST
@@ -1716,6 +1951,56 @@ updated_at TIMESTAMP
 
     debugPrint(
         '[LOAD_LEARNERS] Found ${result.length} learners with clocking data for today');
+    return result;
+  }
+
+  // Get ONLY learners who have clocked in today
+  Future<List<Map<String, dynamic>>> getClockedInLearnersOnly(
+      String classID) async {
+    final db = await database;
+
+    // Use South African time (SAST - UTC+2)
+    final saTime = DateTime.now().toUtc().add(const Duration(hours: 2));
+    final currentDate = DateFormat('yyyy-MM-dd').format(saTime);
+
+    debugPrint(
+        '[CLOCKED_IN_ONLY] Getting clocked-in learners for classID: $classID, date: $currentDate (SAST)');
+
+    final result = await db.rawQuery('''
+    SELECT 
+      l.LearnerID, 
+      l.Name, 
+      l.Surname,
+      l.IDNumber,
+      l.zkteco_left_template,
+      l.zkteco_right_template,
+      l.futronic_left_template,
+      l.futronic_right_template,
+      l.sourceafis_template,
+      lc.clock_in_time, 
+      lc.clock_out_time,
+      lc.contact_time
+    FROM learnerdetails l
+    INNER JOIN (
+      SELECT LearnerID, clock_date, 
+             MIN(clock_in_time) as clock_in_time, 
+             MAX(clock_out_time) as clock_out_time,
+             MAX(contact_time) as contact_time
+      FROM learner_clocking
+      WHERE clock_date = ?
+      GROUP BY LearnerID
+    ) lc ON l.LearnerID = lc.LearnerID 
+    WHERE l.classID = ?
+    AND lc.clock_in_time IS NOT NULL
+    AND lc.clock_in_time != ''
+    ORDER BY lc.clock_in_time DESC
+  ''', [
+      currentDate, // Current date in SAST
+      classID
+    ]);
+
+    debugPrint(
+        '[CLOCKED_IN_ONLY] Found ${result.length} learners who clocked in today');
     return result;
   }
 
@@ -1770,6 +2055,32 @@ updated_at TIMESTAMP
     }
 
     return result;
+  }
+
+  // Get approved manual attendance days for a learner in a specific month
+  Future<int> getApprovedManualAttendanceDays(
+      int learnerId, String monthStr) async {
+    final db = await database;
+
+    try {
+      // Query approved manual clocking records for the month
+      final result = await db.rawQuery('''
+        SELECT COUNT(DISTINCT DATE(clock_date)) as count
+        FROM manual_clocking
+        WHERE LearnerID = ?
+        AND clock_date LIKE ?
+        AND (status = 'Approved' OR status = 'approved' OR status = 'APPROVED')
+      ''', [learnerId, '$monthStr%']);
+
+      if (result.isNotEmpty && result.first['count'] != null) {
+        return result.first['count'] as int;
+      }
+      return 0;
+    } catch (e) {
+      print(
+          '[DATABASE] Error getting approved manual attendance for learner $learnerId: $e');
+      return 0;
+    }
   }
 
   // Method to check if clock-in exists for a specific learner and date
@@ -2726,14 +3037,12 @@ updated_at TIMESTAMP
   Future<List<Map<String, dynamic>>> getLearnerData(int learnerID) async {
     final db = await database;
 
-    // SQL query with proper string formatting, including question_type
+    // Fetch raw data including the raw Project_pathway JSON string
     var result = await db.rawQuery('''
     SELECT 
       ld.classID, 
       s.project_id,
-      pr.Project_pathway->'\$[0].name' AS pathway_name,
-      pr.Project_pathway->'\$[0].qual_types[0].qualification.name' AS qualification_name,
-      pr.Project_pathway->'\$[0].qual_types[0].qualification.unitStandards' AS unit_standards,
+      pr.Project_pathway,
       a.unit_standard_id,
       a.assessment_type,
       a.question_type,
@@ -2746,233 +3055,178 @@ updated_at TIMESTAMP
     LEFT JOIN class c ON ld.classID = c.classID
     LEFT JOIN sites s ON c.siteID = s.siteID
     LEFT JOIN project pr ON s.project_id = pr.project_id
-    LEFT JOIN assessments a ON a.unit_standard_id IS NOT NULL AND a.unit_standard_id != ''
+    LEFT JOIN assessments a ON a.project_id = pr.project_id 
+      AND a.unit_standard_id IS NOT NULL 
+      AND a.unit_standard_id != ''
     WHERE ld.learnerID  = ?;
   ''', [learnerID]);
 
-    print('Raw query results (count: ${result.length}):');
-    for (var row in result) {
-      print('Row: $row');
+    if (result.isEmpty) {
+      print('No data found for learnerID: $learnerID');
+      return [];
     }
 
-    List<Map<String, dynamic>> filteredResult = [];
+    // Process data from all rows to handle multiple classes/projects if they exist
+    List<Map<String, dynamic>> finalResult = [];
     Map<String, List<Map<String, dynamic>>> unitStandardAssessments = {};
-    List<String> validUnitStandardIds = [];
+    List<dynamic> unitStandardsList = [];
+    Map<String, String> allowedUnitStandardNames = {};
 
-    // Process query results
+    // Track unique projects to avoid redundant parsing
+    Set<String> processedProjects = {};
+
     for (var row in result) {
-      String? unitStandardsJson = row['unit_standards'] as String?;
-      String? unitStandardId = row['unit_standard_id']?.toString().trim();
+      final projectId = row['project_id']?.toString() ?? 'Unknown';
+      final rawPathwayJson = row['Project_pathway'] as String? ?? '[]';
 
-      // Create a new map for the row
-      Map<String, dynamic> enrichedRow = Map<String, dynamic>.from(row);
+      if (!processedProjects.contains(projectId)) {
+        processedProjects.add(projectId);
 
-      // Initialize default values
-      enrichedRow['unit_standard_name'] = 'Unknown Unit Standard';
-      enrichedRow['unit_standards_list'] = [];
-      enrichedRow['assessments'] = {
-        'formative': [],
-        'summative': [],
-        'logbook': [],
-      };
-
-      if (unitStandardsJson != null &&
-          unitStandardsJson.isNotEmpty &&
-          unitStandardsJson.startsWith('[')) {
         try {
-          List<dynamic> unitStandards = jsonDecode(unitStandardsJson);
-          enrichedRow['unit_standards_list'] = unitStandards;
+          final pathwayData = jsonDecode(rawPathwayJson);
+          if (pathwayData is List) {
+            for (var pathway in pathwayData) {
+              final currentPathwayName =
+                  pathway['name']?.toString() ?? 'Unknown Pathway';
 
-          // Collect valid unit standard IDs
-          if (validUnitStandardIds.isEmpty) {
-            validUnitStandardIds = unitStandards
-                .map((us) => us['id']?.toString().trim() ?? '')
-                .where((id) => id.isNotEmpty)
-                .toList();
-            print('Valid unit standard IDs: $validUnitStandardIds');
-          }
+              if (pathway['qual_types'] is List) {
+                for (var qualType in pathway['qual_types']) {
+                  if (qualType['qualification'] != null) {
+                    final qual = qualType['qualification'];
+                    final currentQualName =
+                        qual['name']?.toString() ?? 'Unknown Qualification';
 
-          print('Parsed unit_standards_list: $unitStandards');
+                    if (qual['unitStandards'] is List) {
+                      for (var us in qual['unitStandards']) {
+                        final id = us['id']?.toString().trim();
+                        if (id != null) {
+                          allowedUnitStandardNames[id] =
+                              us['name']?.toString() ?? 'Unknown Unit Standard';
 
-          if (unitStandardId != null && unitStandardId.isNotEmpty) {
-            // Check if unit_standard_id is valid
-            if (!validUnitStandardIds.contains(unitStandardId)) {
-              print(
-                  'Invalid unit_standard_id: "$unitStandardId" not in $validUnitStandardIds');
-              print('Problematic row: $row');
-              continue; // Skip rows with invalid unit_standard_id
-            }
+                          bool alreadyExists = unitStandardsList.any(
+                              (existing) =>
+                                  existing['id']?.toString().trim() == id);
 
-            var matchingUnitStandard = unitStandards.firstWhere(
-              (us) {
-                String jsonId = us['id']?.toString().trim() ?? '';
-                String normalizedUnitStandardId =
-                    unitStandardId.replaceAll('"', '').trim();
-                bool isMatch = jsonId == normalizedUnitStandardId;
-                print(
-                    'Comparing: jsonId="$jsonId" vs unitStandardId="$unitStandardId" (normalized: "$normalizedUnitStandardId") -> isMatch=$isMatch');
-                return isMatch;
-              },
-              orElse: () => null,
-            );
-
-            if (matchingUnitStandard != null) {
-              print('Match found: $matchingUnitStandard');
-              enrichedRow['unit_standard_name'] =
-                  matchingUnitStandard['name'] ?? 'Unknown Unit Standard';
-
-              String assessmentType =
-                  row['assessment_type']?.toString().toLowerCase() ?? '';
-              String questionType =
-                  row['question_type']?.toString() ?? 'Knowledge';
-
-              if (assessmentType == 'formative' ||
-                  assessmentType == 'summative' ||
-                  assessmentType == 'logbook') {
-                if (!unitStandardAssessments.containsKey(unitStandardId)) {
-                  unitStandardAssessments[unitStandardId] = [];
-                }
-                // Avoid duplicate assessments
-                bool isDuplicate = unitStandardAssessments[unitStandardId]!.any(
-                  (a) =>
-                      a['question_number'] == row['question_number'] &&
-                      a['exercise'] == row['exercise'] &&
-                      a['assessment_type'] == assessmentType,
-                );
-                if (!isDuplicate) {
-                  var assessment = {
-                    'assessment_type': assessmentType,
-                    'question_number':
-                        row['question_number']?.toString() ?? 'N/A',
-                    'specific_outcome':
-                        row['specific_outcome']?.toString() ?? '',
-                    'assessment_criteria':
-                        row['assessment_criteria']?.toString() ?? '',
-                    'exercise': row['exercise']?.toString() ?? 'N/A',
-                    'marks': row['marks']?.toString() ?? '',
-                    'question_type': questionType,
-                  };
-                  unitStandardAssessments[unitStandardId]!.add(assessment);
-                } else {
-                  print(
-                      'Duplicate assessment skipped: unit_standard_id=$unitStandardId, question_number=${row['question_number']}, exercise=${row['exercise']}');
+                          if (!alreadyExists) {
+                            unitStandardsList.add({
+                              'id': id,
+                              'name': us['name'],
+                              'pathway_name': currentPathwayName,
+                              'qualification_name': currentQualName,
+                              'classID': row['classID'],
+                              'project_id': row['project_id'],
+                            });
+                          }
+                        }
+                      }
+                    }
+                  }
                 }
               }
-            } else {
-              print('No match for unit_standard_id: "$unitStandardId"');
-              continue;
             }
-          } else {
-            print('Null or empty unit_standard_id: "$unitStandardId"');
           }
         } catch (e) {
           print(
-              'JSON parsing error: $e, for unit_standards: $unitStandardsJson');
-          enrichedRow['unit_standards_list'] = [];
+              'Error parsing Project_pathway JSON for project $projectId: $e');
         }
-      } else {
-        print('Invalid or empty unit_standards: $unitStandardsJson');
       }
 
-      // Only add valid rows
-      if (enrichedRow['unit_standard_name'] != 'Unknown Unit Standard') {
-        filteredResult.add(enrichedRow);
-      }
-    }
+      // Group assessments by unit standard ID
+      final usId = row['unit_standard_id']?.toString().trim();
+      if (usId != null && allowedUnitStandardNames.containsKey(usId)) {
+        final type = row['assessment_type']?.toString().toLowerCase() ?? '';
+        final qType = row['question_type']?.toString() ?? 'Knowledge';
 
-    // Aggregate assessments into the result
-    for (var row in filteredResult) {
-      String? unitStandardId = row['unit_standard_id']?.toString().trim();
-      if (unitStandardId != null &&
-          unitStandardAssessments.containsKey(unitStandardId)) {
-        row['assessments'] = {
-          'formative': unitStandardAssessments[unitStandardId]!
-              .where((a) => a['assessment_type'] == 'formative')
-              .map((a) => {
-                    'exercise': a['exercise'],
-                    'question_number': a['question_number'],
-                  })
-              .toList(),
-          'summative': unitStandardAssessments[unitStandardId]!
-              .where((a) => a['assessment_type'] == 'summative')
-              .map((a) => {
-                    'exercise': a['exercise'],
-                    'question_number': a['question_number'],
-                  })
-              .toList(),
-          'logbook': unitStandardAssessments[unitStandardId]!
-              .where((a) =>
-                  a['assessment_type'] == 'logbook' ||
-                  (a['assessment_type'] == 'summative' &&
-                      a['question_type'] == 'Practical'))
-              .map((a) => {
-                    'exercise': a['exercise'],
-                    'question_number': a['question_number'],
-                  })
-              .toList(),
-        };
-      }
-    }
+        // Determine bucket
+        String bucket = type;
+        if (qType == 'Practical') bucket = 'logbook';
 
-    // Ensure all unit standards from the qualification are included
-    if (filteredResult.isNotEmpty) {
-      List<dynamic> unitStandards =
-          filteredResult.first['unit_standards_list'] ?? [];
-      List<Map<String, dynamic>> finalResult = [];
+        if (!unitStandardAssessments.containsKey(usId)) {
+          unitStandardAssessments[usId] = [];
+        }
 
-      for (var unitStandard in unitStandards) {
-        String unitStandardId = unitStandard['id']?.toString().trim() ?? '';
-        String unitStandardName =
-            unitStandard['name']?.toString() ?? 'Unknown Unit Standard';
+        // Deduplicate assessments
+        bool isDuplicate = unitStandardAssessments[usId]!.any((a) =>
+            a['question_number'] == row['question_number'] &&
+            a['exercise'] == row['exercise'] &&
+            a['assessment_type'] == bucket);
 
-        // Find matching rows
-        var matchingRows = filteredResult
-            .where((row) =>
-                row['unit_standard_id']?.toString().trim() == unitStandardId)
-            .toList();
-
-        if (matchingRows.isNotEmpty) {
-          finalResult.addAll(matchingRows);
-        } else {
-          // Add a row for unit standards without assessments
-          finalResult.add({
-            'classID': filteredResult.first['classID'],
-            'project_id': filteredResult.first['project_id'],
-            'pathway_name': filteredResult.first['pathway_name'],
-            'qualification_name': filteredResult.first['qualification_name'],
-            'unit_standards_list': unitStandards,
-            'unit_standard_id': unitStandardId,
-            'unit_standard_name': unitStandardName,
-            'assessments': {
-              'formative': [],
-              'summative': [],
-              'LogBook': [],
-            },
+        if (!isDuplicate) {
+          unitStandardAssessments[usId]!.add({
+            'assessment_type': bucket,
+            'question_number': row['question_number']?.toString() ?? 'N/A',
+            'specific_outcome': row['specific_outcome']?.toString() ?? '',
+            'assessment_criteria': row['assessment_criteria']?.toString() ?? '',
+            'exercise': row['exercise']?.toString() ?? 'N/A',
+            'marks': row['marks']?.toString() ?? '',
+            'question_type': qType,
           });
         }
       }
-
-      filteredResult = finalResult;
     }
 
-    print('\nFiltered results (count: ${filteredResult.length}):');
-    for (var row in filteredResult) {
-      print('Filtered row: $row');
+    // Build the final result list using the allowed unit standards list
+    for (var us in unitStandardsList) {
+      final usId = us['id']?.toString().trim() ?? '';
+      final usRawName =
+          us['name']?.toString().trim() ?? 'Unknown Unit Standard';
+
+      // Aggressively remove ID from the start if it exists (e.g., "259604 - ...")
+      final idPattern = RegExp('^' + RegExp.escape(usId) + r'[\s:\-–—]*',
+          caseSensitive: false);
+      final usCleanName = usRawName.replaceFirst(idPattern, '');
+      final fullUsName = "$usId - $usCleanName";
+
+      final assessments = unitStandardAssessments[usId] ?? [];
+
+      finalResult.add({
+        'classID': us['classID'],
+        'project_id': us['project_id'],
+        'pathway_name': us['pathway_name'],
+        'qualification_name': us['qualification_name'],
+        'unit_standards_list': unitStandardsList,
+        'unit_standard_id': usId,
+        'unit_standard_name': fullUsName,
+        'assessments': {
+          'formative': assessments
+              .where((a) => a['assessment_type'] == 'formative')
+              .toList(),
+          'summative': assessments
+              .where((a) => a['assessment_type'] == 'summative')
+              .toList(),
+          'logbook': assessments
+              .where((a) => a['assessment_type'] == 'logbook')
+              .toList(),
+          'formativeremedial': assessments
+              .where((a) => a['assessment_type'] == 'formativeremedial')
+              .toList(),
+          'summativeremedial': assessments
+              .where((a) => a['assessment_type'] == 'summativeremedial')
+              .toList(),
+        },
+      });
     }
 
-    return filteredResult;
+    return finalResult;
   }
 
   Future<void> saveUploadToLocalPoe(
-      int learnerID, String type, String exercise, String filePath) async {
+      int learnerID, String type, String exercise, String filePath,
+      {String? unitStandard, int synced = 0}) async {
     try {
       final db = await database;
 
       // Check if record already exists
       final existing = await db.query(
         'poe',
-        where: 'learnerID = ? AND type = ? AND exercise = ?',
-        whereArgs: [learnerID.toString(), type, exercise],
+        where:
+            'learnerID = ? AND type = ? AND exercise = ? AND unitStandard = ?',
+        whereArgs: [
+          learnerID.toString(),
+          type,
+          exercise,
+          (unitStandard ?? '').trim(),
+        ],
       );
 
       if (existing.isNotEmpty) {
@@ -2982,13 +3236,20 @@ updated_at TIMESTAMP
           {
             'filePath': filePath,
             'submitted_at': DateTime.now().toIso8601String(),
-            'synced': 0,
+            'synced': synced,
+            'unitStandard': (unitStandard ?? '').trim(),
           },
-          where: 'learnerID = ? AND type = ? AND exercise = ?',
-          whereArgs: [learnerID.toString(), type, exercise],
+          where:
+              'learnerID = ? AND type = ? AND exercise = ? AND unitStandard = ?',
+          whereArgs: [
+            learnerID.toString(),
+            type,
+            exercise,
+            (unitStandard ?? '').trim(),
+          ],
         );
         print(
-            "POE upload updated: learnerID=$learnerID, type=$type, exercise=$exercise, filePath=$filePath");
+            "POE upload updated (synced=$synced): learnerID=$learnerID, type=$type, exercise=$exercise, filePath=$filePath");
       } else {
         // Insert new record
         await db.insert(
@@ -2997,13 +3258,14 @@ updated_at TIMESTAMP
             'learnerID': learnerID.toString(),
             'type': type,
             'exercise': exercise,
+            'unitStandard': (unitStandard ?? '').trim(),
             'filePath': filePath,
             'submitted_at': DateTime.now().toIso8601String(),
-            'synced': 0,
+            'synced': synced,
           },
         );
         print(
-            "POE upload inserted: learnerID=$learnerID, type=$type, exercise=$exercise, filePath=$filePath");
+            "POE upload inserted (synced=$synced): learnerID=$learnerID, type=$type, exercise=$exercise, filePath=$filePath");
       }
     } catch (e, stackTrace) {
       print("Error saving POE upload: $e\nStackTrace: $stackTrace");
@@ -3012,15 +3274,22 @@ updated_at TIMESTAMP
   }
 
   Future<void> saveManualMarkToLocalPoe(
-      int learnerID, String type, String exercise, String filePath) async {
+      int learnerID, String type, String exercise, String filePath,
+      {String? unitStandard}) async {
     try {
       final db = await database;
 
       // Check if record already exists
       final existing = await db.query(
         'poe',
-        where: 'learnerID = ? AND type = ? AND exercise = ?',
-        whereArgs: [learnerID.toString(), type, exercise],
+        where:
+            'learnerID = ? AND type = ? AND exercise = ? AND unitStandard = ?',
+        whereArgs: [
+          learnerID.toString(),
+          type,
+          exercise,
+          (unitStandard ?? '').trim(),
+        ],
       );
 
       if (existing.isNotEmpty) {
@@ -3030,10 +3299,18 @@ updated_at TIMESTAMP
           {
             'filePath': filePath,
             'submitted_at': DateTime.now().toIso8601String(),
-            'synced': 1, // Mark as synced/completed for manual entries
+            'synced':
+                0, // Set to 0 for manual entries so they can be updated later by a scan
+            'unitStandard': (unitStandard ?? '').trim(),
           },
-          where: 'learnerID = ? AND type = ? AND exercise = ?',
-          whereArgs: [learnerID.toString(), type, exercise],
+          where:
+              'learnerID = ? AND type = ? AND exercise = ? AND unitStandard = ?',
+          whereArgs: [
+            learnerID.toString(),
+            type,
+            exercise,
+            (unitStandard ?? '').trim(),
+          ],
         );
         print(
             "Manual POE entry updated: learnerID=$learnerID, type=$type, exercise=$exercise, filePath=$filePath");
@@ -3045,9 +3322,11 @@ updated_at TIMESTAMP
             'learnerID': learnerID.toString(),
             'type': type,
             'exercise': exercise,
+            'unitStandard': (unitStandard ?? '').trim(),
             'filePath': filePath,
             'submitted_at': DateTime.now().toIso8601String(),
-            'synced': 1, // Mark as synced/completed for manual entries
+            'synced':
+                0, // Set to 0 for manual entries so they can be updated later by a scan
           },
         );
         print(
@@ -3068,21 +3347,246 @@ updated_at TIMESTAMP
         whereArgs: [learnerID],
       );
       final uploadStatus = <String, bool>{};
+
+      // Get unit standard mapping from exercise names
+      final unitStandardMapping = await _extractUnitStandardFromExercise();
+
+      // Get all formative/summative questions from API for proper key generation
+      final apiQuestions = await _getAllQuestionsFromAPI(learnerID);
+
       for (var upload in uploads) {
-        final key = '${upload['type']}-${upload['exercise']}-$learnerID';
-        // Mark as completed if record exists, regardless of sync status
-        // synced=0 means saved locally (pending sync)
-        // synced=1 means synced to server
-        // Both should show as completed in UI
-        uploadStatus[key] = true;
+        final type = upload['type']?.toString() ?? '';
+        final exercise = upload['exercise']?.toString() ?? '';
+
+        // Generate old format key (for backward compatibility)
+        final oldKey = '$type-$exercise-$learnerID';
+        uploadStatus[oldKey] = true;
+
+        // Check if this is an "All Questions" record
+        final isAllQuestionsFormat = exercise.contains('All Questions');
+
+        if (isAllQuestionsFormat) {
+          // Extract unit standard ID from "All Questions" exercise
+          final unitIdMatch = RegExp(r'- (\d{4,10}) -').firstMatch(exercise);
+          if (unitIdMatch != null) {
+            final unitId = unitIdMatch.group(1)!;
+            // Try to get full name from the mapping we'll build or the hardcoded list
+            String? fullUnitName = _getFullUnitStandardName(unitId);
+
+            // If not in hardcoded list, try to find it in the exercise string itself
+            if (fullUnitName == null) {
+              final fullNameMatch =
+                  RegExp(r'- (\d{4,10} - [^-]+)').firstMatch(exercise);
+              if (fullNameMatch != null) {
+                fullUnitName = fullNameMatch.group(1);
+              }
+            }
+
+            if (fullUnitName != null) {
+              // Mark all individual questions for this unit standard and type as completed
+              final questionsForUnit = apiQuestions
+                  .where((q) =>
+                          q['unitStandardId'] == unitId &&
+                          q['type'] ==
+                              type.replaceAll(
+                                  'Remedial', '') // Remove Remedial suffix
+                      )
+                  .toList();
+
+              for (var question in questionsForUnit) {
+                final questionText = question['exercise'] as String;
+
+                // Generate keys for individual questions
+                final oldQuestionKey = '$type-$questionText-$learnerID';
+                final newQuestionKey =
+                    '$type-$questionText-$fullUnitName-$learnerID';
+
+                uploadStatus[oldQuestionKey] = true;
+                uploadStatus[newQuestionKey] = true;
+
+                // Also generate keys without Remedial suffix for compatibility
+                if (type.contains('Remedial')) {
+                  final baseType = type.replaceAll('Remedial', '');
+                  final baseOldKey = '$baseType-$questionText-$learnerID';
+                  final baseNewKey =
+                      '$baseType-$questionText-$fullUnitName-$learnerID';
+                  uploadStatus[baseOldKey] = true;
+                  uploadStatus[baseNewKey] = true;
+                }
+              }
+
+              print(
+                  'Expanded All Questions for $unitId $type: ${questionsForUnit.length} individual questions marked as completed');
+            }
+          }
+        }
+
+        // Try to extract unit standard from exercise name or use mapping
+        String? unitStandard;
+
+        // Check if exercise contains unit standard info (like "All Questions - 9964 - Apply health...")
+        final unitStandardMatch =
+            RegExp(r'- (\d{4,10} - [^-]+)').firstMatch(exercise);
+        if (unitStandardMatch != null) {
+          unitStandard = unitStandardMatch.group(1);
+        } else {
+          // Try to find unit standard from mapping based on exercise content
+          unitStandard = unitStandardMapping[exercise];
+        }
+
+        // Generate new format key if unit standard is available
+        if (unitStandard != null && unitStandard.isNotEmpty) {
+          final newKey = '$type-$exercise-$unitStandard-$learnerID';
+          uploadStatus[newKey] = true;
+        }
+
+        // Also try to match with known unit standards for individual questions
+        if (unitStandard == null) {
+          // Extract potential unit standard ID from exercise content
+          final idMatch = RegExp(r'\b(\d{4,10})\b').firstMatch(exercise);
+          if (idMatch != null) {
+            final unitId = idMatch.group(1);
+            final fullUnitName = _getFullUnitStandardName(unitId!);
+            if (fullUnitName != null) {
+              final newKey = '$type-$exercise-$fullUnitName-$learnerID';
+              uploadStatus[newKey] = true;
+            }
+          }
+        }
       }
+
       print(
-          "Local upload status for learnerID $learnerID: $uploadStatus (${uploadStatus.length} exercises)");
+          "Local upload status for learnerID $learnerID: ${uploadStatus.length} keys generated");
+      print("Sample keys: ${uploadStatus.keys.take(5).toList()}");
       return uploadStatus;
     } catch (e, stackTrace) {
       print("Error fetching local upload status: $e\nStackTrace: $stackTrace");
       return {};
     }
+  }
+
+  // Helper function to get all questions from API
+  Future<List<Map<String, dynamic>>> _getAllQuestionsFromAPI(
+      String learnerID) async {
+    try {
+      final questions = <Map<String, dynamic>>[];
+
+      // Make API call to get POE data
+      final url = AppConfig.poeUrl;
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {'learnerID': learnerID},
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['pathways'] != null) {
+          // Extract all questions from all unit standards
+          for (var pathway in data['pathways'].values) {
+            if (pathway['qualifications'] != null) {
+              for (var qualification in pathway['qualifications'].values) {
+                if (qualification['unitstandards'] != null) {
+                  for (var unitStandardName
+                      in qualification['unitstandards'].keys) {
+                    final unitStandard =
+                        qualification['unitstandards'][unitStandardName];
+
+                    // Extract unit standard ID from name
+                    final unitIdMatch =
+                        RegExp(r'^(\d{4,10})').firstMatch(unitStandardName);
+                    final unitId = unitIdMatch?.group(1) ?? '';
+
+                    // Add formative questions
+                    if (unitStandard['formative'] != null) {
+                      for (var formative in unitStandard['formative']) {
+                        questions.add({
+                          'type': 'Formative',
+                          'exercise': formative['exercise'],
+                          'unitStandardId': unitId,
+                          'unitStandardName': unitStandardName,
+                        });
+                      }
+                    }
+
+                    // Add summative questions
+                    if (unitStandard['summative'] != null) {
+                      for (var summative in unitStandard['summative']) {
+                        questions.add({
+                          'type': 'Summative',
+                          'exercise': summative['exercise'],
+                          'unitStandardId': unitId,
+                          'unitStandardName': unitStandardName,
+                        });
+                      }
+                    }
+
+                    // Add logbook questions
+                    if (unitStandard['logbook'] != null) {
+                      for (var logbook in unitStandard['logbook']) {
+                        questions.add({
+                          'type': 'LogBook',
+                          'exercise': logbook['exercise'],
+                          'unitStandardId': unitId,
+                          'unitStandardName': unitStandardName,
+                        });
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      print(
+          'Retrieved ${questions.length} questions from API for learner $learnerID');
+      return questions;
+    } catch (e) {
+      print('Error getting questions from API: $e');
+      return [];
+    }
+  }
+
+  // Helper function to get full unit standard name from ID
+  String? _getFullUnitStandardName(String unitId) {
+    // Check if the ID exists in our known list
+    final unitStandardNames = {
+      '9964': '9964 - Apply health and safety to a work area',
+      '9986': '9986 - Apply quality principles on a construction site',
+      '9966': '9966 - Establish and prepare a work area',
+      '14336': '14336 - Maintain records on a constuction site',
+      '9965': '9965 - Render basic first aid',
+      '9962': '9962 - Calculate construction quantities to develop a work plan',
+      '9968': '9968 - Procure materials, tools and equipment',
+      '14580':
+          '14580 - Read and interpret construction drawings and specifications',
+      '14555': '14555 - Conduct a bituminous seal operation',
+      '13958': '13958 - Maintain and repair bituminous road surfaces',
+      '261661': '261661 - Develop construction work plans',
+      '261664':
+          '261664 - Erect, use and dismantle access equipment for construction work',
+      '259604':
+          '259604 - Verify compliance to safety, health and environmental requirements in the workplace',
+      '14672':
+          '14672 - Describe the composition, roleplayers and the role of the construction industry in the South African economy',
+    };
+
+    if (unitStandardNames.containsKey(unitId)) {
+      return unitStandardNames[unitId];
+    }
+
+    // DYNAMIC FALLBACK: If ID is not in hardcoded list, we'll return a placeholder
+    // that the UI can still use to match against the pathway JSON.
+    return "$unitId - Unknown Unit Standard";
+  }
+
+  // Helper function to extract unit standard mapping from exercises
+  Future<Map<String, String>> _extractUnitStandardFromExercise() async {
+    // This could be enhanced to build a mapping from exercise content to unit standards
+    // For now, return empty map as the regex matching above should handle most cases
+    return {};
   }
 
   Future<String?> getExistingDocumentPath(
@@ -4814,10 +5318,21 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
       }
 
       if (response.statusCode == 200) {
-        final List<dynamic> learnersData = json.decode(response.body);
+        List<dynamic> learnersDataRaw = json.decode(response.body);
+
+        // Deduplicate learners by LearnerID to prevent duplicate processing
+        Map<String, dynamic> uniqueLearnersMap = {};
+        for (var learner in learnersDataRaw) {
+          String? id = learner['LearnerID']?.toString();
+          if (id != null && id.isNotEmpty) {
+            uniqueLearnersMap[id] = learner;
+          }
+        }
+        final List<dynamic> learnersData = uniqueLearnersMap.values.toList();
+
         debugPrint('[SYNC-CLASS] ===== CLASS LEARNER SYNC DEBUG START =====');
         debugPrint(
-            '[SYNC-CLASS] Received ${learnersData.length} learners from server for classID: $classID');
+            '[SYNC-CLASS] Received ${learnersDataRaw.length} raw records, ${learnersData.length} unique learners from server for classID: $classID');
         debugPrint(
             '[SYNC-CLASS] First learner data sample: ${learnersData.isNotEmpty ? learnersData.first : 'No learners'}');
 
@@ -5088,8 +5603,15 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
       final result = await db.rawQuery('''
         SELECT l.LearnerID, l.Name, l.Surname, l.IDNumber, ic.clock_in_time, ic.clock_out_time, ic.contact_time
         FROM learnerdetails l
-        LEFT JOIN induction_clocking ic ON l.LearnerID = ic.LearnerID
-        AND ic.clock_date = ?
+        LEFT JOIN (
+          SELECT LearnerID, clock_date, 
+                 MIN(clock_in_time) as clock_in_time, 
+                 MAX(clock_out_time) as clock_out_time,
+                 MAX(contact_time) as contact_time
+          FROM induction_clocking
+          WHERE clock_date = ?
+          GROUP BY LearnerID
+        ) ic ON l.LearnerID = ic.LearnerID
         WHERE l.classID = ?
       ''', [DateFormat('yyyy-MM-dd').format(DateTime.now()), classID]);
       print('Fetched learners with clocking data: $result');
@@ -5149,6 +5671,13 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
     try {
       final db = await database;
       final templateStr = template.toString();
+
+      // Skip if template is empty
+      if (templateStr.isEmpty) {
+        debugPrint(
+            '[SAVE] Skipping save for empty template: $scannerType $finger for learner $learnerId');
+        return false;
+      }
 
       // Save to the appropriate column based on scanner type
       if (scannerType == 'zkteco') {
@@ -5804,6 +6333,13 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
   Future<bool> _syncFacilitatorTemplateToServer(
       int facilitatorId, String templateType, String templateData) async {
     try {
+      // Skip sync if template is empty
+      if (templateData.isEmpty) {
+        debugPrint(
+            '[FAC_FP_SYNC] Skipping sync for empty template: $templateType for facilitator $facilitatorId');
+        return false;
+      }
+
       // Check connectivity
       final connectivityResult = await Connectivity().checkConnectivity();
       if (connectivityResult.first == ConnectivityResult.none) {
@@ -6069,7 +6605,7 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
   //     // Find a working server URL
   //     List<String> serverUrls = [
   //       'http://10.0.2.2:5001',
-  //       'http://192.168.0.53:5001',
+  //       'http://192.168.68.105:5001',
   //       'http://localhost:5001',
   //       'http://127.0.0.1:5001'
   //     ];
@@ -6194,11 +6730,16 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
         print(
             '  - Futronic right template exists: ${fingerprint['futronic_right_template'] != null}');
 
-        // Check which templates exist and sync accordingly
-        bool hasZkTecoLeft = fingerprint['zkteco_left_template'] != null;
-        bool hasZkTecoRight = fingerprint['zkteco_right_template'] != null;
-        bool hasFutronicLeft = fingerprint['futronic_left_template'] != null;
-        bool hasFutronicRight = fingerprint['futronic_right_template'] != null;
+        // Check which templates exist and are not empty
+        bool hasZkTecoLeft = fingerprint['zkteco_left_template'] != null &&
+            (fingerprint['zkteco_left_template'] as String).isNotEmpty;
+        bool hasZkTecoRight = fingerprint['zkteco_right_template'] != null &&
+            (fingerprint['zkteco_right_template'] as String).isNotEmpty;
+        bool hasFutronicLeft = fingerprint['futronic_left_template'] != null &&
+            (fingerprint['futronic_left_template'] as String).isNotEmpty;
+        bool hasFutronicRight =
+            fingerprint['futronic_right_template'] != null &&
+                (fingerprint['futronic_right_template'] as String).isNotEmpty;
 
         List<String> syncErrors = [];
         int successfulSyncs = 0;
@@ -6293,6 +6834,13 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
       debugPrint(
           '[SYNC] Template preview: ${template.isNotEmpty ? template.substring(0, template.length > 50 ? 50 : template.length) : 'EMPTY'}...');
       debugPrint('[SYNC] Template is empty: ${template.isEmpty}');
+
+      // Skip sync if template is empty
+      if (template.isEmpty) {
+        debugPrint(
+            '[SYNC] Skipping sync for empty template: $templateType for learner $learnerId');
+        return;
+      }
 
       final response = await http.post(
         Uri.parse(AppConfig.buildUrl('sync_fingerprint.php')),

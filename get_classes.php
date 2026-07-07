@@ -53,6 +53,7 @@ try {
             c.siteID,
             s.siteName,
             s.project_id,
+            s.learning_pathway,
             p.Project_name,
             COUNT(DISTINCT ld.LearnerID) as numberOfLearners
         FROM facilitator f
@@ -83,6 +84,7 @@ try {
             'siteID' => $row['siteID'],
             'siteName' => $row['siteName'] ?? '',
             'project_id' => $row['project_id'] ?? '',
+            'learning_pathway' => $row['learning_pathway'] ?? '',
             'Project_name' => $row['Project_name'] ?? '',
             'numberOfLearners' => (int)$row['numberOfLearners']
         ];

@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POE API Tester</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            border: none;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .response {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .loading {
+            display: none;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 POE API Tester</h1>
+        <p>Test the Portfolio of Evidence (POE) API endpoints</p>
+        
+        <div class="form-group">
+            <label for="baseUrl">Base URL:</label>
+            <input type="text" id="baseUrl" value="http://192.168.68.148:8080/assessorReport2/mobile" style="width: 400px;">
+        </div>
+        
+        <div class="form-group">
+            <label for="endpoint">Endpoint:</label>
+            <select id="endpoint">
+                <option value="poe.php">poe.php (Main POE Endpoint)</option>
+                <option value="get_poe.php">get_poe.php (Enhanced with Remedial)</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="learnerID">Learner ID:</label>
+            <input type="number" id="learnerID" value="11515" placeholder="Enter learner ID">
+        </div>
+        
+        <div class="form-group">
+            <label for="method">Method:</label>
+            <select id="method">
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+            </select>
+        </div>
+        
+        <button onclick="testAPI()">🚀 Test API</button>
+        <button onclick="clearResponse()">🗑️ Clear</button>
+        
+        <div class="loading" id="loading">⏳ Loading...</div>
+        
+        <div id="response"></div>
+        
+        <div id="stats"></div>
+    </div>
+
+    <script>
+        async function testAPI() {
+            const baseUrl = document.getElementById('baseUrl').value;
+            const endpoint = document.getElementById('endpoint').value;
+            const learnerID = document.getElementById('learnerID').value;
+            const method = document.getElementById('method').value;
+            
+            if (!learnerID) {
+                showResponse('Please enter a learner ID', 'error');
+                return;
+            }
+            
+            const url = `${baseUrl}/${endpoint}`;
+            const loading = document.getElementById('loading');
+            const responseDiv = document.getElementById('response');
+            const statsDiv = document.getElementById('stats');
+            
+            loading.style.display = 'block';
+            responseDiv.innerHTML = '';
+            statsDiv.innerHTML = '';
+            
+            try {
+                const startTime = performance.now();
+                
+                let response;
+                if (method === 'GET') {
+                    response = await fetch(`${url}?learnerId=${learnerID}`);
+                } else {
+                    const formData = new FormData();
+                    formData.append('learnerID', learnerID);
+                    response = await fetch(url, {
+                        method: 'POST',
+                        body: formData
+                    });
+                }
+                
+                const endTime = performance.now();
+                const responseTime = Math.round(endTime - startTime);
+                
+                const data = await response.json();
+                
+                loading.style.display = 'none';
+                
+                if (!response.ok) {
+                    showResponse(`HTTP ${response.status}: ${response.statusText}`, 'error');
+                    return;
+                }
+                
+                if (data.error) {
+                    showResponse(`API Error: ${data.error}`, 'error');
+                    return;
+                }
+                
+                // Show formatted response
+                showResponse(JSON.stringify(data, null, 2), 'success');
+                
+                // Show statistics
+                showStats(data, responseTime, response.status);
+                
+            } catch (error) {
+                loading.style.display = 'none';
+                showResponse(`Network Error: ${error.message}`, 'error');
+            }
+        }
+        
+        function showResponse(content, type) {
+            const responseDiv = document.getElementById('response');
+            responseDiv.className = `response ${type}`;
+            responseDiv.textContent = content;
+        }
+        
+        function showStats(data, responseTime, status) {
+            const statsDiv = document.getElementById('stats');
+            
+            let stats = [
+                { label: 'HTTP Status', value: status },
+                { label: 'Response Time', value: `${responseTime}ms` }
+            ];
+            
+            if (data.pathways) {
+                const pathwayCount = Object.keys(data.pathways).length;
+                stats.push({ label: 'Pathways', value: pathwayCount });
+                
+                let totalQualifications = 0;
+                let totalUnitStandards = 0;
+                let totalFormative = 0;
+                let totalSummative = 0;
+                let totalLogbook = 0;
+                let totalFormativeRemedial = 0;
+                let totalSummativeRemedial = 0;
+                
+                Object.values(data.pathways).forEach(pathway => {
+                    if (pathway.qualifications) {
+                        totalQualifications += Object.keys(pathway.qualifications).length;
+                        
+                        Object.values(pathway.qualifications).forEach(qualification => {
+                            if (qualification.unitstandards) {
+                                totalUnitStandards += Object.keys(qualification.unitstandards).length;
+                                
+                                Object.values(qualification.unitstandards).forEach(unit => {
+                                    totalFormative += (unit.formative || []).length;
+                                    totalSummative += (unit.summative || []).length;
+                                    totalLogbook += (unit.logbook || []).length;
+                                    totalFormativeRemedial += (unit.formativeremedial || []).length;
+                                    totalSummativeRemedial += (unit.summativeremedial || []).length;
+                                });
+                            }
+                        });
+                    }
+                });
+                
+                stats.push(
+                    { label: 'Qualifications', value: totalQualifications },
+                    { label: 'Unit Standards', value: totalUnitStandards },
+                    { label: 'Formative Assessments', value: totalFormative },
+                    { label: 'Summative Assessments', value: totalSummative },
+                    { label: 'Logbook Entries', value: totalLogbook },
+                    { label: 'Formative Remedial', value: totalFormativeRemedial },
+                    { label: 'Summative Remedial', value: totalSummativeRemedial }
+                );
+            }
+            
+            statsDiv.innerHTML = '<h3>📊 Response Statistics</h3><div class="stats">' + 
+                stats.map(stat => `
+                    <div class="stat-card">
+                        <strong>${stat.label}:</strong><br>
+                        ${stat.value}
+                    </div>
+                `).join('') + '</div>';
+        }
+        
+        function clearResponse() {
+            document.getElementById('response').innerHTML = '';
+            document.getElementById('stats').innerHTML = '';
+        }
+        
+        // Quick test buttons
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.querySelector('.container');
+            const quickTests = document.createElement('div');
+            quickTests.innerHTML = `
+                <h3>🚀 Quick Tests</h3>
+                <button onclick="quickTest(11515)">Test Learner 11515</button>
+                <button onclick="quickTest(11504)">Test Learner 11504</button>
+                <button onclick="quickTest(11511)">Test Learner 11511</button>
+                <button onclick="quickTest(11514)">Test Learner 11514</button>
+                <hr style="margin: 20px 0;">
+            `;
+            container.insertBefore(quickTests, container.children[1]);
+        });
+        
+        function quickTest(learnerID) {
+            document.getElementById('learnerID').value = learnerID;
+            testAPI();
+        }
+    </script>
+</body>
+</html>

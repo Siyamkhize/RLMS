@@ -1,10 +1,14 @@
 import 'dart:io';
 import 'dart:math';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_doc_scanner/flutter_doc_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'config.dart';
+import 'services/camera_resource_manager.dart';
+import 'utils/scanner_pdf_resolver.dart';
 
 class PoeDocumentScanner extends StatefulWidget {
   final int learnerId;
@@ -37,6 +41,33 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
   String? _statusMessage;
   List<String> _scannedPages = [];
   File? _pdfFile;
+  final CameraResourceManager _cameraManager = CameraResourceManager();
+
+  @override
+  void dispose() {
+    print('🔄 POE Document Scanner disposing...');
+
+    // Enhanced cleanup to prevent crashes
+    try {
+      _cameraManager.markMLKitScannerInactive();
+      print('✅ Camera manager cleaned up');
+    } catch (e) {
+      print('❌ Error cleaning up camera manager: $e');
+    }
+
+    // Cancel any ongoing operations
+    try {
+      if (_isScanning || _isUploading) {
+        print(
+            '⚠️ Disposing while operations are active - this may cause crashes');
+      }
+    } catch (e) {
+      print('❌ Error checking operation state: $e');
+    }
+
+    super.dispose();
+    print('✅ POE Document Scanner disposed');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -329,17 +360,130 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
       if (shouldContinue != true) return;
     }
 
+    // Check camera permissions first
+    var status = await Permission.camera.status;
+    if (!status.isGranted) {
+      status = await Permission.camera.request();
+      if (!status.isGranted) {
+        if (mounted) {
+          _showErrorDialog('Camera Permission Required',
+              'Camera permission is needed to scan documents. Please enable it in your device settings.');
+        }
+        return;
+      }
+    }
+
+    // Request camera access (prevents conflicts when app goes to background for native scanner)
+    const String requester = 'PoeDocumentScanner';
+    final bool hasAccess = await _cameraManager.requestCameraAccess(requester,
+        timeout: const Duration(seconds: 10));
+
+    if (!hasAccess && mounted) {
+      _showErrorDialog(
+          'Camera Busy',
+          _cameraManager.currentUser != null
+              ? 'Camera is being used by ${_cameraManager.currentUser}. Please wait and try again.'
+              : 'Camera is currently busy. Please wait and try again.');
+      return;
+    }
+
+    if (!mounted) return;
     setState(() {
       _isScanning = true;
       _statusMessage = 'Opening scanner... Scan continuously for best results!';
     });
 
     try {
-      // Use FlutterDocScanner with unlimited pages (same as CameraScanPage)
-      // No timeout - let scanner run as long as needed for large documents
-      final dynamic scanResult = await FlutterDocScanner().getScanDocuments(
-        page: 999, // Unlimited pages
-      );
+      // Mark ML Kit scanner as active (prevents incorrect camera release when app pauses)
+      _cameraManager.markMLKitScannerActive();
+
+      // ENHANCED CRASH PREVENTION: Wrap scanner call with comprehensive error handling
+      dynamic scanResult;
+      try {
+        print(
+            '🔄 Starting FlutterDocScanner with enhanced crash prevention...');
+
+        // Use FlutterDocScanner - upgraded to 0.0.18 for Android crash fixes
+        scanResult = await FlutterDocScanner()
+            .getScanDocuments(
+          // Very high limits (e.g. 999) can cause ML Kit/Android process death.
+          // Keep this bounded and scan in batches.
+          page: 80,
+        )
+            .timeout(
+          const Duration(minutes: 30), // 30 minute timeout
+          onTimeout: () {
+            print('❌ Scanner timeout after 30 minutes');
+            throw TimeoutException('Scanner session timed out after 30 minutes',
+                const Duration(minutes: 30));
+          },
+        );
+
+        print('✅ FlutterDocScanner completed successfully');
+      } on TimeoutException catch (e) {
+        print('❌ Scanner timeout: $e');
+        if (mounted) {
+          setState(() {
+            _isScanning = false;
+            _statusMessage =
+                'Scanner timed out after 30 minutes. Please try again with fewer pages.';
+          });
+          _showErrorDialog(
+            'Scanner Timeout',
+            'The scanner session timed out after 30 minutes.\n\n'
+                'This usually happens when:\n'
+                '• Scanning too many pages at once\n'
+                '• Taking very long pauses between pages\n'
+                '• Device running low on memory\n\n'
+                'Please try again with fewer pages (50-100 maximum).',
+          );
+        }
+        return;
+      } catch (e, stackTrace) {
+        print('❌ Scanner crashed with error: $e');
+        print('❌ Stack trace: $stackTrace');
+
+        if (mounted) {
+          setState(() {
+            _isScanning = false;
+            _statusMessage = 'Scanner crashed: $e';
+          });
+
+          // Determine error type and show appropriate message
+          String errorTitle = 'Scanner Error';
+          String errorMessage =
+              'The document scanner encountered an error: $e\n\n';
+
+          if (e.toString().contains('memory') ||
+              e.toString().contains('OutOfMemory')) {
+            errorTitle = 'Memory Error';
+            errorMessage +=
+                'This is likely due to scanning too many pages at once.\n\n'
+                'Solutions:\n'
+                '• Scan fewer pages (50-100 maximum)\n'
+                '• Restart the app\n'
+                '• Close other apps to free memory\n'
+                '• Restart your device if problem persists';
+          } else if (e.toString().contains('camera') ||
+              e.toString().contains('Camera')) {
+            errorTitle = 'Camera Error';
+            errorMessage += 'Camera access was interrupted.\n\n'
+                'Solutions:\n'
+                '• Close other camera apps\n'
+                '• Restart this app\n'
+                '• Check camera permissions\n'
+                '• Restart your device if problem persists';
+          } else {
+            errorMessage += 'Please try again. If the problem persists:\n'
+                '• Restart the app\n'
+                '• Scan fewer pages at once\n'
+                '• Contact support with this error message';
+          }
+
+          _showErrorDialog(errorTitle, errorMessage);
+        }
+        return;
+      }
 
       print('Scan Result: $scanResult');
 
@@ -375,11 +519,10 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
       }
 
       final String? pdfUri = scanResult['pdfUri'] as String?;
-      final pdfPath = pdfUri!.replaceFirst('file:///', '');
-      print('Processed PDF Path: $pdfPath');
+      print('Processed PDF URI: $pdfUri');
 
-      final file = File(pdfPath);
-      if (await file.exists()) {
+      final file = await resolveFlutterDocScannerPdfFile(pdfUri);
+      if (file != null && await isReadablePdfFile(file)) {
         final fileSize = await file.length();
         print('PDF exists: ${file.path}, size: $fileSize bytes');
 
@@ -400,7 +543,7 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
 
         setState(() {
           _pdfFile = file;
-          _scannedPages = [pdfPath]; // Store path for display
+          _scannedPages = [file.path];
           _isScanning = false;
           _statusMessage =
               'PDF scanned successfully! Size: ${(fileSize / 1024 / 1024).toStringAsFixed(1)} MB\n'
@@ -409,7 +552,7 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
 
         _showSnackBar('PDF document scanned successfully! Upload it now.');
       } else {
-        print('Error: PDF does not exist at $pdfPath');
+        print('Error: PDF unreadable or missing for uri: $pdfUri');
         setState(() {
           _isScanning = false;
           _statusMessage =
@@ -419,66 +562,88 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
         _showErrorDialog(
           'Scanner Session Lost',
           'The scanner failed to save the PDF file. This happens when:\n\n'
+              '• Android returned a content URI we could not read\n'
               '• Android terminated the scanner due to long idle time\n'
-              '• The document was too large for available memory\n'
               '• The app was backgrounded during scanning\n\n'
-              'Solution: Scan in smaller batches (50-80 pages) without long pauses.',
+              'Solution: Try again; scan in smaller batches if needed.',
         );
       }
     } catch (e, stackTrace) {
       print('Scan Error: $e\nStack Trace: $stackTrace');
-      setState(() {
-        _isScanning = false;
-        _statusMessage = 'Scanning error: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _isScanning = false;
+          _statusMessage = 'Scanning error: $e';
+        });
 
-      // Check for plugin initialization error
-      if (e.toString().contains('UninitializedPropertyAccessException') ||
-          e.toString().contains('resultChannel')) {
-        _showErrorDialog(
-          'Scanner Plugin Error',
-          'The scanner plugin encountered an error. This can happen when scanning multiple times.\n\n'
-              'Solutions:\n'
-              '• Close this screen and open it again\n'
-              '• Restart the app\n'
-              '• If problem persists, restart your device\n\n'
-              'Your previous scan was saved successfully.',
-        );
-        return;
+        // Check for plugin initialization error
+        if (e.toString().contains('UninitializedPropertyAccessException') ||
+            e.toString().contains('resultChannel')) {
+          _showErrorDialog(
+            'Scanner Plugin Error',
+            'The scanner plugin encountered an error. This can happen when scanning multiple times.\n\n'
+                'Solutions:\n'
+                '• Close this screen and open it again\n'
+                '• Restart the app\n'
+                '• If problem persists, restart your device\n\n'
+                'Your previous scan was saved successfully.',
+          );
+        } else if (e.toString().contains('FileNotFoundException') ||
+            e.toString().contains('ENOENT')) {
+          _showErrorDialog(
+            'Scanner Cache Error',
+            'The document scanner ran out of cache space. This typically happens with very large documents (100+ pages).\n\n'
+                'Solutions:\n'
+                '• Scan in smaller batches (50-100 pages)\n'
+                '• Clear app cache and try again\n'
+                '• Restart the device\n'
+                '• Free up device storage',
+          );
+        } else {
+          _showErrorDialog('Scanning Error', 'Error: $e');
+        }
       }
-
-      // Check if it's the Google ML Kit cache error
-      if (e.toString().contains('FileNotFoundException') ||
-          e.toString().contains('ENOENT')) {
-        _showErrorDialog(
-          'Scanner Cache Error',
-          'The document scanner ran out of cache space. This typically happens with very large documents (100+ pages).\n\n'
-              'Solutions:\n'
-              '• Scan in smaller batches (50-100 pages)\n'
-              '• Clear app cache and try again\n'
-              '• Restart the device\n'
-              '• Free up device storage',
-        );
-      } else {
-        _showErrorDialog('Scanning Error', 'Error: $e');
+    } finally {
+      _cameraManager.markMLKitScannerInactive();
+      _cameraManager.releaseCameraAccess(requester);
+      if (mounted) {
+        setState(() => _isScanning = false);
       }
     }
   }
 
   void _showErrorDialog(String title, String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+    if (!mounted) return;
+
+    try {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () {
+                if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      print('Error showing dialog: $e');
+      // Fallback: show snackbar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$title: $message'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
   }
 
   void _showSnackBar(String message) {
@@ -533,37 +698,90 @@ class _PoeDocumentScannerState extends State<PoeDocumentScanner> {
           ),
         );
 
-        // Close the scanner screen after successful upload
-        // This prevents the plugin initialization error on subsequent scans
         await Future.delayed(const Duration(seconds: 2));
+
+        // Single pop back to the screen that opened the scanner (e.g. learners list).
+        // Do NOT use popUntil(isFirst) or pushNamedAndRemoveUntil: in this app the first
+        // route is LoginPage, so those "fallbacks" logged users out of their workflow.
         if (mounted) {
-          Navigator.pop(context, true);
+          try {
+            Navigator.pop(context, true);
+          } catch (e) {
+            print('Navigation error after upload: $e');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Upload complete. Use the back button to return to the previous screen.',
+                  ),
+                  backgroundColor: Colors.green,
+                  duration: Duration(seconds: 4),
+                ),
+              );
+            }
+          }
         }
       }
     } catch (e, stackTrace) {
       print('Upload error: $e');
       print('Stack trace: $stackTrace');
-      setState(() {
-        _isUploading = false;
-        _statusMessage = 'Upload failed: $e';
-      });
 
-      // Show error dialog
+      // ENHANCED ERROR HANDLING: Prevent crashes during error handling
       if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Upload Failed'),
-            content: Text(
-                'Error: $e\n\nPlease try again or contact support if the problem persists.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
+        try {
+          setState(() {
+            _isUploading = false;
+            _statusMessage = 'Upload failed: $e';
+          });
+        } catch (setStateError) {
+          print('SetState error during upload failure: $setStateError');
+        }
+      }
+
+      // Show error with safe navigation
+      if (mounted) {
+        try {
+          showDialog(
+            context: context,
+            barrierDismissible: true,
+            builder: (context) => AlertDialog(
+              title: const Text('Upload Failed'),
+              content: Text(
+                  'Error: $e\n\nPlease try again or contact support if the problem persists.'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    // Safe dialog dismissal
+                    try {
+                      if (Navigator.canPop(context)) {
+                        Navigator.pop(context);
+                      }
+                    } catch (navError) {
+                      print('Error closing error dialog: $navError');
+                    }
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        } catch (dialogError) {
+          print('Error showing upload error dialog: $dialogError');
+          // Fallback: show snackbar instead
+          try {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Upload failed: $e'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 5),
               ),
-            ],
-          ),
-        );
+            );
+          } catch (snackBarError) {
+            print('Error showing snackbar: $snackBarError');
+            // Ultimate fallback: just print the error
+            print('FINAL FALLBACK: Upload failed with error: $e');
+          }
+        }
       }
     }
   }

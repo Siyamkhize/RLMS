@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../database_helper.dart';
 import '../config.dart';
+import 'database_coordinator.dart';
 
 /// Persistent Sync Service for Offline-First Architecture
 /// Ensures learner data is always available locally for offline clocking
@@ -13,10 +14,11 @@ class PersistentSyncService {
   factory PersistentSyncService() => _instance;
   PersistentSyncService._internal();
 
-  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   Timer? _periodicSyncTimer;
   bool _isSyncing = false;
   DateTime? _lastSyncTime;
+  final DatabaseCoordinator _coordinator = DatabaseCoordinator();
 
   /// Start listening for connectivity changes and trigger auto-sync
   void startAutoSync() {
@@ -24,14 +26,16 @@ class PersistentSyncService {
 
     // Listen for connectivity changes
     _connectivitySubscription =
-        Connectivity().onConnectivityChanged.listen((result) {
+        Connectivity().onConnectivityChanged.listen((results) {
+      final result =
+          results.isNotEmpty ? results.first : ConnectivityResult.none;
       if (result != ConnectivityResult.none) {
         print('[PERSISTENT_SYNC] Connectivity restored: $result');
         _triggerBackgroundSync();
       }
     });
 
-    // Periodic sync every 30 minutes when online
+    // Periodic sync every 30 minutes when online (reduced frequency to prevent conflicts)
     _periodicSyncTimer = Timer.periodic(const Duration(minutes: 30), (timer) {
       _triggerBackgroundSync();
     });
@@ -46,19 +50,34 @@ class PersistentSyncService {
 
   /// Trigger background sync (non-blocking)
   Future<void> _triggerBackgroundSync() async {
-    if (_isSyncing) {
-      print('[PERSISTENT_SYNC] Sync already in progress, skipping');
+    // Check if enough time has passed since last sync
+    if (!_coordinator.shouldAllowSync(
+        minInterval: const Duration(minutes: 2))) {
+      print('[PERSISTENT_SYNC] Skipping sync - too soon since last sync');
+      return;
+    }
+
+    // Check connectivity first to avoid unnecessary work
+    final connectivityResult = await Connectivity().checkConnectivity();
+    final isConnected = connectivityResult.isNotEmpty &&
+        connectivityResult.first != ConnectivityResult.none;
+
+    if (!isConnected) {
+      print('[PERSISTENT_SYNC] No connectivity, skipping sync');
       return;
     }
 
     try {
-      _isSyncing = true;
-      await syncAllData();
-      _lastSyncTime = DateTime.now();
+      await _coordinator.executeSyncOperation(
+        'PersistentSyncService.syncAllData',
+        () async {
+          await syncAllData();
+          _lastSyncTime = DateTime.now();
+        },
+        timeout: const Duration(minutes: 5),
+      );
     } catch (e) {
       print('[PERSISTENT_SYNC] Background sync failed: $e');
-    } finally {
-      _isSyncing = false;
     }
   }
 
@@ -71,7 +90,10 @@ class PersistentSyncService {
     try {
       // Check connectivity
       final connectivityResult = await Connectivity().checkConnectivity();
-      if (connectivityResult == ConnectivityResult.none) {
+      final isConnected = connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+
+      if (!isConnected) {
         result.success = false;
         result.message = 'No internet connection';
         return result;
@@ -152,80 +174,93 @@ class PersistentSyncService {
 
       final db = await dbHelper.database;
 
-      // UPSERT logic: Update existing, insert new (NO DELETE)
-      for (var learner in serverLearners) {
-        final learnerID = learner['LearnerID']?.toString();
-        if (learnerID == null || learnerID.isEmpty) continue;
+      // Use shorter transactions to prevent database locks
+      // Process learners in batches of 10 to avoid long-running transactions
+      const batchSize = 10;
+      for (int i = 0; i < serverLearners.length; i += batchSize) {
+        final batch = serverLearners.skip(i).take(batchSize).toList();
 
-        // Check if learner exists
-        final existing = await db.query(
-          'learnerdetails',
-          where: 'LearnerID = ?',
-          whereArgs: [learnerID],
-        );
+        await db.transaction((txn) async {
+          for (var learner in batch) {
+            final learnerID = learner['LearnerID']?.toString();
+            if (learnerID == null || learnerID.isEmpty) continue;
 
-        // Prepare learner data
-        final learnerData = {
-          'LearnerID': learnerID,
-          'Name': learner['Name']?.toString() ?? '',
-          'Surname': learner['Surname']?.toString() ?? '',
-          'IDNumber': learner['IDNumber']?.toString() ?? '',
-          'DateOfBirth': learner['DateOfBirth']?.toString() ?? '',
-          'PhoneNumber': learner['PhoneNumber']?.toString() ?? '',
-          'Email': learner['Email']?.toString() ?? '',
-          'Title': learner['Title']?.toString() ?? '',
-          'classID': classID,
-          'synced': 1,
-          // Preserve fingerprint templates from server
-          'zkteco_left_template':
-              learner['zkteco_left_template']?.toString() ?? '',
-          'zkteco_right_template':
-              learner['zkteco_right_template']?.toString() ?? '',
-          'futronic_left_template':
-              learner['futronic_left_template']?.toString() ?? '',
-          'futronic_right_template':
-              learner['futronic_right_template']?.toString() ?? '',
-          'sourceafis_template':
-              learner['sourceafis_template']?.toString() ?? '',
-        };
+            // Check if learner exists
+            final existing = await txn.query(
+              'learnerdetails',
+              where: 'LearnerID = ?',
+              whereArgs: [learnerID],
+            );
 
-        if (existing.isEmpty) {
-          // Insert new learner
-          await db.insert('learnerdetails', learnerData);
-          print('[PERSISTENT_SYNC] Inserted new learner: $learnerID');
-        } else {
-          // Update existing learner (merge with local data)
-          final existingData = existing.first;
+            // Prepare learner data
+            final learnerData = {
+              'LearnerID': learnerID,
+              'Name': learner['Name']?.toString() ?? '',
+              'Surname': learner['Surname']?.toString() ?? '',
+              'IDNumber': learner['IDNumber']?.toString() ?? '',
+              'DateOfBirth': learner['DateOfBirth']?.toString() ?? '',
+              'PhoneNumber': learner['PhoneNumber']?.toString() ?? '',
+              'Email': learner['Email']?.toString() ?? '',
+              'Title': learner['Title']?.toString() ?? '',
+              'classID': classID,
+              'synced': 1,
+              // Preserve fingerprint templates from server
+              'zkteco_left_template':
+                  learner['zkteco_left_template']?.toString() ?? '',
+              'zkteco_right_template':
+                  learner['zkteco_right_template']?.toString() ?? '',
+              'futronic_left_template':
+                  learner['futronic_left_template']?.toString() ?? '',
+              'futronic_right_template':
+                  learner['futronic_right_template']?.toString() ?? '',
+              'sourceafis_template':
+                  learner['sourceafis_template']?.toString() ?? '',
+            };
 
-          // Preserve local fingerprint templates if server doesn't have them
-          if (learnerData['zkteco_left_template']!.isEmpty &&
-              existingData['zkteco_left_template'] != null) {
-            learnerData['zkteco_left_template'] =
-                existingData['zkteco_left_template'].toString();
+            if (existing.isEmpty) {
+              // Insert new learner
+              await txn.insert('learnerdetails', learnerData);
+              print('[PERSISTENT_SYNC] Inserted new learner: $learnerID');
+            } else {
+              // Update existing learner (merge with local data)
+              final existingData = existing.first;
+
+              // Preserve local fingerprint templates if server doesn't have them
+              if (learnerData['zkteco_left_template']!.toString().isEmpty &&
+                  existingData['zkteco_left_template'] != null) {
+                learnerData['zkteco_left_template'] =
+                    existingData['zkteco_left_template'].toString();
+              }
+              if (learnerData['zkteco_right_template']!.toString().isEmpty &&
+                  existingData['zkteco_right_template'] != null) {
+                learnerData['zkteco_right_template'] =
+                    existingData['zkteco_right_template'].toString();
+              }
+              if (learnerData['futronic_left_template']!.toString().isEmpty &&
+                  existingData['futronic_left_template'] != null) {
+                learnerData['futronic_left_template'] =
+                    existingData['futronic_left_template'].toString();
+              }
+              if (learnerData['futronic_right_template']!.toString().isEmpty &&
+                  existingData['futronic_right_template'] != null) {
+                learnerData['futronic_right_template'] =
+                    existingData['futronic_right_template'].toString();
+              }
+
+              await txn.update(
+                'learnerdetails',
+                learnerData,
+                where: 'LearnerID = ?',
+                whereArgs: [learnerID],
+              );
+              print('[PERSISTENT_SYNC] Updated learner: $learnerID');
+            }
           }
-          if (learnerData['zkteco_right_template']!.isEmpty &&
-              existingData['zkteco_right_template'] != null) {
-            learnerData['zkteco_right_template'] =
-                existingData['zkteco_right_template'].toString();
-          }
-          if (learnerData['futronic_left_template']!.isEmpty &&
-              existingData['futronic_left_template'] != null) {
-            learnerData['futronic_left_template'] =
-                existingData['futronic_left_template'].toString();
-          }
-          if (learnerData['futronic_right_template']!.isEmpty &&
-              existingData['futronic_right_template'] != null) {
-            learnerData['futronic_right_template'] =
-                existingData['futronic_right_template'].toString();
-          }
+        }).timeout(const Duration(seconds: 5)); // Add timeout to prevent locks
 
-          await db.update(
-            'learnerdetails',
-            learnerData,
-            where: 'LearnerID = ?',
-            whereArgs: [learnerID],
-          );
-          print('[PERSISTENT_SYNC] Updated learner: $learnerID');
+        // Small delay between batches to allow other operations
+        if (i + batchSize < serverLearners.length) {
+          await Future.delayed(const Duration(milliseconds: 100));
         }
       }
 

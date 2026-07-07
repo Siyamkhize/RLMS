@@ -48,6 +48,10 @@ class _FacilitatorFingerprintPageState
   bool _isEnrolling = false;
   bool _isInitializing = false;
   bool _enrollmentInProgress = false;
+
+  // Stream subscriptions for proper disposal
+  StreamSubscription? _enrollStatusSubscription;
+  StreamSubscription? _enrollSuccessSubscription;
   String _activeScanner = 'auto'; // 'zkteco', 'futronic', or 'none'
   bool _isClocking = false; // Track if we're in clocking mode
   String? _clockingAction; // 'in' or 'out'
@@ -65,7 +69,13 @@ class _FacilitatorFingerprintPageState
 
   @override
   void dispose() {
+    // Cancel all subscriptions BEFORE disposing the service
+    _enrollStatusSubscription?.cancel();
+    _enrollSuccessSubscription?.cancel();
+
+    // Dispose the fingerprint service AFTER cancelling subscriptions
     _fingerprintService.dispose();
+
     super.dispose();
   }
 
@@ -99,12 +109,53 @@ class _FacilitatorFingerprintPageState
 
     try {
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      
+      // Step 1: Check local database
       final attendance = await _databaseHelper.getFacilitatorAttendanceForDay(
           widget.facilitatorId.toString(), today);
 
-      debugPrint('[FAC_CHECK] Today attendance: $attendance');
+      debugPrint('[FAC_CHECK] Today local attendance: $attendance');
 
+      bool alreadyClockedIn = false;
       if (attendance != null && attendance['clock_in_time'] != null) {
+        alreadyClockedIn = true;
+      }
+
+      // Step 2: If not found locally, check server (important for reinstalled apps)
+      if (!alreadyClockedIn) {
+        debugPrint('[FAC_CHECK] Not found locally, checking server...');
+        final connectivityResult = await Connectivity().checkConnectivity();
+        if (connectivityResult.first != ConnectivityResult.none) {
+          try {
+            final url = Uri.parse('${AppConfig.baseUrl}/get_facilitator_attendance.php?facilitator_id=${widget.facilitatorId}&date=$today');
+            final response = await http.get(url).timeout(const Duration(seconds: 10));
+            
+            if (response.statusCode == 200) {
+              final data = json.decode(response.body);
+              if (data['success'] == true && data['attendance'] != null) {
+                final serverAttendance = data['attendance'];
+                if (serverAttendance['clock_in_time'] != null) {
+                  debugPrint('[FAC_CHECK] Found server record - facilitator already clocked in');
+                  alreadyClockedIn = true;
+                  
+                  // Cache it locally so we don't have to check server again
+                  await _databaseHelper.insertFacilitatorClocking({
+                    'facilitator_id': widget.facilitatorId,
+                    'clock_date': today,
+                    'clock_in_time': serverAttendance['clock_in_time'],
+                    'clock_out_time': serverAttendance['clock_out_time'],
+                    'synced': 1
+                  });
+                }
+              }
+            }
+          } catch (serverError) {
+            debugPrint('[FAC_CHECK] Server check failed: $serverError');
+          }
+        }
+      }
+
+      if (alreadyClockedIn) {
         debugPrint(
             '[FAC_CHECK] ✅ Already clocked in today - navigating to dashboard');
 
@@ -555,7 +606,8 @@ class _FacilitatorFingerprintPageState
   }
 
   void _setupStreamListeners() {
-    _fingerprintService.enrollStatusStream.listen((status) {
+    _enrollStatusSubscription =
+        _fingerprintService.enrollStatusStream.listen((status) {
       if (!mounted) return;
       setState(() {
         _enrollmentStatus = status;
@@ -571,7 +623,8 @@ class _FacilitatorFingerprintPageState
     // Note: ZKTeco verification uses direct method calls, not streams
     // The verification result is handled in the _verifyAndClock method
 
-    _fingerprintService.enrollSuccessStream.listen((result) async {
+    _enrollSuccessSubscription =
+        _fingerprintService.enrollSuccessStream.listen((result) async {
       if (!mounted) return;
 
       final finger = result['finger'] as String?;

@@ -676,6 +676,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         echo json_encode([
                             'success' => true,
                             'role' => $role,
+                            'facilitator_id' => $row['facilitator_id'],
                             'classID' => $classID,
                             'learners' => $learners
                         ]);

@@ -7,8 +7,6 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'package:sqflite/sqflite.dart';
-import 'package:geolocator/geolocator.dart';
-import 'dart:math' as math;
 import 'config.dart';
 import 'utils/fingerprint_error_handler.dart';
 import 'package:signature/signature.dart';
@@ -50,6 +48,10 @@ class _FacilitatorFingerprintPageState
   bool _isEnrolling = false;
   bool _isInitializing = false;
   bool _enrollmentInProgress = false;
+
+  // Stream subscriptions for proper disposal
+  StreamSubscription? _enrollStatusSubscription;
+  StreamSubscription? _enrollSuccessSubscription;
   String _activeScanner = 'auto'; // 'zkteco', 'futronic', or 'none'
   bool _isClocking = false; // Track if we're in clocking mode
   String? _clockingAction; // 'in' or 'out'
@@ -67,7 +69,13 @@ class _FacilitatorFingerprintPageState
 
   @override
   void dispose() {
+    // Cancel all subscriptions BEFORE disposing the service
+    _enrollStatusSubscription?.cancel();
+    _enrollSuccessSubscription?.cancel();
+
+    // Dispose the fingerprint service AFTER cancelling subscriptions
     _fingerprintService.dispose();
+
     super.dispose();
   }
 
@@ -557,7 +565,8 @@ class _FacilitatorFingerprintPageState
   }
 
   void _setupStreamListeners() {
-    _fingerprintService.enrollStatusStream.listen((status) {
+    _enrollStatusSubscription =
+        _fingerprintService.enrollStatusStream.listen((status) {
       if (!mounted) return;
       setState(() {
         _enrollmentStatus = status;
@@ -573,7 +582,8 @@ class _FacilitatorFingerprintPageState
     // Note: ZKTeco verification uses direct method calls, not streams
     // The verification result is handled in the _verifyAndClock method
 
-    _fingerprintService.enrollSuccessStream.listen((result) async {
+    _enrollSuccessSubscription =
+        _fingerprintService.enrollSuccessStream.listen((result) async {
       if (!mounted) return;
 
       final finger = result['finger'] as String?;
@@ -930,139 +940,40 @@ class _FacilitatorFingerprintPageState
       if (_clockingAction == 'in') {
         debugPrint('[FAC_CLOCK] ========== CLOCK-IN PROCESS ==========');
 
-        // Step 1: Get facilitator's classID
-        debugPrint('[FAC_CLOCK] Step 1: Getting facilitator classID...');
-        final db = await _databaseHelper.database;
-        final facilitatorData = await db.query(
-          'facilitator',
-          columns: ['classID'],
-          where: 'facilitator_id = ?',
-          whereArgs: [widget.facilitatorId],
-        );
-
-        if (facilitatorData.isEmpty) {
-          debugPrint('[FAC_CLOCK] ERROR: Facilitator not found in database');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Error: Facilitator data not found'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-          return;
-        }
-
-        final classID = facilitatorData.first['classID'] as int?;
-        if (classID == null) {
-          debugPrint('[FAC_CLOCK] ERROR: Facilitator has no classID assigned');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Error: No class assigned to facilitator'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-          return;
-        }
-
-        debugPrint('[FAC_CLOCK] Facilitator classID: $classID');
-
-        // Step 2: Check geofencing (with error handling)
-        debugPrint('[FAC_CLOCK] Step 2: Checking geofencing...');
-        bool isWithinRadius = false;
-        try {
-          isWithinRadius = await _checkLocationAndRadius(classID);
-        } catch (e) {
-          debugPrint('[FAC_CLOCK] ⚠️ Geofencing check error: $e');
-          debugPrint('[FAC_CLOCK] Proceeding without geofencing validation...');
-          // Continue without geofencing if there's an error
-          isWithinRadius = true;
-        }
-
-        if (!isWithinRadius) {
-          debugPrint(
-              '[FAC_CLOCK] ❌ Geofencing check failed - not within site radius');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('You are not at the correct site location'),
-                backgroundColor: Colors.red,
-                duration: Duration(seconds: 4),
-              ),
-            );
-            setState(() {
-              _isClocking = false;
-              _enrollmentStatus = 'Clock-in failed: Not at correct location';
-            });
-          }
-          return;
-        }
-
-        debugPrint('[FAC_CLOCK] ✅ Geofencing check passed');
-
-        // Step 3: Get current GPS position (REQUIRED - no fallback)
-        debugPrint('[FAC_CLOCK] Step 3: Getting GPS coordinates...');
-        Position? position;
-
-        try {
-          position = await _getCurrentPosition();
-          debugPrint(
-              '[FAC_CLOCK] GPS: ${position.latitude}, ${position.longitude} (accuracy: ${position.accuracy}m)');
-        } catch (e) {
-          debugPrint('[FAC_CLOCK] ❌ Error getting GPS position: $e');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                    'Cannot get GPS location. Please enable GPS and try again.'),
-                backgroundColor: Colors.red,
-                duration: Duration(seconds: 4),
-              ),
-            );
-            setState(() {
-              _isClocking = false;
-              _enrollmentStatus = 'Clock-in failed: GPS not available';
-            });
-          }
-          return; // STOP - Don't allow clock-in without GPS
-        }
-
-        // Clock in with real GPS coordinates (REQUIRED)
+        // Clock in
         final attendance = {
           'facilitator_id': widget.facilitatorId,
           'clock_in_time': now,
           'clock_date': date,
           'synced': 0,
-          'user_latitude': position.latitude.toString(),
-          'user_longitude': position.longitude.toString(),
-          'user_accuracy': position.accuracy.toString(),
+          'user_latitude': '0.0',
+          'user_longitude': '0.0',
+          'user_accuracy': '10.0',
         };
 
         debugPrint('[FAC_CLOCK] Attendance data: $attendance');
 
         // Save to local database first
-        debugPrint('[FAC_CLOCK] Step 4: Saving to local database...');
+        debugPrint('[FAC_CLOCK] Step 1: Saving to local database...');
         await _databaseHelper.insertFacilitatorClocking(attendance);
         debugPrint('[FAC_CLOCK] ✅ Saved clock-in to local database');
 
         // Check connectivity
-        debugPrint('[FAC_CLOCK] Step 5: Checking connectivity...');
+        debugPrint('[FAC_CLOCK] Step 2: Checking connectivity...');
         final connectivityResult = await Connectivity().checkConnectivity();
         debugPrint('[FAC_CLOCK] Connectivity result: $connectivityResult');
 
         // Try to sync to server
         bool synced = false;
         if (connectivityResult.first != ConnectivityResult.none) {
-          debugPrint('[FAC_CLOCK] Step 6: Online - attempting server sync...');
+          debugPrint('[FAC_CLOCK] Step 3: Online - attempting server sync...');
           try {
             synced = await _syncClockInToServer(attendance);
             debugPrint('[FAC_CLOCK] Server sync result: $synced');
 
             if (synced) {
               debugPrint(
-                  '[FAC_CLOCK] Step 7: Updating local record as synced...');
+                  '[FAC_CLOCK] Step 4: Updating local record as synced...');
               // Update local record to mark as synced
               final todayAttendance =
                   await _databaseHelper.getFacilitatorAttendanceForDay(
@@ -1194,198 +1105,6 @@ class _FacilitatorFingerprintPageState
     } catch (_) {
       return "0h 0m 0s";
     }
-  }
-
-  // ==================== GEOFENCING METHODS ====================
-
-  Future<bool> _checkLocationAndRadius(int classID) async {
-    try {
-      debugPrint(
-          '[FAC_GEOFENCE] Checking location permissions for class $classID...');
-
-      // Check if location services are enabled
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content:
-                  Text('Location services are disabled. Please enable GPS.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return false;
-      }
-
-      // Check location permissions
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Location permissions are denied'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-          return false;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  'Location permissions are permanently denied. Please enable in settings.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return false;
-      }
-
-      // Get current position
-      debugPrint('[FAC_GEOFENCE] Getting current position...');
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
-      );
-
-      debugPrint(
-          '[FAC_GEOFENCE] Current position: ${position.latitude}, ${position.longitude}');
-      debugPrint('[FAC_GEOFENCE] Accuracy: ${position.accuracy} meters');
-
-      // Check if within site radius (50 meters)
-      return await _isWithinSiteRadius(
-        classID,
-        position.latitude,
-        position.longitude,
-        position.accuracy,
-      );
-    } catch (e) {
-      debugPrint('[FAC_GEOFENCE] Error checking location: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error getting location: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      return false;
-    }
-  }
-
-  Future<bool> _isWithinSiteRadius(
-      int classID, double userLat, double userLon, double userAccuracy) async {
-    if (userAccuracy > 50) {
-      debugPrint(
-          '[FAC_GEOFENCE] Geolocation accuracy too low: $userAccuracy meters');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content:
-                Text('GPS accuracy too low. Please wait for better signal.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-      return false;
-    }
-
-    try {
-      final db = await _databaseHelper.database;
-      debugPrint('[FAC_GEOFENCE] Querying coordinates for classID: $classID');
-
-      final result = await db.rawQuery(
-        'SELECT s.latitude, s.longitude FROM class c JOIN sites s ON c.siteID = s.siteID WHERE c.classID = ?',
-        [classID.toString()],
-      );
-
-      debugPrint('[FAC_GEOFENCE] Query result: $result');
-
-      if (result.isEmpty) {
-        debugPrint(
-            '[FAC_GEOFENCE] No matching class or site found for classID: $classID');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text('No site coordinates found for class $classID.')),
-          );
-        }
-        return false;
-      }
-
-      final siteLat = double.tryParse(result.first['latitude'].toString());
-      final siteLon = double.tryParse(result.first['longitude'].toString());
-
-      debugPrint(
-          '[FAC_GEOFENCE] Site coordinates from DB: lat=$siteLat, lon=$siteLon');
-
-      if (siteLat == null || siteLon == null) {
-        debugPrint(
-            '[FAC_GEOFENCE] Invalid site coordinates for classID: $classID');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Invalid site coordinates in database.')),
-          );
-        }
-        return false;
-      }
-
-      final distance = _calculateDistance(userLat, userLon, siteLat, siteLon);
-      debugPrint(
-          '[FAC_GEOFENCE] Distance to site: ${distance.toStringAsFixed(2)} meters');
-
-      if (distance > 50) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                  'You are ${distance.toStringAsFixed(0)} meters away. Must be within 50 meters.'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        }
-        return false;
-      }
-
-      debugPrint('[FAC_GEOFENCE] ✅ Within 50 meter radius - clocking allowed');
-      return true;
-    } catch (e) {
-      debugPrint('[FAC_GEOFENCE] Error: $e');
-      return false;
-    }
-  }
-
-  double _calculateDistance(
-      double lat1, double lon1, double lat2, double lon2) {
-    const double earthRadius = 6371000;
-    final double dLat = _degreesToRadians(lat2 - lat1);
-    final double dLon = _degreesToRadians(lon2 - lon1);
-    final double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(_degreesToRadians(lat1)) *
-            math.cos(_degreesToRadians(lat2)) *
-            math.sin(dLon / 2) *
-            math.sin(dLon / 2);
-    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-    return earthRadius * c;
-  }
-
-  double _degreesToRadians(double degrees) {
-    return degrees * math.pi / 180;
-  }
-
-  Future<Position> _getCurrentPosition() async {
-    return await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
   }
 
   Future<String> _detectScanner() async {

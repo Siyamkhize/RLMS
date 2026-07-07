@@ -1210,6 +1210,9 @@ class SyncService extends ChangeNotifier {
         return;
       }
 
+      // Sync monitoring records first
+      await syncMonitoringRecords();
+
       final unsyncedRecords = await fetchDataFromLocalDatabase();
       if (unsyncedRecords.isEmpty) {
         print("No data to sync.");
@@ -1306,6 +1309,54 @@ class SyncService extends ChangeNotifier {
   void showSyncError(String message) {
     print("Sync error: $message");
     // Add SnackBar or other UI feedback if needed
+  }
+
+  /// Sync unsynced monitoring records to the server
+  Future<void> syncMonitoringRecords() async {
+    try {
+      debugPrint('[SYNC-MONITORING] Starting monitoring sync...');
+
+      final unsyncedRecords = await _dbHelper.getUnsyncedMonitoringRecords();
+      if (unsyncedRecords.isEmpty) {
+        debugPrint('[SYNC-MONITORING] No unsynced monitoring records found');
+        return;
+      }
+
+      debugPrint(
+          '[SYNC-MONITORING] Found ${unsyncedRecords.length} records to sync');
+
+      for (var record in unsyncedRecords) {
+        try {
+          final response = await http
+              .post(
+                Uri.parse(AppConfig.saveMonitoringRecordsUrl),
+                headers: {'Content-Type': 'application/json'},
+                body: json.encode(record),
+              )
+              .timeout(const Duration(seconds: 15));
+
+          if (response.statusCode == 200) {
+            final result = json.decode(response.body);
+            if (result['success'] == true || result['status'] == 'success') {
+              await _dbHelper.markMonitoringRecordAsSynced(record['id']);
+              debugPrint(
+                  '[SYNC-MONITORING] ✅ Successfully synced record ID: ${record['id']}');
+            } else {
+              debugPrint(
+                  '[SYNC-MONITORING] ❌ Server returned error for record ${record['id']}: ${result['message']}');
+            }
+          } else {
+            debugPrint(
+                '[SYNC-MONITORING] ❌ Server error (${response.statusCode}) for record ${record['id']}');
+          }
+        } catch (e) {
+          debugPrint(
+              '[SYNC-MONITORING] ⚠️ Failed to sync record ${record['id']}: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('[SYNC-MONITORING] ❌ ERROR during monitoring sync: $e');
+    }
   }
 
   // Sync learnerdetails table
@@ -2607,7 +2658,6 @@ class SyncService extends ChangeNotifier {
           // Always include required fields
           request.fields['LearnerID'] = learnerID;
           request.fields['IDNumber'] = idNumber;
-          request.fields['classID'] = learner['classID']?.toString() ?? '0';
           request.fields['synced'] = '1';
 
           // Add a special flag to indicate this is a partial update

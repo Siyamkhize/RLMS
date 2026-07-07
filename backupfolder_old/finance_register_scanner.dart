@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'config.dart';
 import 'package:flutter_doc_scanner/flutter_doc_scanner.dart';
+import 'utils/scanner_pdf_resolver.dart';
 
 class FinanceRegisterScanner extends StatefulWidget {
   final String learnerId;
@@ -250,7 +251,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
 
     try {
       final docScanner = FlutterDocScanner();
-      final scannedImage = await docScanner.getScanDocuments();
+      final scannedImage = await docScanner.getScanDocuments(page: 25);
 
       print('Scanned image result: $scannedImage');
       print('Scanned image type: ${scannedImage.runtimeType}');
@@ -262,38 +263,21 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
         return;
       }
 
-      String? imagePath;
-
-      if (scannedImage is String) {
-        imagePath = scannedImage;
+      String? pdfUri;
+      if (scannedImage is Map) {
+        pdfUri = scannedImage['pdfUri']?.toString();
+      } else if (scannedImage is String) {
+        pdfUri = scannedImage;
       } else if (scannedImage is List && scannedImage.isNotEmpty) {
-        imagePath = scannedImage.first.toString();
-      } else if (scannedImage is Map) {
-        imagePath = scannedImage['pdfUri']?.toString() ??
-            scannedImage['path']?.toString() ??
-            scannedImage['scanned_path']?.toString() ??
-            scannedImage['file_path']?.toString() ??
-            scannedImage['scannedPath']?.toString() ??
-            scannedImage['filePath']?.toString();
-
-        if (imagePath == null) {
-          for (var value in scannedImage.values) {
-            if (value != null && value.toString().contains('/')) {
-              imagePath = value.toString();
-              break;
-            }
-          }
-        }
+        pdfUri = scannedImage.first.toString();
       }
 
-      if (imagePath != null && imagePath.startsWith('file://')) {
-        imagePath = imagePath.substring(7);
-      }
-
-      if (imagePath == null || imagePath.isEmpty) {
+      final resolved =
+          await resolveFlutterDocScannerPdfFile(pdfUri);
+      if (resolved == null || !await isReadablePdfFile(resolved)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Failed to get scanned document path'),
+            content: Text('Failed to read scanned PDF (try again)'),
             duration: Duration(seconds: 3),
           ),
         );
@@ -301,7 +285,7 @@ class _FinanceRegisterScannerState extends State<FinanceRegisterScanner> {
       }
 
       setState(() {
-        scannedDocumentPath = imagePath;
+        scannedDocumentPath = resolved.path;
         showScanner = true;
       });
 
