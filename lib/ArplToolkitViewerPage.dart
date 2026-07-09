@@ -1266,7 +1266,7 @@ class _ArplToolkitViewerPageState extends State<ArplToolkitViewerPage>
                         color: Color(0xFF006341)),
                   ),
                   const Divider(height: 24),
-                  _InfoRow('Trade Title', 'Plumber'),
+                  _InfoRow('Trade Title', _getTradeName(widget.ofoNumber)),
                   _InfoRow('OFO Code', widget.ofoNumber),
                   const SizedBox(height: 12),
                   if (_isEditing)
@@ -1740,7 +1740,7 @@ class _ArplToolkitViewerPageState extends State<ArplToolkitViewerPage>
                         color: Color(0xFF006341)),
                   ),
                   const Divider(height: 24),
-                  _InfoRow('Qualification', 'Plumber'),
+                  _InfoRow('Qualification', _getTradeName(widget.ofoNumber)),
                   _InfoRow('OFO Code', widget.ofoNumber),
                   _InfoRow('NQF Level', '4'),
                 ],
@@ -2787,7 +2787,8 @@ class _ArplToolkitViewerPageState extends State<ArplToolkitViewerPage>
                         color: Color(0xFF006341)),
                   ),
                   const Divider(height: 24),
-                  _InfoRow('Qualification Title', 'Plumber'),
+                  _InfoRow(
+                      'Qualification Title', _getTradeName(widget.ofoNumber)),
                   _InfoRow('OFO Code', widget.ofoNumber),
                   _InfoRow('NQF Level', '4'),
                 ],
@@ -3043,7 +3044,8 @@ class _ArplToolkitViewerPageState extends State<ArplToolkitViewerPage>
                   _InfoRow('Name', _toolkitData!.learner?.fullName ?? 'N/A'),
                   _InfoRow(
                       'ID Number', _toolkitData!.learner?.idNumber ?? 'N/A'),
-                  _InfoRow('Trade', 'Plumber (${widget.ofoNumber})'),
+                  _InfoRow('Trade',
+                      '${_getTradeName(widget.ofoNumber)} (${widget.ofoNumber})'),
                 ],
               ),
             ),
