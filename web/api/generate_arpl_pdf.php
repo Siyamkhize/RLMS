@@ -317,24 +317,24 @@ function generateARPLHTML($learner, $tradeName, $ofo_code, $learnerID, $conn, $d
         
         /* Cover Page */
         .cover-page {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            display: block;
             text-align: center;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            padding: 60px 40px;
+            min-height: 297mm;
+            position: relative;
         }
         .cover-page h1 {
             font-size: 48px;
-            margin: 20px 0;
+            margin: 60px 0 20px 0;
             font-weight: bold;
         }
         .cover-page .trade-section {
             background: rgba(255,255,255,0.1);
             padding: 30px;
             border-radius: 10px;
-            margin: 30px 0;
+            margin: 50px 0;
         }
         .cover-page .trade-name {
             font-size: 36px;
@@ -346,17 +346,21 @@ function generateARPLHTML($learner, $tradeName, $ofo_code, $learnerID, $conn, $d
             opacity: 0.9;
         }
         .learner-info-cover {
-            margin-top: 40px;
+            margin: 50px auto;
             background: rgba(255,255,255,0.15);
             padding: 20px;
             border-radius: 8px;
+            max-width: 600px;
         }
         .learner-info-cover p {
             font-size: 14px;
             margin: 10px 0;
         }
         .cover-page .footer {
-            margin-top: auto;
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            right: 0;
             font-size: 12px;
             opacity: 0.8;
         }
@@ -472,27 +476,24 @@ function generateARPLHTML($learner, $tradeName, $ofo_code, $learnerID, $conn, $d
 
 <!-- PAGE 1: COVER PAGE -->
 <div class="page cover-page">
-    <div style="margin-bottom: auto;"></div>
-    
     <h1>ARPL PORTFOLIO</h1>
-    <p style="font-size: 20px; opacity: 0.9;">Recognition of Prior Learning</p>
+    <p style="font-size: 20px; opacity: 0.9; margin: 0 0 30px 0;">Recognition of Prior Learning</p>
     
     <div class="trade-section">
-        <p style="font-size: 14px; opacity: 0.9; margin: 0;">Qualification</p>
+        <p style="font-size: 14px; opacity: 0.9; margin: 0 0 10px 0;">Qualification</p>
         <div class="trade-name">{$tradeName}</div>
         <p class="trade-code">NQF Level 4 | OFO Code: {$ofo_code}</p>
     </div>
     
     <div class="learner-info-cover">
-        <p><strong>Learner Name:</strong> {$learner['name']} {$learner['surname']}</p>
-        <p><strong>Learner ID:</strong> {$learnerID}</p>
-        <p><strong>ID Number:</strong> {$learner['idNumber']}</p>
-        <p><strong>Portfolio Generated:</strong> {$date}</p>
+        <p style="margin: 8px 0;"><strong>Learner Name:</strong> {$learner['name']} {$learner['surname']}</p>
+        <p style="margin: 8px 0;"><strong>Learner ID:</strong> {$learnerID}</p>
+        <p style="margin: 8px 0;"><strong>ID Number:</strong> {$learner['idNumber']}</p>
+        <p style="margin: 8px 0;"><strong>Portfolio Generated:</strong> {$date}</p>
     </div>
     
-    <div style="margin-top: auto;"></div>
     <div class="footer">
-        <p>This portfolio documents evidence of learning and competency</p>
+        <p style="margin: 0;">This portfolio documents evidence of learning and competency</p>
     </div>
 </div>
 
@@ -776,40 +777,130 @@ HTML;
 <!-- PAGE 7-8: APPENDIX B (THEORY ACTIVITIES) - TRADE-SPECIFIC -->
 <div class="page">
     <div class="header-info">
-        <span>Appendix B: Theory Assessment Activities</span>
+        <span>Appendix B: Theory Self-Evaluation</span>
         <span>Pages 7-8 of 24</span>
     </div>
     
-    <h2><span class="section-number">A</span>Appendix B: Theory Assessment Activities</h2>
+    <h2><span class="section-number">A</span>Appendix B: Theory Assessment - Knowledge Self-Evaluation</h2>
     
     <div class="info-box">
-        <strong>Theory Competency Assessment</strong>
-        <p>The following theory assessment activities have been completed for the {$tradeName} qualification:</p>
+        <strong>Competency Proficiency Scale for Self-Evaluation (Theory Knowledge)</strong>
+        <p style="font-size: 10px;">Rate your level of knowledge in each area using the scale below:</p>
     </div>
     
-HTML;
-
-    if (count($theoryActivities) > 0) {
-        $html .= "<table class='table' style='font-size: 10px;'>";
-        $html .= "<tr><th>Activity #</th><th>Activity Name</th><th>Competency Scale</th><th>Assessment Date</th></tr>";
-        foreach ($theoryActivities as $activity) {
-            $actNum = isset($activity['activity_number']) ? $activity['activity_number'] : '';
-            $actName = isset($activity['activity_name']) ? htmlspecialchars($activity['activity_name']) : 'N/A';
-            $rating = isset($activity['competency_scale_id']) && $activity['competency_scale_id'] ? $activity['competency_scale_id'] : 'Pending';
-            $date = isset($activity['rating_date']) && $activity['rating_date'] ? $activity['rating_date'] : 'Not Assessed';
-            $html .= "<tr>";
-            $html .= "<td>$actNum</td>";
-            $html .= "<td>$actName</td>";
-            $html .= "<td>$rating</td>";
-            $html .= "<td>$date</td>";
-            $html .= "</tr>";
-        }
-        $html .= "</table>";
-    } else {
-        $html .= "<div class='info-box'><p><em>No theory assessment activities have been recorded yet.</em></p></div>";
-    }
-
-    $html .= <<<HTML
+    <table class="table" style="font-size: 9px; margin-bottom: 15px;">
+        <tr>
+            <th style="width: 8%; text-align: center; background: #667eea; color: white;">Score</th>
+            <th style="width: 25%; background: #667eea; color: white;">Proficiency Level</th>
+            <th style="background: #667eea; color: white;">Description</th>
+        </tr>
+        <tr>
+            <td style="text-align: center; font-weight: bold;">1</td>
+            <td><b>Fundamental Awareness</b></td>
+            <td>You have basic knowledge but your understanding is minimal</td>
+        </tr>
+        <tr>
+            <td style="text-align: center; font-weight: bold;">2</td>
+            <td><b>Novice</b></td>
+            <td>You have limited experience - not yet fully competent</td>
+        </tr>
+        <tr>
+            <td style="text-align: center; font-weight: bold;">3</td>
+            <td><b>Intermediate</b></td>
+            <td>You meet minimum requirements but need more experience</td>
+        </tr>
+        <tr>
+            <td style="text-align: center; font-weight: bold;">4</td>
+            <td><b>Advanced</b></td>
+            <td>You have all required knowledge and practical skills</td>
+        </tr>
+        <tr>
+            <td style="text-align: center; font-weight: bold;">5</td>
+            <td><b>Expert</b></td>
+            <td>You have expert knowledge and can teach others</td>
+        </tr>
+    </table>
+    
+    <p style="font-size: 10px; font-weight: bold; margin: 10px 0;">Theory Knowledge & Practical Skills Assessment:</p>
+    <table class="table" style="font-size: 9px;">
+        <tr>
+            <th style="width: 50%; background: #f0f4ff;">Knowledge/Skill Area</th>
+            <th style="width: 10%; text-align: center; background: #f0f4ff;">1</th>
+            <th style="width: 10%; text-align: center; background: #f0f4ff;">2</th>
+            <th style="width: 10%; text-align: center; background: #f0f4ff;">3</th>
+            <th style="width: 10%; text-align: center; background: #f0f4ff;">4</th>
+            <th style="width: 10%; text-align: center; background: #f0f4ff;">5</th>
+        </tr>
+        <tr>
+            <td>Safety and Health Regulations</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+        </tr>
+        <tr>
+            <td>Hand and Workshop Tools</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+        </tr>
+        <tr>
+            <td>Measuring and Testing Equipment</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+        </tr>
+        <tr>
+            <td>Blueprint and Technical Drawings</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+        </tr>
+        <tr>
+            <td>Materials and Specifications</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+        </tr>
+        <tr>
+            <td>Trade-Specific Knowledge</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+        </tr>
+        <tr>
+            <td>Workplace Standards & Compliance</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+        </tr>
+    </table>
+    
+    <div style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; background: #fafafa;">
+        <table style="width: 100%; font-size: 10px;">
+            <tr>
+                <td style="width: 50%;"><b>Learner Signature:</b></td>
+                <td style="border-bottom: 1px solid #999; height: 20px;"></td>
+            </tr>
+            <tr>
+                <td><b>Date:</b></td>
+                <td style="border-bottom: 1px solid #999; height: 20px;"></td>
+            </tr>
+        </table>
+    </div>
     
     <div class="page-number">Pages 7-8 of 24</div>
 </div>
@@ -817,40 +908,114 @@ HTML;
 <!-- PAGE 9-10: APPENDIX E (WORKPLACE ACTIVITIES) - TRADE-SPECIFIC -->
 <div class="page">
     <div class="header-info">
-        <span>Appendix E: Workplace Assessment Activities</span>
+        <span>Appendix E: Workplace Experience Evaluation</span>
         <span>Pages 9-10 of 24</span>
     </div>
     
-    <h2><span class="section-number">B</span>Appendix E: Workplace Assessment Activities</h2>
+    <h2><span class="section-number">B</span>Appendix E: Workplace Experience & Assessment</h2>
     
     <div class="info-box">
-        <strong>Workplace Experience & Assessment</strong>
-        <p>The following workplace assessment activities document the learner's competency in the work environment:</p>
+        <strong>Workplace Competency Evaluation</strong>
+        <p style="font-size: 10px;">This section documents the learner's demonstration of competency in the workplace environment. Rate each activity using the 1-5 scale (see Appendix B for descriptions).</p>
     </div>
     
-HTML;
-
-    if (count($workplaceActivities) > 0) {
-        $html .= "<table class='table' style='font-size: 10px;'>";
-        $html .= "<tr><th>Activity #</th><th>Activity Name</th><th>Competency Scale</th><th>Assessment Date</th></tr>";
-        foreach ($workplaceActivities as $activity) {
-            $actNum = isset($activity['activity_number']) ? $activity['activity_number'] : '';
-            $actName = isset($activity['activity_name']) ? htmlspecialchars($activity['activity_name']) : 'N/A';
-            $rating = isset($activity['competency_scale_id']) && $activity['competency_scale_id'] ? $activity['competency_scale_id'] : 'Pending';
-            $date = isset($activity['rating_date']) && $activity['rating_date'] ? $activity['rating_date'] : 'Not Assessed';
-            $html .= "<tr>";
-            $html .= "<td>$actNum</td>";
-            $html .= "<td>$actName</td>";
-            $html .= "<td>$rating</td>";
-            $html .= "<td>$date</td>";
-            $html .= "</tr>";
-        }
-        $html .= "</table>";
-    } else {
-        $html .= "<div class='info-box'><p><em>No workplace assessment activities have been recorded yet.</em></p></div>";
-    }
-
-    $html .= <<<HTML
+    <p style="font-size: 10px; font-weight: bold; margin: 10px 0;">Workplace Activities and Ratings:</p>
+    <table class="table" style="font-size: 9px;">
+        <tr>
+            <th style="width: 50%; background: #f0f4ff;">Workplace Activity</th>
+            <th style="width: 10%; text-align: center; background: #f0f4ff;">1</th>
+            <th style="width: 10%; text-align: center; background: #f0f4ff;">2</th>
+            <th style="width: 10%; text-align: center; background: #f0f4ff;">3</th>
+            <th style="width: 10%; text-align: center; background: #f0f4ff;">4</th>
+            <th style="width: 10%; text-align: center; background: #f0f4ff;">5</th>
+        </tr>
+        <tr>
+            <td>Planning and Preparation</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+        </tr>
+        <tr>
+            <td>Material Selection and Handling</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+        </tr>
+        <tr>
+            <td>Tool Use and Equipment Operation</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+        </tr>
+        <tr>
+            <td>Quality Standards Compliance</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+        </tr>
+        <tr>
+            <td>Safety and Health Practice</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+        </tr>
+        <tr>
+            <td>Communication and Teamwork</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+        </tr>
+        <tr>
+            <td>Problem Solving and Adaptability</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+        </tr>
+        <tr>
+            <td>Work Completion and Reporting</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+            <td style="text-align: center;">☐</td>
+        </tr>
+    </table>
+    
+    <p style="font-size: 10px; font-weight: bold; margin: 10px 0;">Supervisor Comments:</p>
+    <div style="height: 50px; border: 1px solid #ddd; padding: 8px; background: white; font-size: 9px; overflow: hidden;">
+        (Space for supervisor/assessor comments on workplace performance)
+    </div>
+    
+    <div style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; background: #fafafa;">
+        <table style="width: 100%; font-size: 10px;">
+            <tr>
+                <td style="width: 50%;"><b>Supervisor/Assessor Name:</b></td>
+                <td style="border-bottom: 1px solid #999; height: 20px;"></td>
+            </tr>
+            <tr>
+                <td><b>Signature:</b></td>
+                <td style="border-bottom: 1px solid #999; height: 20px;"></td>
+            </tr>
+            <tr>
+                <td><b>Date:</b></td>
+                <td style="border-bottom: 1px solid #999; height: 20px;"></td>
+            </tr>
+        </table>
+    </div>
     
     <div class="page-number">Pages 9-10 of 24</div>
 </div>
@@ -865,28 +1030,89 @@ HTML;
     <h2><span class="section-number">C</span>Appendix H: Access Confirmation Recommendation (ACR)</h2>
     
     <div class="info-box">
-        <strong>Assessor Recommendation for ARPL Access</strong>
-        <p>Based on the evidence of prior learning and assessment results, the following recommendation is made:</p>
+        <strong>Assessor Recommendation for ARPL Access & Certification</strong>
+        <p style="font-size: 10px;">Based on the evidence of prior learning and comprehensive assessment results, the following recommendation is made:</p>
     </div>
     
-HTML;
-
-    if ($accessRecommendation) {
-        $html .= "<table class='table'>";
-        $html .= "<tr><th>Field</th><th>Value</th></tr>";
-        $html .= "<tr><td>Trade</td><td>" . htmlspecialchars($accessRecommendation['Trade'] ?? 'N/A') . "</td></tr>";
-        $html .= "<tr><td>OFO Code</td><td>" . htmlspecialchars($accessRecommendation['OFOCode'] ?? 'N/A') . "</td></tr>";
-        $html .= "<tr><td>ACR ID</td><td>" . htmlspecialchars($accessRecommendation['ACRID'] ?? 'N/A') . "</td></tr>";
-        $html .= "<tr><td>Status</td><td><strong>" . htmlspecialchars($accessRecommendation['Status'] ?? 'Not Set') . "</strong></td></tr>";
-        if (isset($accessRecommendation['Remarks']) && !empty($accessRecommendation['Remarks'])) {
-            $html .= "<tr><td>Remarks</td><td>" . nl2br(htmlspecialchars($accessRecommendation['Remarks'])) . "</td></tr>";
-        }
-        $html .= "</table>";
-    } else {
-        $html .= "<div class='info-box'><p><em>No access recommendation has been recorded yet.</em></p></div>";
-    }
-
-    $html .= <<<HTML
+    <table class="table" style="font-size: 10px;">
+        <tr>
+            <th style="width: 40%; background: #f0f4ff;">Field</th>
+            <th style="width: 60%; background: #f0f4ff;">Value</th>
+        </tr>
+        <tr>
+            <td><b>Learner Name</b></td>
+            <td>{$learner['name']} {$learner['surname']}</td>
+        </tr>
+        <tr>
+            <td><b>Trade/Qualification</b></td>
+            <td>{$tradeName}</td>
+        </tr>
+        <tr>
+            <td><b>OFO Code</b></td>
+            <td>{$ofo_code}</td>
+        </tr>
+        <tr>
+            <td><b>NQF Level</b></td>
+            <td>4</td>
+        </tr>
+        <tr>
+            <td><b>ACR Reference Number</b></td>
+            <td>_______________________</td>
+        </tr>
+        <tr>
+            <td><b>Assessment Status</b></td>
+            <td>☐ Complete &nbsp;&nbsp; ☐ Pending &nbsp;&nbsp; ☐ Under Review</td>
+        </tr>
+    </table>
+    
+    <p style="font-size: 10px; font-weight: bold; margin: 15px 0 10px 0;">Overall Assessment Recommendation:</p>
+    <table class="table" style="font-size: 10px;">
+        <tr>
+            <td style="width: 50%;"><b>ACR Decision:</b></td>
+            <td style="background: #f0f4ff;">
+                ☐ <b>APPROVED</b> &nbsp;&nbsp; ☐ <b>CONDITIONALLY APPROVED</b> &nbsp;&nbsp; ☐ <b>NOT APPROVED</b>
+            </td>
+        </tr>
+        <tr>
+            <td><b>Competency Level (1-5):</b></td>
+            <td style="background: #f0f4ff;">
+                ☐ 1 &nbsp; ☐ 2 &nbsp; ☐ 3 &nbsp; ☐ 4 &nbsp; ☐ 5
+            </td>
+        </tr>
+        <tr>
+            <td><b>Recommendation:</b></td>
+            <td style="background: #f0f4ff;">
+                ☐ CERTIFICATION &nbsp;&nbsp; ☐ GAP CLOSURE &nbsp;&nbsp; ☐ REJECT
+            </td>
+        </tr>
+    </table>
+    
+    <p style="font-size: 10px; font-weight: bold; margin: 10px 0 5px 0;">Assessor Remarks (if applicable):</p>
+    <div style="height: 60px; border: 1px solid #ddd; padding: 8px; background: white; font-size: 10px; overflow: hidden;">
+        (Assessor comments on ACR decision and recommendations)
+    </div>
+    
+    <div style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; background: #fafafa;">
+        <p style="font-size: 10px; font-weight: bold; margin-bottom: 8px;">Assessor Certification:</p>
+        <table style="width: 100%; font-size: 10px;">
+            <tr>
+                <td style="width: 50%;"><b>Assessor Name & Title:</b></td>
+                <td style="border-bottom: 1px solid #999; height: 20px;"></td>
+            </tr>
+            <tr>
+                <td><b>Assessor Signature:</b></td>
+                <td style="border-bottom: 1px solid #999; height: 25px;"></td>
+            </tr>
+            <tr>
+                <td><b>Date:</b></td>
+                <td style="border-bottom: 1px solid #999; height: 20px;"></td>
+            </tr>
+        </table>
+    </div>
+    
+    <p style="font-size: 9px; color: #666; text-align: center; margin-top: 10px;">
+        <em>This recommendation is based on evidence gathered through the ARPL assessment process.</em>
+    </p>
     
     <div class="page-number">Page 11 of 24</div>
 </div>
@@ -902,78 +1128,265 @@ HTML;
     <!-- APPENDIX A: APPLICATION FORM -->
     <h3>Appendix A: Application Form</h3>
     <div class="info-box">
-HTML;
-
-    if (!empty($appendixA)) {
-        $html .= "<p><strong>Applicant Details:</strong></p>";
-        if (isset($appendixA['postal_address1'])) {
-            $html .= "<p>Address: " . htmlspecialchars($appendixA['postal_address1']) . "</p>";
-        }
-        if (isset($appendixA['current_employer'])) {
-            $html .= "<p><strong>Current Employment:</strong> " . htmlspecialchars($appendixA['current_employer']) . "</p>";
-        }
-        if (isset($appendixA['position_job_title'])) {
-            $html .= "<p><strong>Position:</strong> " . htmlspecialchars($appendixA['position_job_title']) . "</p>";
-        }
-        if (isset($appendixA['employment_history'])) {
-            $html .= "<p><strong>Employment History:</strong> " . htmlspecialchars($appendixA['employment_history']) . "</p>";
-        }
-    } else {
-        $html .= "<p><em>No application form data found. Please complete in system.</em></p>";
-    }
-    
-    $html .= <<<HTML
+        <table class="table" style="font-size: 10px; width: 100%; margin: 10px 0;">
+            <tr>
+                <th style="width: 30%;">Document</th>
+                <th style="width: 30%;">Trade</th>
+                <th style="width: 40%;">Trade Test Centre</th>
+            </tr>
+            <tr>
+                <td>ARPLTOOLKIT</td>
+                <td>{$tradeName}</td>
+                <td>Provider Details</td>
+            </tr>
+            <tr>
+                <th style="width: 30%;">Version</th>
+                <th style="width: 30%;">OFO Code</th>
+                <th style="width: 40%;">Accreditation No</th>
+            </tr>
+            <tr>
+                <td>1/2019</td>
+                <td>{$ofo_code}</td>
+                <td>To be entered</td>
+            </tr>
+        </table>
+        
+        <h4 style="margin: 15px 0 10px 0; font-size: 12px;">APPLICATION FOR RECOGNITION OF PRIOR LEARNING</h4>
+        
+        <p style="font-size: 11px; font-weight: bold; margin: 10px 0;">Applicant Details:</p>
+        <table class="table" style="font-size: 10px;">
+            <tr>
+                <td style="width: 35%;"><b>Ref Number:</b></td>
+                <td style="background: #f9f9f9; padding: 8px;">{$learnerID}</td>
+            </tr>
+            <tr>
+                <td><b>Trade Title</b></td>
+                <td style="background: #f9f9f9;">{$tradeName}</td>
+            </tr>
+            <tr>
+                <td><b>OFO Code</b></td>
+                <td style="background: #f9f9f9;">{$ofo_code}</td>
+            </tr>
+            <tr>
+                <td><b>Name of Candidate</b></td>
+                <td style="background: #f9f9f9;">{$learner['name']} {$learner['surname']}</td>
+            </tr>
+            <tr>
+                <td><b>ID Number</b></td>
+                <td style="background: #f9f9f9;">{$learner['idNumber']}</td>
+            </tr>
+        </table>
+        
+        <p style="font-size: 11px; font-weight: bold; margin: 15px 0 10px 0;">Address Details:</p>
+        <table class="table" style="font-size: 10px;">
+            <tr>
+                <th style="width: 48%; background: #f0f4ff;">Physical Address</th>
+                <th style="width: 48%; background: #f0f4ff;">Postal Address</th>
+            </tr>
+            <tr>
+                <td>[Address Line 1]</td>
+                <td>[Postal Line 1]</td>
+            </tr>
+            <tr>
+                <td>[Address Line 2]</td>
+                <td>[Postal Line 2]</td>
+            </tr>
+            <tr>
+                <td>[City/Postal Code]</td>
+                <td>[Postal Code]</td>
+            </tr>
+        </table>
+        
+        <p style="font-size: 11px; font-weight: bold; margin: 15px 0 10px 0;">Contact Details:</p>
+        <table class="table" style="font-size: 10px;">
+            <tr>
+                <td style="width: 35%;"><b>Tel No</b></td>
+                <td style="background: #f9f9f9;">[Phone]</td>
+            </tr>
+            <tr>
+                <td><b>Cell No</b></td>
+                <td style="background: #f9f9f9;">[Cell Phone]</td>
+            </tr>
+            <tr>
+                <td><b>Email</b></td>
+                <td style="background: #f9f9f9;">[Email Address]</td>
+            </tr>
+        </table>
+        
+        <p style="font-size: 11px; font-weight: bold; margin: 15px 0 10px 0;">Employment Status:</p>
+        <table class="table" style="font-size: 10px;">
+            <tr>
+                <td style="width: 35%;"><b>Currently Employed</b></td>
+                <td>☐ Yes &nbsp;&nbsp; ☐ No</td>
+            </tr>
+            <tr>
+                <td><b>Self Employed</b></td>
+                <td>☐ Yes &nbsp;&nbsp; ☐ No</td>
+            </tr>
+            <tr>
+                <td><b>Current/Most Recent Employer</b></td>
+                <td style="background: #f9f9f9;">[Employer Name]</td>
+            </tr>
+            <tr>
+                <td><b>Position/Job Title</b></td>
+                <td style="background: #f9f9f9;">[Job Title]</td>
+            </tr>
+            <tr>
+                <td><b>Employer Contact</b></td>
+                <td style="background: #f9f9f9;">[Phone/Email]</td>
+            </tr>
+        </table>
+        
+        <p style="font-size: 11px; font-weight: bold; margin: 15px 0 10px 0;">Employment History:</p>
+        <table class="table" style="font-size: 9px;">
+            <tr>
+                <th>Company</th>
+                <th>Position</th>
+                <th>Period & Duration</th>
+                <th>Contact</th>
+            </tr>
+            <tr>
+                <td>[Company 1]</td>
+                <td>[Job Title]</td>
+                <td>[Dates]</td>
+                <td>[Tel]</td>
+            </tr>
+            <tr>
+                <td>[Company 2]</td>
+                <td>[Job Title]</td>
+                <td>[Dates]</td>
+                <td>[Tel]</td>
+            </tr>
+            <tr>
+                <td>[Company 3]</td>
+                <td>[Job Title]</td>
+                <td>[Dates]</td>
+                <td>[Tel]</td>
+            </tr>
+        </table>
+        
+        <div style="margin: 15px 0; border-top: 1px solid #ddd; padding-top: 15px;">
+            <table style="width: 100%; font-size: 10px;">
+                <tr>
+                    <td style="width: 40%;"><b>Candidate Signature:</b></td>
+                    <td style="border-bottom: 1px solid #ddd; height: 20px;"></td>
+                </tr>
+                <tr>
+                    <td style="padding-top: 10px;"><b>Date:</b></td>
+                    <td style="border-bottom: 1px solid #ddd; height: 20px; padding-top: 10px;"></td>
+                </tr>
+            </table>
+        </div>
     </div>
     
     <!-- APPENDIX C: CURRICULUM CONTENT -->
     <h3>Appendix C: Trade Curriculum Content</h3>
     <div class="info-box">
-HTML;
-
-    if (!empty($appendixC)) {
-        if (isset($appendixC['curriculum_overview'])) {
-            $html .= "<p><strong>Curriculum Overview:</strong></p>";
-            $html .= "<p>" . nl2br(htmlspecialchars($appendixC['curriculum_overview'])) . "</p>";
-        }
-        if (isset($appendixC['learning_outcomes'])) {
-            $html .= "<p><strong>Learning Outcomes:</strong></p>";
-            $html .= "<p>" . nl2br(htmlspecialchars($appendixC['learning_outcomes'])) . "</p>";
-        }
-    } else {
-        $html .= "<p><em>Curriculum content to be entered in system.</em></p>";
-    }
-    
-    $html .= <<<HTML
+        <table class="table" style="font-size: 10px; margin-bottom: 15px;">
+            <tr>
+                <th style="width: 50%; background: #f0f4ff;">Knowledge Area</th>
+                <th style="width: 50%; background: #f0f4ff;">Learning Outcomes</th>
+            </tr>
+            <tr>
+                <td><b>Safety & Health</b></td>
+                <td>Demonstrate knowledge of workplace safety and health regulations</td>
+            </tr>
+            <tr>
+                <td><b>Tools & Equipment</b></td>
+                <td>Identify and safely use trade-specific tools and equipment</td>
+            </tr>
+            <tr>
+                <td><b>Practical Skills</b></td>
+                <td>Execute trade activities according to industry standards</td>
+            </tr>
+            <tr>
+                <td><b>Workplace Practice</b></td>
+                <td>Apply best practices in workplace environment</td>
+            </tr>
+            <tr>
+                <td><b>Quality Standards</b></td>
+                <td>Ensure work meets required quality and specification standards</td>
+            </tr>
+        </table>
+        
+        <p style="font-size: 10px;"><b>Curriculum Overview:</b> The {$tradeName} curriculum is designed to develop practical competency in all aspects of the trade, including theoretical knowledge and hands-on skill application in workplace environments.</p>
+        
+        <p style="font-size: 10px; margin-top: 10px;"><b>Assessment Components:</b></p>
+        <ul style="font-size: 10px; margin: 5px 0; padding-left: 20px;">
+            <li>Theory Assessment (5 papers)</li>
+            <li>Practical Skill Assessment (22 activities)</li>
+            <li>Workplace Experience Evaluation</li>
+            <li>Competency Rating Scale</li>
+        </ul>
     </div>
     
     <!-- APPENDIX D: PRACTICAL SKILLS CHECKLIST -->
     <h3>Appendix D: Practical Skills Assessment (22 Activities)</h3>
     <div class="info-box">
-        <table class="table" style="font-size: 10px;">
+        <p style="font-size: 10px; font-weight: bold; margin-bottom: 10px;">Competency Proficiency Scale:</p>
+        <table class="table" style="font-size: 9px; margin-bottom: 15px;">
             <tr>
-                <th>Activity</th>
-                <th>Status</th>
-                <th>Activity</th>
-                <th>Status</th>
+                <th style="width: 10%; background: #667eea; color: white;">Score</th>
+                <th style="width: 30%; background: #667eea; color: white;">Proficiency Level</th>
+                <th style="width: 60%; background: #667eea; color: white;">Description</th>
+            </tr>
+            <tr>
+                <td>1</td>
+                <td><b>Awareness</b></td>
+                <td>Basic knowledge - exposure only</td>
+            </tr>
+            <tr>
+                <td>2</td>
+                <td><b>Novice</b></td>
+                <td>Limited experience - not yet competent</td>
+            </tr>
+            <tr>
+                <td>3</td>
+                <td><b>Intermediate</b></td>
+                <td>Meets minimum competency - needs more experience</td>
+            </tr>
+            <tr>
+                <td>4</td>
+                <td><b>Advanced</b></td>
+                <td>All required knowledge and skills present</td>
+            </tr>
+            <tr>
+                <td>5</td>
+                <td><b>Expert</b></td>
+                <td>Expert knowledge - can teach others</td>
+            </tr>
+        </table>
+        
+        <p style="font-size: 10px; font-weight: bold; margin: 10px 0;">Practical Skills Activities and Ratings:</p>
+        <table class="table" style="font-size: 9px;">
+            <tr>
+                <th style="width: 8%; text-align: center;">No</th>
+                <th style="width: 42%;">Activity</th>
+                <th style="width: 12%; text-align: center;">Rating</th>
+                <th style="width: 8%; text-align: center;">No</th>
+                <th style="width: 12%;">Activity</th>
+                <th style="width: 12%; text-align: center;">Rating</th>
             </tr>
 HTML;
 
+    // Display practical activities in two columns
     if (!empty($appendixD)) {
         $activities = formatActivityResponse($appendixD);
         for ($i = 1; $i <= 22; $i += 2) {
-            $status1 = isset($activities[$i]) ? $activities[$i] : 'Pending';
-            $status2 = isset($activities[$i+1]) ? $activities[$i+1] : 'Pending';
+            $status1 = isset($activities[$i]) ? $activities[$i] : '-';
+            $activity2 = $i+1;
+            $status2 = isset($activities[$activity2]) ? $activities[$activity2] : '-';
             $html .= "<tr>";
-            $html .= "<td>Activity $i</td>";
-            $html .= "<td>" . $status1 . "</td>";
-            if ($i + 1 <= 22) {
-                $html .= "<td>Activity " . ($i+1) . "</td>";
-                $html .= "<td>" . $status2 . "</td>";
-            }
+            $html .= "<td style='text-align: center;'>$i</td>";
+            $html .= "<td>Practical Skill $i</td>";
+            $html .= "<td style='text-align: center;'>☐</td>";
+            $html .= "<td style='text-align: center;'>$activity2</td>";
+            $html .= "<td>Practical Skill $activity2</td>";
+            $html .= "<td style='text-align: center;'>☐</td>";
             $html .= "</tr>";
         }
     } else {
-        $html .= "<tr><td colspan='4'><em>Practical skills assessment to be completed.</em></td></tr>";
+        $html .= "<tr><td colspan='6' style='text-align: center;'><em>Practical skills to be assessed and rated</em></td></tr>";
     }
     
     $html .= <<<HTML
@@ -983,75 +1396,190 @@ HTML;
     <!-- APPENDIX F: ASSESSMENT EVALUATION AGREEMENT -->
     <h3>Appendix F: Assessment Evaluation Agreement</h3>
     <div class="info-box">
-HTML;
-
-    if (!empty($appendixF)) {
-        $html .= "<p><strong>Assessment Acknowledgements:</strong></p>";
-        $html .= "<ul>";
-        $html .= "<li>Knowledge Assessment: " . (isset($appendixF['knowledge_acknowledged']) ? ucfirst($appendixF['knowledge_acknowledged']) : 'Not Set') . "</li>";
-        $html .= "<li>Practical Assessment: " . (isset($appendixF['practical_acknowledged']) ? ucfirst($appendixF['practical_acknowledged']) : 'Not Set') . "</li>";
-        $html .= "<li>Workplace Experience: " . (isset($appendixF['workplace_acknowledged']) ? ucfirst($appendixF['workplace_acknowledged']) : 'Not Set') . "</li>";
-        $html .= "<li>Assessor Acknowledged: " . (isset($appendixF['assessor_acknowledged']) ? ucfirst($appendixF['assessor_acknowledged']) : 'Not Set') . "</li>";
-        $html .= "</ul>";
-        if (isset($appendixF['agreement_date'])) {
-            $html .= "<p><strong>Agreement Date:</strong> " . htmlspecialchars($appendixF['agreement_date']) . "</p>";
-        }
-    } else {
-        $html .= "<p><em>Assessment agreement to be completed and signed.</em></p>";
-    }
-    
-    $html .= <<<HTML
+        <p style="font-size: 11px; font-weight: bold; margin: 10px 0;">Assessment Acknowledgements and Agreement:</p>
+        
+        <table class="table" style="font-size: 10px;">
+            <tr>
+                <th style="width: 50%;">Assessment Component</th>
+                <th style="width: 25%; text-align: center;">Acknowledged</th>
+                <th style="width: 25%; text-align: center;">Not Acknowledged</th>
+            </tr>
+            <tr>
+                <td>Theoretical Knowledge Assessment (5 papers)</td>
+                <td style="text-align: center;">☐</td>
+                <td style="text-align: center;">☐</td>
+            </tr>
+            <tr>
+                <td>Practical Skills Assessment (22 activities)</td>
+                <td style="text-align: center;">☐</td>
+                <td style="text-align: center;">☐</td>
+            </tr>
+            <tr>
+                <td>Workplace Experience Evaluation</td>
+                <td style="text-align: center;">☐</td>
+                <td style="text-align: center;">☐</td>
+            </tr>
+            <tr>
+                <td>Competency Rating & Feedback</td>
+                <td style="text-align: center;">☐</td>
+                <td style="text-align: center;">☐</td>
+            </tr>
+            <tr>
+                <td>Assessor Acknowledgement</td>
+                <td style="text-align: center;">☐</td>
+                <td style="text-align: center;">☐</td>
+            </tr>
+        </table>
+        
+        <div style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; background: #fafafa; border-radius: 4px;">
+            <p style="font-size: 10px; font-weight: bold; margin-bottom: 8px;">Learner Declaration:</p>
+            <p style="font-size: 10px; margin-bottom: 10px;">I confirm that I understand the assessment requirements and agree to the assessment plan as described above.</p>
+            <table style="width: 100%; font-size: 10px;">
+                <tr>
+                    <td style="width: 50%; border-bottom: 1px solid #999; height: 25px;"></td>
+                    <td style="width: 10%;"></td>
+                    <td style="width: 40%; border-bottom: 1px solid #999; height: 25px;"></td>
+                </tr>
+                <tr>
+                    <td style="font-size: 9px;">Learner Signature</td>
+                    <td></td>
+                    <td style="font-size: 9px;">Date</td>
+                </tr>
+            </table>
+        </div>
+        
+        <div style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; background: #fafafa; border-radius: 4px;">
+            <p style="font-size: 10px; font-weight: bold; margin-bottom: 8px;">Assessor Acknowledgement:</p>
+            <table style="width: 100%; font-size: 10px;">
+                <tr>
+                    <td style="width: 50%; border-bottom: 1px solid #999; height: 25px;"></td>
+                    <td style="width: 10%;"></td>
+                    <td style="width: 40%; border-bottom: 1px solid #999; height: 25px;"></td>
+                </tr>
+                <tr>
+                    <td style="font-size: 9px;">Assessor Signature</td>
+                    <td></td>
+                    <td style="font-size: 9px;">Date</td>
+                </tr>
+            </table>
+        </div>
     </div>
     
     <!-- APPENDIX G: APPEALS FORM -->
-    <h3>Appendix G: Appeals & Feedback</h3>
+    <h3>Appendix G: Appeals & Feedback Form</h3>
     <div class="info-box">
-HTML;
-
-    if (!empty($appendixG)) {
-        $html .= "<p><strong>Appeal Status:</strong> " . (isset($appendixG['appeal_status']) ? htmlspecialchars($appendixG['appeal_status']) : 'None') . "</p>";
-        if (isset($appendixG['grounds_for_appeal']) && !empty($appendixG['grounds_for_appeal'])) {
-            $html .= "<p><strong>Grounds for Appeal:</strong></p>";
-            $html .= "<p>" . nl2br(htmlspecialchars($appendixG['grounds_for_appeal'])) . "</p>";
-        }
-        if (isset($appendixG['assessor_findings']) && !empty($appendixG['assessor_findings'])) {
-            $html .= "<p><strong>Assessor Findings:</strong></p>";
-            $html .= "<p>" . nl2br(htmlspecialchars($appendixG['assessor_findings'])) . "</p>";
-        }
-    } else {
-        $html .= "<p><em>No appeals submitted. Learner feedback to be recorded here if applicable.</em></p>";
-    }
-    
-    $html .= <<<HTML
+        <p style="font-size: 11px; font-weight: bold; margin: 10px 0;">Appeals and Dispute Resolution:</p>
+        
+        <table class="table" style="font-size: 10px; margin-bottom: 10px;">
+            <tr>
+                <td style="width: 40%;"><b>Appeal Status:</b></td>
+                <td style="background: #f9f9f9;">
+                    ☐ No Appeal &nbsp;&nbsp; ☐ Appeal Submitted &nbsp;&nbsp; ☐ Appeal Under Review
+                </td>
+            </tr>
+            <tr>
+                <td><b>Date of Appeal:</b></td>
+                <td style="background: #f9f9f9;">_________________</td>
+            </tr>
+        </table>
+        
+        <p style="font-size: 10px; font-weight: bold; margin: 10px 0 5px 0;">Grounds for Appeal (if applicable):</p>
+        <div style="height: 60px; border: 1px solid #ddd; padding: 8px; background: white; font-size: 10px; overflow: hidden;">
+            (Enter details if appeal is submitted)
+        </div>
+        
+        <p style="font-size: 10px; font-weight: bold; margin: 10px 0 5px 0;">Assessor Response/Findings:</p>
+        <div style="height: 60px; border: 1px solid #ddd; padding: 8px; background: white; font-size: 10px; overflow: hidden;">
+            (Assessor comments on appeal)
+        </div>
+        
+        <p style="font-size: 10px; font-weight: bold; margin: 10px 0 5px 0;">Learner Feedback:</p>
+        <div style="height: 50px; border: 1px solid #ddd; padding: 8px; background: white; font-size: 10px; overflow: hidden;">
+            (Optional feedback from learner)
+        </div>
+        
+        <div style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; background: #fafafa; border-radius: 4px;">
+            <table style="width: 100%; font-size: 10px;">
+                <tr>
+                    <td style="width: 50%;"><b>Learner/Representative Signature:</b></td>
+                    <td style="width: 50%; border-bottom: 1px solid #999; height: 25px;"></td>
+                </tr>
+                <tr>
+                    <td><b>Date:</b></td>
+                    <td style="border-bottom: 1px solid #999; height: 25px;"></td>
+                </tr>
+            </table>
+        </div>
     </div>
     
     <!-- APPENDIX I: STATEMENT OF RESULTS -->
     <h3>Appendix I: Statement of Results</h3>
     <div class="info-box">
-HTML;
-
-    if (!empty($appendixI)) {
-        $html .= "<table class='table'>";
-        $html .= "<tr><th>Assessment Component</th><th>Result</th></tr>";
-        $html .= "<tr><td>Knowledge Assessment</td><td>" . (isset($appendixI['knowledge_result']) ? htmlspecialchars($appendixI['knowledge_result']) : 'Pending') . "</td></tr>";
-        $html .= "<tr><td>Practical Assessment</td><td>" . (isset($appendixI['practical_result']) ? htmlspecialchars($appendixI['practical_result']) : 'Pending') . "</td></tr>";
-        $html .= "<tr><td>Workplace Experience</td><td>" . (isset($appendixI['workplace_result']) ? htmlspecialchars($appendixI['workplace_result']) : 'Pending') . "</td></tr>";
-        $html .= "</table>";
+        <p style="font-size: 11px; font-weight: bold; margin: 10px 0;">Assessment Results Summary:</p>
         
-        if (isset($appendixI['overall_competency_rating'])) {
-            $html .= "<p><strong>Overall Competency Rating:</strong> " . htmlspecialchars($appendixI['overall_competency_rating']) . "/5</p>";
-        }
-        if (isset($appendixI['assessor_name'])) {
-            $html .= "<p><strong>Assessor:</strong> " . htmlspecialchars($appendixI['assessor_name']) . "</p>";
-        }
-        if (isset($appendixI['certification_date'])) {
-            $html .= "<p><strong>Certification Date:</strong> " . htmlspecialchars($appendixI['certification_date']) . "</p>";
-        }
-    } else {
-        $html .= "<p><em>Results to be entered upon assessment completion.</em></p>";
-    }
-    
-    $html .= <<<HTML
+        <table class="table" style="font-size: 10px; margin-bottom: 15px;">
+            <tr>
+                <th style="background: #667eea; color: white; width: 40%;">Assessment Component</th>
+                <th style="background: #667eea; color: white; width: 30%;">Result</th>
+                <th style="background: #667eea; color: white; width: 30%;">Mark / Rating</th>
+            </tr>
+            <tr>
+                <td>Theoretical Knowledge (5 papers avg)</td>
+                <td style="background: #f9f9f9;">☐ Pass &nbsp; ☐ Fail</td>
+                <td style="background: #f9f9f9;"></td>
+            </tr>
+            <tr>
+                <td>Practical Skills (22 activities avg)</td>
+                <td style="background: #f9f9f9;">☐ Pass &nbsp; ☐ Fail</td>
+                <td style="background: #f9f9f9;"></td>
+            </tr>
+            <tr>
+                <td>Workplace Experience</td>
+                <td style="background: #f9f9f9;">☐ Pass &nbsp; ☐ Fail</td>
+                <td style="background: #f9f9f9;"></td>
+            </tr>
+            <tr>
+                <td><b>Overall Result</b></td>
+                <td style="background: #f0f4ff;"><b>☐ PASS &nbsp; ☐ FAIL</b></td>
+                <td style="background: #f0f4ff;"><b>/100</b></td>
+            </tr>
+        </table>
+        
+        <p style="font-size: 10px; font-weight: bold; margin: 10px 0 5px 0;">Overall Competency Rating (1-5 Scale):</p>
+        <table class="table" style="font-size: 10px; margin-bottom: 10px;">
+            <tr>
+                <td style="width: 50%;"><b>Competency Level:</b></td>
+                <td style="background: #f9f9f9;">☐ 1 &nbsp; ☐ 2 &nbsp; ☐ 3 &nbsp; ☐ 4 &nbsp; ☐ 5</td>
+            </tr>
+            <tr>
+                <td><b>Description:</b></td>
+                <td style="background: #f9f9f9; font-size: 9px;">
+                    1=Awareness, 2=Novice, 3=Intermediate, 4=Advanced, 5=Expert
+                </td>
+            </tr>
+        </table>
+        
+        <div style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; background: #fafafa; border-radius: 4px;">
+            <p style="font-size: 10px; font-weight: bold; margin-bottom: 8px;">Assessor Certification:</p>
+            <table style="width: 100%; font-size: 10px;">
+                <tr>
+                    <td style="width: 50%;"><b>Assessor Name:</b></td>
+                    <td style="border-bottom: 1px solid #999; height: 20px;"></td>
+                </tr>
+                <tr>
+                    <td><b>Assessor Signature:</b></td>
+                    <td style="border-bottom: 1px solid #999; height: 25px;"></td>
+                </tr>
+                <tr>
+                    <td><b>Date:</b></td>
+                    <td style="border-bottom: 1px solid #999; height: 20px;"></td>
+                </tr>
+            </table>
+        </div>
+        
+        <p style="font-size: 9px; color: #666; margin-top: 15px; text-align: center;">
+            <em>This is an official statement of assessment results for the ARPL {$tradeName} qualification.</em>
+        </p>
     </div>
     
     <div class="page-number">Pages 12-20 of 24</div>
