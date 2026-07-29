@@ -1,0 +1,75 @@
+═════════════════════════════════════════════════════════════════
+  BRICKLAYER TOOLKIT APPENDIX E TEST - QUICK CARD
+═════════════════════════════════════════════════════════════════
+
+✅ APK INSTALLED - Test now on device
+
+TESTING STEPS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. FORCE CLOSE APP
+   Settings → Apps → RLMSS → Force Stop
+
+2. CLEAR CACHE
+   Settings → Apps → RLMSS → Storage → Clear Cache
+
+3. RESTART APP
+   Open RLMSS
+
+4. LOGIN
+   Use facilitator credentials
+
+5. SELECT BRICKLAYER TOOLKIT
+   Navigate to Learner 70 or appropriate learner
+
+6. TAP APPENDIX E TAB
+   ✅ Should see: "WORKPLACE EXPERIENCE EVALUATION"
+   ✅ Should see: Trade: Bricklayer banner
+   ✅ Should see: 15 activities listed
+   ✅ Should see: Rating buttons (1-5) for each
+   ✅ Should see: Comment field for each
+
+EXPECTED ACTIVITIES (15 TOTAL):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ 1. Safety
+ 2. Knowledge of basic hand tools and equipment
+ 3. Types of Materials
+ 4. Understanding of Drawings and symbols of materials
+ 5. Estimation of building materials
+ 6. Setting out a building/dwelling from a Plan
+ 7. Excavate, Cast foundation and concrete floor
+ 8. Determine and Transfer levels
+ 9. Mixing of Mortar
+10. Types of Brick Bonds
+11. Build-in of: Window frames and door frames
+12. Jointing and pointing of Brickwork
+13. Reinforced Concrete Construction
+14. Arch Construction
+15. Steps
+
+SUCCESS CRITERIA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Appendix E displays 15 activities (NOT "No data available")
+✅ Each activity shows rating buttons
+✅ Each activity shows comment field
+✅ All activities are UNRATED (correct - learner hasn't rated)
+✅ No errors or crashes
+✅ Can scroll through all 15 activities
+
+ALSO CHECK:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+→ Appendix F tab should also display the same 15 activities
+  as workplace observations
+
+IF SOMETHING IS WRONG:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Power off phone completely
+2. Power on
+3. Open RLMSS
+4. Try again
+
+═════════════════════════════════════════════════════════════════

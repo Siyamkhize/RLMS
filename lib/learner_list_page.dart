@@ -11,6 +11,7 @@ import 'finance_register_history.dart';
 import 'package:intl/intl.dart';
 
 import 'config.dart';
+import 'utils/scanner_pdf_resolver.dart';
 
 class Learner {
   final String? classID;
@@ -1410,25 +1411,23 @@ class _LearnerListPageState extends State<LearnerListPage> {
                                 }
 
                                 final scanner = FlutterDocScanner();
-                                // Allow unlimited pages (999) for CV and learner agreements
+                                // Keep page limit very modest — high values can cause ML Kit/Android process death.
                                 final scanResult =
-                                    await scanner.getScanDocuments(
-                                  page: 999, // Unlimited pages
-                                );
+                                    await scanner.getScanDocuments(page: 80);
                                 if (scanResult is! Map ||
                                     !scanResult.containsKey('pdfUri') ||
                                     scanResult['pdfUri'] == null) {
                                   throw 'Invalid scan result';
                                 }
 
-                                final pdfPath = (scanResult['pdfUri'] as String)
-                                    .replaceFirst('file:///', '');
-                                final file = File(pdfPath);
-
-                                if (!await file.exists() ||
-                                    !pdfPath.endsWith('.pdf')) {
-                                  throw 'Invalid or missing PDF file';
+                                final file =
+                                    await resolveFlutterDocScannerPdfFile(
+                                        scanResult['pdfUri'] as String?);
+                                if (file == null ||
+                                    !await isReadablePdfFile(file)) {
+                                  throw 'Invalid or missing PDF file (try again; if this persists, update the app)';
                                 }
+                                final pdfPath = file.path;
 
                                 final fileSize = await file.length();
                                 if (fileSize > _maxFileSize) {
@@ -1487,56 +1486,6 @@ class _LearnerListPageState extends State<LearnerListPage> {
             icon: const Icon(Icons.upload_file),
             onPressed: syncUnsyncedDocuments,
             tooltip: 'Sync Documents',
-          ),
-          IconButton(
-            icon: const Icon(Icons.bug_report),
-            onPressed: () {
-              if (learners.isNotEmpty) {
-                testServerConnectivity(learners.first.learnerID ?? 'N/A');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Check console for server test results')),
-                );
-              }
-            },
-            tooltip: 'Test Server Connectivity',
-          ),
-          IconButton(
-            icon: const Icon(Icons.list),
-            onPressed: () {
-              testAllLearnerDocuments();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content:
-                        Text('Check console for all learners test results')),
-              );
-            },
-            tooltip: 'Test All Learners',
-          ),
-          IconButton(
-            icon: const Icon(Icons.storage),
-            onPressed: () async {
-              final dbHelper = DatabaseHelper();
-              await dbHelper.debugDatabaseStructure();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text(
-                        'Check console for database structure debug info')),
-              );
-            },
-            tooltip: 'Debug Database',
-          ),
-          IconButton(
-            icon: const Icon(Icons.account_balance),
-            onPressed: () async {
-              await testBankDataInsertion();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text(
-                        'Check console for bank data insertion test results')),
-              );
-            },
-            tooltip: 'Test Bank Insertion',
           ),
         ],
       ),

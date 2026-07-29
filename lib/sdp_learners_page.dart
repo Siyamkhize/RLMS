@@ -608,7 +608,7 @@ class _SdpLearnersPageState extends State<SdpLearnersPage> {
       // Get additional context for the upload
       final learnerData = _learners.firstWhere(
         (l) => l['LearnerID'].toString() == learnerId.toString(),
-        orElse: () => {},
+        orElse: () => <String, dynamic>{},
       );
 
       final classId = learnerData['classID']?.toString();

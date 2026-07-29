@@ -62,12 +62,85 @@ class _MaterialFormState extends State<MaterialForm> {
     super.initState();
     // Listen for connectivity changes
     _checkConnectivity();
-    // Fetch unit standards for this class
-    _fetchUnitStandards();
-    // Debug: Print database info
-    _debugDatabaseInfo();
+    // Fetch unit standards and other info for this class
+    _loadAllInitialData();
     // Load existing regular material submissions
     _loadExistingRegularMaterialQuantities();
+  }
+
+  Future<void> _loadAllInitialData() async {
+    try {
+      await Future.wait([
+        _fetchUnitStandards(),
+        _fetchPractitionerAndClassInfo(),
+      ]);
+    } catch (e) {
+      print('Error loading initial data: $e');
+    }
+  }
+
+  Future<void> _fetchPractitionerAndClassInfo() async {
+    try {
+      final dbHelper = DatabaseHelper();
+      final db = await dbHelper.database;
+
+      // 1. Try to get facilitator info for this class
+      final facilitatorQuery = '''
+        SELECT 
+          f.firstName,
+          f.lastName,
+          c.className,
+          c.qualification_id as class_qual_id,
+          s.qualification_id as site_qual_id
+        FROM class c
+        LEFT JOIN facilitator f ON c.classID = f.classID
+        LEFT JOIN sites s ON c.siteID = s.siteID
+        WHERE c.classID = ?
+      ''';
+
+      final results = await db.rawQuery(facilitatorQuery, [widget.classID]);
+
+      if (results.isNotEmpty) {
+        final row = results.first;
+        setState(() {
+          practitionerFullName =
+              '${row['firstName'] ?? ''} ${row['lastName'] ?? ''}'.trim();
+          if (practitionerFullName.isEmpty) {
+            practitionerFullName = 'Unknown Facilitator';
+          }
+          className = row['className']?.toString() ?? 'Unknown Class';
+
+          // Try to get qualification name
+          String? qualId = row['class_qual_id']?.toString() ??
+              row['site_qual_id']?.toString();
+          if (qualId != null && qualId.isNotEmpty) {
+            _fetchQualificationName(qualId);
+          }
+        });
+      }
+    } catch (e) {
+      print('Error fetching practitioner info: $e');
+    }
+  }
+
+  Future<void> _fetchQualificationName(String qualId) async {
+    try {
+      final dbHelper = DatabaseHelper();
+      final db = await dbHelper.database;
+
+      final qualQuery =
+          'SELECT name FROM qualification WHERE qualification_id = ?';
+      final qualResults = await db.rawQuery(qualQuery, [qualId]);
+
+      if (qualResults.isNotEmpty) {
+        setState(() {
+          qualification_name = qualResults.first['name']?.toString() ?? '';
+          qualification = qualification_name;
+        });
+      }
+    } catch (e) {
+      print('Error fetching qualification name: $e');
+    }
   }
 
   // Load existing regular material quantities from SERVER (not local database)
@@ -89,8 +162,11 @@ class _MaterialFormState extends State<MaterialForm> {
         final Map<String, dynamic> data = json.decode(response.body);
 
         if (data['success'] == true) {
-          final Map<String, dynamic> regularMaterials =
-              data['regularMaterials'] ?? {};
+          // Robustly handle regularMaterials (could be Map or empty List from PHP)
+          Map<String, dynamic> regularMaterials = {};
+          if (data['regularMaterials'] is Map) {
+            regularMaterials = data['regularMaterials'] as Map<String, dynamic>;
+          }
 
           print(
               '✅ Server returned ${regularMaterials.length} regular material types');
@@ -269,19 +345,22 @@ class _MaterialFormState extends State<MaterialForm> {
           c.className,
           s.siteID,
           s.project_id,
-          pr.Project_pathway
+          pr.Project_pathway,
+          s.qualification_id as site_qual_id
         FROM class c
         LEFT JOIN sites s ON c.siteID = s.siteID
         LEFT JOIN project pr ON s.project_id = pr.project_id
         WHERE c.classID = ?
       ''';
 
-      final projectResult = await db.rawQuery(projectQuery, [widget.classID]);
-      print('Project query result: $projectResult');
+      final List<Map<String, dynamic>> projectResults =
+          await db.rawQuery(projectQuery, [widget.classID]);
+      print('Project query result: $projectResults');
 
-      if (projectResult.isNotEmpty) {
-        final projectPathway =
-            projectResult.first['Project_pathway'] as String?;
+      if (projectResults.isNotEmpty) {
+        final firstRow = projectResults.first;
+        final String? projectPathway = firstRow['Project_pathway'];
+        final String? siteQualId = firstRow['site_qual_id']?.toString();
         print('Raw Project_pathway: $projectPathway');
 
         if (projectPathway != null && projectPathway.isNotEmpty) {
@@ -307,7 +386,8 @@ class _MaterialFormState extends State<MaterialForm> {
                   final unitStandardsList = qualification['unitStandards'];
                   print('Unit standards list: $unitStandardsList');
 
-                  if (unitStandardsList is List) {
+                  if (unitStandardsList is List &&
+                      unitStandardsList.isNotEmpty) {
                     setState(() {
                       unitStandards = unitStandardsList
                           .map((us) => {
@@ -324,45 +404,13 @@ class _MaterialFormState extends State<MaterialForm> {
                           .toList();
 
                       // Initialize selection and quantity maps
-                      for (var us in unitStandards) {
-                        String usId = us['unitstandard_id'].toString();
-                        // Initialize unit standard
-                        selectedUnitStandards[usId] = false;
-                        unitStandardQuantities[usId] = 0;
-                        existingUnitStandardQuantities[usId] = 0;
-                        existingUnitStandardRepresentatives[usId] = '';
-
-                        // Initialize learner guide for this unit standard
-                        String lgId = '${usId}_LG';
-                        selectedUnitStandards[lgId] = false;
-                        unitStandardQuantities[lgId] = 0;
-                        existingUnitStandardQuantities[lgId] = 0;
-                        existingUnitStandardRepresentatives[lgId] = '';
-
-                        // Initialize formative for this unit standard
-                        String formId = '${usId}_FORM';
-                        selectedUnitStandards[formId] = false;
-                        unitStandardQuantities[formId] = 0;
-                        existingUnitStandardQuantities[formId] = 0;
-                        existingUnitStandardRepresentatives[formId] = '';
-
-                        // Initialize summative for this unit standard
-                        String sumId = '${usId}_SUM';
-                        selectedUnitStandards[sumId] = false;
-                        unitStandardQuantities[sumId] = 0;
-                        existingUnitStandardQuantities[sumId] = 0;
-                        existingUnitStandardRepresentatives[sumId] = '';
-                      }
+                      _initializeSelectionMaps();
                     });
 
                     // Load existing quantities from previous submissions
                     await _loadExistingUnitStandardQuantities();
 
-                    print('Unit standards loaded successfully:');
-                    for (var us in unitStandards) {
-                      print(
-                          '  - ID: ${us['unitstandard_id']}, Name: ${us['unit_standard_name']}');
-                    }
+                    print('Unit standards loaded successfully from JSON');
                     print('=== UNIT STANDARDS FETCH COMPLETE ===\\n');
                     return;
                   }
@@ -371,6 +419,43 @@ class _MaterialFormState extends State<MaterialForm> {
             }
           } catch (e) {
             print('Error parsing project pathway JSON: $e');
+          }
+        }
+
+        // Fallback: If JSON is missing or empty, try the unitstandard table
+        print(
+            'Fallback: Trying unitstandard table for qualification_id: $siteQualId');
+        if (siteQualId != null && siteQualId.isNotEmpty) {
+          final usQuery = '''
+            SELECT unitstandard_id, unit_standard_name, level, credits
+            FROM unitstandard 
+            WHERE qualification_id = ?
+          ''';
+          final List<Map<String, dynamic>> usResults =
+              await db.rawQuery(usQuery, [siteQualId]);
+
+          if (usResults.isNotEmpty) {
+            print('Found ${usResults.length} unit standards in table');
+            setState(() {
+              unitStandards = usResults
+                  .map((row) => {
+                        'unitstandard_id':
+                            row['unitstandard_id']?.toString() ?? '',
+                        'unit_standard_name':
+                            row['unit_standard_name']?.toString() ??
+                                'Unknown Unit Standard',
+                        'level': row['level']?.toString() ?? '',
+                        'credits': row['credits']?.toString() ?? '',
+                      })
+                  .toList();
+
+              _initializeSelectionMaps();
+            });
+
+            // Load existing quantities from previous submissions
+            await _loadExistingUnitStandardQuantities();
+            print('=== UNIT STANDARDS FETCH COMPLETE (FALLBACK) ===\\n');
+            return;
           }
         }
       }
@@ -386,6 +471,27 @@ class _MaterialFormState extends State<MaterialForm> {
       setState(() {
         unitStandards = [];
       });
+    }
+  }
+
+  // Helper to initialize maps
+  void _initializeSelectionMaps() {
+    for (var us in unitStandards) {
+      String usId = us['unitstandard_id'].toString();
+      // Initialize unit standard
+      selectedUnitStandards[usId] = false;
+      unitStandardQuantities[usId] = 0;
+      existingUnitStandardQuantities[usId] = 0;
+      existingUnitStandardRepresentatives[usId] = '';
+
+      // Initialize sub-options
+      for (String type in ['LG', 'FORM', 'SUM']) {
+        String subId = '${usId}_$type';
+        selectedUnitStandards[subId] = false;
+        unitStandardQuantities[subId] = 0;
+        existingUnitStandardQuantities[subId] = 0;
+        existingUnitStandardRepresentatives[subId] = '';
+      }
     }
   }
 
@@ -1348,22 +1454,20 @@ class _MaterialFormState extends State<MaterialForm> {
               const SizedBox(width: 10),
               SizedBox(
                 width: 80,
-                child: DropdownButton<int>(
-                  isExpanded: true,
-                  value: currentQuantity,
-                  onChanged: (int? newValue) {
-                    if (newValue != null) {
-                      setState(() {
-                        unitStandardQuantities[usId] = newValue;
-                      });
-                    }
+                child: TextFormField(
+                  initialValue: currentQuantity.toString(),
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      unitStandardQuantities[usId] = int.tryParse(value) ?? 0;
+                    });
                   },
-                  items: List.generate(51, (index) => index).map((int value) {
-                    return DropdownMenuItem<int>(
-                      value: value,
-                      child: Text(value.toString()),
-                    );
-                  }).toList(),
                 ),
               ),
               if (existing > 0) ...[
@@ -1498,22 +1602,20 @@ class _MaterialFormState extends State<MaterialForm> {
                       style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: DropdownButton<int>(
-                      isExpanded: true,
-                      value: quantity,
-                      onChanged: (int? newValue) {
-                        if (newValue == null) return;
+                    child: TextFormField(
+                      initialValue: quantity.toString(),
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (value) {
                         setState(() {
-                          quantity = newValue;
+                          quantity = int.tryParse(value) ?? 0;
                         });
                       },
-                      items:
-                          List.generate(51, (index) => index).map((int value) {
-                        return DropdownMenuItem<int>(
-                          value: value,
-                          child: Text(value.toString()),
-                        );
-                      }).toList(),
                     ),
                   ),
                 ],
@@ -1584,6 +1686,28 @@ class _MaterialFormState extends State<MaterialForm> {
         ),
       );
       return;
+    }
+
+    // Ensure we have a facilitator name and qualification name
+    if (practitionerFullName.isEmpty ||
+        practitionerFullName == 'Loading...' ||
+        practitionerFullName == 'Unknown Facilitator') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              "Facilitator name is missing. Please wait for data to load or check your connection."),
+        ),
+      );
+      return;
+    }
+
+    if (qualification_name.isEmpty) {
+      // Try to use 'qualification' as fallback
+      if (qualification.isNotEmpty) {
+        qualification_name = qualification;
+      } else {
+        qualification_name = 'Unknown Qualification';
+      }
     }
 
     // Additional validation for Learning Material
@@ -2045,44 +2169,137 @@ class _MaterialFormState extends State<MaterialForm> {
 
   Widget buildFacilitatorSignatureTable() {
     return Card(
-      color: Colors.blue.shade50,
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: Container(
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(15),
+          gradient: LinearGradient(
+            colors: [Colors.white, Colors.blue.shade50],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Facilitator and Representative Details',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const SizedBox(height: 16),
-            Table(
-              border: TableBorder.all(
-                  color: Colors.grey,
-                  width: 1,
-                  borderRadius: BorderRadius.circular(12)),
-              columnWidths: {
-                0: const FixedColumnWidth(150),
-                1: const FixedColumnWidth(150),
-              },
+            Row(
               children: [
-                TableRow(
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade100,
-                    borderRadius: BorderRadius.circular(12),
+                Icon(Icons.assignment_ind, color: Colors.blue.shade700),
+                const SizedBox(width: 10),
+                Text(
+                  'Facilitator & Representative Details',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Colors.blue.shade900,
                   ),
-                  children: [
-                    _buildHeaderCell('Name'),
-                    _buildHeaderCell('Signature'),
-                  ],
                 ),
-                buildSignatureTableRow(
-                    practitionerFullName, facilitatorSignature, (signature) {
-                  setState(() {
-                    facilitatorSignature = signature;
-                  });
-                }),
-                buildRepresentativeTableRow(),
+              ],
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12.0),
+              child: Divider(thickness: 1.5),
+            ),
+
+            // Facilitator Section
+            Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Facilitator Name',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        practitionerFullName.isEmpty
+                            ? 'Loading...'
+                            : practitionerFullName,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 15),
+                Expanded(
+                  flex: 1,
+                  child: _buildSignatureBox(
+                    label: 'Facilitator Sign',
+                    signature: facilitatorSignature,
+                    onTap: () => showSignatureDialog(context, (signature) {
+                      setState(() => facilitatorSignature = signature);
+                    }),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 25),
+
+            // Representative Section
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Representative Details',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        onChanged: (value) {
+                          setState(() {
+                            representativeName = value;
+                          });
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'Enter Representative Name',
+                          hintText: 'Full Name',
+                          isDense: true,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          prefixIcon:
+                              const Icon(Icons.person_outline, size: 20),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 15),
+                Expanded(
+                  flex: 1,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 22.0),
+                    child: _buildSignatureBox(
+                      label: 'Rep. Sign',
+                      signature: representativeSignature,
+                      onTap: () => showSignatureDialog(context, (signature) {
+                        setState(() => representativeSignature = signature);
+                      }),
+                    ),
+                  ),
+                ),
               ],
             ),
           ],
@@ -2091,78 +2308,48 @@ class _MaterialFormState extends State<MaterialForm> {
     );
   }
 
-  TableRow buildSignatureTableRow(
-      String name, Uint8List? signature, Function(Uint8List?) onCaptured) {
-    return TableRow(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: TableCell(
-            child: Text(name,
-                style:
-                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: TableCell(
-            child: signature == null
-                ? ElevatedButton(
-                    onPressed: () => showSignatureDialog(context, onCaptured),
-                    child: Text('$name Signature'),
-                  )
-                : Image.memory(
-                    signature,
-                    height: 50,
-                    width: 100,
-                    fit: BoxFit.contain,
-                  ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  TableRow buildRepresentativeTableRow() {
-    return TableRow(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: TableCell(
-            child: TextField(
-              onChanged: (value) {
-                setState(() {
-                  representativeName = value;
-                });
-              },
-              decoration: const InputDecoration(
-                labelText: 'Representative Name',
-                border: OutlineInputBorder(),
-              ),
+  Widget _buildSignatureBox({
+    required String label,
+    Uint8List? signature,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        height: 70,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: Colors.blue.shade200),
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blue.shade100.withOpacity(0.3),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
-          ),
+          ],
         ),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: TableCell(
-            child: representativeSignature == null
-                ? ElevatedButton(
-                    onPressed: () => showSignatureDialog(context, (signature) {
-                      setState(() {
-                        representativeSignature = signature;
-                      });
-                    }),
-                    child: const Text('Representative Signature'),
-                  )
-                : Image.memory(
-                    representativeSignature!,
-                    height: 50,
-                    width: 100,
-                    fit: BoxFit.contain,
+        child: signature == null
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.edit, color: Colors.blue.shade400, size: 18),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    style: TextStyle(fontSize: 10, color: Colors.blue.shade700),
+                    textAlign: TextAlign.center,
                   ),
-          ),
-        ),
-      ],
+                ],
+              )
+            : ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.memory(
+                  signature,
+                  fit: BoxFit.contain,
+                ),
+              ),
+      ),
     );
   }
 

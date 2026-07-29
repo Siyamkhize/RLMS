@@ -18,6 +18,7 @@ class LocationSecurityConfig {
   static const int strictWindowSeconds = 8;
   static const int hardTimeoutSeconds = 20;
   static const double maxReasonableSpeedMs = 30.0; // ~108 km/h
+  static const int maxStreamRetries = 4;
 }
 
 // ============================================================
@@ -55,10 +56,46 @@ class SecureLocationService {
   static SecurePositionResult? _lastResult;
   static final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
 
+  // Broadcast stream for real-time accuracy updates
+  static final StreamController<double?> _accuracyController =
+      StreamController<double?>.broadcast();
+  static Stream<double?> get accuracyStream => _accuracyController.stream;
+  static double? _currentAccuracy;
+  static double? get currentAccuracy => _currentAccuracy;
+
+  static LocationSettings _platformLocationSettings() {
+    if (Platform.isAndroid) {
+      return AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 0,
+        forceLocationManager: false,
+        intervalDuration: const Duration(seconds: 1),
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'RLMSS Location',
+          notificationText:
+              'Verifying your location for attendance — please wait',
+          notificationChannelName: 'Location verification',
+          enableWakeLock: true,
+          setOngoing: true,
+        ),
+      );
+    }
+    if (Platform.isIOS) {
+      return AppleSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 0,
+        pauseLocationUpdatesAutomatically: false,
+      );
+    }
+    return const LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 0,
+    );
+  }
+
   static Future<SecurePositionResult> getSecurePosition() async {
     await _ensureLocationPermission();
 
-    // Reuse very recent trusted location if available (helps offline cases)
     if (_lastResult != null) {
       final ageSeconds =
           DateTime.now().toUtc().difference(_lastResult!.capturedAt).inSeconds;
@@ -113,6 +150,7 @@ class SecureLocationService {
     return result;
   }
 
+  /// Retries the GPS stream with exponential backoff when the stream dies.
   static Future<Position> _getPositionViaStream() async {
     try {
       final cached = await Geolocator.getLastKnownPosition();
@@ -129,6 +167,28 @@ class SecureLocationService {
       }
     } catch (_) {}
 
+    Object? lastError;
+    for (int attempt = 0;
+        attempt < LocationSecurityConfig.maxStreamRetries;
+        attempt++) {
+      try {
+        return await _listenForAccuratePosition();
+      } catch (e) {
+        lastError = e;
+        if (attempt >= LocationSecurityConfig.maxStreamRetries - 1) break;
+        final delaySeconds = 1 << attempt; // 1, 2, 4, 8
+        print(
+          '[SECURE_LOC] Stream failed (attempt ${attempt + 1}): $e. '
+          'Retrying in ${delaySeconds}s...',
+        );
+        await Future.delayed(Duration(seconds: delaySeconds));
+      }
+    }
+
+    throw lastError ?? Exception('Could not obtain location after retries');
+  }
+
+  static Future<Position> _listenForAccuratePosition() async {
     final completer = Completer<Position>();
     StreamSubscription<Position>? sub;
     Timer? relaxTimer;
@@ -143,47 +203,57 @@ class SecureLocationService {
         '[SECURE_LOC] Accepting position ($reason): '
         '${pos.accuracy.toStringAsFixed(0)}m accuracy',
       );
+      _currentAccuracy = pos.accuracy;
+      _accuracyController.add(pos.accuracy);
       sub?.cancel();
       relaxTimer?.cancel();
       hardTimer?.cancel();
       completer.complete(pos);
     }
 
-    final locationSettings = Platform.isAndroid
-        ? AndroidSettings(
-            accuracy: LocationAccuracy.best,
-            distanceFilter: 0,
-            forceLocationManager: false,
-            intervalDuration: const Duration(seconds: 1),
-          )
-        : AppleSettings(
-            accuracy: LocationAccuracy.best,
-            distanceFilter: 0,
-          );
+    void onPosition(Position pos) {
+      _currentAccuracy = pos.accuracy;
+      _accuracyController.add(pos.accuracy);
+
+      print(
+        '[SECURE_LOC] Stream: ${pos.accuracy.toStringAsFixed(0)}m '
+        '(need <=$threshold m, mock=${pos.isMocked})',
+      );
+
+      if (bestSoFar == null || pos.accuracy < bestSoFar!.accuracy) {
+        bestSoFar = pos;
+      }
+
+      if (pos.isMocked) {
+        print('[SECURE_LOC] ⚠️ Stream position flagged as mocked, skipping');
+        return;
+      }
+
+      if (pos.accuracy <= threshold) {
+        accept(pos, 'within threshold ${threshold.toStringAsFixed(0)}m');
+      }
+    }
+
+    final locationSettings = _platformLocationSettings();
 
     sub = Geolocator.getPositionStream(
       locationSettings: locationSettings,
-    ).listen(
+    ).where((pos) => !pos.isMocked).listen(
       (pos) {
-        print(
-          '[SECURE_LOC] Stream: ${pos.accuracy.toStringAsFixed(0)}m '
-          '(need <=$threshold m, mock=${pos.isMocked})',
-        );
-
         if (bestSoFar == null || pos.accuracy < bestSoFar!.accuracy) {
           bestSoFar = pos;
         }
-
-        if (pos.isMocked) {
-          print('[SECURE_LOC] ⚠️ Stream position flagged as mocked, skipping');
+        // Drop junk fixes during strict acquisition (>25m ignored until relax).
+        if (threshold <= LocationSecurityConfig.strictAccuracyMeters &&
+            pos.accuracy > LocationSecurityConfig.strictAccuracyMeters) {
           return;
         }
-
-        if (pos.accuracy <= threshold) {
-          accept(pos, 'within threshold ${threshold.toStringAsFixed(0)}m');
-        }
+        onPosition(pos);
       },
-      onError: (e) {
+      onError: (Object e, StackTrace st) {
+        print('[SECURE_LOC] Stream onError: $e');
+        _currentAccuracy = null;
+        _accuracyController.add(null);
         if (!completer.isCompleted) {
           sub?.cancel();
           relaxTimer?.cancel();
@@ -193,6 +263,15 @@ class SecureLocationService {
           );
         }
       },
+      onDone: () {
+        if (!completer.isCompleted) {
+          print('[SECURE_LOC] Stream ended unexpectedly');
+          completer.completeError(
+            Exception('Location stream closed before a fix was obtained'),
+          );
+        }
+      },
+      cancelOnError: false,
     );
 
     relaxTimer = Timer(
@@ -230,10 +309,9 @@ class SecureLocationService {
           return;
         }
 
-        // Offline / poor-signal fallback: try last known position before failing
         Geolocator.getLastKnownPosition().then((fallback) {
           if (completer.isCompleted) return;
-          if (fallback != null) {
+          if (fallback != null && !fallback.isMocked) {
             accept(
               fallback,
               'hard timeout — using last known position',
@@ -247,7 +325,7 @@ class SecureLocationService {
                 '${LocationSecurityConfig.hardTimeoutSeconds}s. '
                 'Best accuracy: '
                 '${bestSoFar?.accuracy.toStringAsFixed(0) ?? "none"}m. '
-                'Please move outdoors and try again.',
+                'Please move outdoors, disable battery saver for RLMSS, and try again.',
               ),
             );
           }
@@ -259,8 +337,6 @@ class SecureLocationService {
             Exception(
               'Could not get accurate location within '
               '${LocationSecurityConfig.hardTimeoutSeconds}s. '
-              'Best accuracy: '
-              '${bestSoFar?.accuracy.toStringAsFixed(0) ?? "none"}m. '
               'Please move outdoors and try again.',
             ),
           );
@@ -296,7 +372,6 @@ class SecureLocationService {
   static void _validatePositionAge(Position position) {
     final age = DateTime.now().difference(position.timestamp);
     if (age.inSeconds > LocationSecurityConfig.maxPositionAgeSeconds) {
-      // For offline/poor-signal scenarios we allow older positions and just log.
       print(
         '[SECURE_LOC] Position age ${age.inSeconds}s exceeds strict '
         'limit of ${LocationSecurityConfig.maxPositionAgeSeconds}s, '
@@ -443,6 +518,16 @@ class SecureLocationService {
         'Location permission permanently denied. '
         'Please enable in device settings.',
       );
+    }
+
+    if (Platform.isAndroid && permission == LocationPermission.whileInUse) {
+      final upgraded = await Geolocator.requestPermission();
+      if (upgraded != LocationPermission.always) {
+        print(
+          '[SECURE_LOC] "Allow all the time" not granted; '
+          'disable battery optimization for RLMSS if GPS drops',
+        );
+      }
     }
   }
 }

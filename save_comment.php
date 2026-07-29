@@ -53,6 +53,12 @@ try {
     // Normalize assessment type
     $assessmentType = strtolower($assessmentType);
     
+    // Determine the exact type used in the database
+    $dbAssessmentType = ucfirst($assessmentType);
+    if ($assessmentType === 'formativeremedial') $dbAssessmentType = 'FormativeRemedial';
+    if ($assessmentType === 'summativeremedial') $dbAssessmentType = 'SummativeRemedial';
+    if ($assessmentType === 'logbook') $dbAssessmentType = 'Logbook';
+    
     // Check database connection
     if ($conn->connect_error) {
         throw new Exception("Connection failed: " . $conn->connect_error);
@@ -66,8 +72,7 @@ try {
         throw new Exception("Check query prepare failed: " . $conn->error);
     }
 
-    // Capitalize first letter for database query
-    $dbAssessmentType = ucfirst($assessmentType);
+    // Use normalized type for database query
     $checkQuery->bind_param("ss", $learnerId, $dbAssessmentType);
     $checkQuery->execute();
     $result = $checkQuery->get_result();

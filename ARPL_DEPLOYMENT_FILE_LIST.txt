@@ -1,0 +1,310 @@
+================================================================================
+ARPL ONLINE DEPLOYMENT FILE LIST
+================================================================================
+Target: https://rlms.rlms.co.za
+Date: July 14, 2026
+================================================================================
+
+SECTION 1: PHP ENDPOINTS TO DEPLOY (58 Files)
+Deploy to: /mobile/
+Source: c:\projects\rlmss\mobile\
+
+================================================================================
+GET ENDPOINTS (16 files) - Data Retrieval Operations
+================================================================================
+1.  get_arpl_access_recommendation.php
+2.  get_arpl_appeals.php
+3.  get_arpl_appendix_d.php
+4.  get_arpl_appendix_e.php
+5.  get_arpl_appendix_e_ratings.php
+6.  get_arpl_appendix_f.php
+7.  get_arpl_application.php
+8.  get_arpl_assessment_agreement.php
+9.  get_arpl_competency_data.php
+10. get_arpl_curriculum.php
+11. get_arpl_data.php
+12. get_arpl_gap_analysis.php
+13. get_arpl_hierarchy.php
+14. get_arpl_statement_of_results.php
+15. get_arpl_toolkit_data.php
+16. get_bricklayer_toolkit_data.php
+
+================================================================================
+SAVE ENDPOINTS (17 files) - Data Submission Operations
+================================================================================
+17. save_arpl_access_recommendation.php
+18. save_arpl_activity_rating.php
+19. save_arpl_appendix_a.php
+20. save_arpl_appendix_b.php
+21. save_arpl_appendix_c.php
+22. save_arpl_appendix_d.php
+23. save_arpl_appendix_e.php
+24. save_arpl_appendix_e_ratings.php
+25. save_arpl_appendix_f.php
+26. save_arpl_appendix_f_assessment.php
+27. save_arpl_appendix_g.php
+28. save_arpl_appendix_i.php
+29. save_arpl_appendix_j.php
+30. save_arpl_application.php
+31. save_arpl_criteria.php
+32. save_arpl_gap_analysis.php
+33. save_arpl_toolkit_edits.php
+
+================================================================================
+UTILITY/TESTING ENDPOINTS (8 files) - Diagnostics & Verification
+================================================================================
+34. check_arpl_data.php
+35. check_arpl_db.php
+36. check_arpl_papers.php
+37. check_arpl_papers_structure.php
+38. check_arpl_tables.php
+39. check_arpl_trades.php
+40. check_learner_16389_arpl.php
+41. verify_arpl_theory_papers.php
+
+================================================================================
+WEB/API ENDPOINTS (17 files) - Additional API & Web Services
+================================================================================
+42. web/api/get_arpl_classes.php
+43. web/api/get_arpl_trades.php
+44. web/api/get_arpl_complete_data.php
+45. web/api/generate_arpl_pdf_v3.php
+46. web/arpl_pdf.php
+47. web/generate_pdf.php
+48. web/index.php
+49. web/learners.php
+50-58. [Additional endpoints as available in your mobile/ directory]
+
+================================================================================
+SECTION 2: DATABASE SQL FILES (13 Files)
+Execute on online database in this exact order
+================================================================================
+
+Order 1: create_arpl_theory_papers.sql
+Order 2: create_arpl_separate_tables.sql
+Order 3: create_arpl_poe_unified_table.sql
+Order 4: create_arpl_appendix_d_table.sql
+Order 5: create_arpl_appendix_f_tables.sql
+Order 6: create_bricklayer_appendix_tables.sql
+Order 7: create_bricklayer_gap_closure_tables.sql
+Order 8: create_plumber_access_recommendation.sql
+Order 9: create_arpl_complete_tables.sql
+Order 10: insert_questions_electrician_theory.sql
+Order 11: insert_questions_electrician_practical.sql
+Order 12: insert_questions_bricklayer_theory.sql
+Order 13: insert_questions_bricklayer_practical.sql
+
+================================================================================
+SECTION 3: DATABASE TABLES CREATED (26 Total)
+================================================================================
+
+CORE TABLES (4):
+- arpl_poe
+- arpl_papers
+- arpl_questions
+- arpl_trades
+
+COMPETENCY TABLES (7):
+- arpl_competency_scale
+- arplappxb_electrician_activities
+- arplappxb_bricklaying_activities
+- arplappxb_plumbing_activities
+- arplappxe_electrician_activity_ratings
+- arplappxe_bricklaying_activity_ratings
+- arplappxb_activity_ratings
+
+ASSESSMENT FORM TABLES (7):
+- arpl_appendix_c
+- arpl_appendix_d
+- arpl_appendix_g
+- arpl_appendix_i
+- arplelectrician_access_recommendation
+- arplbricklayer_access_recommendation
+- arplplumber_access_recommendation
+
+APPLICATION & EXPERIENCE TABLES (4):
+- arpl_applications_v3
+- arpl_work_experience_v3
+- arpl_references_v3
+- arpl_qualifications_v3
+
+GAP ANALYSIS TABLES (4):
+- gap_analysis_submissions
+- gap_analysis_submission_items
+- gap_analysis_report
+- arpl_bricklayer_gap_tasks
+
+================================================================================
+SECTION 4: OFO CODES (CRITICAL - MUST BE EXACT)
+================================================================================
+
+Electrician:  671101  (classID 782)
+Plumber:      642601  (NOT 671102 - that was a bug)
+Bricklayer:   641201  (NOT 671103 - that was a bug)
+
+These codes must appear in:
+- arpl_trades table
+- arpl_poe records
+- arpl_papers records
+- All API queries
+
+================================================================================
+SECTION 5: DEPLOYMENT INSTRUCTIONS
+================================================================================
+
+STEP 1: DATABASE SETUP
+-------
+SSH to your database server and execute:
+  mysql -u [username] -p [database] < create_arpl_theory_papers.sql
+  mysql -u [username] -p [database] < create_arpl_separate_tables.sql
+  [continue for all 13 files in order]
+
+STEP 2: VERIFY TABLES
+-----
+Run this query to verify all 26 tables were created:
+  SHOW TABLES LIKE 'arpl%';
+  SHOW TABLES LIKE 'gap_%';
+  
+Should return 26 tables total.
+
+STEP 3: FILE UPLOAD
+---
+Upload 58 PHP files to your online server:
+  Path: /mobile/
+  Server: rlms.rlms.co.za
+  
+Using FTP/SCP:
+  scp -r c:\projects\rlmss\mobile\*.php user@rlms.rlms.co.za:/var/www/html/mobile/
+  
+Or upload via web control panel file manager.
+
+STEP 4: FILE PERMISSIONS
+------
+Set proper permissions on online server:
+  chmod 755 /var/www/html/mobile/
+  chmod 644 /var/www/html/mobile/*.php
+
+STEP 5: VERIFY ENDPOINTS
+-------
+Test that endpoints are accessible:
+  curl https://rlms.rlms.co.za/mobile/check_arpl_tables.php
+  
+Should return JSON with table count and status.
+
+STEP 6: TEST WORKFLOWS
+-----
+1. Login as Electrician assessor
+2. Access ARPL assessment
+3. Verify Electrician-specific questions appear (NOT Bricklayer)
+4. Save Appendix B, D, E, F without 404 errors
+5. Generate PDF report with questions loading
+
+================================================================================
+SECTION 6: CONFIGURATION STATUS
+================================================================================
+
+Flutter App (lib/config.dart):
+✓ UPDATED - Now points to https://rlms.rlms.co.za/mobile/
+
+Previous Config:
+  Server: http://192.168.0.57:8080/assessorReport2/mobile
+  Status: LOCAL (development)
+
+Current Config:
+  Server: https://rlms.rlms.co.za/mobile
+  Status: ONLINE (production)
+
+No additional config changes needed on client side.
+
+================================================================================
+SECTION 7: ROLLBACK PLAN
+================================================================================
+
+If issues occur:
+
+1. DATABASE:
+   - Keep backup of original database before running SQL files
+   - Can restore from backup if needed
+   - Tables are new (no data loss risk to existing data)
+
+2. PHP FILES:
+   - Simply delete /mobile/ directory and restore from backup
+   - No database changes needed
+   - Quick and safe rollback
+
+3. CONFIGURATION:
+   - Revert lib/config.dart to old server address if needed
+   - Rebuild APK with old config
+   - Deploy old APK version
+
+================================================================================
+SECTION 8: TIMELINE
+================================================================================
+
+Total Deployment Time: 15-25 minutes
+
+  Database setup:  5-10 minutes (13 SQL files)
+  File upload:     2-5 minutes (58 PHP files)
+  Verification:    5-10 minutes (testing endpoints)
+  ─────────────────────────────
+  TOTAL:          15-25 minutes
+
+================================================================================
+CRITICAL CHECKLIST
+================================================================================
+
+Before deploying:
+☐ Have online server credentials ready
+☐ Have database access ready
+☐ Download all 13 SQL files
+☐ Download all 58 PHP files
+☐ Verify lib/config.dart points to rlms.rlms.co.za
+☐ Have backup of online database
+
+During deployment:
+☐ Execute SQL files in exact order (1-13)
+☐ Upload PHP files to /mobile/ directory
+☐ Set proper file permissions (755/644)
+☐ Verify all 26 tables created
+☐ Test endpoints with curl/Postman
+
+After deployment:
+☐ Test login workflow
+☐ Test ARPL form save operations
+☐ Verify no 404 errors
+☐ Check error logs
+☐ Test mobile app login
+☐ Test end-to-end ARPL workflow
+
+================================================================================
+QUESTIONS OR ISSUES
+================================================================================
+
+If endpoints return 404:
+  1. Verify files uploaded to correct path (/mobile/)
+  2. Check .htaccess rules allow PHP execution
+  3. Verify file permissions are correct (644)
+  4. Check PHP configuration allows URL rewriting
+
+If database errors:
+  1. Verify all 13 SQL files executed in correct order
+  2. Check database credentials in connection.php
+  3. Verify database has same name as local copy
+  4. Check OFO codes are correct in arpl_trades table
+
+If questions don't load:
+  1. Verify all 4 question SQL files executed (Orders 10-13)
+  2. Run: SELECT COUNT(*) FROM arpl_questions;
+  3. Should return 42+ questions
+
+If Bricklayer seeing Electrician questions:
+  1. Verify OFO codes are correct (not mixed up)
+  2. Check arpl_poe records have correct trade_ofo_code
+  3. Verify learner is in correct classID (782 or 783)
+  4. Clear mobile app cache and re-login
+
+================================================================================
+END OF FILE LIST
+Generated: July 14, 2026
+Status: READY FOR DEPLOYMENT
+================================================================================

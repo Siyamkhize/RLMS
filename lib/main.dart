@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:intl/intl.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -12,14 +13,17 @@ import 'sdp_projects_page.dart';
 import 'database_helper.dart';
 import 'sync_service.dart';
 import 'config.dart';
-import 'assessorPage.dart';
+import 'AssessorPage.dart';
+import 'ArplAssessorPage.dart';
 import 'ModeratorPage.dart';
 import 'facilitator_fingerprint_page.dart';
 import 'finance_dashboard.dart';
 import 'logistics_dashboard.dart';
-// MONITORING SYSTEM TEMPORARILY DISABLED - BUILD ISSUE
-// import 'services/random_prompt_service.dart';
-// import 'monitoring_prompt_page.dart';
+import 'utils/global_error_handler.dart';
+import 'utils/ultimate_scanner_crash_prevention.dart';
+import 'services/random_prompt_service.dart';
+import 'monitoring_prompt_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Define unique task names for Workmanager
 const String syncTask = "com.example.rlmss.syncTask";
@@ -160,59 +164,82 @@ void callbackDispatcher() {
 }
 
 void main() async {
+  // Initialize global error handler FIRST to catch all errors
+  GlobalErrorHandler.initialize();
+
+  // Initialize ultimate scanner crash prevention system
+  UltimateScannerCrashPrevention().initialize();
+
   // Ensure bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
 
   // DEBUG-ONLY: Allow connecting to hosts with certificate hostname mismatch (development servers)
   if (kDebugMode) {
-    HttpOverrides.global = _DevHttpOverrides(allowedHosts: {"192.168.0.73"});
+    HttpOverrides.global = _DevHttpOverrides(allowedHosts: {
+      AppConfig.serverHost,
+      "192.168.0.65",
+      "192.168.68.105",
+      "192.168.68.112"
+    });
   }
 
   // Request permissions
   await requestNotificationPermission();
   await requestIgnoreBatteryOptimization();
 
-  // Initialize Workmanager
-  Workmanager().initialize(
-    callbackDispatcher,
-    isInDebugMode: false, // Set to false for production
-  );
+  final supportsWorkmanager = !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+  if (supportsWorkmanager) {
+    // Initialize Workmanager only on supported platforms.
+    Workmanager().initialize(
+      callbackDispatcher,
+      isInDebugMode: false, // Set to false for production
+    );
+  }
 
   // Initialize notifications
   const AndroidInitializationSettings initializationSettingsAndroid =
       AndroidInitializationSettings('@mipmap/ic_launcher');
   const DarwinInitializationSettings initializationSettingsIOS =
       DarwinInitializationSettings();
+  const WindowsInitializationSettings initializationSettingsWindows =
+      WindowsInitializationSettings(
+    appName: 'rlmss',
+    appUserModelId: 'com.example.rlmss',
+    guid: 'd49b0314-ee7c-4f34-95b1-3f01f9c4e9c3',
+  );
   const InitializationSettings initializationSettings = InitializationSettings(
     android: initializationSettingsAndroid,
     iOS: initializationSettingsIOS,
+    windows: initializationSettingsWindows,
   );
   await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
   // Schedule periodic sync task (every 15 minutes)
-  Workmanager().registerPeriodicTask(
-    "sync-task-1",
-    syncTask,
-    frequency: const Duration(minutes: 15),
-    constraints: Constraints(
-      networkType: NetworkType.connected,
-      requiresBatteryNotLow: true,
-      requiresCharging: false,
-    ),
-    initialDelay: const Duration(seconds: 10),
-  );
+  if (supportsWorkmanager) {
+    Workmanager().registerPeriodicTask(
+      "sync-task-1",
+      syncTask,
+      frequency: const Duration(minutes: 15),
+      constraints: Constraints(
+        networkType: NetworkType.connected,
+        requiresBatteryNotLow: true,
+        requiresCharging: false,
+      ),
+      initialDelay: const Duration(seconds: 10),
+    );
 
-  // Schedule initial connectivity check task (runs after 2 minutes, then reschedules itself)
-  Workmanager().registerOneOffTask(
-    "connectivity-check-initial",
-    connectivityCheckTask,
-    initialDelay: const Duration(minutes: 2),
-    constraints: Constraints(
-      networkType: NetworkType.unmetered,
-      requiresBatteryNotLow: false,
-      requiresCharging: false,
-    ),
-  );
+    // Schedule initial connectivity check task (runs after 2 minutes, then reschedules itself)
+    Workmanager().registerOneOffTask(
+      "connectivity-check-initial",
+      connectivityCheckTask,
+      initialDelay: const Duration(minutes: 2),
+      constraints: Constraints(
+        networkType: NetworkType.unmetered,
+        requiresBatteryNotLow: false,
+        requiresCharging: false,
+      ),
+    );
+  }
 
   final dbHelper = DatabaseHelper();
   dbHelper.initConnectivityListener();
@@ -274,6 +301,7 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isOffline = false;
+  bool _obscurePassword = true;
   bool _isLoading = false;
 
   final dbHelper = DatabaseHelper();
@@ -293,9 +321,8 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _initializeRandomPromptService() async {
     try {
       debugPrint('[MAIN] Initializing random prompt service');
-      // MONITORING SYSTEM TEMPORARILY DISABLED - BUILD ISSUE
-      // await RandomPromptService().initialize();
-      debugPrint('[MAIN] Random prompt service initialized (DISABLED)');
+      await RandomPromptService().initialize();
+      debugPrint('[MAIN] Random prompt service initialized');
     } catch (e) {
       debugPrint('[MAIN] Error initializing random prompt service: $e');
     }
@@ -419,13 +446,23 @@ class _LoginPageState extends State<LoginPage> {
       String password = _passwordController.text;
 
       final data = await _attemptLogin(username, password);
+      debugPrint('[LOGIN] Raw parsed data: $data');
       if (data != null) {
         final success = data['success'] == true;
+        debugPrint('[LOGIN] Login success: $success');
         if (success) {
           // Debug: Print the entire response
           debugPrint('[LOGIN] Full login response: $data');
 
+          // Save auth token
+          if (data.containsKey('auth_token') && data['auth_token'] != null) {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('auth_token', data['auth_token']);
+            debugPrint('[LOGIN] Auth token saved successfully');
+          }
+
           final role = data['role']?.toString() ?? '';
+          debugPrint('[LOGIN] Raw role from server: "$role"');
           final classID = data['classID']?.toString() ?? '';
           // Try multiple fields for SDP identifier
           final sdp = data['sdp_id']?.toString() ??
@@ -574,7 +611,13 @@ class _LoginPageState extends State<LoginPage> {
 
           if (facilitator != null) {
             String role = facilitator['role'];
-            if (role == 'Moderator') {
+            // Normalize the role for consistent handling
+            final normalizedRole = role.toLowerCase().trim();
+            if (normalizedRole.contains('arpl')) {
+              role = 'arpl_assessor';
+            } else if (normalizedRole == 'assessor') {
+              role = 'assessor';
+            } else if (role == 'Moderator') {
               role = 'Moderator'; // Ensure case consistency with PHP
             }
             String classID = facilitator['classID']?.toString() ?? '';
@@ -645,7 +688,8 @@ class _LoginPageState extends State<LoginPage> {
     final normalizedRole = role.toLowerCase().trim();
 
     debugPrint('[NAVIGATION] ===== NAVIGATION DEBUG =====');
-    debugPrint('[NAVIGATION] Role: "$normalizedRole"');
+    debugPrint('[NAVIGATION] Role: "$role"');
+    debugPrint('[NAVIGATION] Normalized role: "$normalizedRole"');
     debugPrint('[NAVIGATION] classID: "$classID"');
     debugPrint('[NAVIGATION] sdp: "$sdp"');
     debugPrint('[NAVIGATION] facilitator_id: "$facilitatorId"');
@@ -710,6 +754,152 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
           );
+        },
+      );
+    } else if (normalizedRole == 'arpl_assessor') {
+      // Use classID to get facilitator (old reliable way)
+      debugPrint('[NAVIGATION] ===== ARPL ASSESSOR NAVIGATION =====');
+      debugPrint('[NAVIGATION] Detected ARPL Assessor role');
+      debugPrint('[NAVIGATION] Facilitator ID: "$facilitatorId"');
+      debugPrint('[NAVIGATION] ClassID: "$classID"');
+      debugPrint('[NAVIGATION] About to navigate to ArplAssessorPage');
+      debugPrint('[NAVIGATION] ======================================');
+
+      await _handleFacilitatorLoginByClassID(
+        classID: classID,
+        facilitatorId: facilitatorId,
+        facilitatorName: 'ARPL Assessor',
+        onSuccess: () async {
+          debugPrint(
+              '[NAVIGATION] Successfully authenticated, checking fingerprint and clock-in status');
+
+          // CRITICAL FIX: Use the EXACT SAME workflow as facilitators
+          // Step 1: Check if assessor has fingerprints enrolled (one-time setup)
+          final facilitatorIdInt = int.tryParse(facilitatorId);
+          if (facilitatorIdInt == null) {
+            debugPrint('[LOGIN] Invalid facilitator ID: $facilitatorId');
+            _showError('Invalid assessor ID');
+            return;
+          }
+
+          final hasFingerprints =
+              await dbHelper.facilitatorHasFingerprints(facilitatorIdInt);
+          debugPrint(
+              '[LOGIN] ARPL Assessor $facilitatorIdInt has fingerprints: $hasFingerprints');
+
+          if (!hasFingerprints) {
+            debugPrint(
+                '[LOGIN] No fingerprints enrolled for assessor $facilitatorIdInt - requiring enrollment');
+
+            if (!context.mounted) return;
+
+            // Show message that enrollment is required
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Please enroll your fingerprints to continue'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 2),
+              ),
+            );
+
+            // Navigate to fingerprint enrollment (first-time setup)
+            final enrolled = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => FacilitatorFingerprintPage(
+                  facilitatorId: facilitatorIdInt,
+                  facilitatorName: 'ARPL Assessor',
+                  isFirstTimeSetup: true, // This is first-time setup
+                ),
+              ),
+            );
+
+            if (!mounted) return;
+
+            if (enrolled != true) {
+              // User didn't complete enrollment, stay on login page
+              _showError('Fingerprint enrollment is required to continue');
+              return;
+            }
+
+            debugPrint(
+                '[LOGIN] ✅ Fingerprint enrollment completed for assessor $facilitatorIdInt');
+          }
+
+          // Step 2: Check if assessor has clocked in today (daily requirement)
+          final clockedInToday =
+              await dbHelper.facilitatorClockedInToday(facilitatorIdInt);
+
+          if (!clockedInToday) {
+            debugPrint(
+                '[LOGIN] ARPL Assessor $facilitatorIdInt has NOT clocked in today - requiring clock-in');
+
+            if (!context.mounted) return;
+
+            // Show message that clock-in is required
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Please clock in to start your day'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 2),
+              ),
+            );
+
+            // Navigate to fingerprint page for clock-in (required daily)
+            final clockedIn = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => FacilitatorFingerprintPage(
+                  facilitatorId: facilitatorIdInt,
+                  facilitatorName: 'ARPL Assessor',
+                  isFirstTimeSetup: false,
+                  requireClockIn: true, // Force clock-in mode
+                ),
+              ),
+            );
+
+            if (!mounted) return;
+
+            if (clockedIn != true) {
+              // User didn't clock in, stay on login page
+              _showError('Clock-in is required to access the dashboard');
+              return;
+            }
+
+            debugPrint(
+                '[LOGIN] ✅ Clock-in completed for assessor $facilitatorIdInt');
+          } else {
+            // Already clocked in today, show confirmation
+            final clockInTime =
+                await dbHelper.getFacilitatorTodayClockIn(facilitatorIdInt);
+            debugPrint(
+                '[LOGIN] ARPL Assessor $facilitatorIdInt already clocked in at $clockInTime');
+
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                      'Welcome back! Already clocked in at ${clockInTime ?? 'earlier'}'),
+                  backgroundColor: Colors.green,
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            }
+          }
+
+          // Proceed to ARPL Assessor dashboard
+          if (context.mounted) {
+            debugPrint(
+                '[LOGIN] Proceeding to ARPL Assessor dashboard for $facilitatorIdInt');
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ArplAssessorPage(
+                  facilitator_id: facilitatorId,
+                ),
+              ),
+            );
+          }
         },
       );
     } else if (normalizedRole == 'moderator') {
@@ -785,11 +975,23 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
+                obscureText: _obscurePassword,
+                decoration: InputDecoration(
                   labelText: 'Password',
-                  prefixIcon: Icon(Icons.lock),
-                  border: OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (value) => value!.isEmpty ? 'Enter password' : null,
               ),
@@ -987,6 +1189,199 @@ class _LoginPageState extends State<LoginPage> {
       debugPrint('[LOGIN] Error occurred, bypassing fingerprint features');
       onSuccess();
     }
+  }
+
+  // Check if ARPL assessor is already clocked in today
+  Future<bool> _checkAssessorClockInStatus(String facilitatorId) async {
+    try {
+      final db = await dbHelper.database;
+      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+      final result = await db.query(
+        'facilitator_clocking',
+        where: 'facilitator_id = ? AND clock_date = ?',
+        whereArgs: [facilitatorId, today],
+        limit: 1,
+      );
+
+      if (result.isEmpty) {
+        // No clock-in record for today, need to prompt
+        return true;
+      }
+
+      final record = result.first;
+      final clockOutTime = record['clock_out_time'];
+
+      // If clocked out, need to clock in again
+      if (clockOutTime != null && clockOutTime.toString().isNotEmpty) {
+        return true;
+      }
+
+      // Already clocked in and not clocked out
+      return false;
+    } catch (e) {
+      debugPrint('[CLOCK_IN_CHECK] Error checking clock-in status: $e');
+      // On error, show prompt to be safe
+      return true;
+    }
+  }
+
+  // Show clock-in prompt dialog for ARPL assessor
+  Future<void> _showArplAssessorClockInPrompt({
+    required BuildContext context,
+    required String facilitatorId,
+    required VoidCallback onComplete,
+  }) async {
+    bool isClocking = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.access_time, color: const Color(0xFF006341)),
+              const SizedBox(width: 12),
+              const Text('Clock In Required'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'You need to clock in before accessing the ARPL Assessor dashboard.',
+                style: TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Assessor ID: $facilitatorId',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[700],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (isClocking) ...[
+                const SizedBox(height: 16),
+                const Center(
+                  child: CircularProgressIndicator(),
+                ),
+                const SizedBox(height: 8),
+                const Center(
+                  child: Text('Clocking in...'),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            if (!isClocking)
+              TextButton(
+                onPressed: () {
+                  // Close dialog and go to dashboard anyway
+                  Navigator.of(dialogContext).pop();
+                  onComplete();
+                },
+                child: const Text('Skip'),
+              ),
+            if (!isClocking)
+              ElevatedButton(
+                onPressed: () async {
+                  setState(() {
+                    isClocking = true;
+                  });
+
+                  try {
+                    // Perform clock-in
+                    final now = DateTime.now();
+                    final clockInTime =
+                        DateFormat('yyyy-MM-dd HH:mm:ss').format(now);
+                    final clockDate = DateFormat('yyyy-MM-dd').format(now);
+
+                    // Save to local database
+                    final db = await dbHelper.database;
+                    await db.insert('facilitator_clocking', {
+                      'facilitator_id': facilitatorId,
+                      'clock_date': clockDate,
+                      'clock_in_time': clockInTime,
+                      'clock_out_time': null,
+                      'synced': 0,
+                    });
+
+                    // Try to sync to server
+                    if (!_isOffline) {
+                      try {
+                        final response = await http.post(
+                          Uri.parse(AppConfig.facilitatorClockinUrl),
+                          headers: {'Content-Type': 'application/json'},
+                          body: jsonEncode({
+                            'facilitator_id': facilitatorId,
+                            'clockin_time': clockInTime,
+                          }),
+                        );
+
+                        if (response.statusCode == 200) {
+                          final data = jsonDecode(response.body);
+                          if (data['status'] == 'success') {
+                            // Mark as synced
+                            await db.update(
+                              'facilitator_clocking',
+                              {'synced': 1},
+                              where:
+                                  'facilitator_id = ? AND clock_in_time = ? AND clock_out_time IS NULL',
+                              whereArgs: [facilitatorId, clockInTime],
+                            );
+                          }
+                        }
+                      } catch (e) {
+                        debugPrint(
+                            '[CLOCK_IN] Server sync failed, saved offline: $e');
+                      }
+                    }
+
+                    // Success - close dialog and proceed
+                    if (dialogContext.mounted) {
+                      Navigator.of(dialogContext).pop();
+                    }
+
+                    // Show success message
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('✓ Clocked in successfully'),
+                          backgroundColor: Colors.green,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+
+                    onComplete();
+                  } catch (e) {
+                    setState(() {
+                      isClocking = false;
+                    });
+
+                    if (dialogContext.mounted) {
+                      ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        SnackBar(
+                          content: Text('Error clocking in: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF006341),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Clock In Now'),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showError(String message) {

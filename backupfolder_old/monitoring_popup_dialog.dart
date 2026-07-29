@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
-import 'dart:convert';
-import 'package:intl/intl.dart';
-import 'package:http/http.dart' as http;
 import 'database_helper.dart';
 import 'services/fingerprint_service.dart';
 import 'services/futronic_service.dart' as futronic;
 import 'utils/fingerprint_error_handler.dart';
-import 'config.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 
 class MonitoringPopupDialog extends StatefulWidget {
   final Map<String, dynamic> person;
@@ -32,6 +29,7 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
   int _countdownSeconds = 300; // 5 minutes
   int _currentAttempt = 1;
   Timer? _countdownTimer;
+  Timer? _soundTimer; // Timer for periodic sound alerts
 
   // Fingerprint verification - SAME AS CLOCKING SYSTEM
   final DatabaseHelper _dbHelper = DatabaseHelper();
@@ -52,14 +50,16 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
   void initState() {
     super.initState();
     _startCountdown();
-    _initialVibrationAlert();
+    _initialVibrationAndSoundAlert();
     _setupFingerprintStreams();
     _initializeSensor(); // Initialize fingerprint scanner like clocking system
+    _startPeriodicSoundAlerts(); // Start periodic sound alerts
   }
 
   @override
   void dispose() {
     _countdownTimer?.cancel();
+    _soundTimer?.cancel(); // Cancel sound timer
     _enrollStatusSubscription?.cancel();
     _enrollSuccessSubscription?.cancel();
     _fingerprintService
@@ -67,11 +67,142 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
     super.dispose();
   }
 
-  void _initialVibrationAlert() async {
+  void _initialVibrationAndSoundAlert() async {
+    // Play initial attention sound
+    _playAttentionSound();
+
     // Strong initial vibration pattern
     for (int i = 0; i < 3; i++) {
       await HapticFeedback.heavyImpact();
       await Future.delayed(const Duration(milliseconds: 300));
+    }
+  }
+
+  void _startPeriodicSoundAlerts() {
+    // Play sound every 30 seconds to keep user's attention
+    _soundTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (_countdownSeconds > 0) {
+        _playReminderSound();
+
+        // Extra urgent sound when time is running low
+        if (_countdownSeconds <= 60) {
+          Future.delayed(const Duration(milliseconds: 500), () {
+            _playUrgentSound();
+          });
+        }
+      }
+    });
+  }
+
+  void _playAttentionSound() async {
+    try {
+      // Play notification sound to get attention
+      await FlutterRingtonePlayer().play(
+        android: AndroidSounds.notification,
+        ios: IosSounds.glass,
+        looping: false,
+        volume: 1.0,
+      );
+    } catch (e) {
+      print('[MONITORING_SOUND] Error playing attention sound: $e');
+    }
+  }
+
+  void _playReminderSound() async {
+    try {
+      // Play reminder sound (softer)
+      await FlutterRingtonePlayer().play(
+        android: AndroidSounds.notification,
+        ios: IosSounds.glass,
+        looping: false,
+        volume: 0.7,
+      );
+    } catch (e) {
+      print('[MONITORING_SOUND] Error playing reminder sound: $e');
+    }
+  }
+
+  void _playUrgentSound() async {
+    try {
+      // Play urgent sound when time is running out
+      await FlutterRingtonePlayer().play(
+        android: AndroidSounds.alarm,
+        ios: IosSounds.alarm,
+        looping: false,
+        volume: 1.0,
+      );
+    } catch (e) {
+      print('[MONITORING_SOUND] Error playing urgent sound: $e');
+    }
+  }
+
+  void _playSuccessSound() async {
+    try {
+      print('[MONITORING_SOUND] 🔊 Playing SUCCESS sound...');
+      // Play success sound when fingerprint is verified
+      await FlutterRingtonePlayer().play(
+        android: AndroidSounds.notification,
+        ios: IosSounds.glass,
+        looping: false,
+        volume: 1.0,
+      );
+      print('[MONITORING_SOUND] ✅ SUCCESS sound played successfully');
+    } catch (e) {
+      print('[MONITORING_SOUND] ❌ Error playing success sound: $e');
+    }
+  }
+
+  void _playErrorSound() async {
+    try {
+      print('[MONITORING_SOUND] 🔊 Playing ERROR sound...');
+      // Play error sound when fingerprint doesn't match - use alarm for distinction
+      await FlutterRingtonePlayer().play(
+        android: AndroidSounds.alarm,
+        ios: IosSounds.alarm,
+        looping: false,
+        volume: 1.0,
+      );
+      print('[MONITORING_SOUND] ✅ ERROR sound played successfully');
+    } catch (e) {
+      print('[MONITORING_SOUND] ❌ Error playing error sound: $e');
+    }
+  }
+
+  void _playTestSound() async {
+    try {
+      print('[MONITORING_SOUND] 🔊 Playing TEST sound...');
+      // Test sound to verify sound system is working
+      await FlutterRingtonePlayer().play(
+        android: AndroidSounds.ringtone,
+        ios: IosSounds.glass,
+        looping: false,
+        volume: 1.0,
+      );
+      print('[MONITORING_SOUND] ✅ TEST sound played successfully');
+    } catch (e) {
+      print('[MONITORING_SOUND] ❌ Error playing test sound: $e');
+    }
+  }
+
+  void _playAlternativeSuccessSound() async {
+    try {
+      print('[MONITORING_SOUND] 🔊 Playing ALTERNATIVE SUCCESS sound...');
+      // Alternative success sound using system beep
+      await FlutterRingtonePlayer().playNotification();
+      print('[MONITORING_SOUND] ✅ ALTERNATIVE SUCCESS sound played');
+    } catch (e) {
+      print('[MONITORING_SOUND] ❌ Error playing alternative success sound: $e');
+    }
+  }
+
+  void _playAlternativeErrorSound() async {
+    try {
+      print('[MONITORING_SOUND] 🔊 Playing ALTERNATIVE ERROR sound...');
+      // Alternative error sound using system alarm
+      await FlutterRingtonePlayer().playAlarm();
+      print('[MONITORING_SOUND] ✅ ALTERNATIVE ERROR sound played');
+    } catch (e) {
+      print('[MONITORING_SOUND] ❌ Error playing alternative error sound: $e');
     }
   }
 
@@ -259,7 +390,6 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
         } else {
           debugPrint(
               '[MONITORING] ❌ NO FINGERPRINT MATCH FOUND for Person $personId!');
-
           // Show error and ask to try again - DON'T insert record yet
           setState(() {
             _verificationStatus =
@@ -287,6 +417,12 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
         _countdownSeconds--;
       });
 
+      // Play urgent sound every 10 seconds when under 1 minute
+      if (_countdownSeconds <= 60 && _countdownSeconds % 10 == 0) {
+        _playUrgentSound();
+        HapticFeedback.heavyImpact();
+      }
+
       if (_countdownSeconds <= 0) {
         _handleTimeExpired();
       }
@@ -295,6 +431,7 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
 
   void _handleTimeExpired() {
     _countdownTimer?.cancel();
+    _soundTimer?.cancel(); // Stop sound alerts
 
     if (_currentAttempt < 3) {
       // Move to next attempt
@@ -303,6 +440,8 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
         _countdownSeconds = 300; // Reset to 5 minutes
       });
       _startCountdown();
+      _startPeriodicSoundAlerts(); // Restart sound alerts for new attempt
+      _playAttentionSound(); // Play attention sound for new attempt
     } else {
       // All 3 attempts failed - auto mark as ABSENT
       _handleAbsent();
@@ -325,6 +464,7 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
       debugPrint(
           '[MONITORING_POPUP] Fingerprint verified - marking person as PRESENT');
       _countdownTimer?.cancel();
+      _soundTimer?.cancel(); // Stop sound alerts
       HapticFeedback.lightImpact();
 
       // Update person data with verification details
@@ -351,6 +491,7 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
   void _handleAbsent() async {
     debugPrint('[MONITORING_POPUP] _handleAbsent called - person not present');
     _countdownTimer?.cancel();
+    _soundTimer?.cancel(); // Stop sound alerts
     HapticFeedback.heavyImpact();
 
     // Update person data with verification details (absent = no fingerprint)
@@ -361,172 +502,6 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
     // Call the service's onAbsent callback - service will handle saving
     widget.onAbsent();
     Navigator.of(context).pop();
-  }
-
-  // Save monitoring record (ONLINE-FIRST: save to server first, then local)
-  Future<void> _saveMonitoringClockin(String status) async {
-    try {
-      final now = DateTime.now();
-      final date = DateFormat('yyyy-MM-dd').format(now);
-      final time = DateFormat('HH:mm:ss').format(now);
-      final datetime = DateFormat('yyyy-MM-dd HH:mm:ss').format(now);
-
-      // Determine session type
-      final hour = now.hour;
-      String sessionType = 'morning';
-      if (hour >= 13 && hour < 16) {
-        sessionType = 'afternoon';
-      }
-
-      final record = {
-        'learner_id': widget.person['person_id'].toString(),
-        'learner_name': widget.person['person_name'] ?? 'Unknown',
-        'person_type': widget.person['person_type'] ?? 'learner',
-        'class_id': widget.classID,
-        'monitoring_date': date,
-        'verification_time': datetime,
-        'verification_method': _activeScanner == 'futronic'
-            ? 'fingerprint_futronic'
-            : 'fingerprint_zkteco',
-        'final_status': status,
-        'attempt_1_time': _currentAttempt == 1 ? datetime : null,
-        'attempt_1_status': _currentAttempt == 1 ? status : null,
-        'session_type': sessionType,
-        'fingerprint_matched': !_fingerprintRequired ? 1 : 0,
-        'scanner_type': _activeScanner,
-        'created_at': datetime,
-        'synced': 0,
-      };
-
-      debugPrint('[MONITORING_RECORD] Saving record: $record');
-
-      // ONLINE-FIRST APPROACH: Try to save to server first
-      bool savedOnline = false;
-      try {
-        debugPrint(
-            '[MONITORING_RECORD] 🌐 Attempting to save to server first (ONLINE-FIRST)...');
-
-        final response = await http
-            .post(
-              Uri.parse(AppConfig.saveMonitoringRecordsUrl),
-              headers: {'Content-Type': 'application/json'},
-              body: json.encode(record),
-            )
-            .timeout(const Duration(seconds: 10));
-
-        debugPrint(
-            '[MONITORING_RECORD] Server response status: ${response.statusCode}');
-        debugPrint(
-            '[MONITORING_RECORD] Server response body: ${response.body}');
-
-        if (response.statusCode == 200) {
-          final result = json.decode(response.body);
-          if (result['success'] == true) {
-            savedOnline = true;
-            debugPrint(
-                '[MONITORING_RECORD] ✅ SAVED TO SERVER SUCCESSFULLY (ONLINE)');
-
-            // Save to local database with synced=1 (already on server)
-            final recordWithSynced = Map<String, dynamic>.from(record);
-            recordWithSynced['synced'] = 1;
-            final recordId =
-                await _dbHelper.insertMonitoringClockin(recordWithSynced);
-            debugPrint(
-                '[MONITORING_RECORD] ✅ Saved to local database with ID: $recordId (synced=1)');
-
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content:
-                      Text('✓ Attendance saved to server and synced locally'),
-                  backgroundColor: Colors.green,
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            }
-          } else {
-            debugPrint(
-                '[MONITORING_RECORD] ❌ Server save failed: ${result['error']}');
-          }
-        } else {
-          debugPrint(
-              '[MONITORING_RECORD] ❌ Server returned status ${response.statusCode}');
-        }
-      } catch (e) {
-        debugPrint('[MONITORING_RECORD] ❌ Failed to save to server: $e');
-        savedOnline = false;
-      }
-
-      // OFFLINE FALLBACK: If online save failed, save locally with synced=0
-      if (!savedOnline) {
-        debugPrint(
-            '[MONITORING_RECORD] 💾 Saving to local database (OFFLINE MODE)...');
-
-        final recordId = await _dbHelper.insertMonitoringClockin(record);
-        debugPrint(
-            '[MONITORING_RECORD] ✅ Saved to local database with ID: $recordId (synced=0)');
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content:
-                  Text('📱 Attendance saved locally (will sync when online)'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-
-        // Trigger background sync to retry
-        debugPrint('[MONITORING_RECORD] Scheduling background sync retry...');
-        _triggerBackgroundSync();
-      }
-    } catch (e) {
-      debugPrint('[MONITORING_RECORD] ❌ Error saving monitoring record: $e');
-      // Don't throw error - allow monitoring to continue even if save fails
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving attendance: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    }
-  }
-
-  // Trigger background sync for unsynced records
-  void _triggerBackgroundSync() {
-    // Schedule sync after a short delay
-    Future.delayed(const Duration(seconds: 2), () async {
-      try {
-        debugPrint('[MONITORING_RECORD] Running background sync...');
-        final result = await _dbHelper.syncMonitoringClockinToServer();
-
-        if (result['success'] == true) {
-          final syncedCount = result['synced_count'] ?? 0;
-          debugPrint(
-              '[MONITORING_RECORD] Background sync completed: $syncedCount records synced');
-
-          if (mounted && syncedCount > 0) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                    '$syncedCount attendance record(s) synced to server ✓'),
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 2),
-              ),
-            );
-          }
-        } else {
-          debugPrint(
-              '[MONITORING_RECORD] Background sync failed: ${result['error']}');
-        }
-      } catch (e) {
-        debugPrint('[MONITORING_RECORD] Background sync error: $e');
-      }
-    });
   }
 
   // EXACT SAME FINGERPRINT VERIFICATION WORKFLOW AS CLOCKING
@@ -736,6 +711,7 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
       _hideProgressDialog();
 
       if (match) {
+        debugPrint('[MONITORING] ✅ FINGERPRINT MATCH CONFIRMED (method 2)');
         setState(() {
           _verificationStatus = 'Fingerprint verified! ✅';
           _fingerprintRequired = false;
@@ -749,6 +725,7 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
           }
         });
       } else {
+        debugPrint('[MONITORING] ❌ FINGERPRINT MISMATCH (method 2)');
         setState(() {
           _verificationStatus =
               'Fingerprint does not match! Please try again ❌';
@@ -1023,6 +1000,63 @@ class _MonitoringPopupDialogState extends State<MonitoringPopupDialog> {
                           ),
                         ],
                       ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              // Test Sound Buttons (temporary for debugging)
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        print(
+                            '[MONITORING] 🔊 Test notification sound button pressed');
+                        _playTestSound();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                      ),
+                      child: const Text('TEST', style: TextStyle(fontSize: 10)),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        print(
+                            '[MONITORING] 🔊 Test success sound button pressed');
+                        _playAlternativeSuccessSound();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                      ),
+                      child:
+                          const Text('SUCCESS', style: TextStyle(fontSize: 10)),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        print(
+                            '[MONITORING] 🔊 Test error sound button pressed');
+                        _playAlternativeErrorSound();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                      ),
+                      child:
+                          const Text('ERROR', style: TextStyle(fontSize: 10)),
                     ),
                   ),
                 ],

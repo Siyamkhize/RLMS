@@ -1,0 +1,61 @@
+================================================================================
+                      SESSION 12 - LEARNERS LIST FIX
+================================================================================
+
+PROBLEM:
+  When clicking "Continue to Learners", page immediately redirected to PDF
+  instead of showing learner list with individual buttons.
+
+ROOT CAUSE:
+  Line 219 in learners.php had invalid validation:
+  if (!selectedTradeOFO || !selectedClassID)
+  
+  This failed because classID=0 for ARPL (no classes), and !0 = true
+
+SOLUTION:
+  Changed validation to only check required parameter:
+  if (!selectedTradeOFO)  ← Only trade required
+
+BONUS FIXES:
+  - Updated trade names in classes.php (was missing Plumbing OFO fix)
+  - Added Welder trade (651302)
+
+================================================================================
+RESULTS
+================================================================================
+
+✅ Learners page now DISPLAYS TABLE with all learners
+✅ Each learner has INDIVIDUAL "Generate ARPL ▶" button
+✅ No immediate redirect to PDF
+✅ User can select which learner to generate
+✅ All 4 trades working
+
+================================================================================
+TEST NOW
+================================================================================
+
+1. Clear cache: Ctrl+Shift+Delete
+2. Hard refresh: Ctrl+Shift+F5
+3. Go to: http://localhost:8080/web/web/web/index.php
+4. Select trade → Next → Continue to Learners
+5. See: Full table with learner list
+6. Click individual "Generate ARPL" button per learner
+
+Expected: Table shows all learners with individual buttons
+
+================================================================================
+FILES CHANGED
+================================================================================
+
+c:\projects\rlmss\web\learners.php
+  - Line 219: Validation fix
+  - Line 217: Trade names update
+
+c:\projects\rlmss\web\classes.php
+  - Line 65: Trade names update
+
+Both deployed to XAMPP and synced.
+
+================================================================================
+STATUS: ✅ COMPLETE
+================================================================================

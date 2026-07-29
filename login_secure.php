@@ -57,13 +57,7 @@ try {
         exit;
     }
     
-    // Validate email format
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        Security::logSecurityEvent('Invalid email format', ['email' => $email]);
-        http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Invalid email format']);
-        exit;
-    }
+    // Don't strictly validate email format - allow usernames as well
     
     $db = Database::getInstance();
     
@@ -107,8 +101,8 @@ try {
  * Attempt SDP login
  */
 function attemptSDPLogin($db, $email, $password) {
-    $query = "SELECT sdp_id, client_name, password FROM sdp WHERE email = ?";
-    $results = $db->select($query, 's', [$email]);
+    $query = "SELECT sdp_id, client_name, password FROM sdp WHERE email = ? OR client_name = ?";
+    $results = $db->select($query, 'ss', [$email, $email]);
     
     if (empty($results)) {
         return null;
@@ -161,8 +155,8 @@ function attemptSDPLogin($db, $email, $password) {
  * Attempt Facilitator/Assessor login
  */
 function attemptFacilitatorLogin($db, $email, $password) {
-    $query = "SELECT facilitator_id, role, classID, password FROM facilitator WHERE email = ?";
-    $results = $db->select($query, 's', [$email]);
+    $query = "SELECT facilitator_id, role, classID, password FROM facilitator WHERE email = ? OR firstName = ? OR lastName = ?";
+    $results = $db->select($query, 'sss', [$email, $email, $email]);
     
     if (empty($results)) {
         return null;

@@ -1,0 +1,125 @@
+═════════════════════════════════════════════════════════════════════════════════
+ARPL PDF GENERATOR - XAMPP QUICK TEST GUIDE
+═════════════════════════════════════════════════════════════════════════════════
+
+📁 DEPLOYMENT LOCATION: C:\xampp\htdocs\web\web\web\
+
+🌐 TEST URLS (Copy & Paste):
+
+1. DIAGNOSTIC TEST (Test Setup)
+   http://localhost:8080/web/web/web/test_arpl_setup.php
+
+2. FULL PDF GENERATION (Generate Portfolio)
+   http://localhost:8080/web/web/web/generate_pdf.php?learnerID=16389&ofo_code=671101
+
+3. DIRECT GENERATOR (Skip Wrapper)
+   http://localhost:8080/web/web/web/arpl_pdf.php?learnerID=16389&classID=782&ofo_code=671101
+
+═════════════════════════════════════════════════════════════════════════════════
+
+✅ TESTING STEPS:
+
+Step 1: Run Diagnostic
+   - Open URL #1 above
+   - Look for green checkmarks ✅
+   - All should say "✅ Success"
+   - If any fail, note the error
+
+Step 2: Test Full Generation (if diagnostic passes)
+   - Open URL #2 above
+   - You should see a loading spinner (1-2 seconds)
+   - Page will redirect automatically
+   - 30+ page portfolio should display
+
+Step 3: Verify Output
+   - Look for learner name
+   - Check all 11 appendices are visible
+   - Verify trade info (Electrician, etc)
+   - Try to print with Ctrl+P
+
+═════════════════════════════════════════════════════════════════════════════════
+
+🔍 EXPECTED RESULTS:
+
+Diagnostic Tool Should Show:
+✅ Database connected successfully
+✅ generate_pdf.php exists at expected location
+✅ connection.php found
+✅ Learner LearnerID=16389 found
+✅ Class data loaded
+
+PDF Generation Should Show:
+✅ Loading spinner (1-2 seconds)
+✅ Redirect to arpl_pdf.php
+✅ 30+ page portfolio displays
+✅ Learner name visible
+✅ All 11 appendices present
+✅ Trade: Electrician (671101)
+
+═════════════════════════════════════════════════════════════════════════════════
+
+❌ IF SOMETHING FAILS:
+
+1. Connection Error?
+   → Check if connection.php exists
+   → Try diagnostic tool for more details
+
+2. Learner Not Found?
+   → Check learnerID is correct
+   → Use diagnostic tool to verify database
+
+3. Blank Page?
+   → Check browser console (F12) for errors
+   → Run diagnostic tool first
+
+4. 500 Error?
+   → Check PHP error logs
+   → Run diagnostic tool to identify issue
+
+═════════════════════════════════════════════════════════════════════════════════
+
+📝 FILES DEPLOYED:
+
+C:\xampp\htdocs\web\web\web\
+├─ generate_pdf.php ........... Wrapper/loader page
+├─ arpl_pdf.php .............. Unified PDF generator
+└─ test_arpl_setup.php ....... Diagnostic tool
+
+═════════════════════════════════════════════════════════════════════════════════
+
+🚀 QUICK START:
+
+1. Copy URL: http://localhost:8080/web/web/web/test_arpl_setup.php
+2. Open in browser
+3. Check for green ✅ marks
+4. If all pass, copy URL: http://localhost:8080/web/web/web/generate_pdf.php?learnerID=16389&ofo_code=671101
+5. Open in browser
+6. Wait for portfolio to display
+7. Print with Ctrl+P to save as PDF
+
+═════════════════════════════════════════════════════════════════════════════════
+
+📞 TROUBLESHOOTING:
+
+Q: Page won't load
+A: Check URL spelling, make sure XAMPP is running
+
+Q: "Connection not found"
+A: Run diagnostic tool to see where connection.php should be
+
+Q: "Learner not found"
+A: Diagnostic tool will show if learner exists
+
+Q: Blank page after redirect
+A: Check browser console (F12) for JavaScript errors
+
+Q: Nothing happens when I click generate
+A: Make sure you're logged in to the system first
+
+═════════════════════════════════════════════════════════════════════════════════
+
+✨ STATUS: READY FOR TESTING
+
+Start with diagnostic tool, then test full generation.
+
+═════════════════════════════════════════════════════════════════════════════════

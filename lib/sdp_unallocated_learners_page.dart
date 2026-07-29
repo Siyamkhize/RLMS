@@ -9,6 +9,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'config.dart';
 import 'database_helper.dart';
+import 'utils/scanner_pdf_resolver.dart';
 import 'LearnerDetailsPage.dart';
 
 class UnallocatedLearnersPage extends StatefulWidget {
@@ -590,23 +591,20 @@ class _UnallocatedLearnersPageState extends State<UnallocatedLearnersPage> {
 
                                 final scanner = FlutterDocScanner();
                                 final scanResult =
-                                    await scanner.getScanDocuments(
-                                  page: 999,
-                                );
+                                    await scanner.getScanDocuments(page: 80);
                                 if (scanResult is! Map ||
                                     !scanResult.containsKey('pdfUri') ||
                                     scanResult['pdfUri'] == null) {
                                   throw 'Invalid scan result';
                                 }
 
-                                final pdfPath = (scanResult['pdfUri'] as String)
-                                    .replaceFirst('file:///', '');
-                                final file = File(pdfPath);
-
-                                if (!await file.exists() ||
-                                    !pdfPath.endsWith('.pdf')) {
-                                  throw 'Invalid or missing PDF file';
+                                final file = await resolveFlutterDocScannerPdfFile(
+                                    scanResult['pdfUri'] as String?);
+                                if (file == null ||
+                                    !await isReadablePdfFile(file)) {
+                                  throw 'Invalid or missing PDF file (try again; if this persists, update the app)';
                                 }
+                                final pdfPath = file.path;
 
                                 final fileSize = await file.length();
                                 if (fileSize > _maxFileSize) {

@@ -2,13 +2,16 @@ class AppConfig {
   // ========================================
   // LIVE SERVER CONFIGURATION
   // ========================================
+  // static const String serverHost = 'tesing.mtltechnical.co.za';
   // static const String serverHost = 'rlms.rlms.co.za'; // Live server domain
   // static const int serverPort = 443; // HTTPS port
-  // static const String serverProtocol = 'https'; // Live server uses HTTPS
+  // static const String serverProtocol = 'https';
+  // // Live server uses HTTPS
   // static const String basePath = '/mobile';
+
   static const String serverHost =
-      '192.168.68.132'; // Updated production hostname
-  static const int serverPort = 8080; // HTTP port 8080
+      '192.168.68.102'; // Updated production hostname
+  static const int serverPort = 8080; // HTTP poj   ``rt 8080
   static const String serverProtocol = 'http'; // Local server uses HTTP
   static const String basePath = '/assessorReport2/mobile';
 
@@ -43,6 +46,8 @@ class AppConfig {
   static String get syncSickNotesUrl => '$baseUrl/sync_sick_notes.php';
   static String get syncUsersUrl => '$baseUrl/sync_users.php';
   static String get syncLearnerDetailsUrl => '$baseUrl/sync_learnerdetails.php';
+  static String get syncLearnerDocumentsUrl =>
+      '$baseUrl/sync_learner_documents.php';
   static String get syncBankLocalUrl => '$baseUrl/sync_bank_local.php';
   static String get syncFacilitatorUrl => '$baseUrl/sync_facilitator.php';
   static String get syncLearnerClockingUrl =>
@@ -64,6 +69,11 @@ class AppConfig {
   static String get learnerImagesUrl => '$baseUrl/learnerImages';
   static String get signaturesUrl => '$baseUrl/signatures';
   static String get getSdpUrl => '$baseUrl/get_sdp.php';
+  static String get getSdpProjectsUrl => '$baseUrl/get_sdp_projects.php';
+  static String get getSdpSitesUrl => '$baseUrl/get_sdp_sites.php';
+  static String get getSdpAllDataUrl => '$baseUrl/get_sdp_all_data.php';
+  static String get searchLearnerByIdSdpUrl =>
+      '$baseUrl/search_learner_by_id_sdp.php';
   static String get syncSitesUrl => '$baseUrl/sync_sites.php';
   static String get syncClassUrl => '$baseUrl/sync_class.php';
   static String get syncLearningPathwayUrl =>
@@ -98,20 +108,8 @@ class AppConfig {
       '$baseUrl/syncInductionClocking.php';
   static String get ppeSizesUrl => '$baseUrl/ppe_sizes.php';
   static String get addLearnerUrl => '$baseUrl/add_learner.php';
-
-  // Site Admin Workplace endpoints
-  static String get getSiteAdminWorkplacesUrl =>
-      '$baseUrl/get_site_admin_workplaces.php';
-  static String get saveWorkplaceClockingUrl =>
-      '$baseUrl/save_workplace_clocking.php';
-  static String get getWorkplaceLearnersForClockingUrl =>
-      '$baseUrl/get_workplace_learners_for_clocking.php';
-  static String get getWorkplaceAttendanceUrl =>
-      '$baseUrl/get_workplace_attendance.php';
-
   static String get getAttendanceUrl => '$baseUrl/get_attendance.php';
-  static String get getClockingDaysCountUrl =>
-      '$baseUrl/get_clocking_days_count.php';
+  static String get checkBankDetailsUrl => '$baseUrl/check_bank_details.php';
 
   // Logistics Management Endpoints
   static String get getLogisticsSitesUrl => '$baseUrl/get_logistics_sites.php';

@@ -252,12 +252,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         exit;
                     }
                     // Normalize role including Logistics typo handling (case-insensitive)
-                    $dbRole = trim((string)$row['role']);
-                    if (strcasecmp($dbRole, 'Assessor') === 0) {
+                    $dbRole = strtolower(trim((string)$row['role']));
+                    if ($dbRole === 'assessor') {
                         $role = 'assessor';
-                    } elseif (strcasecmp($dbRole, 'Moderator') === 0) {
+                    } elseif (strpos($dbRole, 'arpl') !== false) {
+                        $role = 'arpl_assessor';
+                    } elseif ($dbRole === 'moderator') {
                         $role = 'Moderator';
-                    } elseif (strcasecmp($dbRole, 'Logistics') === 0 || strcasecmp($dbRole, 'Logistis') === 0) {
+                    } elseif ($dbRole === 'logistics' || $dbRole === 'logistis') {
                         $role = 'Logistics';
                     } else {
                         $role = 'facilitator';
@@ -269,7 +271,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $_SESSION['logged_in'] = true;
                     session_write_close();
 
-                    if ($role === 'assessor' || $role === 'Moderator') {
+                    if ($role === 'assessor' || $role === 'Moderator' || $role === 'arpl_assessor') {
                         $facilitator_id = $row['facilitator_id'];
                         // Optimized query (assumes facilitator_classes table)
                         $sql = "SELECT s.project_id, c.*
@@ -603,14 +605,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
             if ($result->num_rows > 0) {
                 $row = $result->fetch_assoc();
-                $role = ($row['role'] === 'Assessor') ? 'assessor' : (($row['role'] === 'Moderator') ? 'Moderator' : 'facilitator');
+                $role = ($row['role'] === 'Assessor') ? 'assessor' : ((strcasecmp($row['role'], 'arpl_Assessor') === 0 || strcasecmp($row['role'], 'arpl_assessor') === 0) ? 'arpl_assessor' : (($row['role'] === 'Moderator') ? 'Moderator' : 'facilitator'));
 
                 $_SESSION['role'] = $role;
                 $_SESSION['classID'] = $row['classID'];
                 $_SESSION['facilitator_id'] = $row['facilitator_id'];
                 $_SESSION["logged_in"] = true;
 
-                if ($role === 'assessor' || $role === 'Moderator') {
+                if ($role === 'assessor' || $role === 'Moderator' || $role === 'arpl_assessor') {
                     $facilitator_id = $row['facilitator_id'];
                     $sql = "
                         SELECT s.project_id, c.* 
@@ -676,6 +678,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         echo json_encode([
                             'success' => true,
                             'role' => $role,
+                            'facilitator_id' => $row['facilitator_id'],
                             'classID' => $classID,
                             'learners' => $learners
                         ]);

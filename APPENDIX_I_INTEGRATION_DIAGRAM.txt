@@ -1,0 +1,192 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                  APPENDIX I INTEGRATION - COMPLETE FLOW                        ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. USER GENERATES ARPL PDF                                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ URL: /web/arpl_pdf.php?learnerID=20286&classID=782&ofo_code=671101         │
+└──────────────────────────┬──────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 2. SYSTEM EXTRACTS PARAMETERS                                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ • learnerID = 20286 (Electrician)                                           │
+│ • ofo_code = 671101 (Electrician OFO code)                                  │
+│ • classID = 782                                                             │
+└──────────────────────────┬──────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 3. DETERMINE TRADE FROM OFO CODE                                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ if ofo_code == 671101 → Trade = "Electrician"                              │
+│ else if ofo_code == 641201 → Trade = "Bricklaying"                         │
+│ else if ofo_code == 642601 → Trade = "Plumbing"                            │
+└──────────────────────────┬──────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 4. MAP OFO CODE TO TRADE-SPECIFIC TABLE                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ OFO Code     Trade         Database Table                                   │
+│ ─────────────────────────────────────────────────────────────────────────── │
+│ 671101   →   Electrician   →   arplelectrician_access_recommendation       │
+│ 641201   →   Bricklaying   →   arplbricklayer_access_recommendation        │
+│ 642601   →   Plumbing      →   arplplumber_access_recommendation           │
+│                                                                              │
+│ ✓ Current: 671101 → arplelectrician_access_recommendation                  │
+└──────────────────────────┬──────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 5. QUERY DATABASE FOR RECOMMENDATION                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   SELECT * FROM arplelectrician_access_recommendation                       │
+│   WHERE LearnerID = 20286 LIMIT 1                                          │
+│                                                                              │
+│   ╔═════════════════════════════════════════════════════════════════╗      │
+│   ║ Database Result                                                 ║      │
+│   ╠═════════════════════════════════════════════════════════════════╣      │
+│   ║ RecommendationID: 129                                           ║      │
+│   ║ LearnerID: 20286                                                ║      │
+│   ║ Trade: Electrician                                              ║      │
+│   ║ OFOCode: 671101                                                 ║      │
+│   ║ Status: Ready                                   ← KEY FIELD     ║      │
+│   ║ Remarks: [Assessment passed all competencies]  ← DISPLAYED      ║      │
+│   ║ CreatedAt: 2026-07-09 14:31:00                 ← DATE          ║      │
+│   ║ UpdatedAt: 2026-07-09 14:31:00                                 ║      │
+│   ╚═════════════════════════════════════════════════════════════════╝      │
+│                                                                              │
+└──────────────────────────┬──────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 6. DETERMINE DISPLAY STATUS                                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│ if (Status == "Ready") {                                                   │
+│   $isApproved = true;    ← Used to check "APPROVED" checkbox               │
+│   $color = "🟢 GREEN";   ← Used for status color                           │
+│ }                                                                            │
+│ else if (Status == "Not Ready") {                                          │
+│   $isNotReady = true;    ← Used to check "NOT READY" checkbox              │
+│   $color = "🔴 RED";     ← Used for status color                           │
+│ }                                                                            │
+│ else {                                                                       │
+│   $color = "⚪ GRAY";    ← Used if no Status                                │
+│ }                                                                            │
+│                                                                              │
+│ Current Result: Status = "Ready" → $isApproved = true                      │
+└──────────────────────────┬──────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 7. RENDER PDF APPENDIX I SECTION                                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   ╔═══════════════════════════════════════════════════════════════════╗    │
+│   ║        APPENDIX I: ACCESS RECOMMENDATION                          ║    │
+│   ║                                                                   ║    │
+│   ║ Learner Name: John Doe                                            ║    │
+│   ║ ID Number: 20286                                                  ║    │
+│   ║ Trade: Electrician                                                ║    │
+│   ║ OFO Code: 671101                                                  ║    │
+│   ║ Date Assessed: 9 Jul 2026                                         ║    │
+│   ║                                                                   ║    │
+│   ║ RECOMMENDATION FOR ACCESS TO TRADE TEST                           ║    │
+│   ║                                                                   ║    │
+│   ║ [✓] APPROVED FOR TRADE TEST          ← AUTO-CHECKED              ║    │
+│   ║ [ ] NOT YET READY FOR TRADE TEST     ← UNCHECKED                 ║    │
+│   ║                                                                   ║    │
+│   ║ Status: Ready (🟢 GREEN)              ← COLOR-CODED              ║    │
+│   ║                                                                   ║    │
+│   ║ Remarks:                                                          ║    │
+│   ║ Assessment passed all competencies    ← FROM DATABASE            ║    │
+│   ║                                                                   ║    │
+│   ║ Database Source:                                                  ║    │
+│   ║ arplelectrician_access_recommendation ← TRANSPARENCY             ║    │
+│   ║                                                                   ║    │
+│   ╚═══════════════════════════════════════════════════════════════════╝    │
+│                                                                              │
+└──────────────────────────┬──────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 8. GENERATE PDF                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Convert HTML to PDF format with all sections populated                     │
+└──────────────────────────┬──────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 9. OUTPUT PDF FILE                                                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Download: ARPL_Portfolio_20286_Electrician_20260711.pdf                    │
+│ Pages: 12+                                                                  │
+│ Status: ✅ Complete with actual recommendation data                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                         COMPARISON: BEFORE vs AFTER                            ║
+╠════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                ║
+║ BEFORE (Manual Form):                                                         ║
+║ ──────────────────────────────────────────────────────────────────────────── ║
+║ ☐ APPROVED FOR TRADE TEST        ← Blank, user must check manually          ║
+║ ☐ NOT YET READY FOR TRADE TEST   ← Blank, user must check manually          ║
+║ Reason: [Empty textarea]          ← User must type manually                  ║
+║ Status: [Not shown]               ← No automation                             ║
+║                                                                                ║
+║ AFTER (Data-Driven):                                                         ║
+║ ──────────────────────────────────────────────────────────────────────────── ║
+║ ☑ APPROVED FOR TRADE TEST        ← AUTO-CHECKED from database               ║
+║ ☐ NOT YET READY FOR TRADE TEST   ← AUTO-UNCHECKED                           ║
+║ Reason: Assessment passed all     ← AUTO-POPULATED from database             ║
+║ Status: Ready (🟢 GREEN)          ← AUTO-COLORED                             ║
+║ Database: arplelectrician...      ← AUTO-IDENTIFIED for transparency         ║
+║                                                                                ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                       SCENARIO: NO RECOMMENDATION YET                          ║
+╠════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                ║
+║ If learner has no recommendation recorded:                                    ║
+║                                                                                ║
+║ ☐ APPROVED FOR TRADE TEST        ← Blank (no data)                           ║
+║ ☐ NOT YET READY FOR TRADE TEST   ← Blank (no data)                           ║
+║ Reason: [No remarks recorded]     ← Placeholder text                          ║
+║ Status: Not Assigned (⚪ GRAY)    ← No color - no data yet                    ║
+║ Database: arplplumber...          ← Shows which table was queried             ║
+║                                                                                ║
+║ This happens when:                                                            ║
+║ • Assessment not yet completed                                                ║
+║ • Recommendation not yet recorded in database                                 ║
+║ • New learner added to system                                                 ║
+║                                                                                ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                    TRADE-TO-TABLE MAPPING (Current)                           ║
+╠════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                ║
+║ Electrician (671101)                                                          ║
+║ └─ Database: arplelectrician_access_recommendation                           ║
+║    └─ Records: 8 ✅                                                           ║
+║    └─ Sample: Learner 20286, Status: Ready                                   ║
+║                                                                                ║
+║ Bricklaying (641201)                                                          ║
+║ └─ Database: arplbricklayer_access_recommendation                            ║
+║    └─ Records: 0 (ready for data)                                            ║
+║                                                                                ║
+║ Plumbing (642601)                                                             ║
+║ └─ Database: arplplumber_access_recommendation                               ║
+║    └─ Records: 0 (ready for data)                                            ║
+║                                                                                ║
+╚════════════════════════════════════════════════════════════════════════════════╝

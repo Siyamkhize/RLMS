@@ -91,6 +91,10 @@ class _LogisticsLearningMaterialFormPageState
 
     // Set logistics name from widget parameter
     logisticsFullName = widget.logisticsName ?? 'Unknown Logistics';
+    debugPrint(
+        '[LOGISTICS-PAGE] Initialized with logisticsFullName: $logisticsFullName');
+    debugPrint(
+        '[LOGISTICS-PAGE] widget.logisticsName: ${widget.logisticsName}');
 
     _fetchAllLearners();
     _fetchUnitStandards();
@@ -147,72 +151,31 @@ class _LogisticsLearningMaterialFormPageState
       debugPrint(
           '[LOGISTICS] Fetching learners for classID: ${widget.classID}');
 
-      // STEP 1: Try to fetch learners directly from server API (like facilitator does)
+      // STEP 1: Sync learners from server to local database (like other pages do)
       try {
-        debugPrint('[LOGISTICS] Fetching learners from server API...');
-
-        final response = await http
-            .get(
-              Uri.parse(
-                  '${AppConfig.getLearnersUrl}?classID=${widget.classID}'),
-            )
-            .timeout(const Duration(seconds: 10));
-
-        if (response.statusCode == 200) {
-          final List<dynamic> learnersData = json.decode(response.body);
-          debugPrint(
-              '[LOGISTICS] ✅ Received ${learnersData.length} learners from server API');
-
-          // Store all learners from API
-          allLearners = learnersData.map((learner) {
-            return {
-              'LearnerID': learner['LearnerID'],
-              'IDNumber': learner['IDNumber'],
-              'FullName': '${learner['Name']} ${learner['Surname']}',
-              'Name': learner['Name'],
-              'Surname': learner['Surname'],
-              'ClockInTime': null, // Logistics doesn't require clock-in
-            };
-          }).toList();
-
-          debugPrint(
-              '[LOGISTICS] Fetched ${allLearners.length} learners from API');
-
-          // Apply filtering based on selected material type
-          await _filterLearnersByMaterialType();
-
-          setState(() => isLoading = false);
-          return; // Success - exit early
-        } else {
-          debugPrint(
-              '[LOGISTICS] ⚠️ Server API returned status ${response.statusCode}');
-        }
+        debugPrint('[LOGISTICS] Syncing learners from server...');
+        await dbHelper.syncLearnersFromServer(widget.classID);
+        debugPrint('[LOGISTICS] ✅ Successfully synced learners from server');
       } catch (e) {
-        debugPrint('[LOGISTICS] ⚠️ Failed to fetch from server API: $e');
-        debugPrint('[LOGISTICS] Falling back to local database...');
+        debugPrint('[LOGISTICS] ⚠️ Failed to sync from server: $e');
+        debugPrint('[LOGISTICS] Will try to use existing local data...');
       }
 
-      // STEP 2: Fallback to local database if API fails
-      debugPrint('[LOGISTICS] Using local database as fallback...');
-
-      // Check if learners exist in local database
+      // STEP 2: Check if learners exist in local database
       final totalQuery = 'SELECT COUNT(*) as total FROM learnerdetails';
       final totalResult = await db.rawQuery(totalQuery);
       final totalLearners = totalResult.first['total'];
       debugPrint(
           '[LOGISTICS] Total learners in local database: $totalLearners');
 
-      // NEVER SYNC - Only use existing local data
       if (totalLearners == null || (totalLearners as int) == 0) {
         debugPrint('[LOGISTICS] ❌ No data in local database');
-        debugPrint(
-            '[LOGISTICS] Please sync data from another role first (Facilitator, Admin, or SDP)');
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                  'No learner data available. Please sync from another role first.'),
+                  'No learner data available. Please check your internet connection and try again.'),
               backgroundColor: Colors.orange,
               duration: Duration(seconds: 5),
             ),
@@ -223,7 +186,7 @@ class _LogisticsLearningMaterialFormPageState
         return;
       } else {
         debugPrint(
-            '[LOGISTICS] ✅ Using local data ($totalLearners learners already synced)');
+            '[LOGISTICS] ✅ Found $totalLearners learners in local database');
       }
 
       // Try to convert classID to integer in case there's a type mismatch
@@ -955,6 +918,7 @@ class _LogisticsLearningMaterialFormPageState
           classID: widget.classID,
           contiSuitSizes: contiSuitSizes,
           bootsSizes: bootsSizes,
+          logisticsFullName: logisticsFullName,
         );
       },
     );
@@ -2233,12 +2197,14 @@ class _LogisticsPPEDialog extends StatefulWidget {
   final String classID;
   final List<String> contiSuitSizes;
   final List<String> bootsSizes;
+  final String logisticsFullName;
 
   const _LogisticsPPEDialog({
     required this.learner,
     required this.classID,
     required this.contiSuitSizes,
     required this.bootsSizes,
+    required this.logisticsFullName,
   });
 
   @override
@@ -2503,8 +2469,13 @@ class _LogisticsPPEDialogState extends State<_LogisticsPPEDialog> {
         'boots_size': selectedBootsSize,
         'boots_quantity': bootsQuantity,
         'issued_date': DateTime.now().toIso8601String(),
+        'issuedBy': widget.logisticsFullName,
         'synced': 0,
       };
+
+      debugPrint(
+          '[PPE-SAVE] widget.logisticsFullName value: ${widget.logisticsFullName}');
+      debugPrint('[PPE-SAVE] ppeData issuedBy value: ${ppeData['issuedBy']}');
 
       // Save to local database first
       await db.insert(
@@ -2517,6 +2488,8 @@ class _LogisticsPPEDialogState extends State<_LogisticsPPEDialog> {
       // Try to sync to server if online
       bool synced = false;
       try {
+        debugPrint(
+            '[PPE-SAVE] Sending data to server: ${json.encode(ppeData)}');
         final response = await http
             .post(
               Uri.parse('${AppConfig.baseUrl}/save_learner_ppe.php'),
@@ -2524,6 +2497,9 @@ class _LogisticsPPEDialogState extends State<_LogisticsPPEDialog> {
               body: json.encode(ppeData),
             )
             .timeout(const Duration(seconds: 10));
+
+        debugPrint('[PPE-SAVE] Server response status: ${response.statusCode}');
+        debugPrint('[PPE-SAVE] Server response body: ${response.body}');
 
         if (response.statusCode == 200) {
           final result = json.decode(response.body);

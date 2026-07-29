@@ -138,19 +138,17 @@ try {
     $updateQuery->bind_param("ii", $marksScored, $recordId);
 
     if ($updateQuery->execute()) {
-        if ($updateQuery->affected_rows > 0) {
-            error_log("Successfully updated marks for record ID: $recordId from $oldMarks to $marksScored");
-            echo json_encode([
-                'status' => 'success', 
-                'message' => 'Marks updated successfully',
-                'record_id' => $recordId,
-                'old_marks' => $oldMarks,
-                'new_marks' => $marksScored,
-                'assessment_type' => $actualAssessmentType
-            ]);
-        } else {
-            throw new Exception("No rows were updated. Record may not exist or marks are the same.");
-        }
+        // affected_rows can be 0 if the user submits the same marks again.
+        // In MySQL, this is not an error, so we treat it as success.
+        error_log("Successfully processed update for record ID: $recordId (Affected rows: " . $updateQuery->affected_rows . ")");
+        echo json_encode([
+            'status' => 'success', 
+            'message' => 'Marks updated successfully',
+            'record_id' => $recordId,
+            'old_marks' => $oldMarks,
+            'new_marks' => $marksScored,
+            'assessment_type' => $actualAssessmentType
+        ]);
     } else {
         throw new Exception("Update execution failed: " . $updateQuery->error);
     }

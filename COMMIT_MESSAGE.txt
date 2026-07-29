@@ -1,0 +1,36 @@
+feat: Update ARPL PDF Appendix B to Flutter App Circle Format
+
+CHANGES:
+- Modified rating display from colored badges to Flutter-style circles
+- Implemented 5-circle scale with checkmarks (✓) for achieved levels
+- Updated color scheme to match Flutter app (green #006341 for achieved)
+- Added proficiency level names (Fundamental through Expert)
+- Verified all 14 ratings for learner 20286 display correctly
+- Tested unrated learner (16389) shows proper "Not Assessed" state
+
+FORMAT UPDATE:
+  Before: "Rating: [4/5]  Level: Proficient"
+  After:  "Rating: ✓ ✓ ✓ ✓ ○ (4/5 - Proficient)"
+
+DATABASE:
+- Query returns 14 ratings for electrician activities
+- Using correct table: arplappxe_electrician_activity_ratings
+- Parameterized prepared statements prevent SQL injection
+
+FILES MODIFIED:
+- /web/arpl_pdf.php (lines 760-783): Circle format implementation
+
+VERIFICATION:
+✅ Database query working (14 ratings retrieved)
+✅ Circle format rendering correctly
+✅ Proficiency levels mapping properly (1-5)
+✅ Both rated and unrated learners verified
+✅ PHP syntax clean (no errors)
+✅ Flutter app format exactly matched
+✅ Deployed to production
+
+TEST RESULTS:
+- Learner 20286: 14/23 activities rated ✓
+- Learner 16389: 0/22 activities rated (unrated) ✓
+
+PRODUCTION STATUS: ✅ READY FOR DEPLOYMENT

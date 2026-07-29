@@ -1,0 +1,55 @@
+  Widget _buildAppendixH() {
+    if (_toolkitData?.appendixH == null) {
+      return _buildPlaceholder('Appendix H - Access Recommendation');
+    }
+
+    final appendixH = _toolkitData!.appendixH;
+    final items = appendixH.items;
+    final recommendations = appendixH.recommendations;
+    final tradeName = _getTradeName(widget.ofoNumber);
+
+    // Initialize controllers from existing data
+    for (var rec in recommendations) {
+      if (!_appendixHStatus.containsKey(rec.acrId)) {
+        _appendixHStatus[rec.acrId] = rec.status;
+      }
+      if (!_appendixHRemarks.containsKey(rec.acrId)) {
+        _appendixHRemarks[rec.acrId] = TextEditingController(text: rec.remarks);
+      }
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Appendix H: ACCESS RECOMMENDATION FORM',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF006341),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildTradeTitleBanner(tradeName),
+          const SizedBox(height: 16),
+
+          // Assessment Components
+          if (items.isNotEmpty) ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Assessment Components',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF006341),
+                      ),
+                    ),
+                    const Divider(height: 24),
+                    ...items.asMap().entries.map((entry) {

@@ -137,57 +137,6 @@ class _POETabContentState extends State<POETabContent> {
     }
   }
 
-  Future<Map<String, dynamic>> _getLearnerInfoWithClockingDays() async {
-    try {
-      // Get learner basic info from local database
-      final dbHelper = DatabaseHelper();
-      final db = await dbHelper.database;
-
-      final learnerResult = await db.query(
-        'learnerdetails',
-        where: 'LearnerID = ?',
-        whereArgs: [widget.learnerID],
-        limit: 1,
-      );
-
-      if (learnerResult.isEmpty) {
-        return {};
-      }
-
-      final learnerInfo = Map<String, dynamic>.from(learnerResult.first);
-
-      // Get clocking days count from server
-      try {
-        final url = AppConfig.getClockingDaysCountUrl;
-        final uri = Uri.parse(url).replace(queryParameters: {
-          'learner_id': widget.learnerID.toString(),
-          'include_today': 'true',
-        });
-
-        final response =
-            await http.get(uri).timeout(const Duration(seconds: 5));
-
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          if (data['success'] == true) {
-            learnerInfo['clocking_days'] = data['data']['clocking_days'] ?? 0;
-            learnerInfo['working_days'] = data['data']['working_days'] ?? 0;
-          }
-        }
-      } catch (e) {
-        print('Error fetching clocking days: $e');
-        // Set defaults if server call fails
-        learnerInfo['clocking_days'] = 0;
-        learnerInfo['working_days'] = 0;
-      }
-
-      return learnerInfo;
-    } catch (e) {
-      print('Error getting learner info: $e');
-      return {};
-    }
-  }
-
   Future<void> _syncOfflinePOE() async {
     if (isSyncing) return;
 
@@ -438,6 +387,18 @@ class _POETabContentState extends State<POETabContent> {
       String? existingDocumentPath = await dbHelper.getExistingDocumentPath(
           widget.learnerID, 'Formative', unitStandard);
 
+      if (existingDocumentPath == null) {
+        // No existing document found, show error
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                '❌ No scanned document found. Please scan at least one question first.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       print('Using existing document: $existingDocumentPath');
 
       // Apply the existing document to all pending questions
@@ -448,11 +409,8 @@ class _POETabContentState extends State<POETabContent> {
         // Only mark if not already completed
         if (!(uploadedExercises[uploadKey] ?? false)) {
           // Use the same document path from the existing scan
-          await dbHelper.saveManualMarkToLocalPoe(
-              widget.learnerID,
-              'Formative',
-              exercise,
-              existingDocumentPath ?? '' // Use the actual scanned document
+          await dbHelper.saveManualMarkToLocalPoe(widget.learnerID, 'Formative',
+              exercise, existingDocumentPath // Use the actual scanned document
               );
 
           setState(() {
@@ -554,6 +512,18 @@ class _POETabContentState extends State<POETabContent> {
       String? existingDocumentPath = await dbHelper.getExistingDocumentPath(
           widget.learnerID, 'LogBook', unitStandard);
 
+      if (existingDocumentPath == null) {
+        // No existing document found, show error
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                '❌ No scanned document found. Please scan at least one logbook item first.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       print('Using existing document: $existingDocumentPath');
 
       // Apply the existing document to all pending logbook items
@@ -564,11 +534,8 @@ class _POETabContentState extends State<POETabContent> {
         // Only mark if not already completed
         if (!(uploadedExercises[uploadKey] ?? false)) {
           // Use the same document path from the existing scan
-          await dbHelper.saveManualMarkToLocalPoe(
-              widget.learnerID,
-              'LogBook',
-              exercise,
-              existingDocumentPath ?? '' // Use the actual scanned document
+          await dbHelper.saveManualMarkToLocalPoe(widget.learnerID, 'LogBook',
+              exercise, existingDocumentPath // Use the actual scanned document
               );
 
           // Also save logbook text
@@ -677,6 +644,18 @@ class _POETabContentState extends State<POETabContent> {
       String? existingDocumentPath = await dbHelper.getExistingDocumentPath(
           widget.learnerID, 'Summative', unitStandard);
 
+      if (existingDocumentPath == null) {
+        // No existing document found, show error
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                '❌ No scanned document found. Please scan at least one question first.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       print('Using existing document: $existingDocumentPath');
 
       // Apply the existing document to all pending questions
@@ -687,11 +666,8 @@ class _POETabContentState extends State<POETabContent> {
         // Only mark if not already completed
         if (!(uploadedExercises[uploadKey] ?? false)) {
           // Use the same document path from the existing scan
-          await dbHelper.saveManualMarkToLocalPoe(
-              widget.learnerID,
-              'Summative',
-              exercise,
-              existingDocumentPath ?? '' // Use the actual scanned document
+          await dbHelper.saveManualMarkToLocalPoe(widget.learnerID, 'Summative',
+              exercise, existingDocumentPath // Use the actual scanned document
               );
 
           setState(() {
@@ -2171,7 +2147,8 @@ class _POETabContentState extends State<POETabContent> {
                 SnackBar(content: Text('Server error: ${decoded['message']}')),
               );
               await _saveLocally(document, assessmentType, exercise,
-                  updatedLogbookText ?? logbookText);
+                  updatedLogbookText ?? logbookText,
+                  unitStandard: unitStandard);
             }
           } catch (e) {
             print('Upload error: $e');
@@ -2179,11 +2156,13 @@ class _POETabContentState extends State<POETabContent> {
               SnackBar(content: Text('Upload failed: $e. Saving locally.')),
             );
             await _saveLocally(document, assessmentType, exercise,
-                updatedLogbookText ?? logbookText);
+                updatedLogbookText ?? logbookText,
+                unitStandard: unitStandard);
           }
         } else {
           await _saveLocally(document, assessmentType, exercise,
-              updatedLogbookText ?? logbookText);
+              updatedLogbookText ?? logbookText,
+              unitStandard: unitStandard);
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2443,7 +2422,8 @@ class _POETabContentState extends State<POETabContent> {
             // Save to local database for all exercises
             for (var item in formativeQuestions) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
-              await _saveLocally(document, 'Formative', exercise, null);
+              await _saveLocally(document, 'Formative', exercise, null,
+                  unitStandard: unitStandard);
             }
             successfulUploads = formativeQuestions.length;
             print(
@@ -2453,7 +2433,8 @@ class _POETabContentState extends State<POETabContent> {
             // Save locally for all exercises
             for (var item in formativeQuestions) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
-              await _saveLocally(document, 'Formative', exercise, null);
+              await _saveLocally(document, 'Formative', exercise, null,
+                  unitStandard: unitStandard);
             }
             failedUploads = formativeQuestions.length;
           }
@@ -2462,7 +2443,8 @@ class _POETabContentState extends State<POETabContent> {
           // Save locally for all exercises
           for (var item in formativeQuestions) {
             final exercise = item['exercise']?.toString() ?? 'N/A';
-            await _saveLocally(document, 'Formative', exercise, null);
+            await _saveLocally(document, 'Formative', exercise, null,
+                unitStandard: unitStandard);
           }
           failedUploads = formativeQuestions.length;
         }
@@ -2512,7 +2494,8 @@ class _POETabContentState extends State<POETabContent> {
           print(
               '[OFFLINE_SCAN] Processing question $localSaveCount/${formativeQuestions.length}: $exercise');
 
-          await _saveLocally(document, 'Formative', exercise, null);
+          await _saveLocally(document, 'Formative', exercise, null,
+              unitStandard: unitStandard);
           localSaveCount++;
 
           // Verify it was marked
@@ -2801,7 +2784,8 @@ class _POETabContentState extends State<POETabContent> {
             // Save to local database for all exercises
             for (var item in summativeQuestions) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
-              await _saveLocally(document, 'Summative', exercise, null);
+              await _saveLocally(document, 'Summative', exercise, null,
+                  unitStandard: unitStandard);
             }
             successfulUploads = summativeQuestions.length;
             print(
@@ -2811,7 +2795,8 @@ class _POETabContentState extends State<POETabContent> {
             // Save locally for all exercises
             for (var item in summativeQuestions) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
-              await _saveLocally(document, 'Summative', exercise, null);
+              await _saveLocally(document, 'Summative', exercise, null,
+                  unitStandard: unitStandard);
             }
             failedUploads = summativeQuestions.length;
           }
@@ -2820,7 +2805,8 @@ class _POETabContentState extends State<POETabContent> {
           // Save locally for all exercises
           for (var item in summativeQuestions) {
             final exercise = item['exercise']?.toString() ?? 'N/A';
-            await _saveLocally(document, 'Summative', exercise, null);
+            await _saveLocally(document, 'Summative', exercise, null,
+                unitStandard: unitStandard);
           }
           failedUploads = summativeQuestions.length;
         }
@@ -2870,7 +2856,8 @@ class _POETabContentState extends State<POETabContent> {
           print(
               '[OFFLINE_SCAN] Processing question $localSaveCount/${summativeQuestions.length}: $exercise');
 
-          await _saveLocally(document, 'Summative', exercise, null);
+          await _saveLocally(document, 'Summative', exercise, null,
+              unitStandard: unitStandard);
           localSaveCount++;
 
           // Verify it was marked
@@ -3050,15 +3037,18 @@ class _POETabContentState extends State<POETabContent> {
             print('[REMEDIAL] $remedialType uploaded to server successfully');
           } else {
             print('[REMEDIAL] Server error: ${decoded['message']}');
-            await _saveLocally(document, remedialType, exercise, null);
+            await _saveLocally(document, remedialType, exercise, null,
+                unitStandard: unitStandard);
           }
         } catch (e) {
           print('[REMEDIAL] Upload error: $e');
-          await _saveLocally(document, remedialType, exercise, null);
+          await _saveLocally(document, remedialType, exercise, null,
+              unitStandard: unitStandard);
         }
       } else {
         // Save locally
-        await _saveLocally(document, remedialType, exercise, null);
+        await _saveLocally(document, remedialType, exercise, null,
+            unitStandard: unitStandard);
       }
 
       print('[REMEDIAL] $remedialType document saved for $unitStandard');
@@ -3261,7 +3251,8 @@ class _POETabContentState extends State<POETabContent> {
             for (var item in logBookItems) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
               await _saveLocally(document, 'LogBook', exercise,
-                  'Logbook entry for $exercise - $unitStandard');
+                  'Logbook entry for $exercise - $unitStandard',
+                  unitStandard: unitStandard);
             }
             successfulUploads = logBookItems.length;
             print(
@@ -3272,7 +3263,8 @@ class _POETabContentState extends State<POETabContent> {
             for (var item in logBookItems) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
               await _saveLocally(document, 'LogBook', exercise,
-                  'Logbook entry for $exercise - $unitStandard');
+                  'Logbook entry for $exercise - $unitStandard',
+                  unitStandard: unitStandard);
             }
             failedUploads = logBookItems.length;
           }
@@ -3282,7 +3274,8 @@ class _POETabContentState extends State<POETabContent> {
           for (var item in logBookItems) {
             final exercise = item['exercise']?.toString() ?? 'N/A';
             await _saveLocally(document, 'LogBook', exercise,
-                'Logbook entry for $exercise - $unitStandard');
+                'Logbook entry for $exercise - $unitStandard',
+                unitStandard: unitStandard);
           }
           failedUploads = logBookItems.length;
         }
@@ -3328,7 +3321,8 @@ class _POETabContentState extends State<POETabContent> {
               '[OFFLINE_SCAN] Processing logbook item $localSaveCount/${logBookItems.length}: $exercise');
 
           await _saveLocally(document, 'LogBook', exercise,
-              'Logbook entry for $exercise - $unitStandard');
+              'Logbook entry for $exercise - $unitStandard',
+              unitStandard: unitStandard);
           localSaveCount++;
 
           // Verify it was marked
@@ -3464,22 +3458,26 @@ class _POETabContentState extends State<POETabContent> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Server error: ${decoded['message']}')),
           );
-          await _saveLocally(pdfFile, assessmentType, exercise, null);
+          await _saveLocally(pdfFile, assessmentType, exercise, null,
+              unitStandard: unitStandard);
         }
       } catch (e) {
         print('Upload error: $e');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to upload to server')),
         );
-        await _saveLocally(pdfFile, assessmentType, exercise, null);
+        await _saveLocally(pdfFile, assessmentType, exercise, null,
+            unitStandard: unitStandard);
       }
     } else {
-      await _saveLocally(pdfFile, assessmentType, exercise, null);
+      await _saveLocally(pdfFile, assessmentType, exercise, null,
+          unitStandard: unitStandard);
     }
   }
 
   Future<void> _saveLocally(File document, String assessmentType,
-      String exercise, String? logbookText) async {
+      String exercise, String? logbookText,
+      {String? unitStandard}) async {
     final dbHelper = DatabaseHelper();
     String filePath = document.path;
 
@@ -3493,8 +3491,24 @@ class _POETabContentState extends State<POETabContent> {
 
       final extension = filePath.split('.').last;
       final timestamp = DateTime.now().millisecondsSinceEpoch;
+
+      // Extract unit standard ID from unit standard name or use a simple approach
+      String unitStandardId = 'UNKNOWN';
+      if (unitStandard != null && unitStandard.isNotEmpty) {
+        // Try to extract numeric ID from unit standard name
+        // Common patterns: "Unit Standard 9964 - Name", "9964 - Name", "US9964", or just "9964"
+        RegExp idPattern = RegExp(r'(?:US|Unit\s*Standard\s*)?(\d{4,6})\b');
+        Match? match = idPattern.firstMatch(unitStandard);
+        if (match != null) {
+          unitStandardId = match.group(1)!;
+        } else {
+          // Fallback: use a simple hash but make it shorter and more readable
+          unitStandardId = (unitStandard.hashCode.abs() % 99999).toString();
+        }
+      }
+
       final newFileName =
-          '${assessmentType}_${widget.learnerID}_${exercise.replaceAll(' ', '_')}_$timestamp.$extension';
+          '${assessmentType}_${unitStandardId}_${exercise.replaceAll(' ', '_')}_$timestamp.$extension';
       final newFilePath = '${poeDir.path}/$newFileName';
 
       // Copy file to app directory
@@ -3619,127 +3633,6 @@ class _POETabContentState extends State<POETabContent> {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          // Learner Info Card with Clocking Days Counter
-          FutureBuilder<Map<String, dynamic>>(
-            future: _getLearnerInfoWithClockingDays(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return Container(
-                  padding: const EdgeInsets.all(16),
-                  child: const Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                );
-              }
-
-              final learnerInfo = snapshot.data;
-              if (learnerInfo == null) {
-                return const SizedBox.shrink();
-              }
-
-              final name = learnerInfo['Name']?.toString() ?? 'N/A';
-              final surname = learnerInfo['Surname']?.toString() ?? 'N/A';
-              final idNumber = learnerInfo['IDNumber']?.toString() ?? 'N/A';
-              final clockingDays = learnerInfo['clocking_days'] as int? ?? 0;
-              final workingDays = learnerInfo['working_days'] as int? ?? 0;
-              final percentage =
-                  workingDays > 0 ? (clockingDays / workingDays) * 100 : 0.0;
-
-              // Color based on attendance percentage
-              Color attendanceColor;
-              if (percentage >= 80) {
-                attendanceColor = Colors.green.shade700;
-              } else if (percentage >= 50) {
-                attendanceColor = Colors.orange.shade700;
-              } else {
-                attendanceColor = Colors.red.shade700;
-              }
-
-              return Card(
-                margin: const EdgeInsets.all(12),
-                elevation: 4,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.person,
-                              color: Colors.blue, size: 32),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '$name $surname',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text(
-                                  'ID: $idNumber',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Divider(height: 24),
-                      Row(
-                        children: [
-                          Icon(Icons.calendar_today,
-                              color: attendanceColor, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Days Clocked This Month:',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '$clockingDays/$workingDays',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: attendanceColor,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: attendanceColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: attendanceColor),
-                            ),
-                            child: Text(
-                              '${percentage.toStringAsFixed(0)}%',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: attendanceColor,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
           // Sync status banner
           if (unsyncedCount > 0)
             Container(

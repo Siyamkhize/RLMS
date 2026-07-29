@@ -6,9 +6,43 @@ ini_set('error_log', __DIR__ . '/error.log'); // Valid log path
 
 header('Content-Type: application/json; charset=UTF-8');
 
+// Ensure we return JSON even on fatal errors (which bypass try/catch).
+register_shutdown_function(function () {
+    $error = error_get_last();
+    if ($error === null) {
+        return;
+    }
+
+    $isFatal = in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR], true);
+    if (!$isFatal) {
+        return;
+    }
+
+    // If headers/body already sent, we can't reliably emit JSON.
+    if (headers_sent()) {
+        error_log("Fatal error after headers sent: " . print_r($error, true));
+        return;
+    }
+
+    http_response_code(500);
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Server error (fatal) in save_marks.php',
+        'debug_info' => [
+            'type' => $error['type'],
+            'file' => basename($error['file'] ?? ''),
+            'line' => $error['line'] ?? null,
+        ],
+    ]);
+});
+
 try {
     // Include database connection
-    include('php/connection.php');
+    $connectionPath = __DIR__ . '/php/connection.php';
+    if (!file_exists($connectionPath)) {
+        throw new Exception("Missing connection file: php/connection.php");
+    }
+    include($connectionPath);
     
     // Read and decode JSON input
     $input = file_get_contents("php://input");
@@ -27,6 +61,9 @@ try {
     $marksScored = isset($data['marksScored']) ? (int)$data['marksScored'] : null;
     $assessmentType = $data['assessmentType'] ?? null;
     $specificOutcome = $data['specific_outcome'] ?? null;
+    $aComment = $data['a_comment'] ?? null;
+    $comment = $data['comment'] ?? $data['c'] ?? null;
+    $approvalStatus = $data['approval_status'] ?? null;
     $isUpdate = isset($data['isUpdate']) && $data['isUpdate'] === true;
 
     // Basic validation
@@ -51,6 +88,12 @@ try {
     }
 
     $exerciseName = $exercise['exercise'];
+    
+    // Safety check: Truncate exercise name if it's too long for VARCHAR(255)
+    if (strlen($exerciseName) > 255) {
+        $exerciseName = substr($exerciseName, 0, 252) . '...';
+    }
+    
     $specificOutcomeStr = implode(',', $specificOutcome);
 
     // Check database connection
@@ -58,7 +101,7 @@ try {
         throw new Exception("Connection failed: " . $conn->connect_error);
     }
 
-    // SIMPLIFIED TYPE DETERMINATION - ROBUST AND SAFE
+    // SIMPLIFIED TYPE DETERMINATION - ROBUST AND SAFE WITH REMEDIAL SUPPORT
     $actualAssessmentType = 'Formative'; // Safe default
     
     // Priority 1: Check exercise['type'] field (most reliable)
@@ -72,11 +115,21 @@ try {
             $actualAssessmentType = 'Summative';
         } elseif ($exerciseType === 'logbook') {
             $actualAssessmentType = 'Logbook';
+        } elseif ($exerciseType === 'formativeremedial') {
+            $actualAssessmentType = 'FormativeRemedial';
+        } elseif ($exerciseType === 'summativeremedial') {
+            $actualAssessmentType = 'SummativeRemedial';
         }
         error_log("Type determined from exercise.type: $actualAssessmentType");
     }
     // Priority 2: Check assessmentType field for type hints
-    elseif (stripos($assessmentType, 'formative') !== false) {
+    elseif (stripos($assessmentType, 'formativeremedial') !== false) {
+        $actualAssessmentType = 'FormativeRemedial';
+        error_log("Type determined from assessmentType: FormativeRemedial");
+    } elseif (stripos($assessmentType, 'summativeremedial') !== false) {
+        $actualAssessmentType = 'SummativeRemedial';
+        error_log("Type determined from assessmentType: SummativeRemedial");
+    } elseif (stripos($assessmentType, 'formative') !== false) {
         $actualAssessmentType = 'Formative';
         error_log("Type determined from assessmentType: Formative");
     } elseif (stripos($assessmentType, 'summative') !== false) {
@@ -84,7 +137,13 @@ try {
         error_log("Type determined from assessmentType: Summative");
     }
     // Priority 3: Check exercise name for type hints
-    elseif (stripos($exerciseName, 'formative') !== false) {
+    elseif (stripos($exerciseName, 'formativeremedial') !== false) {
+        $actualAssessmentType = 'FormativeRemedial';
+        error_log("Type determined from exercise name: FormativeRemedial");
+    } elseif (stripos($exerciseName, 'summativeremedial') !== false) {
+        $actualAssessmentType = 'SummativeRemedial';
+        error_log("Type determined from exercise name: SummativeRemedial");
+    } elseif (stripos($exerciseName, 'formative') !== false) {
         $actualAssessmentType = 'Formative';
         error_log("Type determined from exercise name: Formative");
     } elseif (stripos($exerciseName, 'summative') !== false) {
@@ -123,30 +182,28 @@ try {
             // Update existing marks
             $checkQuery->close();
             
-            $updateQuery = $conn->prepare("UPDATE marks SET marks_scored = ? WHERE id = ?");
+            $updateQuery = $conn->prepare("UPDATE marks SET marks_scored = ?, a_comment = ?, comment = ? WHERE id = ?");
             if (!$updateQuery) {
                 throw new Exception("Update query prepare failed: " . $conn->error);
             }
 
             // Convert marksScored to integer for database int(11) type
             $marksScored = (int)$marksScored;
-            $updateQuery->bind_param("ii", $marksScored, $recordId);
+            $updateQuery->bind_param("issi", $marksScored, $aComment, $comment, $recordId);
 
             if ($updateQuery->execute()) {
-                if ($updateQuery->affected_rows > 0) {
-                    error_log("Successfully updated marks for record ID: $recordId from $oldMarks to $marksScored");
-                    echo json_encode([
-                        'status' => 'success', 
-                        'message' => 'Marks updated successfully',
-                        'action' => 'update',
-                        'record_id' => $recordId,
-                        'old_marks' => $oldMarks,
-                        'new_marks' => $marksScored,
-                        'actual_type' => $actualAssessmentType
-                    ]);
-                } else {
-                    throw new Exception("No rows were updated. Marks may be the same as existing.");
-                }
+                // affected_rows can be 0 if the user submits the same marks again.
+                // In MySQL, this is not an error, so we treat it as success.
+                error_log("Successfully processed update for record ID: $recordId (Affected rows: " . $updateQuery->affected_rows . ")");
+                echo json_encode([
+                    'status' => 'success', 
+                    'message' => 'Marks updated successfully',
+                    'action' => 'update',
+                    'record_id' => $recordId,
+                    'old_marks' => $oldMarks,
+                    'new_marks' => $marksScored,
+                    'actual_type' => $actualAssessmentType
+                ]);
             } else {
                 throw new Exception("Update execution failed: " . $updateQuery->error);
             }
@@ -173,14 +230,14 @@ try {
     $checkQuery->close();
 
     // Insert new marks (no existing record found)
-    $stmt = $conn->prepare("INSERT INTO marks (learnerID, exercise, so, marks_scored, type) VALUES (?, ?, ?, ?, ?)");
+    $stmt = $conn->prepare("INSERT INTO marks (learnerID, exercise, so, marks_scored, type, a_comment, comment, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     if (!$stmt) {
         throw new Exception("Insert prepare failed: " . $conn->error);
     }
 
     // Bind parameters with correct types
-    error_log("Binding values - learnerID: $learnerId, exercise: $exerciseName, so: $specificOutcomeStr, marks_scored: $marksScored, type: $actualAssessmentType");
-    $stmt->bind_param("issis", $learnerId, $exerciseName, $specificOutcomeStr, $marksScored, $actualAssessmentType);
+    error_log("Binding values - learnerID: $learnerId, exercise: $exerciseName, so: $specificOutcomeStr, marks_scored: $marksScored, type: $actualAssessmentType, a_comment: $aComment, comment: $comment, approval_status: $approvalStatus");
+    $stmt->bind_param("ississss", $learnerId, $exerciseName, $specificOutcomeStr, $marksScored, $actualAssessmentType, $aComment, $comment, $approvalStatus);
 
     if ($stmt->execute()) {
         $newRecordId = $conn->insert_id;
@@ -208,12 +265,9 @@ try {
     error_log("Error in save_marks.php: $errorMessage at $errorFile:$errorLine");
     error_log("Stack trace: " . $e->getTraceAsString());
     
-    // Return appropriate HTTP status code
-    if (strpos($errorMessage, 'Connection failed') !== false) {
-        http_response_code(500); // Database connection issues
-    } else {
-        http_response_code(400); // Client request issues
-    }
+    // Return HTTP 500 to match server failure semantics.
+    // (Client can still show message; classification is in JSON.)
+    http_response_code(500);
     
     echo json_encode([
         'status' => 'error', 

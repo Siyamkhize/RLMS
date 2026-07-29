@@ -689,35 +689,87 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: GridView.count(
-          shrinkWrap: true,
-          crossAxisCount: 3,
-          crossAxisSpacing: 8.0,
-          mainAxisSpacing: 8.0,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            buildCard('Full Name', practitionerFullName),
-            buildCard('Class Name', className),
-            buildCard('Date Created', DateTime.now().toString().split(' ')[0]),
+            Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue.shade800),
+                const SizedBox(width: 8),
+                Text(
+                  'Issuance Information',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade800,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildInfoDetail(
+                      'Facilitator Name', practitionerFullName, Icons.person),
+                ),
+                Expanded(
+                  child:
+                      _buildInfoDetail('Class Name', className, Icons.class_),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildInfoDetail(
+                    'Date Created',
+                    DateTime.now().toString().split(' ')[0],
+                    Icons.calendar_today,
+                  ),
+                ),
+                Expanded(
+                  child: _buildInfoDetail(
+                      'Qualification', qualification_name, Icons.school),
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget buildCard(String label, String value) {
-    return Card(
-      color: Colors.blue.shade50,
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 5),
-            Text(value, textAlign: TextAlign.center),
-          ],
+  Widget _buildInfoDetail(String label, String value, IconData icon) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: Colors.blue.shade600),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -1215,22 +1267,20 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
               const SizedBox(width: 10),
               SizedBox(
                 width: 80,
-                child: DropdownButton<int>(
-                  isExpanded: true,
-                  value: currentQuantity,
-                  onChanged: (int? newValue) {
-                    if (newValue != null) {
-                      setState(() {
-                        unitStandardQuantities[usId] = newValue;
-                      });
-                    }
+                child: TextFormField(
+                  initialValue: currentQuantity.toString(),
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      unitStandardQuantities[usId] = int.tryParse(value) ?? 0;
+                    });
                   },
-                  items: List.generate(51, (index) => index).map((int value) {
-                    return DropdownMenuItem<int>(
-                      value: value,
-                      child: Text(value.toString()),
-                    );
-                  }).toList(),
                 ),
               ),
               if (existing > 0) ...[
@@ -1360,22 +1410,20 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
                       style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: DropdownButton<int>(
-                      isExpanded: true,
-                      value: quantity,
-                      onChanged: (int? newValue) {
-                        if (newValue == null) return;
+                    child: TextFormField(
+                      initialValue: quantity.toString(),
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (value) {
                         setState(() {
-                          quantity = newValue;
+                          quantity = int.tryParse(value) ?? 0;
                         });
                       },
-                      items:
-                          List.generate(51, (index) => index).map((int value) {
-                        return DropdownMenuItem<int>(
-                          value: value,
-                          child: Text(value.toString()),
-                        );
-                      }).toList(),
                     ),
                   ),
                 ],
@@ -1403,45 +1451,130 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
 
   Widget buildFacilitatorSignatureTable() {
     return Card(
-      color: Colors.blue.shade50,
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(8.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Facilitator and Representative Details',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const SizedBox(height: 16),
-            Table(
-              border: TableBorder.all(
-                  color: Colors.grey,
-                  width: 1,
-                  borderRadius: BorderRadius.circular(12)),
-              columnWidths: {
-                0: const FixedColumnWidth(150),
-                1: const FixedColumnWidth(150),
-              },
+            Row(
               children: [
-                TableRow(
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade100,
-                    borderRadius: BorderRadius.circular(12),
+                Icon(Icons.assignment_turned_in, color: Colors.blue.shade800),
+                const SizedBox(width: 8),
+                Text(
+                  'Facilitator & Representative Confirmation',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade800,
                   ),
-                  children: [
-                    _buildHeaderCell('Name'),
-                    _buildHeaderCell('Signature'),
-                  ],
                 ),
-                buildSignatureTableRow(
-                    practitionerFullName, facilitatorSignature, (signature) {
-                  setState(() {
-                    facilitatorSignature = signature;
-                  });
-                }),
-                buildRepresentativeTableRow(),
               ],
+            ),
+            const Divider(height: 24),
+
+            // Facilitator Section
+            Text(
+              'FACILITATOR',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Full Name',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                        Text(
+                          practitionerFullName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _buildSignatureButton(
+                    facilitatorSignature,
+                    'Facilitator',
+                    (sig) => setState(() => facilitatorSignature = sig),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Representative Section
+            Text(
+              'REPRESENTATIVE',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                children: [
+                  TextField(
+                    onChanged: (value) =>
+                        setState(() => representativeName = value),
+                    decoration: InputDecoration(
+                      labelText: 'Representative Full Name',
+                      hintText: 'Enter name of person receiving materials',
+                      prefixIcon: const Icon(Icons.person_outline),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      const Text(
+                        'Signature:',
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                      const SizedBox(width: 12),
+                      _buildSignatureButton(
+                        representativeSignature,
+                        'Representative',
+                        (sig) => setState(() => representativeSignature = sig),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -1449,79 +1582,53 @@ class _FacilitatorIssueFormPageState extends State<FacilitatorIssueFormPage> {
     );
   }
 
-  TableRow buildSignatureTableRow(
-      String name, Uint8List? signature, Function(Uint8List?) onCaptured) {
-    return TableRow(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: TableCell(
-            child: Text(name,
-                style:
-                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-          ),
+  Widget _buildSignatureButton(
+      Uint8List? signature, String label, Function(Uint8List?) onCaptured) {
+    if (signature == null) {
+      return ElevatedButton.icon(
+        onPressed: () => showSignatureDialog(context, onCaptured),
+        icon: const Icon(Icons.edit),
+        label: Text('Sign as $label'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.blue.shade700,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: TableCell(
-            child: signature == null
-                ? ElevatedButton(
-                    onPressed: () => showSignatureDialog(context, onCaptured),
-                    child: Text('$name Signature'),
-                  )
-                : Image.memory(
-                    signature,
-                    height: 50,
-                    width: 100,
-                    fit: BoxFit.contain,
-                  ),
+      );
+    } else {
+      return Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.blue.shade200),
+              borderRadius: BorderRadius.circular(8),
+              color: Colors.white,
+            ),
+            child: Image.memory(
+              signature,
+              height: 60,
+              width: 120,
+              fit: BoxFit.contain,
+            ),
           ),
-        ),
-      ],
-    );
-  }
-
-  TableRow buildRepresentativeTableRow() {
-    return TableRow(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: TableCell(
-            child: TextField(
-              onChanged: (value) {
-                setState(() {
-                  representativeName = value;
-                });
-              },
-              decoration: const InputDecoration(
-                labelText: 'Representative Name',
-                border: OutlineInputBorder(),
+          Positioned(
+            right: 0,
+            top: 0,
+            child: GestureDetector(
+              onTap: () => onCaptured(null),
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, size: 14, color: Colors.white),
               ),
             ),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: TableCell(
-            child: representativeSignature == null
-                ? ElevatedButton(
-                    onPressed: () => showSignatureDialog(context, (signature) {
-                      setState(() {
-                        representativeSignature = signature;
-                      });
-                    }),
-                    child: const Text('Representative Signature'),
-                  )
-                : Image.memory(
-                    representativeSignature!,
-                    height: 50,
-                    width: 100,
-                    fit: BoxFit.contain,
-                  ),
-          ),
-        ),
-      ],
-    );
+        ],
+      );
+    }
   }
 
   Widget _buildHeaderCell(String text) {

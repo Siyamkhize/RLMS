@@ -1,90 +1,52 @@
-╔══════════════════════════════════════════════════════════════════════════════╗
-║           MODERATOR CLASS FILTERING - QUICK FIX REFERENCE                    ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+════════════════════════════════════════════════════════════════════════════════
+  ARPL BUG FIX - QUICK REFERENCE
+════════════════════════════════════════════════════════════════════════════════
 
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ THE BUG                                                                      │
-└──────────────────────────────────────────────────────────────────────────────┘
-  Moderators were seeing ALL learners with POE instead of only learners from
-  their allocated classes.
+🔴 THE BUG:
+   Bricklayer users see Electrician ARPL questions instead of Bricklayer questions
 
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ THE FIX                                                                      │
-└──────────────────────────────────────────────────────────────────────────────┘
-  File: get_learners_with_poe_assigned.php
-  Line: ~370 (in getAvailableLearnersByStrata function)
-  
-  Changed:  FROM learnerdetails l
-  To:       FROM temp_poe_learners tpl
-            INNER JOIN learnerdetails l ON tpl.learnerID = l.LearnerID
+✅ THE FIX:
+   Corrected OFO code mapping in PHP APIs:
+   - 671102 → 642601 (Plumber OFO)
+   - 671103 → 641201 (Bricklayer OFO)
+   - Removed hardcoded Electrician defaults
 
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ DEPLOYMENT                                                                   │
-└──────────────────────────────────────────────────────────────────────────────┘
-  1. Upload: get_learners_with_poe_assigned.php
-  2. Test:   php test_class_filtering_fix.php?moderator_id=77
-  3. Verify: All learners have correct classID
-  4. Deploy: Mobile app ready to use
+📁 FILES CHANGED (4):
+   1. mobile/get_arpl_toolkit_data.php
+   2. web/api/get_arpl_complete_data.php
+   3. mobile/save_arpl_appendix_f_assessment.php
+   4. mobile/arpl_toolkit_dynamic.php
 
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ TESTING                                                                      │
-└──────────────────────────────────────────────────────────────────────────────┘
-  Quick Test:
-    curl "https://rlms.rlms.co.za/get_learners_with_poe_assigned.php?moderator_id=77"
-  
-  Verify Data:
-    php test_moderator_77_data.php
-  
-  Full Test:
-    php test_class_filtering_fix.php?moderator_id=77
+🏗️ NEXT ACTION:
+   Rebuild APK:
+   
+   cd c:\projects\rlmss
+   flutter clean
+   flutter pub get
+   flutter build apk --release
 
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ EXPECTED RESULTS (Moderator 77)                                             │
-└──────────────────────────────────────────────────────────────────────────────┘
-  ✅ Allocated Classes: 1 (Class A, ID: 74)
-  ✅ Learners with POE: 3
-  ✅ Selected: ~1 learner (25%)
-  ✅ All learners have classID = 74
-  ✅ No learners from other classes
+✅ VERIFICATION:
+   1. Install new APK on test device
+   2. Login as Bricklayer (classID 783)
+   3. Go to ARPL → Should show Bricklayer questions
+   4. Login as Electrician (classID 782)
+   5. Go to ARPL → Should show Electrician questions
 
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ CLEAR ASSIGNMENTS (Optional)                                                │
-└──────────────────────────────────────────────────────────────────────────────┘
-  If moderators have incorrect assignments from before the fix:
-  
-  SQL:
-    DELETE FROM moderator_assignments WHERE moderator_id = '77';
-  
-  Or clear all:
-    DELETE FROM moderator_assignments;
+📊 CORRECT OFO CODES:
+   Electrician: 671101
+   Plumber:     642601
+   Bricklayer:  641201
+   Welder:      651302
 
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ DOCUMENTATION                                                                │
-└──────────────────────────────────────────────────────────────────────────────┘
-  📄 MODERATOR_CLASS_FILTERING_BUG_FIXED.md     - Main summary
-  📄 CLASS_FILTERING_CODE_CHANGE.md             - Exact code changes
-  📄 MODERATOR_CLASS_FILTERING_SUMMARY.md       - Detailed analysis
-  📄 DEPLOY_CLASS_FILTERING_FIX.md              - Deployment guide
-  📄 CLASS_FILTERING_FIX_DIAGRAM.txt            - Visual diagram
-  📄 test_class_filtering_fix.php               - Test script
+⏱️ TIME ESTIMATE:
+   APK Rebuild: 15-20 minutes
+   Testing:     10-15 minutes
+   Total:       25-35 minutes
 
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ STATUS                                                                       │
-└──────────────────────────────────────────────────────────────────────────────┘
-  ✅ Bug identified
-  ✅ Root cause found
-  ✅ Code fixed
-  ✅ Tests created
-  ✅ Documentation complete
-  ⏳ Ready for deployment
-  ⏳ Awaiting server upload
-  ⏳ Awaiting verification
+📞 IF ISSUES:
+   - Check server is running (XAMPP MySQL + Apache)
+   - Verify PHP files were actually updated
+   - Check app cache: Settings → Apps → RLMSS → Clear Cache
+   - Force logout and login again
 
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ CONTACT                                                                      │
-└──────────────────────────────────────────────────────────────────────────────┘
-  If issues occur after deployment:
-  1. Check PHP error logs
-  2. Run test_moderator_77_data.php
-  3. Verify facilitator table has correct class assignments
-  4. Check temp tables are being created
+════════════════════════════════════════════════════════════════════════════════

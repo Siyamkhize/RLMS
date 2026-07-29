@@ -9,7 +9,7 @@ class OptimizedSearchWidget extends StatefulWidget {
   final Function(Map<String, dynamic>) onLearnerSelected;
   final String hintText;
   final bool showAutocomplete;
-  
+
   const OptimizedSearchWidget({
     super.key,
     this.classID,
@@ -49,10 +49,10 @@ class _OptimizedSearchWidgetState extends State<OptimizedSearchWidget> {
 
   void _onSearchChanged() {
     final query = _searchController.text.trim();
-    
+
     // Cancel previous timer
     _debounceTimer?.cancel();
-    
+
     if (query.length < 2) {
       setState(() {
         _suggestions.clear();
@@ -88,7 +88,7 @@ class _OptimizedSearchWidgetState extends State<OptimizedSearchWidget> {
 
   Future<void> _fetchSuggestions(String query) async {
     if (!mounted) return;
-    
+
     setState(() {
       _isLoading = true;
     });
@@ -101,17 +101,18 @@ class _OptimizedSearchWidgetState extends State<OptimizedSearchWidget> {
       });
 
       final response = await http.get(Uri.parse(url)).timeout(
-        const Duration(seconds: 5),
-      );
+            const Duration(seconds: 5),
+          );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true && mounted) {
           setState(() {
-            _suggestions = List<Map<String, dynamic>>.from(data['suggestions'] ?? []);
+            _suggestions =
+                List<Map<String, dynamic>>.from(data['suggestions'] ?? []);
             _showSuggestions = _suggestions.isNotEmpty;
           });
-          
+
           if (_showSuggestions) {
             _showOverlay();
           } else {
@@ -138,13 +139,14 @@ class _OptimizedSearchWidgetState extends State<OptimizedSearchWidget> {
 
   Future<void> _performDirectSearch(String query) async {
     if (!mounted) return;
-    
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final url = AppConfig.buildUrl('search_learner_optimized.php', queryParams: {
+      final url =
+          AppConfig.buildUrl('search_learner_optimized.php', queryParams: {
         'search': query,
         if (widget.classID != null) 'classID': widget.classID!,
         'type': 'all',
@@ -152,8 +154,8 @@ class _OptimizedSearchWidgetState extends State<OptimizedSearchWidget> {
       });
 
       final response = await http.get(Uri.parse(url)).timeout(
-        const Duration(seconds: 10),
-      );
+            const Duration(seconds: 10),
+          );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -178,7 +180,7 @@ class _OptimizedSearchWidgetState extends State<OptimizedSearchWidget> {
 
   void _showOverlay() {
     _removeOverlay();
-    
+
     _overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
         width: MediaQuery.of(context).size.width - 32,
@@ -228,7 +230,7 @@ class _OptimizedSearchWidgetState extends State<OptimizedSearchWidget> {
       _showSuggestions = false;
     });
     _removeOverlay();
-    
+
     // Convert suggestion to learner format
     final learner = {
       'learner_id': suggestion['id'],
@@ -236,7 +238,7 @@ class _OptimizedSearchWidgetState extends State<OptimizedSearchWidget> {
       'surname': suggestion['surname'],
       'id_number': suggestion['id_number'],
     };
-    
+
     widget.onLearnerSelected(learner);
   }
 
@@ -316,7 +318,9 @@ class _OptimizedSearchWidgetState extends State<OptimizedSearchWidget> {
           ),
         ),
         // Show suggestions inline if overlay is not used
-        if (!widget.showAutocomplete && _showSuggestions && _suggestions.isNotEmpty)
+        if (!widget.showAutocomplete &&
+            _showSuggestions &&
+            _suggestions.isNotEmpty)
           Container(
             margin: const EdgeInsets.only(top: 8),
             decoration: BoxDecoration(

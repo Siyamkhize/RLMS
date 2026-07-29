@@ -1,22 +1,21 @@
-class AppConfig {
-  // ========================================
-  // LIVE SERVER CONFIGURATION
-  // ========================================
-  // static const String serverHost = 'tesing.mtltechnical.co.za';
-  static const String serverHost = 'rlms.rlms.co.za'; // Live server domain
-  static const int serverPort = 443; // HTTPS port
-  static const String serverProtocol = 'https';
-  // Live server uses HTTPS
-  static const String basePath = '/mobile';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-  // static const String serverHost =
-  //     '192.168.68.115'; // Updated production hostname
-  // static const int serverPort = 8080; // HTTP poj   ``rt 8080
-  // static const String serverProtocol = 'http'; // Local server uses HTTP
+class AppConfig {
+  // Local dev (phone must be on same Wi-Fi as the PC running the server)
+  // static const String serverHost = '192.168.0.57'; // Local dev IP
+  // static const int serverPort = 8080; // Local dev port
+  // static const String serverProtocol = 'http'; // Local dev uses HTTP
   // static const String basePath = '/assessorReport2/mobile';
 
+  // Live server configuration - ONLINE
+  static const String serverHost = 'rlms.rlms.co.za'; // Live server domain
+  static const int serverPort = 443; // HTTPS port
+  static const String serverProtocol = 'https'; // Live server uses HTTPS
+  static const String basePath = '/mobile';
+
   // Base URL for all API calls
-  // Result: https://rlms.rlms.co.za/mobile
+  // Result: http://192.168.68.106/assessorReport2/mobile
   static String get baseUrl {
     // Don't include port for standard HTTPS (443) or HTTP (80)
     final includePort = (serverProtocol == 'https' && serverPort != 443) ||
@@ -100,6 +99,55 @@ class AppConfig {
   static String get saveReceiptFormUrl => '$baseUrl/save_receipt_form.php';
   static String get saveMaterialsReceivedUrl =>
       '$baseUrl/save_materials_received.php';
+
+  // ARPL Endpoints
+  static String get saveArplAppendixBUrl => '$baseUrl/save_arpl_appendix_b.php';
+  static String get saveArplAppendixDUrl => '$baseUrl/save_arpl_appendix_d.php';
+  static String get getArplAppendixDUrl => '$baseUrl/get_arpl_appendix_d.php';
+  static String get saveArplAppendixEUrl => '$baseUrl/save_arpl_appendix_e.php';
+  static String get getArplAppendixEUrl => '$baseUrl/get_arpl_appendix_e.php';
+  static String get saveArplAppendixFUrl => '$baseUrl/save_arpl_appendix_f.php';
+  static String get saveAppendixFDataUrl =>
+      '$baseUrl/save_appendix_f_data.php'; // NEW REDESIGNED ENDPOINT
+  static String get saveArplToolkitEditsUrl =>
+      '$baseUrl/save_arpl_toolkit_edits.php'; // B/D/E save endpoint
+  static String get saveArplCriteriaUrl => '$baseUrl/save_arpl_criteria.php';
+  static String get getArplDataUrl => '$baseUrl/get_arpl_data.php';
+  static String get verifyFingerprintSignatureUrl =>
+      '$baseUrl/verify_fingerprint_and_get_signature.php'; // Fingerprint-verified signature
+  // ARPL Toolkit Data - All trades use unified endpoint
+  static String get getArplToolkitDataUrl =>
+      '$baseUrl/get_arpl_toolkit_data.php';
+  static String get getBricklayerToolkitDataUrl =>
+      '$baseUrl/get_bricklayer_toolkit_data.php'; // Separate endpoint for bricklayer
+  static String get getPlumberToolkitDataUrl =>
+      '$baseUrl/get_arpl_toolkit_data.php'; // Use unified endpoint for plumber
+  static String get getArplSaveToolkitDataUrl =>
+      '$baseUrl/save_arpl_appendix_f_assessment.php';
+
+  // Bricklayer Gap Closure Endpoints
+  static String get getBricklayerGapUnitStandardsUrl =>
+      '$baseUrl/get_bricklayer_gap_unit_standards.php';
+  static String get saveBricklayerGapClosureUrl =>
+      '$baseUrl/save_bricklayer_gap_closure.php';
+
+  // Electrician Gap Closure Endpoints
+  static String get getElectricianGapUnitStandardsUrl =>
+      '$baseUrl/get_electrician_gap_unit_standards.php';
+  static String get saveElectricianGapClosureUrl =>
+      '$baseUrl/save_electrician_gap_closure.php';
+
+  // Plumber Gap Closure Endpoints
+  static String get getPlumberGapUnitStandardsUrl =>
+      '$baseUrl/get_plumber_gap_unit_standards.php';
+  static String get savePlumberGapClosureUrl =>
+      '$baseUrl/save_plumber_gap_closure.php';
+
+  // Sick Note Endpoints
+  static String get getSickNoteEligibleDatesUrl =>
+      '$baseUrl/get_sick_note_eligible_dates.php?v=2';
+  static String get submitSickNoteUrl => '$baseUrl/submit_sick_note.php?v=2';
+
   static String get syncProjectUrl => '$baseUrl/sync_project.php';
   static String get syncPoeOnlineUrl => '$baseUrl/sync_PoeOnline.php';
   static String get syncOnlineDetailsUrl => '$baseUrl/sync_online_details.php';
@@ -109,6 +157,7 @@ class AppConfig {
   static String get ppeSizesUrl => '$baseUrl/ppe_sizes.php';
   static String get addLearnerUrl => '$baseUrl/add_learner.php';
   static String get getAttendanceUrl => '$baseUrl/get_attendance.php';
+  static String get checkBankDetailsUrl => '$baseUrl/check_bank_details.php';
 
   // Logistics Management Endpoints
   static String get getLogisticsSitesUrl => '$baseUrl/get_logistics_sites.php';
@@ -144,6 +193,31 @@ class AppConfig {
           .join('&');
       url += '?$queryString';
     }
+    return url;
+  }
+
+  // Helper function to get auth token
+  static Future<String?> getAuthToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('auth_token');
+    } catch (e) {
+      debugPrint('[AUTH] Error getting auth token: $e');
+      return null;
+    }
+  }
+
+  // Helper function to build serve_file.php URL with token
+  static Future<String> buildServeFileUrl(String filePath) async {
+    final token = await getAuthToken();
+    debugPrint('[CONFIG] buildServeFileUrl called with filePath: $filePath');
+    debugPrint('[CONFIG] Retrieved token: $token');
+    final params = {'file': filePath};
+    if (token != null) {
+      params['token'] = token;
+    }
+    final url = buildUrl('serve_file.php', queryParams: params);
+    debugPrint('[CONFIG] Generated serve URL: $url');
     return url;
   }
 }

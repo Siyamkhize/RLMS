@@ -51,7 +51,29 @@ class _AttendancePageState extends State<AttendancePage> {
       '${date.year}-12-26', // Day of Goodwill
     ];
 
+    // Easter-related holidays (moveable dates)
+    // 2026: Easter Sunday = April 5
+    final easterHolidays2026 = [
+      '2026-04-03', // Good Friday (April 3, 2026)
+      '2026-04-06', // Family Day (April 6, 2026)
+    ];
+
+    // 2025: Easter Sunday = April 20
+    final easterHolidays2025 = [
+      '2025-04-18', // Good Friday
+      '2025-04-21', // Family Day
+    ];
+
+    // 2027: Easter Sunday = March 28
+    final easterHolidays2027 = [
+      '2027-03-26', // Good Friday
+      '2027-03-29', // Family Day
+    ];
+
     return fixedHolidays.contains(dateStr) ||
+        easterHolidays2026.contains(dateStr) ||
+        easterHolidays2025.contains(dateStr) ||
+        easterHolidays2027.contains(dateStr) ||
         holidays.any((h) =>
             h.year == date.year && h.month == date.month && h.day == date.day);
   }
@@ -219,9 +241,22 @@ class _AttendancePageState extends State<AttendancePage> {
             '[ATTENDANCE] Records with clocking data: ${recordsWithClocking.length}');
       }
 
-      return localRecords
-          .map((record) => Map<String, dynamic>.from(record))
-          .toList();
+      // Enrich local records with manual attendance data
+      final enrichedRecords = <Map<String, dynamic>>[];
+      for (final record in localRecords) {
+        final learnerId = record['LearnerID'] as int;
+
+        // Get approved manual attendance days for this learner
+        final manualDays = await DatabaseHelper()
+            .getApprovedManualAttendanceDays(learnerId, monthStr);
+
+        enrichedRecords.add({
+          ...Map<String, dynamic>.from(record),
+          'manual_days_clocked': manualDays,
+        });
+      }
+
+      return enrichedRecords;
     } catch (e) {
       print('[ATTENDANCE] Error loading local records: $e');
       return [];
@@ -412,8 +447,10 @@ class _AttendancePageState extends State<AttendancePage> {
 
         for (final record in localData) {
           final localDaysClocked = record['local_days_clocked'] ?? 0;
-          final totalDaysAttended =
-              localDaysClocked; // Only count local clocking for now
+          final manualDaysClocked = record['manual_days_clocked'] ?? 0;
+
+          // Total attendance includes both regular clocking and approved manual attendance
+          final totalDaysAttended = localDaysClocked + manualDaysClocked;
           final totalDue = dailyRate * totalDaysAttended;
 
           finalData.add({
@@ -421,7 +458,7 @@ class _AttendancePageState extends State<AttendancePage> {
             'Name': record['Name'],
             'Surname': record['Surname'],
             'days_clocked': localDaysClocked,
-            'manual_days_clocked': 0, // Not available locally
+            'manual_days_clocked': manualDaysClocked,
             'sick_note_days': 0, // Not available locally
             'days_attended': totalDaysAttended,
             'expected_days': expectedDays,
@@ -627,9 +664,11 @@ class _AttendancePageState extends State<AttendancePage> {
               children: [
                 Expanded(flex: 3, child: _buildHeaderCell('Surname')),
                 Expanded(flex: 3, child: _buildHeaderCell('Name')),
-                Expanded(flex: 2, child: _buildHeaderCell('Days\nAttended')),
-                Expanded(flex: 2, child: _buildHeaderCell('Daily\nRate')),
-                Expanded(flex: 2, child: _buildHeaderCell('Total\nDue')),
+                Expanded(flex: 2, child: _buildHeaderCell('Regular\nDays')),
+                Expanded(flex: 2, child: _buildHeaderCell('Manual\nDays')),
+                Expanded(flex: 2, child: _buildHeaderCell('Sick\nDays')),
+                Expanded(flex: 2, child: _buildHeaderCell('Holidays')),
+                Expanded(flex: 2, child: _buildHeaderCell('Total\nDays')),
               ],
             ),
           ),
@@ -643,71 +682,13 @@ class _AttendancePageState extends State<AttendancePage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.inbox,
-                                size: 64, color: Colors.grey),
+                            const Icon(Icons.info_outline,
+                                size: 48, color: Colors.grey),
                             const SizedBox(height: 16),
-                            const Text(
-                              'No learners found for this class',
-                              style:
-                                  TextStyle(color: Colors.grey, fontSize: 16),
-                            ),
+                            const Text('No attendance records found'),
                             const SizedBox(height: 8),
-                            Text(
-                              'Class ID: ${widget.classID}',
-                              style: TextStyle(
-                                  color: Colors.grey.shade600, fontSize: 12),
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              onPressed: () async {
-                                // Show debug info
-                                final db = await DatabaseHelper().database;
-                                final allClasses = await db.rawQuery('''
-                                  SELECT DISTINCT classID, COUNT(*) as count 
-                                  FROM learnerdetails 
-                                  WHERE classID IS NOT NULL 
-                                  GROUP BY classID
-                                  ORDER BY count DESC
-                                ''');
-
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: const Text('Debug Info'),
-                                    content: SingleChildScrollView(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                              'Current Class ID: ${widget.classID}'),
-                                          const SizedBox(height: 16),
-                                          const Text('Available Classes:',
-                                              style: TextStyle(
-                                                  fontWeight: FontWeight.bold)),
-                                          const SizedBox(height: 8),
-                                          ...allClasses.map((c) => Padding(
-                                                padding: const EdgeInsets.only(
-                                                    bottom: 4),
-                                                child: Text(
-                                                    '• ${c['classID']}: ${c['count']} learners'),
-                                              )),
-                                        ],
-                                      ),
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: const Text('Close'),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.bug_report),
-                              label: const Text('Show Debug Info'),
-                            ),
+                            Text('Class ID: ${widget.classID}',
+                                style: const TextStyle(color: Colors.grey)),
                           ],
                         ),
                       )
@@ -771,10 +752,12 @@ class _AttendancePageState extends State<AttendancePage> {
 
     final bgColor = index % 2 == 0 ? Colors.white : Colors.grey.shade50;
 
-    // Build breakdown tooltip
-    final breakdown = dataSource == 'local'
-        ? 'Local clocking: $daysClocked\nTotal: $daysAttended\n📱 Offline mode'
-        : 'Regular: $daysClocked\nManual: $manualDaysClocked\nSick Notes: $sickNoteDays\nHolidays: $holidays\nTotal: $daysAttended';
+    // Determine color for total days based on attendance percentage
+    final attendanceColor = daysAttended > expectedDays * 0.8
+        ? Colors.green.shade700
+        : daysAttended > expectedDays * 0.5
+            ? Colors.orange.shade700
+            : Colors.red.shade700;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
@@ -805,30 +788,43 @@ class _AttendancePageState extends State<AttendancePage> {
           ),
           Expanded(
             flex: 2,
-            child: Tooltip(
-              message: breakdown,
-              child: _buildTableCell(
-                '$daysAttended/$expectedDays',
-                color: daysAttended > expectedDays * 0.8
-                    ? Colors.green.shade700
-                    : daysAttended > expectedDays * 0.5
-                        ? Colors.orange.shade700
-                        : Colors.red.shade700,
-                isBold: true,
-              ),
+            child: _buildTableCell(
+              daysClocked.toString(),
+              color: Colors.blue.shade700,
+              fontSize: 11,
             ),
           ),
           Expanded(
             flex: 2,
-            child: _buildTableCell('R${dailyRate.toStringAsFixed(0)}',
-                fontSize: 11),
+            child: _buildTableCell(
+              manualDaysClocked.toString(),
+              color: Colors.purple.shade700,
+              fontSize: 11,
+            ),
           ),
           Expanded(
             flex: 2,
             child: _buildTableCell(
-              'R${totalDue.toStringAsFixed(0)}',
-              color: Colors.green.shade700,
+              sickNoteDays.toString(),
+              color: Colors.orange.shade700,
+              fontSize: 11,
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: _buildTableCell(
+              holidays.toString(),
+              color: Colors.teal.shade700,
+              fontSize: 11,
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: _buildTableCell(
+              '$daysAttended/$expectedDays',
+              color: attendanceColor,
               isBold: true,
+              fontSize: 11,
             ),
           ),
         ],

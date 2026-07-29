@@ -157,10 +157,12 @@ class _GuardianDetailsPageState extends State<GuardianDetailsPage> {
       if (guardianData == null) {
         guardianData = await DatabaseHelper()
             .fetchGuardianDetails(int.parse(widget.learnerID));
-        print('[GUARDIAN] Data loaded from local database');
-            }
+        if (guardianData != null) {
+          print('[GUARDIAN] Data loaded from local database');
+        }
+      }
 
-      if (mounted) {
+      if (guardianData != null && mounted) {
         setState(() {
           _guardianFullNameController.text =
               guardianData!['full_name']?.toString() ?? '';
@@ -178,9 +180,7 @@ class _GuardianDetailsPageState extends State<GuardianDetailsPage> {
         });
 
         // Load signature images if available
-        if (guardianData != null) {
-          await _loadSignatureImages(guardianData);
-        }
+        await _loadSignatureImages(guardianData);
 
         print(
             '[GUARDIAN] Guardian data loaded for learner ${widget.learnerID}');

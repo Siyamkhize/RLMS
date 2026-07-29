@@ -246,185 +246,40 @@ class SyncService extends ChangeNotifier {
 
   // Initialize the app and download data if online
   Future<void> initSync() async {
-    try {
-      debugPrint('[SYNC] Starting initial sync...');
-      await syncData();
-      debugPrint('[SYNC] Initial sync completed successfully');
-    } catch (e, stackTrace) {
-      debugPrint('[SYNC] Error during initial sync: $e');
-      debugPrint('[SYNC] Stack trace: $stackTrace');
-      // Don't rethrow - allow app to continue even if sync fails
-    }
+    await syncData();
   }
 
   // Sync all tables from the server to the local database
   Future<void> syncData() async {
-    debugPrint('[SYNC] ========== FULL SYNC START ==========');
-
-    try {
-      await _syncUsers();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing users: $e');
-    }
-
-    try {
-      await _syncLearnerDetails();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing learner details: $e');
-    }
-
+    await _syncUsers();
+    await _syncLearnerDetails();
     // Only sync current day's clocking data to avoid loading old records
-    try {
-      await _syncLearnerClocking(currentDayOnly: true);
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing learner clocking: $e');
-    }
-
-    try {
-      await _syncFacilitator();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing facilitator: $e');
-    }
-
-    try {
-      await _syncSdp();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing SDP: $e');
-    }
-
-    try {
-      await syncSites();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing sites: $e');
-    }
-
-    try {
-      await _syncClass();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing class: $e');
-    }
-
-    try {
-      await _syncLearningpathway();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing learning pathway: $e');
-    }
-
-    try {
-      await _syncPathwaySelection();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing pathway selection: $e');
-    }
-
-    try {
-      await _syncQualification();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing qualification: $e');
-    }
-
-    try {
-      await _syncQualification_selection();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing qualification selection: $e');
-    }
-
-    try {
-      await _syncQualification_pathway();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing qualification pathway: $e');
-    }
-
-    try {
-      await _syncQualificationunitstandard();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing qualification unit standard: $e');
-    }
-
-    try {
-      await _syncUnitstandard();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing unit standard: $e');
-    }
-
-    try {
-      await _syncUnit_standard_selection();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing unit standard selection: $e');
-    }
-
-    try {
-      await _syncAssessment();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing assessment: $e');
-    }
-
-    try {
-      await _syncPoe();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing POE: $e');
-    }
-
-    try {
-      await syncAcknowledgmentOfReceiptToServer();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing acknowledgment: $e');
-    }
-
-    try {
-      await syncDataFromServer();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing data from server: $e');
-    }
-
-    try {
-      await syncMaterialReceiptFormData();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing material receipt: $e');
-    }
-
-    try {
-      await syncMaterialsReceivedData();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing materials received: $e');
-    }
-
-    try {
-      await syncProjectData();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing project data: $e');
-    }
-
-    try {
-      await syncSickNotesToServer();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing sick notes: $e');
-    }
-
-    try {
-      await _syncBankDetails();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing bank details: $e');
-    }
-
-    try {
-      await _syncInductionClocking();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing induction clocking: $e');
-    }
-
-    try {
-      await sync_inductionClocking();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing induction clocking (alt): $e');
-    }
-
-    try {
-      await _syncPPEIssuance();
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing PPE issuance: $e');
-    }
-
-    debugPrint('[SYNC] ========== FULL SYNC COMPLETE ==========');
+    await _syncLearnerClocking(currentDayOnly: true);
+    await _syncFacilitator();
+    await _syncSdp();
+    await syncSites();
+    await _syncClass();
+    await _syncLearningpathway();
+    await _syncPathwaySelection();
+    await _syncQualification();
+    await _syncQualification_selection();
+    await _syncQualification_pathway();
+    await _syncQualificationunitstandard();
+    await _syncUnitstandard();
+    await _syncUnit_standard_selection();
+    await _syncAssessment();
+    // Sync learner documents
+    await _syncLearnerDocuments();
+    await _syncPoe();
+    await syncAcknowledgmentOfReceiptToServer();
+    await syncDataFromServer();
+    await syncMaterialReceiptFormData();
+    await syncMaterialsReceivedData();
+    await syncProjectData();
+    await syncSickNotesToServer();
+    await _syncBankDetails();
+    await _syncInductionClocking();
+    await sync_inductionClocking();
   }
 
   // Sync users table
@@ -435,13 +290,19 @@ class SyncService extends ChangeNotifier {
         var data = jsonDecode(response.body);
         print('Users data from server: $data'); // Debug the response
 
-        // Clear existing data in the local users table
-        await _dbHelper.clearTable('users');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print('Syncing ${data.length} users using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         // Insert each user into the SQLite database
         for (var user in data) {
-          await _dbHelper.insertData('users', user);
-          print('Inserted user: $user'); // Debug insertion
+          await db.insert(
+            'users',
+            user,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+          print('Synced user: $user'); // Debug insertion
         }
         print(
             "Users table synchronized and data inserted into local database successfully.");
@@ -463,37 +324,27 @@ class SyncService extends ChangeNotifier {
   // Sync learnerdetails table
   Future<void> _syncLearnerDetails() async {
     try {
-      debugPrint('[SYNC-LEARNERS] Starting learner details sync...');
-
       // Verify connectivity
       final connectivityResult = await Connectivity().checkConnectivity();
       if (!connectivityResult.contains(ConnectivityResult.wifi) &&
           !connectivityResult.contains(ConnectivityResult.mobile)) {
-        debugPrint(
-            "[SYNC-LEARNERS] No network available, skipping learner details sync");
+        print("No network available, skipping learner details sync");
         return;
       }
-
-      debugPrint(
-          '[SYNC-LEARNERS] Fetching from: ${AppConfig.syncLearnerDetailsUrl}');
 
       // Make GET request to fetch learner details
       final response = await http.get(
         Uri.parse(AppConfig.syncLearnerDetailsUrl),
         headers: {'Content-Type': 'application/json'},
-      ).timeout(const Duration(seconds: 30));
+      );
 
-      debugPrint(
-          "[SYNC-LEARNERS] Server response status: ${response.statusCode}");
+      print("Server response status: ${response.statusCode}");
+      print("Server response body: ${response.body}");
 
       if (response.statusCode == 200) {
         final List<dynamic> learners = json.decode(response.body);
-        debugPrint(
-            "[SYNC-LEARNERS] Received ${learners.length} learners from server");
-
         if (learners.isEmpty) {
-          debugPrint(
-              "[SYNC-LEARNERS] Warning: No learner data received from API");
+          print("Warning: No learner data received from API");
           return;
         }
 
@@ -519,117 +370,83 @@ class SyncService extends ChangeNotifier {
           if (idNumberToServerId.containsKey(idNumber)) {
             int serverId = idNumberToServerId[idNumber]!;
             localToServerIdMapping[localId] = serverId;
-            debugPrint(
-                "[SYNC-LEARNERS] Mapping local ID $localId to server ID $serverId for IDNumber $idNumber");
+            print(
+                "Mapping local ID $localId to server ID $serverId for IDNumber $idNumber");
           }
         }
 
-        // Update related tables with new IDs before clearing learnerdetails
+        // Update related tables with new IDs before syncing learnerdetails
         if (localToServerIdMapping.isNotEmpty) {
           await _updateRelatedTablesWithNewIds(db, localToServerIdMapping);
         }
 
-        // Clear and re-insert learner details
-        await _dbHelper.clearTable('learnerdetails');
-        debugPrint("[SYNC-LEARNERS] Cleared learnerdetails table");
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${learners.length} learner details using UPDATE/INSERT pattern');
 
         // Insert records one by one
-        int successCount = 0;
-        int errorCount = 0;
-
         for (var learner in learners) {
           // Validate required fields
           if (learner['IDNumber'] == null || learner['classID'] == null) {
-            debugPrint(
-                "[SYNC-LEARNERS] Skipping invalid learner record: $learner");
-            errorCount++;
+            print("Skipping invalid learner record: $learner");
             continue;
           }
 
-          // Create a copy of the learner data and preserve the server's LearnerID
-          Map<String, dynamic> learnerData = Map<String, dynamic>.from(learner);
+          // Extract bank details before inserting learner
+          Map<String, dynamic>? bankDetails;
+          if (learner['BankName'] != null || learner['BankAccount'] != null) {
+            bankDetails = {
+              'LearnerID': learner['LearnerID'],
+              'BankName': learner['BankName'] ?? '',
+              'bankType': learner['bankType'] ?? '',
+              'BankAccount': learner['BankAccount'] ?? '',
+              'BankCode': learner['BankCode'] ?? '',
+              'synced': 0,
+            };
+          }
 
-          // CRITICAL: Remove bank fields - they belong in bankdetails table, not learnerdetails
-          // The backend returns these fields joined from bankdetails table
-          final bankName = learnerData.remove('BankName');
-          final bankType = learnerData.remove('bankType');
-          final bankAccount = learnerData.remove('BankAccount');
-          final bankCode = learnerData.remove('BankCode');
+          // Create learner data WITHOUT bank fields
+          Map<String, dynamic> learnerData = Map<String, dynamic>.from(learner);
+          learnerData.remove('BankName');
+          learnerData.remove('bankType');
+          learnerData.remove('BankAccount');
+          learnerData.remove('BankCode');
 
           try {
-            // Insert learner details (without bank fields)
-            await _dbHelper.insertData('learnerdetails', learnerData);
-            successCount++;
+            // Insert/update learner details
+            await db.insert(
+              'learnerdetails',
+              learnerData,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
 
-            // If bank details exist, insert/update them in bankdetails table
-            if (bankName != null || bankAccount != null) {
-              try {
-                final bankData = {
-                  'LearnerID': learner['LearnerID'],
-                  'BankName': bankName ?? '',
-                  'bankType': bankType ?? '',
-                  'BankAccount': bankAccount ?? '',
-                  'BankCode': bankCode ?? '',
-                  'synced': 1,
-                };
-
-                // Check if bank record exists
-                final existingBank = await db.query(
-                  'bankdetails',
-                  where: 'LearnerID = ?',
-                  whereArgs: [learner['LearnerID']],
-                );
-
-                if (existingBank.isEmpty) {
-                  await db.insert('bankdetails', bankData);
-                } else {
-                  await db.update(
-                    'bankdetails',
-                    bankData,
-                    where: 'LearnerID = ?',
-                    whereArgs: [learner['LearnerID']],
-                  );
-                }
-              } catch (e) {
-                debugPrint(
-                    "[SYNC-LEARNERS] ⚠️ Error syncing bank details for learner ${learner['LearnerID']}: $e");
-              }
+            // Insert/update bank details if they exist
+            if (bankDetails != null) {
+              await db.insert(
+                'bankdetails',
+                bankDetails,
+                conflictAlgorithm: ConflictAlgorithm.replace,
+              );
             }
 
-            if (successCount <= 3) {
-              debugPrint(
-                  "[SYNC-LEARNERS] ✅ Inserted learner: ${learner['Name']} ${learner['Surname']} (ID: ${learner['LearnerID']}, IDNumber: ${learner['IDNumber']})");
-            }
+            print(
+                "Successfully synced learner with IDNumber: ${learner['IDNumber']}, Server ID: ${learner['LearnerID']}");
           } catch (e) {
-            errorCount++;
-            debugPrint(
-                "[SYNC-LEARNERS] ❌ Error inserting learner with IDNumber ${learner['IDNumber']}: $e");
+            print(
+                "Error syncing learner with IDNumber ${learner['IDNumber']}: $e");
             // Continue with other learners even if one fails
           }
         }
 
-        debugPrint("[SYNC-LEARNERS] ========== SYNC COMPLETE ==========");
-        debugPrint(
-            "[SYNC-LEARNERS] ✅ Successfully synchronized $successCount learner records");
-        if (errorCount > 0) {
-          debugPrint(
-              "[SYNC-LEARNERS] ⚠️ Failed to sync $errorCount learner records");
-        }
-
-        // Verify the sync
-        final verifyCount =
-            await db.rawQuery('SELECT COUNT(*) as count FROM learnerdetails');
-        debugPrint(
-            "[SYNC-LEARNERS] 📊 Total learners in local database: ${verifyCount.first['count']}");
+        print("Successfully synchronized ${learners.length} learner records");
       } else {
-        debugPrint(
-            "[SYNC-LEARNERS] ❌ Failed to sync learner details. Status code: ${response.statusCode}");
-        debugPrint("[SYNC-LEARNERS] Response body: ${response.body}");
+        throw Exception(
+            "Failed to sync learner details. Status code: ${response.statusCode}");
       }
     } catch (e, stackTrace) {
-      debugPrint("[SYNC-LEARNERS] ❌ Error syncing learner details: $e");
-      debugPrint("[SYNC-LEARNERS] Stack trace: $stackTrace");
-      // Don't rethrow - allow other syncs to continue
+      print("Error syncing learner details: $e");
+      print("Stack trace: $stackTrace");
+      rethrow;
     }
   }
 
@@ -707,10 +524,19 @@ class SyncService extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         List details = json.decode(response.body);
-        await _dbHelper.clearTable('bankdetails');
+
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${details.length} bank details using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var detail in details) {
-          await _dbHelper.insertData('bankdetails', detail);
+          await db.insert(
+            'bankdetails',
+            detail,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
         print("bankdetails table synchronized successfully.");
       } else {
@@ -849,21 +675,20 @@ class SyncService extends ChangeNotifier {
 
           // Insert or update each record
           for (var clocking in clockingData) {
-            // Map JSON keys to match table schema if needed
-            var mappedClocking = {
-              'clocking_id': clocking['clocking_id'],
-              'LearnerID': clocking['LearnerID'] ??
-                  clocking['learner_id'], // Handle key mismatch
-              'clock_date': clocking['clock_date'],
-              'clock_in_time': clocking['clock_in_time'],
-              'clock_out_time': clocking['clock_out_time'],
-              'contact_time': clocking['contact_time'],
-              'signature': clocking['signature'],
-              'synced': clocking['synced'] ??
-                  1, // Mark as synced since it's from server
-              'user_latitude': clocking['user_latitude'],
-              'user_longitude': clocking['user_longitude'],
-              'user_accuracy': clocking['user_accuracy'],
+            // Map JSON keys to match table schema - include ALL columns for full sync
+            final raw = clocking as Map<String, dynamic>;
+            var mappedClocking = <String, dynamic>{
+              'clocking_id': raw['clocking_id'],
+              'LearnerID': raw['LearnerID'] ?? raw['learner_id'],
+              'clock_date': raw['clock_date'],
+              'clock_in_time': raw['clock_in_time'],
+              'clock_out_time': raw['clock_out_time'],
+              'contact_time': raw['contact_time'],
+              'signature': raw['signature'],
+              'synced': raw['synced'] ?? 1,
+              'user_latitude': raw['user_latitude'],
+              'user_longitude': raw['user_longitude'],
+              'user_accuracy': raw['user_accuracy'],
             };
 
             // Validate required fields
@@ -887,49 +712,30 @@ class SyncService extends ChangeNotifier {
             print("Merging server record: $mappedClocking");
             try {
               final db = await _dbHelper.database;
-              // Check for existing record with same learner, date, AND clock-in time
+              // Check for existing record with same learner and date ONLY.
+              // This guarantees max ONE local record per learner per date.
               final existingRecords = await db.query(
                 'learner_clocking',
-                where: 'LearnerID = ? AND clock_date = ? AND clock_in_time = ?',
+                where: 'LearnerID = ? AND clock_date = ?',
                 whereArgs: [
                   mappedClocking['LearnerID'],
                   mappedClocking['clock_date'],
-                  mappedClocking['clock_in_time']
                 ],
               );
 
               if (existingRecords.isNotEmpty) {
-                final existingRecord = existingRecords.first;
-
-                // Only preserve local unsynced records (synced=0)
-                // Server records (synced=1 or coming from server) should always be accepted
-                if (existingRecord['synced'] == 0 &&
-                    existingRecord['clock_in_time'] != null &&
-                    existingRecord['clock_out_time'] == null) {
-                  // Local has unsynced clock-in without clock-out - preserve it
-                  print(
-                      "PRESERVING local unsynced clock-in for ${mappedClocking['LearnerID']}");
-                  continue;
-                }
-
-                // Update with server data (server is source of truth for current day)
-                await db.update(
+                // NEVER overwrite local records - local is source of truth.
+                // Also, do NOT create a second record for the same learner/date.
+                print(
+                    "⏭️ PRESERVING local record for ${mappedClocking['LearnerID']} (clock_date=${mappedClocking['clock_date']}) - not inserting duplicate for day");
+                skippedCount++;
+              } else {
+                // Insert new record from server (no existing record for that learner/date)
+                await db.insert(
                   'learner_clocking',
                   mappedClocking,
-                  where:
-                      'LearnerID = ? AND clock_date = ? AND clock_in_time = ?',
-                  whereArgs: [
-                    mappedClocking['LearnerID'],
-                    mappedClocking['clock_date'],
-                    mappedClocking['clock_in_time']
-                  ],
+                  conflictAlgorithm: ConflictAlgorithm.replace,
                 );
-                print(
-                    "✅ Updated local with server record for ${mappedClocking['LearnerID']}");
-                insertedCount++;
-              } else {
-                // Insert new record from server (no existing record found)
-                await db.insert('learner_clocking', mappedClocking);
                 print(
                     "✅ Inserted new server record for ${mappedClocking['LearnerID']}");
                 insertedCount++;
@@ -987,12 +793,16 @@ class SyncService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Only sync current day's records
-      final today = DateTime.now().toIso8601String().split('T')[0];
+      // Sync ALL unsynced records for the last 10 days (including clock-in only)
+      // This allows devices to be offline for a few days but avoids sending very old data.
+      final now = DateTime.now();
+      final cutoffDate = DateFormat('yyyy-MM-dd')
+          .format(now.subtract(const Duration(days: 10)));
+
       final List<Map<String, dynamic>> clockingDataList = await db.query(
         'learner_clocking',
-        where: 'synced = ? AND clock_date = ?',
-        whereArgs: [false, today],
+        where: 'synced = ? AND clock_date >= ?',
+        whereArgs: [0, cutoffDate],
       );
 
       if (clockingDataList.isEmpty) {
@@ -1008,7 +818,7 @@ class SyncService extends ChangeNotifier {
         final clockInTime = clockingData['clock_in_time'];
         final clockOutTime = clockingData['clock_out_time'];
         final contactTime = clockingData['contact_time'];
-        final signaturePath = clockingData['signature_path'];
+        // We no longer send signature for clocking sync; always null on server
         final userLatitude = clockingData['user_latitude'];
         final userLongitude = clockingData['user_longitude'];
         final userAccuracy = clockingData['user_accuracy'];
@@ -1034,32 +844,6 @@ class SyncService extends ChangeNotifier {
             request.fields['user_latitude'] = userLatitude?.toString() ?? '';
             request.fields['user_longitude'] = userLongitude?.toString() ?? '';
             request.fields['user_accuracy'] = userAccuracy?.toString() ?? '';
-
-            // Add signature file if it exists
-            if (signaturePath != null && File(signaturePath).existsSync()) {
-              var signatureFile = File(signaturePath);
-              var signatureStream = http.ByteStream(signatureFile.openRead());
-              var signatureLength = await signatureFile.length();
-              var extension = path
-                  .extension(signaturePath)
-                  .toLowerCase()
-                  .replaceFirst('.', '');
-              var mimeType = extension == 'png' ? 'image/png' : 'image/jpeg';
-
-              var signatureMultipart = http.MultipartFile(
-                'signature',
-                signatureStream,
-                signatureLength,
-                filename: path.basename(signaturePath),
-                contentType: MediaType.parse(mimeType),
-              );
-              request.files.add(signatureMultipart);
-              print(
-                  'Attempt $attempt: Signature file added: $signaturePath, MIME type: $mimeType');
-            } else if (signaturePath != null) {
-              print(
-                  'Attempt $attempt: Signature file not found: $signaturePath');
-            }
 
             // Log request details
             print('Attempt $attempt: Request fields: ${request.fields}');
@@ -1208,13 +992,21 @@ class SyncService extends ChangeNotifier {
 
           print("sdp data received from server: $sdpData");
 
-          // Clear the local sdp table before inserting new data
-          await _dbHelper.clearTable('sdp');
+          // SMART SYNC: Update existing, insert new (no delete)
+          final db = await _dbHelper.database;
 
-          // Insert each sdp record into the local database
           for (var sdp in sdpData) {
-            print("Inserting sdp: $sdp"); // Debug log
-            await _dbHelper.insertData('sdp', {
+            print("Syncing sdp: $sdp"); // Debug log
+
+            // Check if record exists
+            final existing = await db.query(
+              'sdp',
+              where: 'sdp_id = ?',
+              whereArgs: [sdp['sdp_id']],
+              limit: 1,
+            );
+
+            final sdpRecord = {
               'sdp_id': sdp['sdp_id'],
               'sdp_name': sdp['sdp_name'],
               'Reg_number': sdp['Reg_number'],
@@ -1230,15 +1022,27 @@ class SyncService extends ChangeNotifier {
               'role': sdp['role'],
               'client_name': sdp['client_name'],
               'signature_image': sdp['signature_image'],
-            });
+            };
+
+            if (existing.isNotEmpty) {
+              // Update existing record
+              await db.update(
+                'sdp',
+                sdpRecord,
+                where: 'sdp_id = ?',
+                whereArgs: [sdp['sdp_id']],
+              );
+              print("Updated sdp: ${sdp['sdp_id']}");
+            } else {
+              // Insert new record
+              await _dbHelper.insertData('sdp', sdpRecord);
+              print("Inserted new sdp: ${sdp['sdp_id']}");
+            }
           }
 
-          // Ensure that the database is opened before querying
-          final db = await _dbHelper.database;
-
-          // Query the local sdp table to check if data is inserted
+          // Query the local sdp table to check if data is synced
           final sdp = await db.query('sdp');
-          print("sdp in local database: $sdp");
+          print("sdp in local database: ${sdp.length} records");
 
           print("sdp table synchronized successfully.");
         } else {
@@ -1261,11 +1065,11 @@ class SyncService extends ChangeNotifier {
         var data = json.decode(response.body);
         if (data['status'] == 'success') {
           List sitesData = data['data'];
-          print('Sites data: $sitesData');
+          print('Sites data received: ${sitesData.length} sites');
 
           // Process the data and insert it into the local database (SQLite)
           for (var sites in sitesData) {
-            // Insert each site into the local database
+            // Insert each site into the local database with ALL fields
             await _dbHelper.insertSite({
               'siteID': sites['siteID'],
               'siteName': sites['siteName'],
@@ -1279,16 +1083,22 @@ class SyncService extends ChangeNotifier {
               'Category': sites['Category'],
               'project_id': sites['project_id'],
               'Project_pathway': sites['Project_pathway'],
+              'qualification_id': sites['qualification_id'],
+              'first_name': sites['first_name'],
+              'last_name': sites['last_name'],
+              'cell_phone': sites['cell_phone'],
+              'email': sites['email'],
             });
           }
+
           // Ensure that the database is opened before querying
           final db = await _dbHelper.database;
 
-          // Query the local sdp table to check if data is inserted
-          final sdp = await db.query('sites');
-          print("sites in local database: $sitesData");
+          // Query the local sites table to check if data is inserted
+          final localSites = await db.query('sites');
+          print("Sites in local database: ${localSites.length} records");
 
-          print("sites table synchronized successfully.");
+          print("Sites table synchronized successfully.");
         } else {
           print("Failed to sync sites. Unexpected response format.");
         }
@@ -1316,26 +1126,30 @@ class SyncService extends ChangeNotifier {
 
           print("Class data received from server: $classData");
 
-          // Clear the local class table before inserting new data
-          await _dbHelper.clearTable('class');
+          // SMART SYNC: Update existing, insert new (no delete)
+          print(
+              'Syncing ${classData.length} classes using UPDATE/INSERT pattern');
+
+          final db = await _dbHelper.database;
 
           // Insert each class record into the local database
           for (var classEntry in classData) {
-            print("Inserting class: $classEntry"); // Debug log
-            await _dbHelper.insertData('class', {
-              'classID': classEntry['classID'],
-              'className': classEntry['className'],
-              'numberOfLearners': classEntry['numberOfLearners'],
-              'siteID': classEntry['siteID'],
-            });
+            print("Syncing class: $classEntry"); // Debug log
+            await db.insert(
+              'class',
+              {
+                'classID': classEntry['classID'],
+                'className': classEntry['className'],
+                'numberOfLearners': classEntry['numberOfLearners'],
+                'siteID': classEntry['siteID'],
+              },
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
           }
-
-          // Ensure the database is opened before querying
-          final db = await _dbHelper.database;
 
           // Query the local class table to check if data is inserted
           final localClassData = await db.query('class');
-          print("Class in local database: $localClassData");
+          print("Class in local database: ${localClassData.length} records");
 
           print("Class table synchronized successfully.");
         } else {
@@ -1516,10 +1330,18 @@ class SyncService extends ChangeNotifier {
           insertLearningpathway = [];
         }
 
-        await _dbHelper.clearTable('learningpathway');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${insertLearningpathway.length} learning pathways using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var pathwayData in insertLearningpathway) {
-          await _dbHelper.insertData('learningpathway', pathwayData);
+          await db.insert(
+            'learningpathway',
+            pathwayData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
         print("Pathway selection table synchronized successfully.");
       } else {
@@ -1550,11 +1372,18 @@ class SyncService extends ChangeNotifier {
           pathwaySelectionlist = decodedResponse;
         }
 
-        await _dbHelper.clearTable('pathway_selection');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${pathwaySelectionlist.length} pathway selections using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var pathway_selectionData in pathwaySelectionlist) {
-          await _dbHelper.insertData(
-              'pathway_selection', pathway_selectionData);
+          await db.insert(
+            'pathway_selection',
+            pathway_selectionData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
 
         print("Pathway selection table synchronized successfully.");
@@ -1586,10 +1415,18 @@ class SyncService extends ChangeNotifier {
           qualificationList = decodedResponse;
         }
 
-        await _dbHelper.clearTable('qualification');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${qualificationList.length} qualifications using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var qualificationData in qualificationList) {
-          await _dbHelper.insertData('qualification', qualificationData);
+          await db.insert(
+            'qualification',
+            qualificationData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
 
         print("Qualification table synchronized successfully.");
@@ -1621,11 +1458,18 @@ class SyncService extends ChangeNotifier {
           qualificationSelectionlist = decodedResponse;
         }
 
-        await _dbHelper.clearTable('qualification_selection');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${qualificationSelectionlist.length} qualification selections using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var qualification_selectionData in qualificationSelectionlist) {
-          await _dbHelper.insertData(
-              'qualification_selection', qualification_selectionData);
+          await db.insert(
+            'qualification_selection',
+            qualification_selectionData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
 
         print("Qualification selection table synchronized successfully.");
@@ -1657,11 +1501,18 @@ class SyncService extends ChangeNotifier {
           qualificationPathwaylist = decodedResponse;
         }
 
-        await _dbHelper.clearTable('qualification_pathway');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${qualificationPathwaylist.length} qualification pathways using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var qualification_pathwayData in qualificationPathwaylist) {
-          await _dbHelper.insertData(
-              'qualification_pathway', qualification_pathwayData);
+          await db.insert(
+            'qualification_pathway',
+            qualification_pathwayData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
 
         print("Qualification pathway table synchronized successfully.");
@@ -1693,12 +1544,19 @@ class SyncService extends ChangeNotifier {
           qualificationunitstandardList = decodedResponse;
         }
 
-        await _dbHelper.clearTable('qualificationunitstandard');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${qualificationunitstandardList.length} qualification unit standards using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var qualificationunitstandardData
             in qualificationunitstandardList) {
-          await _dbHelper.insertData(
-              'qualificationunitstandard', qualificationunitstandardData);
+          await db.insert(
+            'qualificationunitstandard',
+            qualificationunitstandardData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
 
         print("Qualification unitstandard table synchronized successfully.");
@@ -1729,10 +1587,18 @@ class SyncService extends ChangeNotifier {
           unitstandardList = decodedResponse;
         }
 
-        await _dbHelper.clearTable('unitstandard');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${unitstandardList.length} unit standards using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var unitstandardData in unitstandardList) {
-          await _dbHelper.insertData('unitstandard', unitstandardData);
+          await db.insert(
+            'unitstandard',
+            unitstandardData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
 
         print("Unitstandard table synchronized successfully.");
@@ -1764,11 +1630,18 @@ class SyncService extends ChangeNotifier {
           unitstandardSelectionList = decodedResponse;
         }
 
-        await _dbHelper.clearTable('unit_standard_selection');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${unitstandardSelectionList.length} unit standard selections using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var unitstandardSelectionData in unitstandardSelectionList) {
-          await _dbHelper.insertData(
-              'unit_standard_selection', unitstandardSelectionData);
+          await db.insert(
+            'unit_standard_selection',
+            unitstandardSelectionData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
 
         print("Unit standard selection table synchronized successfully.");
@@ -1799,10 +1672,18 @@ class SyncService extends ChangeNotifier {
           assessmentsList = decodedResponse;
         }
 
-        await _dbHelper.clearTable('assessments');
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${assessmentsList.length} assessments using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
 
         for (var assessmentsData in assessmentsList) {
-          await _dbHelper.insertData('assessments', assessmentsData);
+          await db.insert(
+            'assessments',
+            assessmentsData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
 
         print("Assessments table synchronized successfully.");
@@ -1833,17 +1714,43 @@ class SyncService extends ChangeNotifier {
           poeList = decodedResponse;
         }
 
-        await _dbHelper.clearTable('poe');
-        for (var poeData in poeList) {
-          await _dbHelper.insertData('poe', poeData);
+        // SMART SYNC: Update existing, insert new (no delete)
+        print(
+            'Syncing ${poeList.length} POE records using UPDATE/INSERT pattern');
+
+        final db = await _dbHelper.database;
+
+        for (var poe in poeList) {
+          try {
+            await db.insert(
+              'poe',
+              poe,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          } catch (e) {
+            print("Error syncing POE with ID ${poe['poe_id']}: $e");
+            // Continue with other POE records even if one fails
+          }
         }
 
-        print("Poe table synchronized successfully.");
+        print("Successfully synchronized ${poeList.length} POE records");
       } else {
-        print("Failed to sync poe. Status code: ${response.statusCode}");
+        throw Exception(
+            "Failed to sync POE. Status code: ${response.statusCode}");
       }
     } catch (e) {
-      print("Error syncing poe: $e");
+      print("Error syncing POE: $e");
+    }
+  }
+
+  // Sync learner documents from server
+  Future<void> _syncLearnerDocuments() async {
+    try {
+      print('[SYNC] Starting learner documents sync...');
+      await _dbHelper.syncLearnerDocuments();
+      print('[SYNC] Learner documents sync completed');
+    } catch (e) {
+      print('[SYNC] Error syncing learner documents: $e');
     }
   }
 
@@ -2329,37 +2236,54 @@ class SyncService extends ChangeNotifier {
 
   // Method to sync project data
   Future<void> syncProjectData() async {
+    print('[PROJECT_SYNC] ===== STARTING PROJECT SYNC =====');
     try {
       // Define your PHP API URL
       final apiUrl = AppConfig.syncProjectUrl;
+      print('[PROJECT_SYNC] API URL: $apiUrl');
 
       // Make the API call
+      print('[PROJECT_SYNC] Making HTTP GET request...');
       final response = await http.get(Uri.parse(apiUrl));
+      print('[PROJECT_SYNC] Response status: ${response.statusCode}');
 
       // Check if the response is successful
       if (response.statusCode == 200) {
+        print('[PROJECT_SYNC] ✅ HTTP request successful');
         print(
-            'Response body: ${response.body}'); // Print the response for debugging
+            '[PROJECT_SYNC] Response body length: ${response.body.length} characters');
+        print(
+            '[PROJECT_SYNC] Response body preview: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}...');
 
         try {
           // Decode the JSON response into a Map
+          print('[PROJECT_SYNC] Attempting to decode JSON...');
           final Map<String, dynamic> data = jsonDecode(response.body);
+          print('[PROJECT_SYNC] ✅ JSON decoded successfully');
+          print('[PROJECT_SYNC] Response status: ${data['status']}');
 
           // Check if the response contains 'status' as 'success'
           if (data['status'] == 'success') {
             // Access the 'data' field which contains the list of projects
             List<dynamic> projects = data['data'];
+            print(
+                '[PROJECT_SYNC] ✅ Found ${projects.length} projects in response');
 
             // Get an instance of the database
             final db = await _dbHelper.database;
+            print('[PROJECT_SYNC] ✅ Database connection obtained');
 
-            // Start a database transaction to insert the projects
-            await db.transaction((txn) async {
-              // Clear existing data in the 'project' table before inserting new data
-              await txn.delete('project');
+            // SMART SYNC: Update existing, insert new (no delete)
+            print(
+                '[PROJECT_SYNC] Syncing ${projects.length} projects using UPDATE/INSERT pattern');
 
-              // Insert each project into the table
-              for (var project in projects) {
+            int successCount = 0;
+            int errorCount = 0;
+
+            for (var project in projects) {
+              try {
+                print(
+                    '[PROJECT_SYNC] Processing project ID: ${project['project_id']}, Name: ${project['Project_name']}');
                 // Check if required fields are missing and provide default values if necessary
                 String projectName = project['Project_name'] ??
                     'Unknown Project'; // Default value
@@ -2392,7 +2316,7 @@ class SyncService extends ChangeNotifier {
                 String nBeneficiaries =
                     project['n_beneficiaries'] ?? '0'; // Default value
 
-                await txn.insert(
+                await db.insert(
                   'project',
                   {
                     'project_id': project['project_id'],
@@ -2420,23 +2344,49 @@ class SyncService extends ChangeNotifier {
                   },
                   conflictAlgorithm: ConflictAlgorithm.replace,
                 );
+                print(
+                    '[PROJECT_SYNC] ✅ Successfully inserted project ID: ${project['project_id']}');
+                successCount++;
+              } catch (insertError) {
+                print(
+                    '[PROJECT_SYNC] ❌ Error inserting project ID ${project['project_id']}: $insertError');
+                errorCount++;
               }
-            });
+            }
 
-            print('Project data synced successfully.');
+            print(
+                '[PROJECT_SYNC] ✅ Project sync completed: $successCount successful, $errorCount errors');
+
+            // Verify data was inserted
+            final projectCount =
+                await db.rawQuery('SELECT COUNT(*) as count FROM project');
+            final count = projectCount.first['count'] as int? ?? 0;
+            print('[PROJECT_SYNC] 📊 Total projects in local database: $count');
           } else {
-            print('Error syncing project data: ${data['message']}');
+            print(
+                '[PROJECT_SYNC] ❌ Server response status not success: ${data['status']}');
+            print(
+                '[PROJECT_SYNC] Server message: ${data['message'] ?? 'No message provided'}');
           }
         } catch (e) {
-          print('Error decoding JSON response: $e');
+          print('[PROJECT_SYNC] ❌ Error decoding JSON response: $e');
+          print('[PROJECT_SYNC] Raw response body: ${response.body}');
         }
       } else {
         print(
-            'Error: Failed to fetch project data. Status code: ${response.statusCode}');
+            '[PROJECT_SYNC] ❌ HTTP request failed with status: ${response.statusCode}');
+        print('[PROJECT_SYNC] Response body: ${response.body}');
       }
     } catch (e) {
-      print('Error syncing project data: $e');
+      print('[PROJECT_SYNC] ❌ Error syncing project data: $e');
     }
+    print('[PROJECT_SYNC] ===== PROJECT SYNC COMPLETED =====');
+  }
+
+  // Public method to manually sync project data for testing
+  Future<void> manualSyncProjectData() async {
+    print('[MANUAL_SYNC] Manually triggering project sync...');
+    await syncProjectData();
   }
 
   Future<void> syncToServerPOE(Map<String, dynamic> poe) async {
@@ -2644,20 +2594,19 @@ class SyncService extends ChangeNotifier {
               'N/A',
               'n/a',
               '1900-01-01',
-              '0',
               '0.0',
               'false',
               'null',
               'NULL',
               'undefined'
             ];
+            // Don't exclude '0' as it's a valid value for Age (newborns) and other numeric fields
             return excludeValues.contains(trimmed);
           }
 
           // Always include required fields
           request.fields['LearnerID'] = learnerID;
           request.fields['IDNumber'] = idNumber;
-          request.fields['classID'] = learner['classID']?.toString() ?? '0';
           request.fields['synced'] = '1';
 
           // Add a special flag to indicate this is a partial update
@@ -3017,7 +2966,8 @@ class SyncService extends ChangeNotifier {
         final clockInTime = clockingData['clock_in_time'];
         final clockOutTime = clockingData['clock_out_time'];
         final contactTime = clockingData['contact_time'];
-        final signaturePath = clockingData['signature_path'];
+        final signaturePath =
+            clockingData['signature_path'] ?? clockingData['signature'];
         final userLatitude = clockingData['user_latitude'];
         final userLongitude = clockingData['user_longitude'];
         final userAccuracy = clockingData['user_accuracy'];
@@ -3283,187 +3233,5 @@ class SyncService extends ChangeNotifier {
     } catch (e) {
       print("Error syncing induction_clocking: $e");
     }
-  }
-
-  // Sync offline PPE issuance records to server
-  Future<void> _syncPPEIssuance() async {
-    try {
-      debugPrint('[SYNC-PPE] Starting PPE issuance sync...');
-
-      final db = await _dbHelper.database;
-
-      // Get unsynced PPE records
-      final unsyncedRecords = await db.query(
-        'learner_ppe_issuance',
-        where: 'synced = ?',
-        whereArgs: [0],
-      );
-
-      if (unsyncedRecords.isEmpty) {
-        debugPrint('[SYNC-PPE] No unsynced PPE records found');
-        return;
-      }
-
-      debugPrint(
-          '[SYNC-PPE] Found ${unsyncedRecords.length} unsynced PPE records');
-
-      int successCount = 0;
-      int failCount = 0;
-
-      for (var record in unsyncedRecords) {
-        try {
-          final ppeData = {
-            'LearnerID': record['LearnerID'],
-            'learner_name': record['learner_name'],
-            'classID': record['classID'],
-            'conti_suit_size': record['conti_suit_size'],
-            'conti_suit_quantity': record['conti_suit_quantity'],
-            'boots_size': record['boots_size'],
-            'boots_quantity': record['boots_quantity'],
-            'issued_date': record['issued_date'],
-            'facilitator_name': record['facilitator_name'] ??
-                record['issued_by'] ??
-                'Facilitator',
-          };
-
-          final response = await http
-              .post(
-                Uri.parse('${AppConfig.baseUrl}/save_learner_ppe.php'),
-                headers: {'Content-Type': 'application/json'},
-                body: json.encode(ppeData),
-              )
-              .timeout(const Duration(seconds: 10));
-
-          if (response.statusCode == 200) {
-            final result = json.decode(response.body);
-            if (result['success'] == true) {
-              // Mark as synced
-              await db.update(
-                'learner_ppe_issuance',
-                {'synced': 1},
-                where: 'id = ?',
-                whereArgs: [record['id']],
-              );
-              successCount++;
-              debugPrint(
-                  '[SYNC-PPE] ✅ Synced PPE for learner ${record['LearnerID']}');
-            } else {
-              failCount++;
-              debugPrint(
-                  '[SYNC-PPE] ❌ Failed to sync PPE for learner ${record['LearnerID']}: ${result['message']}');
-            }
-          } else {
-            failCount++;
-            debugPrint(
-                '[SYNC-PPE] ❌ Server error ${response.statusCode} for learner ${record['LearnerID']}');
-          }
-        } catch (e) {
-          failCount++;
-          debugPrint(
-              '[SYNC-PPE] ❌ Error syncing PPE for learner ${record['LearnerID']}: $e');
-        }
-      }
-
-      debugPrint(
-          '[SYNC-PPE] Sync complete: $successCount succeeded, $failCount failed');
-    } catch (e) {
-      debugPrint('[SYNC-PPE] Error during PPE sync: $e');
-    }
-  }
-}
-
-// Sync unsynced poe_sizes records to server
-Future<Map<String, dynamic>> syncPoeSizes() async {
-  try {
-    debugPrint('[POE-SIZES-SYNC] Starting sync...');
-
-    // Check connectivity
-    final connectivityResult = await Connectivity().checkConnectivity();
-    final isOffline = connectivityResult is List
-        ? (connectivityResult.isEmpty ||
-            connectivityResult.first == ConnectivityResult.none)
-        : (connectivityResult == ConnectivityResult.none);
-
-    if (isOffline) {
-      debugPrint('[POE-SIZES-SYNC] No internet connection');
-      return {'success': false, 'message': 'No internet connection'};
-    }
-
-    final dbHelper = DatabaseHelper();
-    final db = await dbHelper.database;
-
-    // Get all unsynced poe_sizes records
-    final unsyncedRecords = await db.query(
-      'poe_sizes',
-      where: 'synced = ?',
-      whereArgs: [0],
-    );
-
-    if (unsyncedRecords.isEmpty) {
-      debugPrint('[POE-SIZES-SYNC] No unsynced records found');
-      return {'success': true, 'synced': 0, 'message': 'No records to sync'};
-    }
-
-    debugPrint(
-        '[POE-SIZES-SYNC] Found ${unsyncedRecords.length} unsynced records');
-
-    // Prepare records for sync
-    final recordsToSync = unsyncedRecords.map((record) {
-      return {
-        'learner_id': record['learner_id'],
-        'conti_suits_size': record['conti_suits_size'],
-        'safety_boots_size': record['safety_boots_size'],
-      };
-    }).toList();
-
-    // Send to server
-    final url = Uri.parse('${AppConfig.baseUrl}/sync_poe_sizes.php');
-    debugPrint('[POE-SIZES-SYNC] Syncing to: $url');
-
-    final response = await http
-        .post(
-          url,
-          headers: {'Content-Type': 'application/json'},
-          body: json.encode({'records': recordsToSync}),
-        )
-        .timeout(const Duration(seconds: 30));
-
-    debugPrint(
-        '[POE-SIZES-SYNC] Response (${response.statusCode}): ${response.body}');
-
-    if (response.statusCode == 200) {
-      final result = json.decode(response.body);
-
-      if (result['status'] == 'success') {
-        final syncedCount = result['synced'] ?? 0;
-
-        // Mark records as synced in local database
-        if (syncedCount > 0) {
-          await db.update(
-            'poe_sizes',
-            {'synced': 1},
-            where: 'synced = ?',
-            whereArgs: [0],
-          );
-          debugPrint(
-              '[POE-SIZES-SYNC] ✓ Marked $syncedCount records as synced');
-        }
-
-        return {
-          'success': true,
-          'synced': syncedCount,
-          'failed': result['failed'] ?? 0,
-          'message': result['message'] ?? 'Sync completed'
-        };
-      }
-    }
-
-    return {
-      'success': false,
-      'message': 'Server returned error: ${response.statusCode}'
-    };
-  } catch (e) {
-    debugPrint('[POE-SIZES-SYNC] Error: $e');
-    return {'success': false, 'message': 'Sync failed: $e'};
   }
 }

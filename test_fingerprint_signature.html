@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Fingerprint Signature Backend</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #006341;
+            border-bottom: 3px solid #006341;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #006341;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px 10px 0;
+        }
+        button:hover {
+            background: #004d31;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .status {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+            margin: 5px;
+        }
+        .signature-preview {
+            max-width: 400px;
+            margin-top: 15px;
+            border: 2px solid #006341;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Fingerprint Signature Backend Test</h1>
+        
+        <div class="test-section">
+            <h2>Test Configuration</h2>
+            <label>
+                Learner ID: 
+                <input type="number" id="learnerID" value="11701">
+            </label>
+            <br>
+            <label>
+                Template Data: 
+                <input type="text" id="templateData" value="test_template_data" style="width: 400px;">
+            </label>
+        </div>
+
+        <div class="test-section">
+            <h2>Run Tests</h2>
+            <button onclick="testBackend()">🧪 Test Backend Endpoint</button>
+            <button onclick="testWithRealData()">🔍 Test with Learner 11701</button>
+            <button onclick="clearResults()">🗑️ Clear Results</button>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const API_URL = 'https://rlms.rlms.co.za/mobile/verify_fingerprint_and_get_signature.php';
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        function addResult(title, content, type = 'info') {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'test-section';
+            resultDiv.innerHTML = `
+                <h3>${title}</h3>
+                <div class="result ${type}">${content}</div>
+            `;
+            document.getElementById('results').appendChild(resultDiv);
+        }
+
+        async function testBackend() {
+            const learnerID = parseInt(document.getElementById('learnerID').value);
+            const templateData = document.getElementById('templateData').value;
+
+            addResult('🚀 Testing Backend...', 'Sending request to backend...', 'info');
+
+            try {
+                const requestData = {
+                    learnerID: learnerID,
+                    scannedTemplate: templateData
+                };
+
+                addResult('📤 Request Data', JSON.stringify(requestData, null, 2), 'info');
+
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                const data = await response.json();
+
+                addResult('📥 Response Status', `HTTP ${response.status} ${response.statusText}`, 
+                    response.ok ? 'success' : 'error');
+
+                addResult('📥 Response Data', JSON.stringify(data, null, 2), 
+                    data.status === 'success' ? 'success' : 'error');
+
+                if (data.status === 'success') {
+                    if (data.signature) {
+                        addResult('✅ Signature Retrieved', 
+                            `<div class="status">✅ SUCCESS: Signature found for ${data.learnerName}</div>` +
+                            `Signature length: ${data.signature.length} characters<br>` +
+                            `Verified at: ${data.verifiedAt}<br><br>` +
+                            `<img src="${data.signature}" alt="Signature" class="signature-preview">`,
+                            'success');
+                    } else {
+                        addResult('⚠️ No Signature', 
+                            `Learner ${data.learnerName} verified but no signature on file`, 
+                            'info');
+                    }
+                } else {
+                    addResult('❌ Verification Failed', 
+                        `Error: ${data.message}`, 
+                        'error');
+                }
+
+            } catch (error) {
+                addResult('❌ Request Failed', 
+                    `Error: ${error.message}\n\nThis could mean:\n` +
+                    `- Backend file not uploaded\n` +
+                    `- CORS issues\n` +
+                    `- Network error\n` +
+                    `- PHP syntax error`, 
+                    'error');
+            }
+        }
+
+        async function testWithRealData() {
+            // Test with learner 11701 (Anele Cele)
+            document.getElementById('learnerID').value = '11701';
+            document.getElementById('templateData').value = 'real_fingerprint_test';
+            await testBackend();
+        }
+
+        // Auto-run test on page load
+        window.addEventListener('load', () => {
+            addResult('ℹ️ Instructions', 
+                'This page tests the fingerprint signature backend endpoint.\n\n' +
+                '1. Click "Test Backend Endpoint" to send a test request\n' +
+                '2. Check if you get a success or error response\n' +
+                '3. If successful, the learner\'s signature image will appear below\n\n' +
+                'Expected response for learner 11701 (Anele Cele):\n' +
+                '- status: "success"\n' +
+                '- verified: true\n' +
+                '- learnerName: "Anele Cele"\n' +
+                '- signature: "data:image/png;base64,..."',
+                'info');
+        });
+    </script>
+</body>
+</html>

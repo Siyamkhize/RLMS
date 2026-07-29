@@ -1,0 +1,63 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                    ARPL WORKFLOW - QUICK TEST CARD                        ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📍 TEST URLS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌐 Main: http://localhost/web/web/web/index.php
+🔧 Debug: http://localhost/web/web/web/debug_classes.php
+
+📋 QUICK TEST STEPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Open main URL in browser
+2. Click "Electrician" card (has classes)
+3. Click "Continue to Classes →"
+4. Wait for class to load
+5. Click "lowest" class
+6. ✅ "View Learners →" button should ENABLE (not grayed out)
+7. Click "View Learners →"
+8. ✅ Should see table with 10 learners
+9. Each learner should have "Generate ARPL ▶" button
+10. Click any button to test individual ARPL generation
+
+🔍 EXPECTED BEHAVIOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✓ Button starts DISABLED on classes page
+✓ Button ENABLES when class is clicked
+✓ Each learner gets OWN button (not batch)
+✓ Confirmation dialog before generating ARPL
+✓ NO immediate redirect
+
+🆘 TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Button still disabled?
+  → Open F12 console
+  → Look for: "selectClass called with classID="
+  → Report what you see
+
+No classes showing?
+  → Make sure you selected Electrician or Bricklayer
+  → (Plumber & Welder have no classes)
+
+API error?
+  → Open debug_classes.php
+  → Click "Test /api/get_arpl_classes.php"
+  → Check if it finds classes
+
+📊 TRADES WITH CLASSES (READY TO TEST)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✓ Electrician (OFO: 671101) → "lowest" class with 10 learners
+✓ Bricklayer (OFO: 641201) → "Bricklaying" class with 10 learners
+
+✗ Plumber (OFO: 642601) → NO classes (empty)
+✗ Welder (OFO: 651302) → NO classes (empty)
+
+📚 DOCUMENTATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TASK_5_COMPLETE_WORKFLOW_READY.md ← Full details & troubleshooting
+ARPL_WORKFLOW_COMPLETE_FIX.md ← Technical architecture
+
+═════════════════════════════════════════════════════════════════════════════
+STATUS: ✅ READY FOR TESTING
+DEPLOYED: C:\xampp\htdocs\web\web\web\
+═════════════════════════════════════════════════════════════════════════════

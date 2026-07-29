@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test ARPL PDF Generation</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .form-group { margin: 10px 0; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; }
+        input { padding: 8px; width: 200px; }
+        button { padding: 10px 20px; background: #667eea; color: white; border: none; cursor: pointer; }
+        button:hover { background: #764ba2; }
+        .result { margin-top: 20px; padding: 15px; background: #f0f4ff; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>ARPL PDF Generation Test</h1>
+    
+    <div class="form-group">
+        <label>Learner ID (Test with 20286 or 20310):</label>
+        <input type="number" id="learnerID" value="20286">
+    </div>
+    
+    <div class="form-group">
+        <label>OFO Code (671101 = Electrician):</label>
+        <input type="text" id="ofo_code" value="671101">
+    </div>
+    
+    <button onclick="generatePDF()">Generate PDF</button>
+    
+    <div id="result"></div>
+    
+    <script>
+        function generatePDF() {
+            const learnerID = document.getElementById('learnerID').value;
+            const ofo_code = document.getElementById('ofo_code').value;
+            const resultDiv = document.getElementById('result');
+            
+            resultDiv.innerHTML = '<p>Generating PDF...</p>';
+            
+            fetch('/rlmss/web/api/generate_arpl_pdf.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    learnerID: parseInt(learnerID),
+                    ofo_code: ofo_code
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            <h3>✓ Success!</h3>
+                            <p>File: ${data.file}</p>
+                            <p>Learner ID: ${data.learnerID}</p>
+                            <p><a href="/rlmss/web/pdfs/${data.file}" target="_blank">View PDF</a></p>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            <h3>✗ Error</h3>
+                            <p>${data.message}</p>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>✗ Error</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            });
+        }
+    </script>
+</body>
+</html>

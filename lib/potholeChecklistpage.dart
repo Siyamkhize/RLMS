@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -9,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 import 'database_helper.dart';
 import 'config.dart';
+import 'utils/scanner_pdf_resolver.dart';
 
 class PotholeChecklistPage extends StatefulWidget {
   final String learnerId;
@@ -349,21 +351,22 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
   Future<void> _scanDocument() async {
     try {
       final docScanner = FlutterDocScanner();
-      final scannedDoc = await docScanner.getScanDocuments();
+      final scannedDoc = await docScanner.getScanDocuments(page: 80);
 
-      if (scannedDoc != null && scannedDoc.isNotEmpty) {
-        // Get the first scanned document
-        final scannedPath = scannedDoc.first;
+      String? pdfUri;
+      if (scannedDoc is Map && scannedDoc['pdfUri'] != null) {
+        pdfUri = scannedDoc['pdfUri'].toString();
+      }
+      final resolved = await resolveFlutterDocScannerPdfFile(pdfUri);
 
+      if (resolved != null && await isReadablePdfFile(resolved)) {
         // Save to permanent location
         final appDir = await getApplicationDocumentsDirectory();
         final fileName =
             'pothole_checklist_${widget.learnerId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
         final permanentPath = '${appDir.path}/$fileName';
 
-        // Copy file to permanent location
-        final file = File(scannedPath);
-        await file.copy(permanentPath);
+        await resolved.copy(permanentPath);
 
         // Save to database
         final assessmentDate = _date.toIso8601String().split('T').first;
@@ -392,6 +395,8 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
 
         // Sync to server if online
         _syncScannedDocument(permanentPath, assessmentDate);
+      } else if (scannedDoc != null) {
+        _showError('Could not read the scanned PDF. Try again.');
       }
     } catch (e) {
       _showError('Error scanning document: $e');
@@ -750,12 +755,25 @@ class _PotholeChecklistPageState extends State<PotholeChecklistPage> {
         }
       }
 
-      // Get signature data - using simple approach for now
-      // Note: Full signature support can be implemented with proper package methods
-      final learnerSignatureData =
-          _learnerSignatureController.isEmpty ? null : 'signature_present';
-      final assessorSignatureData =
-          _assessorSignatureController.isEmpty ? null : 'signature_present';
+      // Get signature data as base64 strings
+      String? learnerSignatureData;
+      String? assessorSignatureData;
+
+      if (_learnerSignatureController.isNotEmpty) {
+        final Uint8List? learnerBytes =
+            await _learnerSignatureController.toPngBytes();
+        if (learnerBytes != null) {
+          learnerSignatureData = base64Encode(learnerBytes);
+        }
+      }
+
+      if (_assessorSignatureController.isNotEmpty) {
+        final Uint8List? assessorBytes =
+            await _assessorSignatureController.toPngBytes();
+        if (assessorBytes != null) {
+          assessorSignatureData = base64Encode(assessorBytes);
+        }
+      }
 
       final payload = {
         'learner_id': widget.learnerId,

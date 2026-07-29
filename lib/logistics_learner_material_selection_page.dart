@@ -100,9 +100,9 @@ class _LogisticsLearnerMaterialSelectionPageState
                     // Initialize all selections to false
                     for (var us in unitStandards) {
                       String usId = us['unitstandard_id'].toString();
-                      selections['${usId}_formative'] = false;
-                      selections['${usId}_summative'] = false;
-                      selections['${usId}_learner_guide'] = false;
+                      selections['${usId}_FORM'] = false;
+                      selections['${usId}_SUM'] = false;
+                      selections['${usId}_LG'] = false;
                     }
                   });
 
@@ -129,21 +129,27 @@ class _LogisticsLearnerMaterialSelectionPageState
   Future<void> _loadExistingSubmissions() async {
     try {
       // Load from server what this specific learner has already received
+      // STRICTLY use internal LearnerID for database consistency
+      final learnerIdentifier =
+          widget.learner['LearnerID']?.toString() ?? widget.learner['IDNumber'];
       final response = await http.get(
         Uri.parse(AppConfig.buildUrl(
-            'get_logistics_learner_material_status.php?classID=${widget.classID}&learnerID=${widget.learner['IDNumber']}')),
+            'get_logistics_checkbox_status.php?classID=${widget.classID}&learnerID=$learnerIdentifier')),
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['success'] == true && data['materials'] != null) {
+        if (data['success'] == true) {
           setState(() {
-            Map<String, dynamic> materials = data['materials'];
-            materials.forEach((key, value) {
-              if (value == true || value == 1) {
-                selections[key] = true;
-              }
-            });
+            // Map checkboxStatus to selections
+            if (data['checkboxStatus'] != null) {
+              Map<String, dynamic> materials = data['checkboxStatus'];
+              materials.forEach((key, value) {
+                if (value == true || value == 1) {
+                  selections[key] = true;
+                }
+              });
+            }
 
             // Load quantities if available
             if (data['quantities'] != null) {
@@ -445,9 +451,9 @@ class _LogisticsLearnerMaterialSelectionPageState
                 final usName = us['unit_standard_name'] ?? 'Unknown';
 
                 // Check if any items are already issued for this unit standard
-                final formativeKey = '${usId}_formative';
-                final summativeKey = '${usId}_summative';
-                final learnerGuideKey = '${usId}_learner_guide';
+                final formativeKey = '${usId}_FORM';
+                final summativeKey = '${usId}_SUM';
+                final learnerGuideKey = '${usId}_LG';
 
                 final hasFormative = selections[formativeKey] == true;
                 final hasSummative = selections[summativeKey] == true;
@@ -518,11 +524,11 @@ class _LogisticsLearnerMaterialSelectionPageState
                         ),
                         const SizedBox(height: 12),
                         _buildCheckboxRow(
-                            usId, 'Formative', 'formative', hasFormative),
+                            usId, 'Formative', 'FORM', hasFormative),
                         _buildCheckboxRow(
-                            usId, 'Summative', 'summative', hasSummative),
-                        _buildCheckboxRow(usId, 'Learner Guide',
-                            'learner_guide', hasLearnerGuide),
+                            usId, 'Summative', 'SUM', hasSummative),
+                        _buildCheckboxRow(
+                            usId, 'Learner Guide', 'LG', hasLearnerGuide),
                       ],
                     ),
                   ),

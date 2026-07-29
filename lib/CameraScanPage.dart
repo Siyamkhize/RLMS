@@ -12,19 +12,24 @@ import 'package:intl/intl.dart';
 import 'services/camera_resource_manager.dart';
 
 import 'config.dart';
+import 'utils/scanner_pdf_resolver.dart';
 
 class CameraScanPage extends StatefulWidget {
   final String type;
   final String exercise;
+  final String? unitStandard;
   final int learnerID;
   final String? logbookText;
+  final bool autoUpload;
 
   const CameraScanPage({
     super.key,
     required this.type,
     required this.exercise,
+    this.unitStandard,
     required this.learnerID,
     this.logbookText,
+    this.autoUpload = true,
   });
 
   @override
@@ -37,22 +42,6 @@ class _CameraScanPageState extends State<CameraScanPage> {
   final TextEditingController _logbookTextController = TextEditingController();
   final CameraResourceManager _cameraManager = CameraResourceManager();
 
-  String? _tryUriToFilePath(String raw) {
-    try {
-      final uri = Uri.parse(raw);
-      if (uri.scheme == 'file') {
-        return uri.toFilePath(windows: false);
-      }
-      // Some scanners return plain paths (no scheme) or other schemes.
-      // We only handle file paths here; other schemes must be resolved by plugin/native side.
-      if (uri.scheme.isEmpty) return raw;
-      return null;
-    } catch (_) {
-      // Not a valid URI; treat as a raw file path.
-      return raw;
-    }
-  }
-
   @override
   void initState() {
     super.initState();
@@ -61,7 +50,8 @@ class _CameraScanPageState extends State<CameraScanPage> {
       'Formative',
       'Summative',
       'FormativeRemedial',
-      'SummativeRemedial'
+      'SummativeRemedial',
+      'ARPL'
     ].contains(widget.type)) {
       print('Error: Invalid type ${widget.type}');
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -114,10 +104,10 @@ class _CameraScanPageState extends State<CameraScanPage> {
       _cameraManager.markMLKitScannerActive();
 
       // All types (including LogBook) now use FlutterDocScanner for multi-page scanning with edge detection
-      // IMPORTANT: keep a reasonable page limit.
-      // Very high values (e.g. 999) can cause native scanner crashes / OOM on some devices.
+      // IMPORTANT: Updated page limit from 10 to 80.
+      // 80 is the recommended maximum to avoid GMS memory crashes on some devices.
       final dynamic scanResult =
-          await FlutterDocScanner().getScanDocuments(page: 25);
+          await FlutterDocScanner().getScanDocuments(page: 80);
       print('Scan Result: $scanResult');
       if (scanResult is! Map ||
           !scanResult.containsKey('pdfUri') ||
@@ -128,25 +118,18 @@ class _CameraScanPageState extends State<CameraScanPage> {
         return;
       }
       final String? pdfUri = scanResult['pdfUri'] as String?;
-      final resolvedPath = pdfUri == null ? null : _tryUriToFilePath(pdfUri);
-      if (resolvedPath == null || resolvedPath.trim().isEmpty) {
-        print('Unable to resolve pdfUri to file path: $pdfUri');
-        _showErrorSnackBar(
-            'Scanner returned an unsupported file location', retryable: true);
+      final file = await resolveFlutterDocScannerPdfFile(pdfUri);
+      if (file == null || !await isReadablePdfFile(file)) {
+        print('Unable to resolve pdfUri to readable PDF: $pdfUri');
+        _showErrorSnackBar('Scanner returned an unreadable file (try again)',
+            retryable: true);
         return;
       }
 
-      print('Processed PDF Path: $resolvedPath');
-      final file = File(resolvedPath);
-      if (await file.exists()) {
-        print('PDF exists: ${file.path}, size: ${await file.length()} bytes');
-        if (!mounted) return;
-        setState(() => scannedImages = [file]);
-        _showSnackBar('PDF document scanned successfully!');
-      } else {
-        print('Error: PDF does not exist at $resolvedPath');
-        _showErrorSnackBar('PDF file not found or invalid', retryable: true);
-      }
+      print('PDF exists: ${file.path}, size: ${await file.length()} bytes');
+      if (!mounted) return;
+      setState(() => scannedImages = [file]);
+      _showSnackBar('PDF document scanned successfully!');
     } catch (e, stackTrace) {
       print('Scan Error: $e\nStack Trace: $stackTrace');
       _showErrorSnackBar('Document scan error: $e', retryable: true);
@@ -179,10 +162,15 @@ class _CameraScanPageState extends State<CameraScanPage> {
       final String logbookText =
           widget.type == 'LogBook' ? _logbookTextController.text : '';
 
-      if (await _checkConnectivity()) {
-        await _uploadImages(filePaths, logbookText);
+      if (widget.autoUpload) {
+        if (await _checkConnectivity()) {
+          await _uploadImages(filePaths, logbookText);
+        } else {
+          await _saveLocally(filePaths, logbookText);
+        }
       } else {
-        await _saveLocally(filePaths, logbookText);
+        print(
+            'Auto-upload disabled for CameraScanPage. Returning results to caller.');
       }
 
       if (mounted) {
@@ -209,26 +197,53 @@ class _CameraScanPageState extends State<CameraScanPage> {
   Future<void> _uploadImages(
       List<String> imagePaths, String logbookText) async {
     try {
-      final uri = Uri.parse(AppConfig.buildUrl('save_metadata.php'));
+      final uri = Uri.parse(AppConfig.buildUrl(widget.type == 'ARPL'
+          ? 'arpl_save_metadata.php'
+          : 'save_metadata.php'));
       final request = http.MultipartRequest('POST', uri);
 
-      for (final path in imagePaths) {
-        final file = File(path);
+      // Extract unit standard ID for filename
+      String unitStandardId = 'UNKNOWN';
+      if (widget.unitStandard != null && widget.unitStandard!.isNotEmpty) {
+        RegExp idPattern = RegExp(r'(?:US|Unit\s*Standard\s*)?(\d{4,10})\b');
+        Match? match = idPattern.firstMatch(widget.unitStandard!);
+        if (match != null) {
+          unitStandardId = match.group(1)!;
+        } else {
+          String digits =
+              widget.unitStandard!.replaceAll(RegExp(r'[^0-9]'), '');
+          if (digits.isNotEmpty) {
+            unitStandardId = digits;
+          }
+        }
+      }
+
+      for (int i = 0; i < imagePaths.length; i++) {
+        final file = File(imagePaths[i]);
         if (await file.exists()) {
-          print('Uploading file: $path, Size: ${await file.length()} bytes');
-          // All types now use PDF from document scanner
+          print(
+              'Uploading file: ${imagePaths[i]}, Size: ${await file.length()} bytes');
+
+          // Generate standardized filename for server
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final sanitizedExercise = sanitizeFileName(widget.exercise);
+          final extension = 'pdf';
+          final standardizedName =
+              '${widget.type}_${unitStandardId}_${sanitizedExercise}_${timestamp}_$i.$extension';
+
           final contentType = MediaType('application', 'pdf');
           request.files.add(
             http.MultipartFile(
               'files[]',
               file.openRead(),
               await file.length(),
-              filename: file.path.split('/').last,
+              filename: standardizedName,
               contentType: contentType,
             ),
           );
+          print('Assigned filename: $standardizedName');
         } else {
-          print('Invalid file path for upload: $path');
+          print('Invalid file path for upload: ${imagePaths[i]}');
         }
       }
 
@@ -236,6 +251,7 @@ class _CameraScanPageState extends State<CameraScanPage> {
         'type': widget.type,
         'exercise': widget.exercise,
         'learnerID': widget.learnerID.toString(),
+        'unit_standard_name': (widget.unitStandard ?? '').trim(),
         if (widget.type == 'LogBook') 'logbook_text': logbookText,
       });
       print('Sending fields: ${request.fields}');
@@ -253,6 +269,11 @@ class _CameraScanPageState extends State<CameraScanPage> {
           final db = await dbHelper.database;
           final batch = db.batch();
           final timestamp = DateTime.now().toIso8601String();
+          final String uniqueExercise = (widget.unitStandard != null &&
+                  widget.unitStandard!.isNotEmpty &&
+                  !widget.exercise.contains(widget.unitStandard!))
+              ? '${widget.unitStandard} - ${widget.exercise}'
+              : widget.exercise;
 
           for (final path in imagePaths) {
             if (File(path).existsSync()) {
@@ -260,10 +281,11 @@ class _CameraScanPageState extends State<CameraScanPage> {
                 'poe',
                 {
                   'learnerID': widget.learnerID,
-                  'exercise': widget.exercise,
+                  'exercise': uniqueExercise,
                   'type': widget.type,
                   'filePath': path,
                   'logbook_text': widget.type == 'LogBook' ? logbookText : '',
+                  'unitStandard': (widget.unitStandard ?? '').trim(),
                   'submitted_at': timestamp,
                   'synced': 1,
                 },
@@ -305,6 +327,28 @@ class _CameraScanPageState extends State<CameraScanPage> {
       final db = await dbHelper.database;
       final batch = db.batch();
       final dateFormatter = DateFormat('yyyy-MM-dd HH:mm:ss');
+      final String uniqueExercise = (widget.unitStandard != null &&
+              widget.unitStandard!.isNotEmpty &&
+              !widget.exercise.contains(widget.unitStandard!))
+          ? '${widget.unitStandard} - ${widget.exercise}'
+          : widget.exercise;
+
+      // Extract unit standard ID for filename
+      String unitStandardId = 'UNKNOWN';
+      if (widget.unitStandard != null && widget.unitStandard!.isNotEmpty) {
+        RegExp idPattern = RegExp(r'(?:US|Unit\s*Standard\s*)?(\d{4,10})\b');
+        Match? match = idPattern.firstMatch(widget.unitStandard!);
+        if (match != null) {
+          unitStandardId = match.group(1)!;
+        } else {
+          // Fallback: extract any digits or use a portion of the string
+          String digits =
+              widget.unitStandard!.replaceAll(RegExp(r'[^0-9]'), '');
+          if (digits.isNotEmpty) {
+            unitStandardId = digits;
+          }
+        }
+      }
 
       for (int i = 0; i < imagePaths.length; i++) {
         final file = File(imagePaths[i]);
@@ -314,7 +358,7 @@ class _CameraScanPageState extends State<CameraScanPage> {
           // All types now use PDF from document scanner
           final extension = 'pdf';
           final fileName =
-              '${widget.learnerID}_${sanitizedExercise}_${timestamp}_$i.$extension';
+              '${widget.type}_${unitStandardId}_${sanitizedExercise}_${timestamp}_$i.$extension';
           final savedPath = '${directory.path}/$fileName';
           await file.copy(savedPath);
           savedPaths.add(savedPath);
@@ -323,17 +367,18 @@ class _CameraScanPageState extends State<CameraScanPage> {
             'poe',
             {
               'learnerID': widget.learnerID,
-              'exercise': widget.exercise,
+              'exercise': uniqueExercise,
               'type': widget.type,
               'filePath': savedPath,
               'logbook_text': widget.type == 'LogBook' ? logbookText : '',
+              'unitStandard': (widget.unitStandard ?? '').trim(),
               'submitted_at': dateFormatter.format(DateTime.now()),
               'synced': 0,
             },
             conflictAlgorithm: ConflictAlgorithm.replace,
           );
           print(
-              'Local DB Insert: learnerID=${widget.learnerID}, exercise=${widget.exercise}, type=${widget.type}, logbook_text=$logbookText');
+              'Local DB Insert: learnerID=${widget.learnerID}, exercise=$uniqueExercise, type=${widget.type}, logbook_text=$logbookText');
         } else {
           print('Invalid file path for local save: ${imagePaths[i]}');
         }

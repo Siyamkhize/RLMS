@@ -1,0 +1,68 @@
+================================================================================
+                    APPENDIX F 404 ERROR - FILES TO UPLOAD
+================================================================================
+
+UPLOAD THESE 3 FILES TO YOUR SERVER NOW:
+
+📁 Server Location: /public_html/mobile/  (or /var/www/html/rlms/mobile/)
+   (Same directory where save_arpl_toolkit_edits.php exists)
+
+📄 FILE 1 (CRITICAL): mobile/save_appendix_f_data.php
+   Purpose: The main backend endpoint for saving Appendix F data
+   Status: MUST BE UPLOADED - This is the missing file causing 404
+
+📄 FILE 2 (DIAGNOSTIC): mobile/verify_appendix_f_endpoint.php
+   Purpose: Verification script to check if files are in correct location
+   Status: Upload this to test if upload worked
+
+📄 FILE 3 (DIAGNOSTIC): mobile/test_appendix_f_exists.php
+   Purpose: Detailed file existence checker
+   Status: Upload this for additional diagnostics
+
+================================================================================
+                              AFTER UPLOADING
+================================================================================
+
+STEP 1: Test Verification Endpoint
+Open in browser: https://rlms.rlms.co.za/mobile/verify_appendix_f_endpoint.php
+
+Expected Response:
+{
+  "status": "success",
+  "message": "Endpoint is reachable!",
+  "save_file_exists": true,
+  "files_in_directory": ["save_appendix_f_data.php", ...]
+}
+
+STEP 2: Test from App
+- Open ARPL Toolkit
+- Select learner (Anele Cele, ID 11701, Class 797)
+- Go to Appendix F tab
+- Make an edit and save
+- Should now work: "✓ Changes saved successfully"
+
+================================================================================
+                            IF STILL GETTING 404
+================================================================================
+
+Then tell me:
+1. What does verify_appendix_f_endpoint.php return? (copy/paste response)
+2. Can you see save_appendix_f_data.php in your FTP/file manager?
+3. What folder is it in?
+4. Is it in the same folder as save_arpl_toolkit_edits.php?
+
+================================================================================
+                              WHY THIS FIXES IT
+================================================================================
+
+The 404 error means:
+- App is calling: https://rlms.rlms.co.za/mobile/save_appendix_f_data.php
+- Server responds: "File not found"
+- Reason: File not uploaded OR uploaded to wrong location
+
+The fix:
+- Upload file to correct location (/mobile/ directory)
+- Server can now find it at the URL
+- App save operation will work
+
+================================================================================

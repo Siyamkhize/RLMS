@@ -213,8 +213,9 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
   Future<void> _refreshDataWithoutClearingState() async {
     try {
       final dbHelper = DatabaseHelper();
+      // CHANGED: Use getClockedInLearnersOnly instead of getLearnersWithClockingData
       final learnersWithClockingData =
-          await dbHelper.getLearnersWithClockingData(widget.classID);
+          await dbHelper.getClockedInLearnersOnly(widget.classID);
 
       setState(() {
         for (var learner in learnersWithClockingData) {
@@ -260,8 +261,9 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
   Future<void> _loadLearnersFromLocalDatabase() async {
     try {
       final dbHelper = DatabaseHelper();
+      // CHANGED: Use getClockedInLearnersOnly instead of getLearnersWithClockingData
       final learnersWithClockingData =
-          await dbHelper.getLearnersWithClockingData(widget.classID);
+          await dbHelper.getClockedInLearnersOnly(widget.classID);
 
       setState(() {
         widget.learners.clear();
@@ -300,9 +302,12 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
           widget.learners.add(stringLearner);
         }
       });
+
+      print(
+          '[LEARNER_LIST] Loaded ${widget.learners.length} clocked-in learners for today');
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading offline learners: $e')),
+        SnackBar(content: Text('Error loading clocked-in learners: $e')),
       );
     }
   }
@@ -463,10 +468,19 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
         throw Exception('ClassID is missing or empty');
       }
 
-      // Validate signature
-      final signatureImage = await _signatureController.toPngBytes();
-      if (signatureImage == null) {
-        throw Exception('Failed to generate signature image.');
+      // Prepare signature (handle failure gracefully)
+      String signatureBase64 = '';
+      try {
+        final signatureImage = await _signatureController.toPngBytes();
+        if (signatureImage != null) {
+          signatureBase64 = base64Encode(signatureImage);
+        } else {
+          print(
+              'Warning: Failed to generate signature image, sending empty signature.');
+        }
+      } catch (e) {
+        print(
+            'Warning: Signature generation failed: $e, sending empty signature.');
       }
 
       // Temporarily disabled geolocator functionality
@@ -477,7 +491,7 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
       final payload = {
         'LearnerID': learnerID,
         'clock_in': '1',
-        'signature': base64Encode(signatureImage),
+        'signature': signatureBase64,
         'user_latitude':
             '0.0', // Default coordinates since geolocator is disabled
         'user_longitude':
@@ -686,29 +700,35 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
       print(
           '[LEARNER_LIST] Geolocator temporarily disabled - skipping location validation');
 
-      // Save signature
+      // Save signature (handle failure gracefully)
       final appDir = await getApplicationDocumentsDirectory();
       final signaturePath =
           '${appDir.path}/signature_${learnerID}_$clockDate.png';
-      final signatureFile = File(signaturePath);
+      String finalSignaturePath = '';
 
-      final signatureImage = await _signatureController.toPngBytes();
-      if (signatureImage == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to generate signature image.')),
-        );
-        return;
+      try {
+        final signatureImage = await _signatureController.toPngBytes();
+        if (signatureImage != null) {
+          final signatureFile = File(signaturePath);
+          await signatureFile.writeAsBytes(signatureImage);
+          finalSignaturePath = signaturePath;
+          print(
+              'Signature saved at: $finalSignaturePath, file exists: ${await signatureFile.exists()}');
+        } else {
+          print(
+              'Warning: Failed to generate signature image, saving clock-in without signature.');
+        }
+      } catch (e) {
+        print(
+            'Warning: Signature generation failed: $e, saving clock-in without signature.');
       }
-      await signatureFile.writeAsBytes(signatureImage);
-      print(
-          'Signature saved at: $signaturePath, file exists: ${await signatureFile.exists()}');
 
       // Store clock-in data
       final clockInData = {
         'LearnerID': learnerID,
         'clock_in_time': clockInTime,
         'clock_date': clockDate,
-        'signature': signaturePath,
+        'signature': finalSignaturePath,
         'synced': 0,
         'user_latitude':
             '0.0', // Default coordinates since geolocator is disabled
@@ -1133,6 +1153,8 @@ class _LearnerlistpageState extends State<Learnerlistpage> {
                                                     SickNotePage(
                                                   learnerID:
                                                       int.parse(learnerID),
+                                                  learnerName:
+                                                      '${item['Name']} ${item['Surname']}',
                                                 ),
                                               ),
                                             );

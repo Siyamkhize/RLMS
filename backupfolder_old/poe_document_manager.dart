@@ -46,7 +46,8 @@ class _PoeDocumentManagerState extends State<PoeDocumentManager> {
         final data = json.decode(response.body);
         if (data['success'] == true) {
           setState(() {
-            _documents = List<Map<String, dynamic>>.from(data['documents'] ?? []);
+            _documents =
+                List<Map<String, dynamic>>.from(data['documents'] ?? []);
           });
         }
       }
@@ -253,7 +254,8 @@ class _PoeDocumentManagerState extends State<PoeDocumentManager> {
                           itemBuilder: (context, index) {
                             final doc = _documents[index];
                             final docId = doc['id'] as int;
-                            final isSelected = _selectedDocuments.contains(docId);
+                            final isSelected =
+                                _selectedDocuments.contains(docId);
                             final isMerged = doc['status'] == 'merged';
 
                             return Card(
@@ -300,7 +302,8 @@ class _PoeDocumentManagerState extends State<PoeDocumentManager> {
                                     Row(
                                       children: [
                                         Icon(Icons.picture_as_pdf,
-                                            size: 14, color: Colors.grey.shade600),
+                                            size: 14,
+                                            color: Colors.grey.shade600),
                                         const SizedBox(width: 4),
                                         Text(
                                           '${_formatFileSize(doc['file_size'])} • ${doc['page_count'] ?? 0} pages',
@@ -341,7 +344,8 @@ class _PoeDocumentManagerState extends State<PoeDocumentManager> {
                                           ),
                                           decoration: BoxDecoration(
                                             color: Colors.green.shade100,
-                                            borderRadius: BorderRadius.circular(4),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
                                           ),
                                           child: Text(
                                             'MERGED DOCUMENT',
@@ -390,9 +394,12 @@ class _PoeDocumentManagerState extends State<PoeDocumentManager> {
                                       value: 'delete',
                                       child: Row(
                                         children: [
-                                          Icon(Icons.delete, size: 20, color: Colors.red),
+                                          Icon(Icons.delete,
+                                              size: 20, color: Colors.red),
                                           SizedBox(width: 8),
-                                          Text('Delete', style: TextStyle(color: Colors.red)),
+                                          Text('Delete',
+                                              style:
+                                                  TextStyle(color: Colors.red)),
                                         ],
                                       ),
                                     ),

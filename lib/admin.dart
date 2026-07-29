@@ -13,6 +13,7 @@ import 'finance_register_history.dart'; // Import for Attendance button
 import 'learner_induction_page.dart'; // Import for Induction button
 
 import 'config.dart'; // Import AppConfig
+import 'utils/scanner_pdf_resolver.dart';
 import 'dart:async'; // For Timer
 
 // ADMIN PAGE WITH STRICT PROJECT FILTERING
@@ -171,68 +172,135 @@ class _AdminPageState extends State<AdminPage> {
         return;
       }
 
-      // Get SDP identifier
+      // CRITICAL DEBUG: Print all widget parameters
+      debugPrint('[ADMIN] 🔍 WIDGET PARAMETERS DEBUG:');
+      debugPrint('[ADMIN] widget.sdp: "${widget.sdp}"');
+      debugPrint('[ADMIN] widget.projectId: "${widget.projectId}"');
+      debugPrint('[ADMIN] widget.pathwayId: "${widget.pathwayId}"');
+      debugPrint('[ADMIN] widget.qualificationId: "${widget.qualificationId}"');
+
+      // Get SDP identifier - USE WIDGET.SDP DIRECTLY, DON'T RESOLVE
       String sdpIdentifier = widget.sdp.trim();
+      
       if (sdpIdentifier.isEmpty) {
-        final resolved = _resolveSdpIdentifier();
-        if (resolved != null && resolved.isNotEmpty) {
-          sdpIdentifier = resolved;
-        }
+        debugPrint('[ADMIN] ❌ ERROR: widget.sdp is empty!');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('SDP identifier missing. Please log out and log in again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
       }
 
-      // Build query params with STRICT PROJECT filtering
+      // Build query params with the CORRECT parameters from widget
       final queryParams = <String, String>{
         'q': query,
         'limit': '8',
+        'sdp_id': sdpIdentifier,
       };
 
-      if (sdpIdentifier.isNotEmpty) {
-        queryParams['sdp_id'] = sdpIdentifier;
-      }
-
-      // STRICT PROJECT FILTERING - only search within current project context
-      if (widget.projectId != null && widget.projectId!.isNotEmpty) {
+      // Use the CORRECT project ID from widget
+      bool useProjectFilter = widget.projectId != null && widget.projectId!.isNotEmpty;
+      if (useProjectFilter) {
         queryParams['project_id'] = widget.projectId!;
-        debugPrint(
-            '[ADMIN] STRICT FILTER: Searching only in project_id: ${widget.projectId}');
-      }
-      if (widget.pathwayId != null && widget.pathwayId!.isNotEmpty) {
-        queryParams['pathway_id'] = widget.pathwayId!;
-        debugPrint(
-            '[ADMIN] STRICT FILTER: Searching only in pathway_id: ${widget.pathwayId}');
-      }
-      if (widget.qualificationId != null &&
-          widget.qualificationId!.isNotEmpty) {
-        queryParams['qualification_id'] = widget.qualificationId!;
-        debugPrint(
-            '[ADMIN] STRICT FILTER: Searching only in qualification_id: ${widget.qualificationId}');
+        debugPrint('[ADMIN] ✅ Using CORRECT project_id: ${widget.projectId}');
+      } else {
+        debugPrint('[ADMIN] ⚠️ WARNING: No project_id provided');
       }
 
       // DEBUG: Print all search parameters
-      debugPrint('[ADMIN] 🔍 SEARCH DEBUG - All parameters:');
-      debugPrint('[ADMIN] SDP Identifier: $sdpIdentifier');
+      debugPrint('[ADMIN] 🔍 SEARCH PARAMETERS:');
+      debugPrint('[ADMIN] SDP ID: $sdpIdentifier');
       debugPrint('[ADMIN] Query params: $queryParams');
-      debugPrint(
-          '[ADMIN] Expected learner data: SDP=41, Project=87, Pathway="Short Skills Programme", Qualification=24173');
 
-      // Use SDP-specific autocomplete endpoint with fallback mechanism
+      // Try SDP-specific autocomplete endpoint first
       final url = AppConfig.buildUrl('search_learner_autocomplete_sdp.php',
           queryParams: queryParams);
+
+      debugPrint('[ADMIN] 🌐 Search URL: $url');
 
       final response = await http.get(Uri.parse(url)).timeout(
             const Duration(seconds: 5),
           );
 
+      List<Map<String, dynamic>> suggestions = [];
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['success'] == true && mounted) {
-          setState(() {
-            _searchSuggestions =
-                List<Map<String, dynamic>>.from(data['suggestions'] ?? []);
-            _showSuggestions =
-                _searchSuggestions.isNotEmpty && _searchFocusNode.hasFocus;
-          });
+        debugPrint('[ADMIN] 📡 Server response: $data');
+        
+        if (data['success'] == true) {
+          suggestions = List<Map<String, dynamic>>.from(data['suggestions'] ?? []);
+          debugPrint('[ADMIN] ✅ SDP endpoint returned ${suggestions.length} suggestions');
+        } else {
+          debugPrint('[ADMIN] ❌ Server error: ${data['message']}');
         }
+      } else {
+        debugPrint('[ADMIN] ❌ HTTP error: ${response.statusCode}');
+      }
+
+      // If no results with project filter, try without project filter (fallback)
+      if (suggestions.isEmpty && useProjectFilter) {
+        debugPrint('[ADMIN] 🔄 FALLBACK: Trying search without project filter');
+        final fallbackParams = <String, String>{
+          'q': query,
+          'limit': '8',
+          'sdp_id': sdpIdentifier,
+        };
+
+        final fallbackUrl = AppConfig.buildUrl(
+            'search_learner_autocomplete_sdp.php',
+            queryParams: fallbackParams);
+
+        final fallbackResponse = await http.get(Uri.parse(fallbackUrl)).timeout(
+              const Duration(seconds: 5),
+            );
+
+        if (fallbackResponse.statusCode == 200) {
+          final fallbackData = json.decode(fallbackResponse.body);
+          if (fallbackData['success'] == true) {
+            suggestions = List<Map<String, dynamic>>.from(
+                fallbackData['suggestions'] ?? []);
+            debugPrint(
+                '[ADMIN] ✅ Fallback search returned ${suggestions.length} suggestions');
+          }
+        }
+      }
+
+      // If still no results, try global search endpoint as final fallback
+      if (suggestions.isEmpty) {
+        debugPrint('[ADMIN] 🔄 FINAL FALLBACK: Trying global search endpoint');
+        final globalParams = <String, String>{
+          'q': query,
+          'limit': '8',
+        };
+
+        final globalUrl = AppConfig.buildUrl(
+            'search_learner_autocomplete_global.php',
+            queryParams: globalParams);
+
+        final globalResponse = await http.get(Uri.parse(globalUrl)).timeout(
+              const Duration(seconds: 5),
+            );
+
+        if (globalResponse.statusCode == 200) {
+          final globalData = json.decode(globalResponse.body);
+          if (globalData['success'] == true) {
+            suggestions = List<Map<String, dynamic>>.from(
+                globalData['suggestions'] ?? []);
+            debugPrint(
+                '[ADMIN] ✅ Global search returned ${suggestions.length} suggestions');
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _searchSuggestions = suggestions;
+          _showSuggestions =
+              _searchSuggestions.isNotEmpty && _searchFocusNode.hasFocus;
+        });
       }
     } catch (e) {
       print('[ADMIN] Smart search autocomplete error: $e');
@@ -1082,54 +1150,37 @@ class _AdminPageState extends State<AdminPage> {
       debugPrint('[ADMIN] Pathway ID: ${widget.pathwayId}');
       debugPrint('[ADMIN] Qualification ID: ${widget.qualificationId}');
 
-      // STRICT PROJECT FILTERING for offline search
+      // RELAXED PROJECT FILTERING for offline search - try strict first, then fallback
       final db = await dbHelper.database;
 
       // Build WHERE clause with project filtering
       final where = <String>['l.IDNumber = ?'];
       final args = <Object>[idNumber];
 
-      // Strictly require SDP + Project filters (same behavior as server strict endpoints)
+      // Try to get SDP ID but don't fail if we can't resolve it
       final sdpId = await _resolveOfflineSdpId(dbHelper);
-      if (sdpId <= 0) {
-        debugPrint(
-            '[ADMIN] OFFLINE STRICT FILTER: sdp_id could not be resolved');
-        return null;
+      if (sdpId > 0) {
+        where.add('s.sdp_id = ?');
+        args.add(sdpId);
       }
-      where.add('s.sdp_id = ?');
-      args.add(sdpId);
 
+      // Try to get Project ID but don't fail if it's missing
       final projectIdStr = widget.projectId?.trim() ?? '';
       final projectIdInt = int.tryParse(projectIdStr) ?? 0;
-      if (projectIdInt <= 0) {
-        debugPrint(
-            '[ADMIN] OFFLINE STRICT FILTER: project_id is missing/invalid');
-        return null;
-      }
-      where.add('s.project_id = ?');
-      args.add(projectIdInt);
-
-      // Keep offline learner search aligned with the same contextual filters
-      // used to load sites online/offline in AdminPage.
-      if (widget.pathwayId != null && widget.pathwayId!.trim().isNotEmpty) {
-        where.add('LOWER(TRIM(s.Project_pathway)) = LOWER(TRIM(?))');
-        args.add(widget.pathwayId!.trim());
+      if (projectIdInt > 0) {
+        where.add('s.project_id = ?');
+        args.add(projectIdInt);
       }
 
-      if (widget.qualificationId != null &&
-          widget.qualificationId!.trim().isNotEmpty) {
-        where.add(
-            '(TRIM(s.qualification_id) = TRIM(?) OR s.qualification_id IS NULL OR s.qualification_id = "")');
-        args.add(widget.qualificationId!.trim());
-      }
-
-      // Query with JOIN to get class + site (for sdp_id/project_id filtering)
+      // Query with JOIN to get class + site
       final query = '''
         SELECT
           l.*,
           c.ClassName,
           c.classID,
-          s.project_id
+          s.project_id,
+          s.siteName,
+          s.siteID
         FROM learnerdetails l
         LEFT JOIN class c ON l.classID = c.classID
         LEFT JOIN sites s ON c.siteID = s.siteID
@@ -1154,7 +1205,48 @@ class _AdminPageState extends State<AdminPage> {
           'id_number': learner['IDNumber']?.toString() ?? '',
           'class_id': learner['classID']?.toString() ?? '',
           'class_name': learner['ClassName']?.toString() ?? '',
+          'site_id': learner['siteID']?.toString() ?? '',
+          'site_name': learner['siteName']?.toString() ?? '',
         };
+      }
+
+      // If strict search failed, try without project/SDP filters
+      if (where.length > 1) {
+        debugPrint('[ADMIN] OFFLINE FALLBACK: Trying search without filters');
+        
+        final fallbackQuery = '''
+          SELECT
+            l.*,
+            c.ClassName,
+            c.classID,
+            s.project_id,
+            s.siteName,
+            s.siteID
+          FROM learnerdetails l
+          LEFT JOIN class c ON l.classID = c.classID
+          LEFT JOIN sites s ON c.siteID = s.siteID
+          WHERE l.IDNumber = ?
+          LIMIT 1
+        ''';
+
+        final fallbackResults = await db.rawQuery(fallbackQuery, [idNumber]);
+        
+        if (fallbackResults.isNotEmpty) {
+          final learner = fallbackResults.first;
+          debugPrint(
+              '[ADMIN] OFFLINE FALLBACK FOUND: ${learner['Name']} ${learner['Surname']} in project ${learner['project_id']}');
+
+          return {
+            'learner_id': learner['LearnerID']?.toString() ?? '',
+            'name': learner['Name']?.toString() ?? '',
+            'surname': learner['Surname']?.toString() ?? '',
+            'id_number': learner['IDNumber']?.toString() ?? '',
+            'class_id': learner['classID']?.toString() ?? '',
+            'class_name': learner['ClassName']?.toString() ?? '',
+            'site_id': learner['siteID']?.toString() ?? '',
+            'site_name': learner['siteName']?.toString() ?? '',
+          };
+        }
       }
 
       debugPrint(
@@ -1473,25 +1565,22 @@ class _AdminPageState extends State<AdminPage> {
                                 }
 
                                 final scanner = FlutterDocScanner();
-                                // Allow unlimited pages (999) for CV and learner agreements
                                 final scanResult =
-                                    await scanner.getScanDocuments(
-                                  page: 999, // Unlimited pages
-                                );
+                                    await scanner.getScanDocuments(page: 80);
                                 if (scanResult is! Map ||
                                     !scanResult.containsKey('pdfUri') ||
                                     scanResult['pdfUri'] == null) {
                                   throw 'Invalid scan result';
                                 }
 
-                                final pdfPath = (scanResult['pdfUri'] as String)
-                                    .replaceFirst('file:///', '');
-                                final file = File(pdfPath);
-
-                                if (!await file.exists() ||
-                                    !pdfPath.endsWith('.pdf')) {
-                                  throw 'Invalid or missing PDF file';
+                                final file =
+                                    await resolveFlutterDocScannerPdfFile(
+                                        scanResult['pdfUri'] as String?);
+                                if (file == null ||
+                                    !await isReadablePdfFile(file)) {
+                                  throw 'Invalid or missing PDF file (try again; if this persists, update the app)';
                                 }
+                                final pdfPath = file.path;
 
                                 final fileSize = await file.length();
                                 if (fileSize > _maxFileSize) {
@@ -1624,6 +1713,23 @@ class _AdminPageState extends State<AdminPage> {
                       fontWeight: FontWeight.w500,
                       color: Colors.grey),
                 ),
+              // DEBUG INFO CARD
+              Card(
+                color: Colors.blue.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('DEBUG INFO:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade800)),
+                      Text('widget.sdp: "${widget.sdp}"', style: TextStyle(fontSize: 12, color: Colors.blue.shade700)),
+                      Text('widget.projectId: "${widget.projectId}"', style: TextStyle(fontSize: 12, color: Colors.blue.shade700)),
+                      Text('widget.pathwayId: "${widget.pathwayId}"', style: TextStyle(fontSize: 12, color: Colors.blue.shade700)),
+                      Text('widget.qualificationId: "${widget.qualificationId}"', style: TextStyle(fontSize: 12, color: Colors.blue.shade700)),
+                    ],
+                  ),
+                ),
+              ),
               Text(
                 'Sites & Classes (${_siteData.length} sites)',
                 style:
@@ -1663,9 +1769,13 @@ class _AdminPageState extends State<AdminPage> {
                                 setState(() {
                                   _searchSuggestions.clear();
                                   _showSuggestions = false;
+                                  _searchedLearner = null;
+                                  // Clear search cache to force fresh results
+                                  _searchCache.clear();
+                                  _searchCacheTimestamps.clear();
                                 });
                               },
-                              tooltip: 'Clear search',
+                              tooltip: 'Clear search and cache',
                             ),
                           _isSearching
                               ? const Padding(

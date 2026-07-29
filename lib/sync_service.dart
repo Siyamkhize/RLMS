@@ -251,35 +251,207 @@ class SyncService extends ChangeNotifier {
 
   // Sync all tables from the server to the local database
   Future<void> syncData() async {
-    await _syncUsers();
-    await _syncLearnerDetails();
+    print('[SYNC] ===== STARTING FULL SYNC =====');
+
+    try {
+      await _syncUsers();
+      print('[SYNC] ✅ Users sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Users sync failed: $e');
+    }
+
+    try {
+      await _syncLearnerDetails();
+      print('[SYNC] ✅ Learner details sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Learner details sync failed: $e');
+    }
+
     // Only sync current day's clocking data to avoid loading old records
-    await _syncLearnerClocking(currentDayOnly: true);
-    await _syncFacilitator();
-    await _syncSdp();
-    await syncSites();
-    await _syncClass();
-    await _syncLearningpathway();
-    await _syncPathwaySelection();
-    await _syncQualification();
-    await _syncQualification_selection();
-    await _syncQualification_pathway();
-    await _syncQualificationunitstandard();
-    await _syncUnitstandard();
-    await _syncUnit_standard_selection();
-    await _syncAssessment();
+    try {
+      await _syncLearnerClocking(currentDayOnly: true);
+      print('[SYNC] ✅ Learner clocking sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Learner clocking sync failed: $e');
+    }
+
+    try {
+      await _syncFacilitator();
+      print('[SYNC] ✅ Facilitator sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Facilitator sync failed: $e');
+    }
+
+    try {
+      await _syncSdp();
+      print('[SYNC] ✅ SDP sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ SDP sync failed: $e');
+    }
+
+    try {
+      await syncSites();
+      print('[SYNC] ✅ Sites sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Sites sync failed: $e');
+    }
+
+    try {
+      await _syncClass();
+      print('[SYNC] ✅ Class sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Class sync failed: $e');
+    }
+
+    try {
+      await _syncLearningpathway();
+      print('[SYNC] ✅ Learning pathway sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Learning pathway sync failed: $e');
+    }
+
+    try {
+      await _syncPathwaySelection();
+      print('[SYNC] ✅ Pathway selection sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Pathway selection sync failed: $e');
+    }
+
+    try {
+      await _syncQualification();
+      print('[SYNC] ✅ Qualification sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Qualification sync failed: $e');
+    }
+
+    try {
+      await _syncQualification_selection();
+      print('[SYNC] ✅ Qualification selection sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Qualification selection sync failed: $e');
+    }
+
+    try {
+      await _syncQualification_pathway();
+      print('[SYNC] ✅ Qualification pathway sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Qualification pathway sync failed: $e');
+    }
+
+    try {
+      await _syncQualificationunitstandard();
+      print('[SYNC] ✅ Qualification unit standard sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Qualification unit standard sync failed: $e');
+    }
+
+    try {
+      await _syncUnitstandard();
+      print('[SYNC] ✅ Unit standard sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Unit standard sync failed: $e');
+    }
+
+    try {
+      await _syncUnit_standard_selection();
+      print('[SYNC] ✅ Unit standard selection sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Unit standard selection sync failed: $e');
+    }
+
+    try {
+      await _syncAssessment();
+      print('[SYNC] ✅ Assessment sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Assessment sync failed: $e');
+    }
+
     // Sync learner documents
-    await _syncLearnerDocuments();
-    await _syncPoe();
-    await syncAcknowledgmentOfReceiptToServer();
-    await syncDataFromServer();
-    await syncMaterialReceiptFormData();
-    await syncMaterialsReceivedData();
-    await syncProjectData();
-    await syncSickNotesToServer();
-    await _syncBankDetails();
-    await _syncInductionClocking();
-    await sync_inductionClocking();
+    try {
+      await _syncLearnerDocuments();
+      print('[SYNC] ✅ Learner documents sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Learner documents sync failed: $e');
+    }
+
+    try {
+      await _syncPoe();
+      print('[SYNC] ✅ POE sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ POE sync failed: $e');
+    }
+
+    try {
+      await syncAcknowledgmentOfReceiptToServer();
+      print('[SYNC] ✅ Acknowledgment of receipt sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Acknowledgment of receipt sync failed: $e');
+    }
+
+    try {
+      await syncDataFromServer();
+      print('[SYNC] ✅ Sync data from server complete');
+    } catch (e) {
+      print('[SYNC] ❌ Sync data from server failed: $e');
+    }
+
+    try {
+      await syncMaterialReceiptFormData();
+      print('[SYNC] ✅ Material receipt form data sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Material receipt form data sync failed: $e');
+    }
+
+    try {
+      await syncMaterialsReceivedData();
+      print('[SYNC] ✅ Materials received data sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Materials received data sync failed: $e');
+    }
+
+    try {
+      await syncProjectData();
+      print('[SYNC] ✅ Project data sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Project data sync failed: $e');
+    }
+
+    try {
+      await syncSickNotesToServer();
+      print('[SYNC] ✅ Sick notes sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Sick notes sync failed: $e');
+    }
+
+    try {
+      await _syncBankDetails();
+      print('[SYNC] ✅ Bank details sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Bank details sync failed: $e');
+    }
+
+    try {
+      await _syncInductionClocking();
+      print('[SYNC] ✅ Induction clocking sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Induction clocking sync failed: $e');
+    }
+
+    try {
+      await sync_inductionClocking();
+      print('[SYNC] ✅ Sync induction clocking complete');
+    } catch (e) {
+      print('[SYNC] ❌ Sync induction clocking failed: $e');
+    }
+
+    try {
+      await syncMonitoringRecords();
+      print('[SYNC] ✅ Monitoring records sync complete');
+    } catch (e) {
+      print('[SYNC] ❌ Monitoring records sync failed: $e');
+    }
+
+    print('[SYNC] ===== FULL SYNC COMPLETED =====');
   }
 
   // Sync users table
@@ -1210,6 +1382,9 @@ class SyncService extends ChangeNotifier {
         return;
       }
 
+      // Sync monitoring records first
+      await syncMonitoringRecords();
+
       final unsyncedRecords = await fetchDataFromLocalDatabase();
       if (unsyncedRecords.isEmpty) {
         print("No data to sync.");
@@ -1306,6 +1481,54 @@ class SyncService extends ChangeNotifier {
   void showSyncError(String message) {
     print("Sync error: $message");
     // Add SnackBar or other UI feedback if needed
+  }
+
+  /// Sync unsynced monitoring records to the server
+  Future<void> syncMonitoringRecords() async {
+    try {
+      debugPrint('[SYNC-MONITORING] Starting monitoring sync...');
+
+      final unsyncedRecords = await _dbHelper.getUnsyncedMonitoringRecords();
+      if (unsyncedRecords.isEmpty) {
+        debugPrint('[SYNC-MONITORING] No unsynced monitoring records found');
+        return;
+      }
+
+      debugPrint(
+          '[SYNC-MONITORING] Found ${unsyncedRecords.length} records to sync');
+
+      for (var record in unsyncedRecords) {
+        try {
+          final response = await http
+              .post(
+                Uri.parse(AppConfig.saveMonitoringRecordsUrl),
+                headers: {'Content-Type': 'application/json'},
+                body: json.encode(record),
+              )
+              .timeout(const Duration(seconds: 15));
+
+          if (response.statusCode == 200) {
+            final result = json.decode(response.body);
+            if (result['success'] == true || result['status'] == 'success') {
+              await _dbHelper.markMonitoringRecordAsSynced(record['id']);
+              debugPrint(
+                  '[SYNC-MONITORING] ✅ Successfully synced record ID: ${record['id']}');
+            } else {
+              debugPrint(
+                  '[SYNC-MONITORING] ❌ Server returned error for record ${record['id']}: ${result['message']}');
+            }
+          } else {
+            debugPrint(
+                '[SYNC-MONITORING] ❌ Server error (${response.statusCode}) for record ${record['id']}');
+          }
+        } catch (e) {
+          debugPrint(
+              '[SYNC-MONITORING] ⚠️ Failed to sync record ${record['id']}: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('[SYNC-MONITORING] ❌ ERROR during monitoring sync: $e');
+    }
   }
 
   // Sync learnerdetails table
@@ -2607,7 +2830,6 @@ class SyncService extends ChangeNotifier {
           // Always include required fields
           request.fields['LearnerID'] = learnerID;
           request.fields['IDNumber'] = idNumber;
-          request.fields['classID'] = learner['classID']?.toString() ?? '0';
           request.fields['synced'] = '1';
 
           // Add a special flag to indicate this is a partial update

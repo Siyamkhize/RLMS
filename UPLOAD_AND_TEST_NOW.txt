@@ -1,0 +1,89 @@
+═══════════════════════════════════════════════════════════════
+   ✅ TOOLKIT 400 ERROR - FIXED! UPLOAD NOW
+═══════════════════════════════════════════════════════════════
+
+🎯 ISSUE FOUND IN YOUR DIAGNOSTIC:
+   Error: "Missing learnerID or classID"
+   Cause: Endpoint only checked JSON input, no fallback
+
+🔧 FIX APPLIED:
+   Enhanced input handling to support all POST methods
+   Added detailed error reporting for debugging
+
+═══════════════════════════════════════════════════════════════
+
+📤 STEP 1: UPLOAD FILE (2 minutes)
+
+   Upload this file:
+   ┌─────────────────────────────────────────────────────────┐
+   │  c:\projects\rlmss\mobile\                             │
+   │  get_bricklayer_toolkit_data.php                       │
+   └─────────────────────────────────────────────────────────┘
+
+   To your server:
+   ┌─────────────────────────────────────────────────────────┐
+   │  https://rlms.rlms.co.za/mobile/                       │
+   └─────────────────────────────────────────────────────────┘
+
+   Method: FTP, cPanel, or File Manager
+   Action: Overwrite existing file
+
+═══════════════════════════════════════════════════════════════
+
+🧪 STEP 2: TEST (2 minutes)
+
+   Option A - Quick Browser Test:
+   ┌─────────────────────────────────────────────────────────┐
+   │  https://rlms.rlms.co.za/mobile/                       │
+   │  test_toolkit_direct.php                               │
+   └─────────────────────────────────────────────────────────┘
+
+   Look for:
+   ✅ HTTP Status: 200
+   ✅ "status": "success"
+   ✅ Learner data in response
+
+   Option B - Test from App:
+   1. Open RLMS app
+   2. Login as ARPL assessor
+   3. Select Class 797, learner Anele Cele
+   4. Click "Open Complete Toolkit"
+   5. Should load without 400 error!
+
+═══════════════════════════════════════════════════════════════
+
+✅ EXPECTED RESULT:
+
+   Toolkit opens successfully with all appendices visible:
+   - Appendix A: Personal Details
+   - Appendix B: 104 bricklaying activities
+   - Appendix C through J: All accessible
+
+   No more 400 errors!
+
+═══════════════════════════════════════════════════════════════
+
+❌ IF STILL NOT WORKING:
+
+   Visit this URL and send me the output:
+   https://rlms.rlms.co.za/mobile/test_toolkit_direct.php
+
+   The error message will now show EXACTLY what data the app
+   is sending, allowing me to provide a precise fix.
+
+═══════════════════════════════════════════════════════════════
+
+⏱️ TIME: 5 minutes total
+   2 min - Upload
+   2 min - Test
+   1 min - Verify
+
+🔄 REBUILD NEEDED: NO (server-side fix only)
+
+═══════════════════════════════════════════════════════════════
+
+🚀 READY TO GO!
+
+   Upload → Test → Done!
+
+═══════════════════════════════════════════════════════════════

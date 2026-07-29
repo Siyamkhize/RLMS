@@ -22,7 +22,7 @@ echo.
 echo Step 2: Installing FPDI 2.3.7 for PHP 8.1...
 echo.
 
-composer require setasign/fpdi:2.3.7 --ignore-platform-reqs
+composer require setasign/fpdf:^1.8 setasign/fpdi:2.3.7 --ignore-platform-reqs
 
 if %ERRORLEVEL% EQU 0 (
     echo.

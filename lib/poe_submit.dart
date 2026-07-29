@@ -905,7 +905,7 @@ class _POESubmitPageState extends State<POESubmitPage> {
           'mark_received': '1',
           'classID': widget.classId,
           'received_learners[]':
-              '${widget.learner['IDNumber']}|${widget.learner['FullName'] ?? '${widget.learner['Name']} ${widget.learner['Surname']}'}',
+              '${widget.learner['IDNumber']}|${widget.learner['FullName'] ?? '${widget.learner['Name']} ${widget.learner['Surname']}'}|${widget.learner['learnerID'] ?? widget.learner['LearnerID'] ?? ''}',
         },
       );
 

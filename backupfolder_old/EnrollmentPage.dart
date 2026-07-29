@@ -39,6 +39,12 @@ class _EnrollmentPageState extends State<EnrollmentPage> {
   String? _futronicRightTemplate;
   String _activeScanner = 'auto'; // 'zkteco', 'futronic', or 'none'
 
+  // Stream subscriptions for proper disposal
+  StreamSubscription? _enrollStatusSubscription;
+  StreamSubscription? _enrollSuccessSubscription;
+  StreamSubscription? _sensorStatusSubscription;
+  StreamSubscription? _connectivitySubscription;
+
   @override
   void initState() {
     super.initState();
@@ -140,7 +146,8 @@ class _EnrollmentPageState extends State<EnrollmentPage> {
   }
 
   void _setupStreamListeners() {
-    _fingerprintService.enrollStatusStream.listen((status) {
+    _enrollStatusSubscription =
+        _fingerprintService.enrollStatusStream.listen((status) {
       debugPrint('[ENROLL_STATUS_STREAM] $status'); // Debug log
       if (!mounted) return;
 
@@ -172,7 +179,8 @@ class _EnrollmentPageState extends State<EnrollmentPage> {
       });
     });
 
-    _fingerprintService.enrollSuccessStream.listen((result) async {
+    _enrollSuccessSubscription =
+        _fingerprintService.enrollSuccessStream.listen((result) async {
       debugPrint('[ENROLL_SUCCESS_STREAM] $result'); // Debug log
       if (!mounted) return;
 
@@ -314,7 +322,8 @@ class _EnrollmentPageState extends State<EnrollmentPage> {
       }
     });
 
-    _fingerprintService.sensorStatusStream.listen((status) {
+    _sensorStatusSubscription =
+        _fingerprintService.sensorStatusStream.listen((status) {
       debugPrint('[SENSOR_STATUS_STREAM] Received: $status');
       debugPrint(
           '[SENSOR_STATUS_STREAM] Current state: _isEnrolling=$_isEnrolling, _enrollmentInProgress=$_enrollmentInProgress');
@@ -614,7 +623,7 @@ class _EnrollmentPageState extends State<EnrollmentPage> {
   }
 
   void _setupConnectivityListener() {
-    Connectivity()
+    _connectivitySubscription = Connectivity()
         .onConnectivityChanged
         .listen((List<ConnectivityResult> results) {
       final result =
@@ -1496,18 +1505,31 @@ class _EnrollmentPageState extends State<EnrollmentPage> {
 
   @override
   void dispose() {
+    // Cancel all subscriptions BEFORE disposing the service
+    _enrollStatusSubscription?.cancel();
+    _enrollSuccessSubscription?.cancel();
+    _sensorStatusSubscription?.cancel();
+    _connectivitySubscription?.cancel();
+
+    // Cancel timers
     _leftCooldownTimer?.cancel();
     _rightCooldownTimer?.cancel();
+
     // Clear enrollment locks
     _isEnrolling = false;
     _enrollmentInProgress = false;
     _lastEnrollmentStart = null;
     _enrollmentProtectionStart = null; // Clear on dispose
+
     // Clear emergency block on dispose (temporarily disabled)
     // _fingerprintService.setEmergencyBlock(false);
+
     // Ensure cleanup on dispose
     _fingerprintService.cancelEnrollment().catchError((e) => null);
+
+    // Dispose the fingerprint service AFTER cancelling subscriptions
     _fingerprintService.dispose();
+
     super.dispose();
   }
 }

@@ -33,7 +33,7 @@ class DatabaseHelper {
       final db = await database;
       final today = DateTime.now().toIso8601String().split('T')[0];
 
-      // Step 1: Check for unsynced records (synced=0)
+      // Step 1: CRITICAL FIX - Attempt to sync unsynced records BEFORE cleanup
       final unsyncedRecords = await db.query(
         'learner_clocking',
         where: 'synced = ?',
@@ -42,16 +42,58 @@ class DatabaseHelper {
 
       if (unsyncedRecords.isNotEmpty) {
         print(
-            '[CLEANUP] Found ${unsyncedRecords.length} unsynced records - will attempt to sync via background service');
-        // Note: Actual sync happens via connectivity listener and background service
-        // We just log here that unsynced records exist
+            '[CLEANUP] Found ${unsyncedRecords.length} unsynced records - attempting to sync before cleanup');
+
+        // Check if we have internet connectivity
+        bool hasInternet = false;
+        try {
+          final connectivityResult = await Connectivity().checkConnectivity();
+          hasInternet = connectivityResult.isNotEmpty &&
+              connectivityResult.first != ConnectivityResult.none;
+        } catch (e) {
+          print('[CLEANUP] Error checking connectivity: $e');
+        }
+
+        if (hasInternet) {
+          print(
+              '[CLEANUP] Internet available - syncing ${unsyncedRecords.length} unsynced records');
+
+          // Attempt to sync each unsynced record
+          int syncedCount = 0;
+          for (var record in unsyncedRecords) {
+            try {
+              final success = await _syncSingleRecord(record);
+              if (success) {
+                // Mark as synced
+                await db.update(
+                  'learner_clocking',
+                  {'synced': 1},
+                  where: 'clocking_id = ?',
+                  whereArgs: [record['clocking_id']],
+                );
+                syncedCount++;
+              }
+            } catch (e) {
+              print(
+                  '[CLEANUP] Failed to sync record ${record['clocking_id']}: $e');
+            }
+          }
+
+          print(
+              '[CLEANUP] Successfully synced $syncedCount/${unsyncedRecords.length} records');
+        } else {
+          print(
+              '[CLEANUP] No internet - preserving ${unsyncedRecords.length} unsynced records');
+          // Don't delete unsynced records when offline
+        }
       }
 
-      // Step 2: Delete synced records (synced=1) - already on server, safe to delete
+      // Step 2: Delete OLD synced records (synced=1) from previous days only
+      // KEEP today's synced records so they remain visible when offline
       final deletedSyncedLearner = await db.delete(
         'learner_clocking',
-        where: 'synced = ?',
-        whereArgs: [1],
+        where: 'synced = ? AND clock_date < ?',
+        whereArgs: [1, today],
       );
 
       // DON'T delete induction_clocking records (keep them permanently)
@@ -61,12 +103,9 @@ class DatabaseHelper {
       //   whereArgs: [1],
       // );
 
-      // Step 3: Delete old learner_clocking records from previous days (keep only today)
-      final deletedOld = await db.delete(
-        'learner_clocking',
-        where: 'clock_date < ?',
-        whereArgs: [today],
-      );
+      // Step 3: The above step already handles old synced records
+      // This step is now redundant but kept for clarity
+      final deletedOld = 0; // No additional deletion needed
 
       // DON'T delete old induction_clocking records (keep them permanently)
       // final deletedOldInduction = await db.delete(
@@ -103,6 +142,107 @@ class DatabaseHelper {
     }
   }
 
+  // Helper method to sync a single record to the server
+  Future<bool> _syncSingleRecord(Map<String, Object?> record) async {
+    try {
+      final learnerId = record['LearnerID'].toString();
+      final clockInTime = record['clock_in_time']?.toString() ?? '';
+      final clockOutTime = record['clock_out_time']?.toString() ?? '';
+      final contactTime = record['contact_time']?.toString() ?? '';
+      final clockDate = record['clock_date']?.toString() ?? '';
+      final classID = record['classID']?.toString() ?? '';
+
+      // Prepare attendance data for sync
+      final attendance = {
+        'LearnerID': learnerId,
+        'clock_in_time': clockInTime,
+        'clock_out_time': clockOutTime,
+        'contact_time': contactTime,
+        'clock_date': clockDate,
+        'classID': classID,
+        'synced': 0,
+        'user_latitude': record['user_latitude']?.toString() ?? '0.0',
+        'user_longitude': record['user_longitude']?.toString() ?? '0.0',
+        'user_accuracy': record['user_accuracy']?.toString() ?? '10.0',
+      };
+
+      // Determine if this is a clock-in or clock-out record
+      bool success = false;
+      if (clockInTime.isNotEmpty && clockOutTime.isEmpty) {
+        // Clock-in only record
+        success = await _syncClockInToServer(attendance);
+      } else if (clockInTime.isNotEmpty && clockOutTime.isNotEmpty) {
+        // Complete clock-in/out record
+        success = await _syncClockOutToServer(attendance);
+      }
+
+      return success;
+    } catch (e) {
+      print('[SYNC_SINGLE] Error syncing record: $e');
+      return false;
+    }
+  }
+
+  // Sync clock-in record to server
+  Future<bool> _syncClockInToServer(Map<String, dynamic> attendance) async {
+    try {
+      final url = '${AppConfig.baseUrl}/mobile/clocking/clockin.php';
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {
+          'learner_id': attendance['LearnerID'].toString(),
+          'clock_in_time': attendance['clock_in_time'].toString(),
+          'clock_date': attendance['clock_date'].toString(),
+          'class_id': attendance['classID'].toString(),
+          'user_latitude': attendance['user_latitude'].toString(),
+          'user_longitude': attendance['user_longitude'].toString(),
+          'user_accuracy': attendance['user_accuracy'].toString(),
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['success'] == true;
+      }
+      return false;
+    } catch (e) {
+      print('[SYNC_CLOCK_IN] Error: $e');
+      return false;
+    }
+  }
+
+  // Sync clock-out record to server
+  Future<bool> _syncClockOutToServer(Map<String, dynamic> attendance) async {
+    try {
+      final url = '${AppConfig.baseUrl}/mobile/clocking/clockout.php';
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {
+          'learner_id': attendance['LearnerID'].toString(),
+          'clock_in_time': attendance['clock_in_time'].toString(),
+          'clock_out_time': attendance['clock_out_time'].toString(),
+          'contact_time': attendance['contact_time'].toString(),
+          'clock_date': attendance['clock_date'].toString(),
+          'class_id': attendance['classID'].toString(),
+          'user_latitude': attendance['user_latitude'].toString(),
+          'user_longitude': attendance['user_longitude'].toString(),
+          'user_accuracy': attendance['user_accuracy'].toString(),
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['success'] == true;
+      }
+      return false;
+    } catch (e) {
+      print('[SYNC_CLOCK_OUT] Error: $e');
+      return false;
+    }
+  }
+
   // Clear all learners for a specific class
   Future<void> clearLearners(String classID) async {
     try {
@@ -127,7 +267,7 @@ class DatabaseHelper {
       // Find all duplicate records (same learner, same date)
       final duplicates = await db.rawQuery('''
         SELECT LearnerID, clock_date, COUNT(*) as count
-        FROM learner_clocking
+        FROM learner_clocking 
         WHERE clock_date = ?
         GROUP BY LearnerID, clock_date
         HAVING COUNT(*) > 1
@@ -188,6 +328,139 @@ class DatabaseHelper {
     debugPrint(
         '[DEPRECATED] updateFingerprintTemplates called - use saveZkTecoTemplate or saveFutronicTemplate instead');
     // This method is kept for backward compatibility but should not be used
+  }
+
+  /// Upsert learner data (INSERT OR REPLACE) - for persistent offline storage
+  /// This method NEVER clears existing data, only updates or inserts
+  Future<void> upsertLearner(Map<String, dynamic> learnerData) async {
+    try {
+      final db = await database;
+
+      // Sanitize data to handle nulls properly
+      final sanitizedData = _sanitizeLearnerData(learnerData);
+
+      // Use INSERT OR REPLACE to upsert
+      await db.insert(
+        'learnerdetails',
+        sanitizedData,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+      debugPrint(
+          '[DB_HELPER] Upserted learner: ${sanitizedData['Name']} ${sanitizedData['Surname']} (ID: ${sanitizedData['LearnerID']})');
+    } catch (e) {
+      debugPrint('[DB_HELPER] Error upserting learner: $e');
+      rethrow;
+    }
+  }
+
+  /// Sanitize learner data to handle null values
+  Map<String, dynamic> _sanitizeLearnerData(Map<String, dynamic> rawData) {
+    return {
+      'LearnerID': rawData['LearnerID'] ?? 0,
+      'Title': _sanitizeString(rawData['Title']),
+      'Name': _sanitizeString(rawData['Name']),
+      'Surname': _sanitizeString(rawData['Surname']),
+      'IDNumber': _sanitizeString(rawData['IDNumber']),
+      'DateOfBirth': _sanitizeDate(rawData['DateOfBirth']),
+      'PhoneNumber': _sanitizeString(rawData['PhoneNumber']),
+      'Email': _sanitizeString(rawData['Email']),
+      'Age': _sanitizeInt(rawData['Age']),
+      'Gender': _sanitizeString(rawData['Gender']),
+      'Race': _sanitizeString(rawData['Race']),
+      'Language': _sanitizeString(rawData['Language']),
+      'Disability': _sanitizeString(rawData['Disability']),
+      'AddressLine1': _sanitizeString(rawData['AddressLine1']),
+      'AddressLine2': _sanitizeString(rawData['AddressLine2']),
+      'AddressLine3': _sanitizeString(rawData['AddressLine3']),
+      'PostalCode': _sanitizeString(rawData['PostalCode']),
+      'KinName': _sanitizeString(rawData['KinName']),
+      'KinRelation': _sanitizeString(rawData['KinRelation']),
+      'KinContact': _sanitizeString(rawData['KinContact']),
+      'SchoolName': _sanitizeString(rawData['SchoolName']),
+      'SchoolCompletion': _sanitizeDate(rawData['SchoolCompletion']),
+      'SchoolLocation': _sanitizeString(rawData['SchoolLocation']),
+      'SchoolGrade': _sanitizeString(rawData['SchoolGrade']),
+      'classID': rawData['classID'] ?? 0,
+      'profile_image': _sanitizeString(rawData['profile_image']),
+      'signature': _sanitizeString(rawData['signature']),
+      'synced': rawData['synced'] ?? 0,
+      'zkteco_left_template': _sanitizeString(rawData['zkteco_left_template']),
+      'zkteco_right_template':
+          _sanitizeString(rawData['zkteco_right_template']),
+      'futronic_left_template':
+          _sanitizeString(rawData['futronic_left_template']),
+      'futronic_right_template':
+          _sanitizeString(rawData['futronic_right_template']),
+      'imagePath': _sanitizeString(rawData['imagePath']),
+      'activity_statu': _sanitizeString(rawData['activity_statu']),
+      'witness_initials': _sanitizeString(rawData['witness_initials']),
+      'learner_initials': _sanitizeString(rawData['learner_initials']),
+      'witness_signature': _sanitizeString(rawData['witness_signature']),
+    };
+  }
+
+  String _sanitizeString(dynamic value) {
+    if (value == null) return '';
+    return value.toString();
+  }
+
+  int? _sanitizeInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) {
+      try {
+        return int.parse(value);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  String? _sanitizeDate(dynamic value) {
+    if (value == null) return null;
+    if (value is String && value.isNotEmpty) {
+      try {
+        DateTime.parse(value);
+        return value;
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  /// Check if local learner data is available for a class (for offline operations)
+  Future<bool> hasLocalLearnerData(String classID) async {
+    try {
+      final db = await database;
+      final result = await db.query(
+        'learnerdetails',
+        where: 'classID = ?',
+        whereArgs: [classID],
+        limit: 1,
+      );
+      return result.isNotEmpty;
+    } catch (e) {
+      debugPrint('[DB_HELPER] Error checking local data: $e');
+      return false;
+    }
+  }
+
+  /// Get count of local learners for a class
+  Future<int> getLocalLearnerCount(String classID) async {
+    try {
+      final db = await database;
+      final result = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM learnerdetails WHERE classID = ?',
+        [classID],
+      );
+      return result.first['count'] as int? ?? 0;
+    } catch (e) {
+      debugPrint('[DB_HELPER] Error getting learner count: $e');
+      return 0;
+    }
   }
 
   // DEPRECATED: Use getAllTemplates instead
@@ -287,7 +560,7 @@ class DatabaseHelper {
 
   Future<Database> _initDatabase() async {
     final path = await getDatabasesPath();
-    return openDatabase(join(path, _dbName), version: 9,
+    return openDatabase(join(path, _dbName), version: 7,
         onUpgrade: (db, oldVersion, newVersion) async {
       debugPrint(
           '[DB] Upgrading database from version $oldVersion to $newVersion');
@@ -466,27 +739,6 @@ class DatabaseHelper {
               '[DB] Error creating facilitator_material_issues table: $e');
         }
       }
-
-      if (oldVersion < 9) {
-        // Create poe_sizes table for PPE tracking
-        try {
-          await db.execute('''
-              CREATE TABLE IF NOT EXISTS poe_sizes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                learner_id INTEGER NOT NULL,
-                conti_suits_size TEXT,
-                safety_boots_size TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                synced INTEGER DEFAULT 0,
-                UNIQUE(learner_id)
-              )
-            ''');
-          debugPrint('[DB] Created poe_sizes table');
-        } catch (e) {
-          debugPrint('[DB] Error creating poe_sizes table: $e');
-        }
-      }
     }, onCreate: (db, dbVersion) async {
       // Create example tables
       await db.execute(
@@ -584,7 +836,7 @@ class DatabaseHelper {
     user_latitude DECIMAL(10,6),
     user_longitude DECIMAL(10,6),
     user_accuracy DECIMAL(10,6)
- );
+ ); 
           ''',
       );
 
@@ -723,6 +975,7 @@ class DatabaseHelper {
       await db.execute(
         '''
          CREATE TABLE qualification (
+         id INTEGER,
          qualification_id INTEGER PRIMARY KEY AUTOINCREMENT,
          name TEXT,
          description TEXT,
@@ -789,7 +1042,7 @@ class DatabaseHelper {
          filePath TEXT,
          submitted_at timestamp,
          synced INTEGER DEFAULT 0,
-         logbook_text TEXT
+         logbook_text TEXT 
 )
 
           ''',
@@ -811,7 +1064,7 @@ class DatabaseHelper {
       await db.execute(
         '''
 CREATE TABLE material_forms(
-id INTEGER PRIMARY KEY AUTOINCREMENT,
+id INTEGER PRIMARY KEY AUTOINCREMENT, 
 classID INTEGER,
 facilitator_full_name TEXT,
 representative_full_name TEXT,
@@ -820,7 +1073,7 @@ facilitator_signature TEXT NOT NULL,  -- Changed to TEXT instead of BLOB
 representative_signature TEXT NOT NULL,  -- Changed to TEXT instead of BLOB
 description TEXT,
 quantity INTEGER,
-is_synced BOOLEAN,
+is_synced BOOLEAN, 
 created_at TIMESTAMP,
 updated_at TIMESTAMP
 )
@@ -880,7 +1133,8 @@ updated_at TIMESTAMP
     status TEXT,
     learner_id TEXT,
     upload_date TEXT,
-    synced INTEGER DEFAULT 0
+    synced INTEGER DEFAULT 0,
+    rejection_reason TEXT
 )''');
       await db.execute('''
   CREATE TABLE sick_note (
@@ -965,19 +1219,7 @@ updated_at TIMESTAMP
                 synced INTEGER DEFAULT 0
               )
             ''');
-      // Create poe_sizes table for PPE size tracking
-      await db.execute('''
-              CREATE TABLE IF NOT EXISTS poe_sizes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                learner_id INTEGER NOT NULL,
-                conti_suits_size TEXT,
-                safety_boots_size TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                synced INTEGER DEFAULT 0,
-                UNIQUE(learner_id)
-              )
-            ''');
+
       // Create facilitator_material_issues table
       await db.execute('''
               CREATE TABLE IF NOT EXISTS facilitator_material_issues (
@@ -1001,8 +1243,6 @@ updated_at TIMESTAMP
                 synced INTEGER DEFAULT 0
               )
             ''');
-
-      // poe_sizes table already created above in facilitator_material_issues section
     });
   }
 
@@ -1157,7 +1397,11 @@ updated_at TIMESTAMP
           results.isNotEmpty ? results.first : ConnectivityResult.none;
 
       if (result != ConnectivityResult.none) {
-        print('Internet available - syncing data...');
+        print('Internet available - syncing offline data...');
+        // Sync unsynced learners (profile, images, etc.) when back online
+        syncUnsyncedLearnersWhenOnline().catchError((error) {
+          print('Error syncing learner data: $error');
+        });
         // Don't block the UI with sync operations
         syncUnsyncedData().catchError((error) {
           print('Error syncing data: $error');
@@ -1169,6 +1413,54 @@ updated_at TIMESTAMP
     } catch (e) {
       print('Error updating connection status: $e');
       // Don't let connectivity errors crash the app
+    }
+  }
+
+  /// Sync unsynced learners to server when back online (no UI - for connectivity listener)
+  Future<void> syncUnsyncedLearnersWhenOnline() async {
+    final db = await database;
+    if (!await _checkConnectivity()) return;
+
+    final unsyncedLearners = await db.query(
+      'learnerdetails',
+      where: 'synced = ?',
+      whereArgs: [0],
+    );
+    if (unsyncedLearners.isEmpty) return;
+
+    print(
+        '[SYNC] Found ${unsyncedLearners.length} unsynced learners - syncing to server');
+    List<Map<String, dynamic>> allDataToSync = [];
+    for (var learner in unsyncedLearners) {
+      try {
+        int localLearnerId = learner['LearnerID'] as int;
+        final bankDetails = await db.query(
+          'bankdetails',
+          where: 'LearnerID = ?',
+          whereArgs: [localLearnerId],
+        );
+        Map<String, dynamic> learnerData =
+            await _prepareLearnerDataWithBase64Images(Map.from(learner));
+        allDataToSync.add({
+          'learner': learnerData,
+          'bank': bankDetails.isNotEmpty ? Map.from(bankDetails.first) : null,
+        });
+      } catch (e) {
+        print('Error preparing learner ${learner['IDNumber']}: $e');
+      }
+    }
+    final responseData = await _sendAllDataToBackend(allDataToSync);
+    if (responseData != null && responseData['status'] == 'success') {
+      List<dynamic> syncedLearners = responseData['learners'] ?? [];
+      for (var syncedLearner in syncedLearners) {
+        try {
+          await updateSyncedStatus(
+              syncedLearner['IDNumber'], syncedLearner['LearnerID']);
+        } catch (e) {
+          print('Error updating sync status: $e');
+        }
+      }
+      print('[SYNC] Successfully synced ${syncedLearners.length} learners');
     }
   }
 
@@ -1256,28 +1548,6 @@ updated_at TIMESTAMP
         print('[DB_INSERT]   Role: ${mappedData['role']}');
         print('[DB_INSERT]   ClassID: ${mappedData['classID']}');
         print('[DB_INSERT]   All keys: ${mappedData.keys.toList()}');
-      }
-
-      // For learnerdetails table, ensure NOT NULL fields have default values
-      if (tableName == 'learnerdetails') {
-        // Provide defaults for NOT NULL fields to allow minimal data sync
-        mappedData['Title'] = mappedData['Title'] ?? 'N/A';
-        mappedData['DateOfBirth'] = mappedData['DateOfBirth'] ?? '1900-01-01';
-        mappedData['PhoneNumber'] = mappedData['PhoneNumber'] ?? '';
-        mappedData['Email'] = mappedData['Email'] ?? '';
-        mappedData['Age'] = mappedData['Age'] ?? 0;
-        mappedData['Gender'] = mappedData['Gender'] ?? '';
-        mappedData['Race'] = mappedData['Race'] ?? '';
-        mappedData['Language'] = mappedData['Language'] ?? '';
-        mappedData['Disability'] = mappedData['Disability'] ?? '';
-        mappedData['synced'] = mappedData['synced'] ?? 1;
-
-        print('[DB_INSERT] Learner sync with minimal data:');
-        print('[DB_INSERT]   ID: ${mappedData['LearnerID']}');
-        print(
-            '[DB_INSERT]   Name: ${mappedData['Name']} ${mappedData['Surname']}');
-        print('[DB_INSERT]   IDNumber: ${mappedData['IDNumber']}');
-        print('[DB_INSERT]   Title: ${mappedData['Title']} (default if null)');
       }
 
       // Insert data as-is (with mappings only for learnerdetails)
@@ -1422,9 +1692,9 @@ updated_at TIMESTAMP
         '[LOAD_LEARNERS] Getting learners for classID: $classID, date: $currentDate (SAST)');
 
     final result = await db.rawQuery('''
-    SELECT
-      l.LearnerID,
-      l.Name,
+    SELECT 
+      l.LearnerID, 
+      l.Name, 
       l.Surname,
       l.IDNumber,
       l.zkteco_left_template,
@@ -1432,11 +1702,11 @@ updated_at TIMESTAMP
       l.futronic_left_template,
       l.futronic_right_template,
       l.sourceafis_template,
-      lc.clock_in_time,
+      lc.clock_in_time, 
       lc.clock_out_time,
       lc.contact_time
     FROM learnerdetails l
-    LEFT JOIN learner_clocking lc ON l.LearnerID = lc.LearnerID
+    LEFT JOIN learner_clocking lc ON l.LearnerID = lc.LearnerID 
     AND lc.clock_date = ?
     WHERE l.classID = ?
   ''', [
@@ -1511,7 +1781,28 @@ updated_at TIMESTAMP
       where: 'LearnerID = ? AND clock_date = ? AND clock_out_time IS NULL',
       whereArgs: [learnerID, clockDate],
     );
-    return result.isNotEmpty ? result.first : null;
+    if (result.isEmpty) return null;
+
+    // Ensure only ONE open record per learner/date by cleaning up duplicates
+    if (result.length > 1) {
+      // Keep the earliest record by clocking_id, delete the rest
+      result.sort((a, b) {
+        final aId = (a['clocking_id'] ?? 0) as int;
+        final bId = (b['clocking_id'] ?? 0) as int;
+        return aId.compareTo(bId);
+      });
+      final keepId = result.first['clocking_id'] as int;
+      final deleted = await db.delete(
+        'learner_clocking',
+        where:
+            'LearnerID = ? AND clock_date = ? AND clock_out_time IS NULL AND clocking_id != ?',
+        whereArgs: [learnerID, clockDate, keepId],
+      );
+      print(
+          '[CLOCKING_CLEANUP] Removed $deleted duplicate open learner_clocking rows for learner=$learnerID, date=$clockDate, kept clocking_id=$keepId');
+    }
+
+    return result.first;
   }
 
 //find all data for clockins
@@ -1547,16 +1838,34 @@ updated_at TIMESTAMP
       // If no existing record, insert a new clock-in record
       await db.insert('learner_clocking', clockInData);
       print('Learner Clock In Data Inserted: $clockInData');
-    } else {
-      // If record exists, update the clock-in data (do not create a new record)
-      await db.update(
-        'learner_clocking',
-        clockInData,
-        where: 'LearnerID = ? AND clock_date = ?',
-        whereArgs: [learnerID, clockDate],
-      );
-      print('Learner Clock In Data Updated: $clockInData');
+      return;
     }
+
+    // If multiple records exist for this learner/date, clean them up: keep one, delete others
+    if (existingClockIn.length > 1) {
+      existingClockIn.sort((a, b) {
+        final aId = (a['clocking_id'] ?? 0) as int;
+        final bId = (b['clocking_id'] ?? 0) as int;
+        return aId.compareTo(bId);
+      });
+      final keepId = existingClockIn.first['clocking_id'] as int;
+      final deleted = await db.delete(
+        'learner_clocking',
+        where: 'LearnerID = ? AND clock_date = ? AND clocking_id != ?',
+        whereArgs: [learnerID, clockDate, keepId],
+      );
+      print(
+          '[CLOCKING_CLEANUP] Removed $deleted duplicate learner_clocking rows for learner=$learnerID, date=$clockDate, kept clocking_id=$keepId');
+    }
+
+    // Update the single remaining record
+    await db.update(
+      'learner_clocking',
+      clockInData,
+      where: 'LearnerID = ? AND clock_date = ?',
+      whereArgs: [learnerID, clockDate],
+    );
+    print('Learner Clock In Data Updated: $clockInData');
   }
 
 //update clock out
@@ -1579,9 +1888,11 @@ updated_at TIMESTAMP
       String contactTime = contactTimeDuration.toString();
 
       // Prepare the data to update the record
+      // Mark as unsynced so full offline record can be pushed to server
       Map<String, dynamic> updatedData = {
         'clock_out_time': clockOutData['clock_out_time'],
         'contact_time': contactTime, // Directly use the value of inMinutes
+        'synced': 0,
       };
 
       print('Learner Clock Out Data Updated: $updatedData');
@@ -1830,6 +2141,70 @@ updated_at TIMESTAMP
     return sites;
   }
 
+  // Save SDP sites for offline use
+  Future<void> saveSdpSitesForOffline(
+      String sdpId, List<Map<String, dynamic>> sites) async {
+    final db = await database;
+
+    // Parse sdpId to int if needed
+    final sdpIdInt = int.tryParse(sdpId);
+
+    // Use a batch operation for better performance
+    final batch = db.batch();
+
+    for (var site in sites) {
+      // Map and convert the API data to match the sites table schema
+      final mappedSite = <String, dynamic>{
+        'siteID': _parseToInt(site['siteID']),
+        'siteName': site['siteName']?.toString(),
+        'beneficiaries': site['beneficiaries']?.toString(),
+        'latitude': site['coordinates']?.toString().split(',')[0].trim(),
+        'longitude': site['coordinates']?.toString().split(',')[1].trim(),
+        'sdp_id': sdpIdInt ?? _parseToInt(site['sdp_id']),
+        'Province': site['province']?.toString(),
+        'District': site['District']?.toString(),
+        'Municipality': site['Municipality']?.toString(),
+        'Category': site['category']?.toString(),
+        'project_id': _parseToInt(site['project_id']),
+        'Project_pathway': site['project_pathway']?.toString(),
+        'qualification_id': site['qualification_id']?.toString(),
+        'first_name': site['first_name']?.toString(),
+        'last_name': site['last_name']?.toString(),
+        'cell_phone': site['cell_phone']?.toString(),
+        'email': site['email']?.toString(),
+      };
+
+      // Remove null values
+      mappedSite.removeWhere((key, value) => value == null);
+
+      batch.insert(
+        'sites',
+        mappedSite,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+
+    await batch.commit(noResult: true);
+  }
+
+  // Helper method to safely parse integers
+  int? _parseToInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  // Helper method to safely parse coordinates
+  String? _parseCoordinate(dynamic coordinates, int index) {
+    if (coordinates == null) return null;
+    final coordStr = coordinates.toString();
+    if (!coordStr.contains(',')) return null;
+    final parts = coordStr.split(',');
+    if (parts.length <= index) return null;
+    return parts[index].trim();
+  }
+
   // Fetch class data by siteID from SQLite
   Future<List<Map<String, dynamic>>> fetchClassDataBySiteID(
       String siteID) async {
@@ -1951,16 +2326,6 @@ updated_at TIMESTAMP
     );
   }
 
-  Future<List<Map<String, dynamic>>> fetchLearners(String classID) async {
-    final db = await database;
-
-    return await db.query(
-      'learnerdetails',
-      where: 'classID = ?',
-      whereArgs: [classID],
-    );
-  }
-
   Future<Map<String, dynamic>?> fetchLearnerByID(String learnerID) async {
     final db = await database; // Assuming you have your database instance here
     final result = await db.query(
@@ -1970,7 +2335,7 @@ updated_at TIMESTAMP
     );
 
     return result.isNotEmpty
-        ? result.first
+        ? Map<String, dynamic>.from(result.first) // Create mutable copy
         : null; // Return the first result or null
   }
 
@@ -2363,8 +2728,8 @@ updated_at TIMESTAMP
 
     // SQL query with proper string formatting, including question_type
     var result = await db.rawQuery('''
-    SELECT
-      ld.classID,
+    SELECT 
+      ld.classID, 
       s.project_id,
       pr.Project_pathway->'\$[0].name' AS pathway_name,
       pr.Project_pathway->'\$[0].qual_types[0].qualification.name' AS qualification_name,
@@ -2738,10 +3103,10 @@ updated_at TIMESTAMP
       // Try to find the most recent document for this learner and type
       // Note: POE table might not have unit standard field, so we search by type and time
       final uploads = await db.rawQuery('''
-        SELECT filePath, exercise, submitted_at FROM poe
+        SELECT filePath, exercise, submitted_at FROM poe 
         WHERE learnerID = ? AND type = ? AND synced = 1
         AND filePath NOT LIKE 'MANUALLY_MARKED%'
-        ORDER BY submitted_at DESC
+        ORDER BY submitted_at DESC 
         LIMIT 5
       ''', [learnerID.toString(), type]);
 
@@ -3024,8 +3389,8 @@ updated_at TIMESTAMP
 
     // Start building the query
     String query = '''
- 
-   SELECT
+  
+   SELECT 
     ld.LearnerID,
     ld.IDNumber,
     ld.PhoneNumber,
@@ -3057,8 +3422,8 @@ WHERE ld.classID = ?
     AND NOT EXISTS (
       SELECT 1
       FROM material_receipt_form mrf
-      WHERE mrf.student_id_number = ld.IDNumber
-        AND mrf.class_name = c.className
+      WHERE mrf.student_id_number = ld.IDNumber 
+        AND mrf.class_name = c.className 
         AND mrf.description = ?
     )
     ''';
@@ -3087,7 +3452,7 @@ WHERE ld.classID = ?
 
     try {
       final result = await db.rawQuery('''
-    SELECT
+    SELECT 
     p.Project_name,
     JSON_UNQUOTE(JSON_EXTRACT(p.project_pathway, '\$[0].name')) AS pathway_name,
     JSON_UNQUOTE(JSON_EXTRACT(p.project_pathway, '\$[0].qual_types[0].qualification.name')) AS qualification_name,
@@ -3101,9 +3466,9 @@ JOIN project p ON site.project_id = p.project_id
 LEFT JOIN sdp s ON p.sdp_name = s.sdp_name
 JOIN facilitator f ON c.classID = f.classID
 WHERE ld.classID =?
-GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].name'),
-         JSON_EXTRACT(p.project_pathway, '\$[0].qual_types[0].qualification.name'),
-         JSON_EXTRACT(p.project_pathway, '\$[0].qual_types[0].qualification.id'),
+GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].name'), 
+         JSON_EXTRACT(p.project_pathway, '\$[0].qual_types[0].qualification.name'), 
+         JSON_EXTRACT(p.project_pathway, '\$[0].qual_types[0].qualification.id'), 
          f.firstName, f.lastName, c.className;
     ''', [classID]);
 
@@ -3287,7 +3652,7 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
     try {
       List<Map<String, dynamic>> result = await db.rawQuery('''
       SELECT f.facilitator_id, f.firstName, f.lastName, f.role, f.email, f.classID,
-             f.phoneNumber, f.f_IDNumber, f.assessorNo, f.assessorExpiryDate, f.f_signature, f.f_profile,
+             f.phoneNumber, f.f_IDNumber, f.assessorNo, f.assessorExpiryDate, f.f_signature, f.f_profile, 
              c.className
       FROM facilitator f
       LEFT JOIN class c ON f.classID = c.classID
@@ -3689,16 +4054,11 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
         where: 'LearnerID = ?',
         whereArgs: [oldLearnerID],
       );
-
-      print(
-          'Updated LearnerID from $oldLearnerID to $newLearnerID in both tables');
     } catch (e) {
       print('Error updating LearnerID: $e');
-      rethrow;
     }
   }
 
-  // Fetch learner by IDNumber
   Future<Map<String, dynamic>?> fetchLearnerByIDNumber(String idNumber) async {
     final db = await database;
     try {
@@ -3707,11 +4067,61 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
         where: 'IDNumber = ?',
         whereArgs: [idNumber],
       );
-      return result.isNotEmpty ? result.first : null;
+      return result.isNotEmpty
+          ? Map<String, dynamic>.from(result.first)
+          : null; // Create mutable copy
     } catch (e) {
       print('Error fetching learner by IDNumber: $e');
       return null;
     }
+  }
+
+  /// Fetch all learners for a specific class ID
+  Future<List<Map<String, dynamic>>> fetchLearners(String classID) async {
+    final db = await database;
+    try {
+      final result = await db.query(
+        'learnerdetails',
+        where: 'classID = ?',
+        whereArgs: [classID],
+      );
+      // Return mutable copies of all results
+      return result.map((row) => Map<String, dynamic>.from(row)).toList();
+    } catch (e) {
+      print('Error fetching learners for classID $classID: $e');
+      return [];
+    }
+  }
+
+  /// Encodes local image/signature files as base64 for offline sync.
+  /// When profile_image, signature, or witness_signature contain device paths
+  /// to existing files, reads and encodes them for server upload.
+  Future<Map<String, dynamic>> _prepareLearnerDataWithBase64Images(
+      Map<String, dynamic> learnerData) async {
+    final result = Map<String, dynamic>.from(learnerData);
+    final learnerId = learnerData['LearnerID']?.toString() ?? '';
+
+    // Helper to encode local file as base64 if it exists
+    Future<void> encodeIfLocalFile(
+        String fieldName, String base64FieldName) async {
+      final path = learnerData[fieldName]?.toString();
+      if (path == null || path.isEmpty) return;
+      try {
+        final file = File(path);
+        if (await file.exists()) {
+          final bytes = await file.readAsBytes();
+          result[base64FieldName] = base64Encode(bytes);
+        }
+      } catch (e) {
+        debugPrint('[SYNC] Error encoding $fieldName: $e');
+      }
+    }
+
+    await encodeIfLocalFile('profile_image', 'profile_image_base64');
+    await encodeIfLocalFile('signature', 'signature_base64');
+    await encodeIfLocalFile('witness_signature', 'witness_signature_base64');
+
+    return result;
   }
 
   Future<bool> _checkConnectivity() async {
@@ -3780,7 +4190,7 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
       return;
     }
 
-    // Prepare all data for batch sync
+    // Prepare all data for batch sync (with base64 images for offline sync)
     List<Map<String, dynamic>> allDataToSync = [];
 
     for (var learner in unsyncedLearners) {
@@ -3795,6 +4205,8 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
         );
 
         Map<String, dynamic> learnerData = Map.from(learner);
+        learnerData = await _prepareLearnerDataWithBase64Images(learnerData);
+
         Map<String, dynamic>? bankData =
             bankDetails.isNotEmpty ? Map.from(bankDetails.first) : null;
 
@@ -3939,12 +4351,50 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
     debugPrint('[DB] bankData: $bankData');
 
     await db.transaction((txn) async {
-      // Check if learner already exists by IDNumber
-      final existingLearner = await txn.query(
-        'learnerdetails',
-        where: 'IDNumber = ?',
-        whereArgs: [learnerData['IDNumber']],
-      );
+      // Get project_id from classID (via class -> sites join)
+      int? projectId;
+      if (learnerData['classID'] != null) {
+        final projectResult = await txn.rawQuery('''
+          SELECT s.project_id 
+          FROM class c 
+          JOIN sites s ON c.siteID = s.siteID 
+          WHERE c.classID = ?
+        ''', [learnerData['classID'].toString()]);
+
+        if (projectResult.isNotEmpty &&
+            projectResult.first['project_id'] != null) {
+          projectId =
+              int.tryParse(projectResult.first['project_id'].toString());
+          debugPrint(
+              '[DB] Found project_id: $projectId for classID: ${learnerData['classID']}');
+        }
+      }
+
+      // Check if learner already exists by IDNumber AND project_id
+      List<Map<String, dynamic>> existingLearner = [];
+      if (projectId != null) {
+        // Check for duplicate in same project
+        existingLearner = await txn.rawQuery('''
+          SELECT ld.* 
+          FROM learnerdetails ld
+          JOIN class c ON ld.classID = c.classID
+          JOIN sites s ON c.siteID = s.siteID
+          WHERE ld.IDNumber = ? AND s.project_id = ?
+        ''', [learnerData['IDNumber'], projectId]);
+
+        debugPrint(
+            '[DB] Checking for duplicate: IDNumber=${learnerData['IDNumber']}, project_id=$projectId');
+        debugPrint(
+            '[DB] Found ${existingLearner.length} existing learner(s) in same project');
+      } else {
+        // Fallback to old behavior if project_id not found
+        existingLearner = await txn.query(
+          'learnerdetails',
+          where: 'IDNumber = ?',
+          whereArgs: [learnerData['IDNumber']],
+        );
+        debugPrint('[DB] No project_id found, using old duplicate check');
+      }
 
       Map<String, dynamic> learnerOnlyData = Map.from(learnerData)
         ..remove('BankName')
@@ -3961,7 +4411,7 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
       }
 
       if (existingLearner.isNotEmpty) {
-        // Update existing learner
+        // Update existing learner in same project
         learnerId = existingLearner.first['LearnerID'] as int;
         await txn.update(
           'learnerdetails',
@@ -3969,10 +4419,11 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
           where: 'LearnerID = ?',
           whereArgs: [learnerId],
         );
-        debugPrint('[DB] Updated existing learner with ID: $learnerId');
-        print('Updated existing learner with ID: $learnerId');
+        debugPrint(
+            '[DB] Updated existing learner with ID: $learnerId (same project)');
+        print('Updated existing learner with ID: $learnerId (same project)');
       } else {
-        // Insert new learner
+        // Insert new learner (either new or duplicate in different project)
         learnerOnlyData['synced'] = 0; // Ensure synced is 0 for new entries
         learnerId = await txn.insert('learnerdetails', learnerOnlyData);
         debugPrint('[DB] Inserted new learner with ID: $learnerId');
@@ -4049,6 +4500,52 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
     return learnerId;
   }
 
+  // Check if learner exists in the same project
+  Future<Map<String, dynamic>?> checkLearnerExistsInProject(
+      String idNumber, String classID) async {
+    final db = await database;
+
+    try {
+      // Get project_id from classID
+      final projectResult = await db.rawQuery('''
+        SELECT s.project_id 
+        FROM class c 
+        JOIN sites s ON c.siteID = s.siteID 
+        WHERE c.classID = ?
+      ''', [classID]);
+
+      if (projectResult.isEmpty || projectResult.first['project_id'] == null) {
+        debugPrint(
+            '[DB] No project_id found for classID: $classID, cannot check duplicate');
+        return null;
+      }
+
+      final projectId = projectResult.first['project_id'];
+
+      // Check if learner exists in same project
+      final existingLearner = await db.rawQuery('''
+        SELECT ld.*, c.className, s.siteName, s.project_id
+        FROM learnerdetails ld
+        JOIN class c ON ld.classID = c.classID
+        JOIN sites s ON c.siteID = s.siteID
+        WHERE ld.IDNumber = ? AND s.project_id = ?
+      ''', [idNumber, projectId]);
+
+      if (existingLearner.isNotEmpty) {
+        debugPrint(
+            '[DB] Learner with IDNumber $idNumber exists in project $projectId');
+        return existingLearner.first;
+      }
+
+      debugPrint(
+          '[DB] Learner with IDNumber $idNumber does NOT exist in project $projectId');
+      return null;
+    } catch (e) {
+      debugPrint('[DB] Error checking learner duplicate: $e');
+      return null;
+    }
+  }
+
   Future<void> syncBankDetails() async {
     final db = await database;
     final unsyncedBankDetails = await db.query(
@@ -4073,6 +4570,85 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
         print(
             'Error processing bank details for BankID ${bankDetail['BankID']}: $e');
       }
+    }
+  }
+
+  // Sync learner documents from server to local database
+  Future<void> syncLearnerDocuments() async {
+    try {
+      print('[SYNC] Starting learner documents sync...');
+
+      // Make request to sync endpoint
+      final response = await http.get(
+        Uri.parse(AppConfig.syncLearnerDocumentsUrl),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+
+        if (jsonData['success'] == true) {
+          final documents = jsonData['documents'] as List;
+          print(
+              '[SYNC] Retrieved ${documents.length} learner documents from server');
+
+          final db = await database;
+          int syncedCount = 0;
+
+          for (var document in documents) {
+            try {
+              // Check if document already exists
+              final existing = await db.query(
+                'learner_document',
+                where: 'document_id = ?',
+                whereArgs: [document['document_id']],
+              );
+
+              if (existing.isEmpty) {
+                // Insert new document
+                await db.insert('learner_document', {
+                  'document_id': document['document_id'],
+                  'documentName': document['documentName'],
+                  'learner_document': document['learner_document'],
+                  'status': document['status'],
+                  'learner_id': document['learner_id'],
+                  'upload_date': document['upload_date'],
+                  'synced': 1, // Mark as synced
+                  'rejection_reason': document['rejection_reason'],
+                });
+                syncedCount++;
+              } else {
+                // Update existing document (in case status changed on server)
+                await db.update(
+                  'learner_document',
+                  {
+                    'documentName': document['documentName'],
+                    'learner_document': document['learner_document'],
+                    'status': document['status'],
+                    'upload_date': document['upload_date'],
+                    'synced': 1,
+                    'rejection_reason': document['rejection_reason'],
+                  },
+                  where: 'document_id = ?',
+                  whereArgs: [document['document_id']],
+                );
+              }
+            } catch (e) {
+              print(
+                  '[SYNC] Error syncing document ${document['document_id']}: $e');
+            }
+          }
+
+          print(
+              '[SYNC] Successfully synced $syncedCount new learner documents');
+        } else {
+          print('[SYNC] Server returned error: ${jsonData['message']}');
+        }
+      } else {
+        print('[SYNC] HTTP error: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('[SYNC] Error syncing learner documents: $e');
     }
   }
 
@@ -4205,11 +4781,37 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
     try {
       debugPrint('[SYNC-CLASS] Starting learner sync for classID: $classID');
 
-      final response = await http
-          .get(
-            Uri.parse('${AppConfig.syncLearnersByClassUrl}?classID=$classID'),
-          )
-          .timeout(const Duration(seconds: 15));
+      // Try primary sync endpoint first
+      http.Response? response;
+      try {
+        debugPrint(
+            '[SYNC-CLASS] Trying primary endpoint: syncLearnersByClassUrl');
+        response = await http
+            .get(
+              Uri.parse('${AppConfig.syncLearnersByClassUrl}?classID=$classID'),
+            )
+            .timeout(const Duration(seconds: 15));
+
+        if (response.statusCode != 200) {
+          debugPrint(
+              '[SYNC-CLASS] Primary endpoint returned ${response.statusCode}, trying fallback...');
+          response = null;
+        }
+      } catch (e) {
+        debugPrint(
+            '[SYNC-CLASS] Primary endpoint failed: $e, trying fallback...');
+        response = null;
+      }
+
+      // Fallback to alternative endpoint if primary fails
+      if (response == null) {
+        debugPrint('[SYNC-CLASS] Trying fallback endpoint: getLearnersUrl');
+        response = await http
+            .get(
+              Uri.parse('${AppConfig.getLearnersUrl}?classID=$classID'),
+            )
+            .timeout(const Duration(seconds: 10));
+      }
 
       if (response.statusCode == 200) {
         final List<dynamic> learnersData = json.decode(response.body);
@@ -4248,82 +4850,94 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
           whereArgs: [classID],
         );
 
-        // Create a map of existing fingerprint templates by LearnerID
-        Map<String, Map<String, String>> existingTemplates = {};
+        // OFFLINE-FIRST FIX: Create a map of existing learners for UPSERT logic
+        // Don't delete existing learners - preserve local data for offline operation
+        Map<String, Map<String, dynamic>> existingLearnersMap = {};
         for (var learner in existingLearners) {
-          existingTemplates[learner['LearnerID'].toString()] = {
-            'zkteco_left_template':
-                learner['zkteco_left_template']?.toString() ?? '',
-            'zkteco_right_template':
-                learner['zkteco_right_template']?.toString() ?? '',
-            'futronic_left_template':
-                learner['futronic_left_template']?.toString() ?? '',
-            'futronic_right_template':
-                learner['futronic_right_template']?.toString() ?? '',
-          };
+          existingLearnersMap[learner['LearnerID'].toString()] = learner;
         }
 
-        // Clear existing learners for this class to avoid duplicates
-        await db.delete(
-          'learnerdetails',
-          where: 'classID = ?',
-          whereArgs: [classID],
-        );
-        debugPrint('[SYNC] Cleared existing learners for classID: $classID');
+        debugPrint(
+            '[SYNC] Found ${existingLearners.length} existing learners in local database');
+        debugPrint(
+            '[SYNC] Using UPSERT logic - preserving existing learners for offline operation');
 
         // Insert new learners
         for (var learner in learnersData) {
           try {
             String learnerId = learner['LearnerID']?.toString() ?? '';
-
-            // Create learner data with ALL fields from server
             Map<String, dynamic> learnerData = {
               'LearnerID': learnerId,
-              'Title': learner['Title']?.toString() ?? '',
               'Name': learner['Name']?.toString() ?? '',
               'Surname': learner['Surname']?.toString() ?? '',
               'IDNumber': learner['IDNumber']?.toString() ?? '',
               'DateOfBirth': learner['DateOfBirth']?.toString() ?? '',
               'PhoneNumber': learner['PhoneNumber']?.toString() ?? '',
               'Email': learner['Email']?.toString() ?? '',
-              'Age': learner['Age']?.toString() ?? '',
-              'Gender': learner['Gender']?.toString() ?? '',
-              'Race': learner['Race']?.toString() ?? '',
-              'Language': learner['Language']?.toString() ?? '',
-              'Disability': learner['Disability']?.toString() ?? '',
-              'AddressLine1': learner['AddressLine1']?.toString() ?? '',
-              'AddressLine2': learner['AddressLine2']?.toString() ?? '',
-              'AddressLine3': learner['AddressLine3']?.toString() ?? '',
-              'PostalCode': learner['PostalCode']?.toString() ?? '',
-              'KinName': learner['KinName']?.toString() ?? '',
-              'KinRelation': learner['KinRelation']?.toString() ?? '',
-              'KinContact': learner['KinContact']?.toString() ?? '',
-              'SchoolName': learner['SchoolName']?.toString() ?? '',
-              'SchoolCompletion': learner['SchoolCompletion']?.toString() ?? '',
-              'SchoolLocation': learner['SchoolLocation']?.toString() ?? '',
-              'SchoolGrade': learner['SchoolGrade']?.toString() ?? '',
+              'Title': learner['Title']?.toString() ?? '',
               'classID': classID,
-              'profile_image': learner['profile_image']?.toString() ?? '',
-              'signature': learner['signature']?.toString() ?? '',
               'synced': 1, // Mark as synced since it came from server
-              'imagePath': learner['imagePath']?.toString() ?? '',
-              'activity_statu': learner['activity_statu']?.toString() ?? '',
-              'witness_initials': learner['witness_initials']?.toString() ?? '',
-              'learner_initials': learner['learner_initials']?.toString() ?? '',
-              'witness_signature':
-                  learner['witness_signature']?.toString() ?? '',
             };
 
             // Process fingerprint templates - merge server data with existing local data
             // Server data takes priority, but preserve local data if server has none
             Map<String, String> fingerprintData = {};
 
+            // Check if learner exists locally
+            final existingLearner = existingLearnersMap[learnerId];
+
             // Start with existing local templates if any
-            if (existingTemplates.containsKey(learnerId)) {
-              final localTemplates = existingTemplates[learnerId]!;
-              fingerprintData.addAll(localTemplates);
+            if (existingLearner != null) {
+              // Preserve existing fingerprint templates
+              if (existingLearner['zkteco_left_template'] != null &&
+                  existingLearner['zkteco_left_template']
+                      .toString()
+                      .isNotEmpty) {
+                fingerprintData['zkteco_left_template'] =
+                    existingLearner['zkteco_left_template'].toString();
+              }
+              if (existingLearner['zkteco_right_template'] != null &&
+                  existingLearner['zkteco_right_template']
+                      .toString()
+                      .isNotEmpty) {
+                fingerprintData['zkteco_right_template'] =
+                    existingLearner['zkteco_right_template'].toString();
+              }
+              if (existingLearner['futronic_left_template'] != null &&
+                  existingLearner['futronic_left_template']
+                      .toString()
+                      .isNotEmpty) {
+                fingerprintData['futronic_left_template'] =
+                    existingLearner['futronic_left_template'].toString();
+              }
+              if (existingLearner['futronic_right_template'] != null &&
+                  existingLearner['futronic_right_template']
+                      .toString()
+                      .isNotEmpty) {
+                fingerprintData['futronic_right_template'] =
+                    existingLearner['futronic_right_template'].toString();
+              }
+              if (existingLearner['fingerprint_template'] != null &&
+                  existingLearner['fingerprint_template']
+                      .toString()
+                      .isNotEmpty) {
+                fingerprintData['fingerprint_template'] =
+                    existingLearner['fingerprint_template'].toString();
+              }
+              if (existingLearner['isLeftHand'] != null &&
+                  existingLearner['isLeftHand'].toString().isNotEmpty) {
+                fingerprintData['isLeftHand'] =
+                    existingLearner['isLeftHand'].toString();
+              }
+              if (existingLearner['sourceafis_template'] != null &&
+                  existingLearner['sourceafis_template']
+                      .toString()
+                      .isNotEmpty) {
+                fingerprintData['sourceafis_template'] =
+                    existingLearner['sourceafis_template'].toString();
+              }
               debugPrint(
-                  '[SYNC-CLASS] Starting with existing local templates for learner: $learnerId');
+                  '[SYNC] Starting with existing local templates for learner: $learnerId');
             }
 
             // Override with server data if it exists (server takes priority)
@@ -4334,54 +4948,123 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
               fingerprintData['zkteco_left_template'] =
                   learner['zkteco_left_template'].toString();
               debugPrint(
-                  '[SYNC-CLASS] Server provided zkteco_left_template for learner: $learnerId');
+                  '[SYNC] Server provided zkteco_left_template for learner: $learnerId');
             }
             if (learner['zkteco_right_template'] != null &&
                 learner['zkteco_right_template'].toString().isNotEmpty) {
               fingerprintData['zkteco_right_template'] =
                   learner['zkteco_right_template'].toString();
               debugPrint(
-                  '[SYNC-CLASS] Server provided zkteco_right_template for learner: $learnerId');
+                  '[SYNC] Server provided zkteco_right_template for learner: $learnerId');
             }
             if (learner['futronic_left_template'] != null &&
                 learner['futronic_left_template'].toString().isNotEmpty) {
               fingerprintData['futronic_left_template'] =
                   learner['futronic_left_template'].toString();
               debugPrint(
-                  '[SYNC-CLASS] Server provided futronic_left_template for learner: $learnerId');
+                  '[SYNC] Server provided futronic_left_template for learner: $learnerId');
             }
             if (learner['futronic_right_template'] != null &&
                 learner['futronic_right_template'].toString().isNotEmpty) {
               fingerprintData['futronic_right_template'] =
                   learner['futronic_right_template'].toString();
               debugPrint(
-                  '[SYNC-CLASS] Server provided futronic_right_template for learner: $learnerId');
+                  '[SYNC] Server provided futronic_right_template for learner: $learnerId');
             }
             if (learner['sourceafis_template'] != null &&
                 learner['sourceafis_template'].toString().isNotEmpty) {
               fingerprintData['sourceafis_template'] =
                   learner['sourceafis_template'].toString();
               debugPrint(
-                  '[SYNC-CLASS] Server provided sourceafis_template for learner: $learnerId');
+                  '[SYNC] Server provided sourceafis_template for learner: $learnerId');
+            }
+
+            // Add old format fields for backwards compatibility mapping
+            if (learner['fingerprint_template'] != null &&
+                learner['fingerprint_template'].toString().isNotEmpty) {
+              fingerprintData['fingerprint_template'] =
+                  learner['fingerprint_template'].toString();
+              debugPrint(
+                  '[SYNC] Server provided fingerprint_template (old format) for learner: $learnerId');
+            }
+            if (learner['isLeftHand'] != null &&
+                learner['isLeftHand'].toString().isNotEmpty) {
+              fingerprintData['isLeftHand'] = learner['isLeftHand'].toString();
+              debugPrint(
+                  '[SYNC] Server provided isLeftHand (old format) for learner: $learnerId');
             }
 
             learnerData.addAll(fingerprintData);
 
             // Debug what we're about to insert
             debugPrint(
-                '[SYNC-CLASS] Inserting learner: ${learnerData['Name']} ${learnerData['Surname']} (ID: $learnerId)');
-
-            // Insert directly into database
-            await db.insert(
-              'learnerdetails',
-              learnerData,
-              conflictAlgorithm: ConflictAlgorithm.replace,
-            );
-
+                '[SYNC] ===== INSERTING LEARNER ${learnerData['LearnerID']} =====');
             debugPrint(
-                '[SYNC-CLASS] ✅ Successfully inserted learner: ${learnerData['Name']} ${learnerData['Surname']}');
+                '[SYNC] Pre-insert learnerData keys: ${learnerData.keys.toList()}');
+            debugPrint('[SYNC] Fingerprint data before insert:');
+            debugPrint(
+                '[SYNC]   fingerprint_template: ${learnerData['fingerprint_template']?.toString().length ?? 'null'} chars');
+            debugPrint('[SYNC]   isLeftHand: ${learnerData['isLeftHand']}');
+            debugPrint(
+                '[SYNC]   zkteco_left_template: ${learnerData['zkteco_left_template']?.toString().length ?? 'null'} chars');
+            debugPrint(
+                '[SYNC]   zkteco_right_template: ${learnerData['zkteco_right_template']?.toString().length ?? 'null'} chars');
+            debugPrint(
+                '[SYNC]   futronic_left_template: ${learnerData['futronic_left_template']?.toString().length ?? 'null'} chars');
+            debugPrint(
+                '[SYNC]   futronic_right_template: ${learnerData['futronic_right_template']?.toString().length ?? 'null'} chars');
+
+            // Use insertData instead of direct db.insert to ensure proper column mapping
+            // OFFLINE-FIRST: Use UPSERT logic (update if exists, insert if new)
+            if (existingLearner != null) {
+              // UPDATE existing learner
+              await db.update(
+                'learnerdetails',
+                learnerData,
+                where: 'LearnerID = ?',
+                whereArgs: [learnerId],
+              );
+              debugPrint(
+                  '[SYNC] Updated existing learner: ${learnerData['Name']} ${learnerData['Surname']} (ID: $learnerId)');
+            } else {
+              // INSERT new learner
+              await insertData('learnerdetails', learnerData);
+              debugPrint(
+                  '[SYNC] Inserted new learner: ${learnerData['Name']} ${learnerData['Surname']} (ID: $learnerId)');
+            }
+
+            // Verify what was actually inserted
+            final verifyResult = await db.query(
+              'learnerdetails',
+              columns: [
+                'LearnerID',
+                'Name',
+                'Surname',
+                'zkteco_left_template',
+                'zkteco_right_template',
+                'futronic_left_template',
+                'futronic_right_template'
+              ],
+              where: 'LearnerID = ?',
+              whereArgs: [learnerData['LearnerID']],
+            );
+            if (verifyResult.isNotEmpty) {
+              final row = verifyResult.first;
+              debugPrint('[SYNC] ===== VERIFICATION POST-INSERT =====');
+              debugPrint(
+                  '[SYNC] Learner ${row['LearnerID']} (${row['Name']} ${row['Surname']}) fingerprint columns:');
+              debugPrint(
+                  '[SYNC]   zkteco_left_template: ${row['zkteco_left_template']?.toString().length ?? 'null'} chars');
+              debugPrint(
+                  '[SYNC]   zkteco_right_template: ${row['zkteco_right_template']?.toString().length ?? 'null'} chars');
+              debugPrint(
+                  '[SYNC]   futronic_left_template: ${row['futronic_left_template']?.toString().length ?? 'null'} chars');
+              debugPrint(
+                  '[SYNC]   futronic_right_template: ${row['futronic_right_template']?.toString().length ?? 'null'} chars');
+              debugPrint('[SYNC] ===== END VERIFICATION =====');
+            }
           } catch (e) {
-            debugPrint('[SYNC-CLASS] Error inserting learner: $e');
+            debugPrint('[SYNC] Error inserting learner: $e');
           }
         }
 
@@ -4466,6 +5149,13 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
     try {
       final db = await database;
       final templateStr = template.toString();
+
+      // Skip if template is empty
+      if (templateStr.isEmpty) {
+        debugPrint(
+            '[SAVE] Skipping save for empty template: $scannerType $finger for learner $learnerId');
+        return false;
+      }
 
       // Save to the appropriate column based on scanner type
       if (scannerType == 'zkteco') {
@@ -4929,12 +5619,12 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
              c.clock_in_time, c.clock_out_time
       FROM learnerdetails l
       INNER JOIN clocking c ON l.LearnerID = c.LearnerID
-      WHERE c.clock_date = ?
-        AND c.clock_in_time IS NOT NULL
+      WHERE c.clock_date = ? 
+        AND c.clock_in_time IS NOT NULL 
         AND c.clock_out_time IS NULL
         AND l.LearnerID NOT IN (
-          SELECT learner_id FROM monitoring
-          WHERE prompt_time >= datetime('now', '-1 hour')
+          SELECT learner_id FROM monitoring 
+          WHERE prompt_time >= datetime('now', '-1 hour') 
             AND status = 'pending'
         )
       ORDER BY RANDOM()
@@ -5027,7 +5717,7 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
     final db = await database;
 
     final result = await db.rawQuery('''
-      SELECT
+      SELECT 
         COUNT(*) as total_prompts,
         SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
         SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
@@ -5121,6 +5811,13 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
   Future<bool> _syncFacilitatorTemplateToServer(
       int facilitatorId, String templateType, String templateData) async {
     try {
+      // Skip sync if template is empty
+      if (templateData.isEmpty) {
+        debugPrint(
+            '[FAC_FP_SYNC] Skipping sync for empty template: $templateType for facilitator $facilitatorId');
+        return false;
+      }
+
       // Check connectivity
       final connectivityResult = await Connectivity().checkConnectivity();
       if (connectivityResult.first == ConnectivityResult.none) {
@@ -5511,11 +6208,16 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
         print(
             '  - Futronic right template exists: ${fingerprint['futronic_right_template'] != null}');
 
-        // Check which templates exist and sync accordingly
-        bool hasZkTecoLeft = fingerprint['zkteco_left_template'] != null;
-        bool hasZkTecoRight = fingerprint['zkteco_right_template'] != null;
-        bool hasFutronicLeft = fingerprint['futronic_left_template'] != null;
-        bool hasFutronicRight = fingerprint['futronic_right_template'] != null;
+        // Check which templates exist and are not empty
+        bool hasZkTecoLeft = fingerprint['zkteco_left_template'] != null &&
+            (fingerprint['zkteco_left_template'] as String).isNotEmpty;
+        bool hasZkTecoRight = fingerprint['zkteco_right_template'] != null &&
+            (fingerprint['zkteco_right_template'] as String).isNotEmpty;
+        bool hasFutronicLeft = fingerprint['futronic_left_template'] != null &&
+            (fingerprint['futronic_left_template'] as String).isNotEmpty;
+        bool hasFutronicRight =
+            fingerprint['futronic_right_template'] != null &&
+                (fingerprint['futronic_right_template'] as String).isNotEmpty;
 
         List<String> syncErrors = [];
         int successfulSyncs = 0;
@@ -5610,6 +6312,13 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
       debugPrint(
           '[SYNC] Template preview: ${template.isNotEmpty ? template.substring(0, template.length > 50 ? 50 : template.length) : 'EMPTY'}...');
       debugPrint('[SYNC] Template is empty: ${template.isEmpty}');
+
+      // Skip sync if template is empty
+      if (template.isEmpty) {
+        debugPrint(
+            '[SYNC] Skipping sync for empty template: $templateType for learner $learnerId');
+        return;
+      }
 
       final response = await http.post(
         Uri.parse(AppConfig.buildUrl('sync_fingerprint.php')),
@@ -6072,7 +6781,7 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
         whereClauses.map((clause) => '($clause)').join(' OR ');
 
     final query = '''
-      SELECT
+      SELECT 
         l.LearnerID,
         l.Name,
         l.Surname,
@@ -6087,7 +6796,7 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
       LEFT JOIN sites site ON c.siteID = site.siteID
       LEFT JOIN sdp s ON site.sdp_id = s.sdp_id
       WHERE $whereStatement
-      ORDER BY
+      ORDER BY 
         c.className COLLATE NOCASE ASC,
         l.Surname COLLATE NOCASE ASC,
         l.Name COLLATE NOCASE ASC
@@ -6107,7 +6816,7 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
 
       // Use SQLite JSON operators to extract unit standards directly
       var result = await db.rawQuery('''
-        SELECT
+        SELECT 
           c.classID,
           c.className,
           s.project_id,
@@ -6258,256 +6967,4 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
       rethrow;
     }
   }
-
-  // ==================== MONITORING RECORDS METHODS ====================
-
-  /// Insert monitoring record (offline storage)
-  Future<int> insertMonitoringClockin(Map<String, dynamic> row) async {
-    final db = await database;
-
-    // Add timestamps if not present
-    final now = DateTime.now().toIso8601String();
-    row['created_at'] = row['created_at'] ?? now;
-
-    // SAFETY CHECK: Ensure table has required columns before inserting
-    try {
-      // Try to get table info
-      final tableInfo =
-          await db.rawQuery('PRAGMA table_info(monitoring_records)');
-      final columnNames =
-          tableInfo.map((col) => col['name'] as String).toList();
-      debugPrint('[DB] monitoring_records columns: $columnNames');
-
-      // Check if required columns exist
-      final requiredColumns = [
-        'person_type',
-        'class_id',
-        'session_type',
-        'verification_method',
-        'scanner_type',
-        'fingerprint_matched',
-        'synced'
-      ];
-
-      final missingAnyColumn =
-          requiredColumns.any((col) => !columnNames.contains(col));
-
-      if (missingAnyColumn) {
-        debugPrint('[DB] ⚠️ WARNING: Some columns missing! Adding them now...');
-
-        // Add missing columns immediately
-        final missingColumns = {
-          'person_type': 'TEXT DEFAULT "learner"',
-          'class_id': 'TEXT',
-          'session_type': 'TEXT',
-          'verification_method': 'TEXT',
-          'scanner_type': 'TEXT',
-          'fingerprint_matched': 'INTEGER DEFAULT 0',
-          'synced': 'INTEGER DEFAULT 0',
-        };
-
-        for (var entry in missingColumns.entries) {
-          if (!columnNames.contains(entry.key)) {
-            try {
-              await db.execute(
-                  'ALTER TABLE monitoring_records ADD COLUMN ${entry.key} ${entry.value}');
-              debugPrint('[DB] ✅ Added ${entry.key} column');
-            } catch (e) {
-              debugPrint('[DB] ❌ Failed to add ${entry.key}: $e');
-            }
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('[DB] Error checking table structure: $e');
-    }
-
-    // Check for duplicate (same person, same date)
-    final existing = await db.query(
-      'monitoring_records',
-      where: 'learner_id = ? AND monitoring_date = ?',
-      whereArgs: [
-        row['learner_id'],
-        row['monitoring_date'],
-      ],
-    );
-
-    if (existing.isNotEmpty) {
-      // Update existing record
-      final id = existing.first['id'] as int;
-      await db.update(
-        'monitoring_records',
-        row,
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-      debugPrint('[DB] Updated monitoring_records record ID: $id');
-      return id;
-    } else {
-      // Insert new record
-      final id = await db.insert('monitoring_records', row);
-      debugPrint('[DB] Inserted monitoring_records record ID: $id');
-      return id;
-    }
-  }
-
-  /// Get unsynced monitoring records
-  Future<List<Map<String, dynamic>>> getUnsyncedMonitoringClockin() async {
-    final db = await database;
-    return await db.query(
-      'monitoring_records',
-      where: 'synced = ?',
-      whereArgs: [0],
-      orderBy: 'created_at DESC',
-    );
-  }
-
-  /// Get monitoring records for a specific date
-  Future<List<Map<String, dynamic>>> getMonitoringClockinForDate(
-      String date) async {
-    final db = await database;
-    return await db.query(
-      'monitoring_records',
-      where: 'monitoring_date = ?',
-      whereArgs: [date],
-      orderBy: 'created_at DESC',
-    );
-  }
-
-  /// Mark monitoring record as synced
-  Future<void> markMonitoringClockinAsSynced(int id) async {
-    final db = await database;
-    await db.update(
-      'monitoring_records',
-      {'synced': 1},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    debugPrint('[DB] Marked monitoring_records record $id as synced');
-  }
-
-  /// Sync monitoring records to server
-  Future<Map<String, dynamic>> syncMonitoringClockinToServer() async {
-    try {
-      final unsyncedRecords = await getUnsyncedMonitoringClockin();
-
-      if (unsyncedRecords.isEmpty) {
-        debugPrint('[SYNC] No unsynced monitoring records');
-        return {
-          'success': true,
-          'synced_count': 0,
-          'message': 'No records to sync'
-        };
-      }
-
-      debugPrint('[SYNC] Syncing ${unsyncedRecords.length} monitoring records');
-
-      // Send to server
-      final response = await http.post(
-        Uri.parse(AppConfig.syncMonitoringRecordsUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'records': unsyncedRecords}),
-      );
-
-      if (response.statusCode == 200) {
-        final result = json.decode(response.body);
-
-        if (result['success'] == true) {
-          // Mark records as synced
-          for (var record in unsyncedRecords) {
-            await markMonitoringClockinAsSynced(record['id'] as int);
-          }
-
-          debugPrint(
-              '[SYNC] Successfully synced ${result['synced_count']} monitoring records');
-          return result;
-        } else {
-          throw Exception(result['error'] ?? 'Unknown error');
-        }
-      } else {
-        throw Exception('Server returned status ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('[SYNC] Error syncing monitoring records: $e');
-      return {'success': false, 'error': e.toString()};
-    }
-  }
-
-  // Get all people (learners + facilitators) who clocked in today for a class
-  Future<List<Map<String, dynamic>>> getAllClockedInPeopleForClass(
-      String classID) async {
-    final db = await database;
-    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-
-    List<Map<String, dynamic>> allPeople = [];
-
-    try {
-      // Get learners who clocked in today
-      final learnerClocking = await db.rawQuery('''
-        SELECT 
-          l.LearnerID as person_id,
-          l.Name,
-          l.Surname,
-          l.IDNumber,
-          lc.clock_in_time,
-          lc.clock_out_time,
-          'learner' as person_type
-        FROM learnerdetails l
-        INNER JOIN learner_clocking lc ON l.LearnerID = lc.LearnerID
-        WHERE l.classID = ? AND lc.clock_date = ?
-      ''', [classID, today]);
-
-      // Add learners to the list
-      for (var learner in learnerClocking) {
-        final name = learner['Name']?.toString() ?? '';
-        final surname = learner['Surname']?.toString() ?? '';
-        final fullName = '$name $surname'.trim();
-
-        allPeople.add({
-          ...learner,
-          'person_name': fullName.isNotEmpty
-              ? fullName
-              : 'Learner ${learner['person_id']}',
-        });
-      }
-
-      // Get facilitators who clocked in today for this class
-      final facilitatorClocking = await db.rawQuery('''
-        SELECT 
-          f.facilitator_id as person_id,
-          f.firstName as Name,
-          f.lastName as Surname,
-          f.email,
-          fc.clock_in_time,
-          fc.clock_out_time,
-          'facilitator' as person_type
-        FROM facilitator f
-        INNER JOIN facilitator_clocking fc ON f.facilitator_id = fc.facilitator_id
-        WHERE f.classID = ? AND fc.clock_date = ?
-      ''', [classID, today]);
-
-      // Add facilitators to the list
-      for (var facilitator in facilitatorClocking) {
-        final firstName = facilitator['Name']?.toString() ?? '';
-        final lastName = facilitator['Surname']?.toString() ?? '';
-        final fullName = '$firstName $lastName'.trim();
-
-        allPeople.add({
-          ...facilitator,
-          'person_name': fullName.isNotEmpty
-              ? fullName
-              : 'Facilitator ${facilitator['person_id']}',
-        });
-      }
-
-      debugPrint(
-          '[DB_HELPER] Found ${allPeople.length} people clocked in today (${learnerClocking.length} learners, ${facilitatorClocking.length} facilitators)');
-    } catch (e) {
-      debugPrint('[DB_HELPER] Error getting clocked in people: $e');
-    }
-
-    return allPeople;
-  }
-
-  // ==================== END MONITORING RECORDS METHODS ====================
 }

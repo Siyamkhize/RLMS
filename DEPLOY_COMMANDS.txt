@@ -1,0 +1,159 @@
+================================================================================
+DEPLOYMENT COMMANDS - Copy & Paste Ready
+================================================================================
+
+CHOOSE ONE METHOD BELOW:
+
+================================================================================
+METHOD 1: PowerShell (Recommended - With Automatic Backup)
+================================================================================
+
+Run this in PowerShell (as Administrator):
+
+$ts = Get-Date -Format "yyyyMMdd_HHmmss"
+if (Test-Path "C:\xampp\htdocs\web") { 
+    Write-Host "Backing up existing web folder..." -ForegroundColor Yellow
+    Rename-Item "C:\xampp\htdocs\web" "web_backup_$ts" -Force
+}
+Copy-Item -Path "C:\projects\rlmss\web\*" -Destination "C:\xampp\htdocs\web" -Recurse -Force
+if (Test-Path "C:\xampp\htdocs\web\index.php") {
+    Write-Host "✓ SUCCESS: Files deployed to C:\xampp\htdocs\web\" -ForegroundColor Green
+    Write-Host "✓ Access URL: http://localhost:8080/web/index.php" -ForegroundColor Green
+} else {
+    Write-Host "✗ ERROR: Deployment failed" -ForegroundColor Red
+}
+
+================================================================================
+METHOD 2: Command Prompt (Simple)
+================================================================================
+
+Run this in Command Prompt (as Administrator):
+
+xcopy "C:\projects\rlmss\web\*" "C:\xampp\htdocs\web\" /E /I /Y
+
+Then verify:
+dir C:\xampp\htdocs\web\index.php
+
+================================================================================
+METHOD 3: Command Prompt (With Backup)
+================================================================================
+
+Run this in Command Prompt (as Administrator):
+
+for /f "tokens=2-4 delims=/ " %%a in ('date /t') do (set mydate=%%c%%a%%b)
+for /f "tokens=1-2 delims=/:" %%a in ('time /t') do (set mytime=%%a%%b)
+if exist "C:\xampp\htdocs\web" ren "C:\xampp\htdocs\web" "web_backup_%mydate%_%mytime%"
+xcopy "C:\projects\rlmss\web\*" "C:\xampp\htdocs\web\" /E /I /Y
+dir C:\xampp\htdocs\web\index.php
+
+================================================================================
+VERIFICATION COMMAND (For Any Method)
+================================================================================
+
+After running deployment, verify files exist:
+
+PowerShell:
+Test-Path "C:\xampp\htdocs\web\index.php"
+
+Command Prompt:
+dir C:\xampp\htdocs\web\index.php
+
+(Should show the file exists)
+
+================================================================================
+TESTING URLS
+================================================================================
+
+After deployment, test these URLs in your browser:
+
+1. Main Portal (Trade Selection):
+   http://localhost:8080/web/index.php
+
+2. Trade API (Test JSON Response):
+   http://localhost:8080/web/api/get_arpl_trades.php
+
+3. If both work, DEPLOYMENT IS SUCCESSFUL ✓
+
+================================================================================
+BACKUP LOCATION
+
+If an existing web folder was backed up, it will be at:
+
+C:\xampp\htdocs\web_backup_YYYYMMDD_HHMMSS\
+
+Example: C:\xampp\htdocs\web_backup_20260710_160000\
+
+(You can restore from here if needed)
+
+================================================================================
+WHAT FILES WILL BE COPIED
+
+These are the files that will be copied from C:\projects\rlmss\web\ to C:\xampp\htdocs\web\:
+
+- index.php (Trade selection page)
+- classes.php (Class selection page)
+- learners.php (Learner list page)
+- generate_pdf.php (PDF generation placeholder)
+- connection.php (Database connection proxy)
+- favicon.png (Browser tab icon)
+- manifest.json (PWA manifest)
+- api/ directory with 4 endpoint files:
+  - get_arpl_trades.php
+  - get_arpl_classes.php
+  - get_arpl_class_learners.php
+  - get_arpl_complete_data.php
+- assets/ directory with:
+  - css/arpl_style.css
+  - icons/ (graphics)
+- README.md (Documentation)
+
+================================================================================
+REQUIREMENTS
+
+Before running deployment command:
+
+✓ Apache must be running (http://localhost:8080/ responds)
+✓ MySQL must be running
+✓ Database "rlmsrlmsco_ezxcmacd_rlms" must exist
+✓ You must run as Administrator (right-click Command Prompt/PowerShell)
+
+================================================================================
+TROUBLESHOOTING
+
+If deployment fails, check:
+
+1. Source files exist:
+   dir C:\projects\rlmss\web\
+
+2. Apache document root accessible:
+   dir C:\xampp\htdocs\
+
+3. Try manual copy (File Explorer):
+   - Open: C:\projects\rlmss\web\
+   - Select All (Ctrl+A)
+   - Copy (Ctrl+C)
+   - Navigate to: C:\xampp\htdocs\
+   - Paste (Ctrl+V)
+
+4. Clear browser cache:
+   Ctrl+F5 on the webpage
+
+5. Restart Apache:
+   XAMPP Control Panel → Stop Apache → Wait → Start Apache
+
+================================================================================
+SUMMARY
+
+1. Choose one deployment method above
+2. Copy the command
+3. Open Command Prompt or PowerShell as Administrator
+4. Paste and run the command
+5. Verify: dir C:\xampp\htdocs\web\index.php (should show file exists)
+6. Test URL: http://localhost:8080/web/index.php (should show trade cards)
+7. Done! ✓
+
+Once deployment is verified and working, let me know and we'll move to Phase 3 (PDF generation).
+
+================================================================================
+Commands tested on Windows 10/11 with Apache on port 8080
+Date: July 10, 2026

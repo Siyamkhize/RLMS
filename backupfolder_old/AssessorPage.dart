@@ -14,6 +14,7 @@ import 'package:flutter_doc_scanner/flutter_doc_scanner.dart';
 import 'PotholeChecklistPage.dart';
 import 'database_helper.dart';
 import 'config.dart';
+import 'utils/scanner_pdf_resolver.dart';
 
 class AssessorPage extends StatefulWidget {
   final String facilitator_id;
@@ -2109,7 +2110,13 @@ class _POETabState extends State<POETab> {
   @override
   void initState() {
     super.initState();
-    _poeData = fetchPOE(widget.learnerId);
+    _refreshData();
+  }
+
+  void _refreshData() {
+    setState(() {
+      _poeData = fetchPOE(widget.learnerId);
+    });
   }
 
   Future<Map<String, dynamic>> fetchPOE(String learnerId) async {
@@ -2139,7 +2146,16 @@ class _POETabState extends State<POETab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('POE Details')),
+      appBar: AppBar(
+        title: const Text('POE Details'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshData,
+            tooltip: 'Refresh Data',
+          ),
+        ],
+      ),
       body: Column(
         children: [
           FutureBuilder<Map<String, dynamic>>(
@@ -3008,6 +3024,8 @@ class _POETabState extends State<POETab> {
             if (responseData['filePath'] != null) {
               exercise['filePath'] = responseData['filePath'];
             }
+            // Refresh the data to show updated marks
+            _refreshData();
           }
         });
 
@@ -3055,6 +3073,8 @@ class _POETabState extends State<POETab> {
                               : 'Failed to update marks: ${updateData['message']}';
                           if (updateData['status'] == 'success') {
                             exercise['marks_scored'] = marksScored;
+                            // Refresh the data to show updated marks
+                            _refreshData();
                           }
                         });
                       }
@@ -3065,17 +3085,10 @@ class _POETabState extends State<POETab> {
               ),
             );
           } else {
-            showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('Error'),
-                content: Text(responseData['message']),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('OK'),
-                  ),
-                ],
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error: ${responseData['message']}'),
+                backgroundColor: Colors.red,
               ),
             );
           }
@@ -3127,6 +3140,10 @@ class _ExerciseTileState extends State<ExerciseTile> {
     super.initState();
     marksScored = widget.exercise['marks_scored']?.toString() ?? '';
     controller = TextEditingController(text: marksScored);
+
+    // Debug: Print the loaded marks
+    print(
+        'ExerciseTile initState - Exercise: ${widget.exercise['exercise']}, Marks: $marksScored');
   }
 
   @override
@@ -3160,7 +3177,24 @@ class _ExerciseTileState extends State<ExerciseTile> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Always show the View File button
+              ElevatedButton(
+                onPressed: () {
+                  String fileUrl = widget.exercise['fileUrl'];
+                  if (fileUrl.isNotEmpty) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PdfViewerScreen(pdfUrl: fileUrl),
+                      ),
+                    );
+                  }
+                },
+                child: const Text('View File'),
+              ),
+              // Show red X and green check only if no marks exist
               if (marksScored.isEmpty) ...[
+                const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.red, size: 24),
                   onPressed: () {
@@ -3182,57 +3216,120 @@ class _ExerciseTileState extends State<ExerciseTile> {
                   },
                 ),
               ],
-              ElevatedButton(
-                onPressed: () {
-                  String fileUrl = widget.exercise['fileUrl'];
-                  if (fileUrl.isNotEmpty) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => PdfViewerScreen(pdfUrl: fileUrl),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('View File'),
-              ),
             ],
           ),
         ),
-        if (marksScored.isNotEmpty && !showInputField)
+        // Always show marks if they exist (either in display mode or edit mode)
+        if (marksScored.isNotEmpty)
           Padding(
             padding:
                 const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: controller,
-                    enabled: false,
-                    decoration: const InputDecoration(
-                      labelText: 'Scored Marks',
-                      border: OutlineInputBorder(),
-                    ),
+            child: showInputField
+                ? Column(
+                    children: [
+                      TextFormField(
+                        controller: controller,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Enter Scored Marks',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (value) {
+                          int? enteredMarks = int.tryParse(value);
+                          if (enteredMarks != null &&
+                              enteredMarks > maxAllowedMarks) {
+                            setState(() {
+                              controller.text = maxAllowedMarks.toString();
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 8.0),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                String enteredMarks = controller.text;
+                                if (enteredMarks.isNotEmpty) {
+                                  int scoredMarks =
+                                      int.tryParse(enteredMarks) ?? 0;
+                                  if (scoredMarks <= maxAllowedMarks) {
+                                    setState(() {
+                                      marksScored = enteredMarks;
+                                      showInputField = false;
+                                    });
+                                    await widget.onSubmitMarks(
+                                      learnerId: widget.learnerId,
+                                      exercise: widget.exercise,
+                                      marksScored: enteredMarks,
+                                      specificOutcome: specificOutcome,
+                                    );
+                                  }
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content:
+                                            Text('Please enter a valid mark')),
+                                  );
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('Update'),
+                            ),
+                          ),
+                          const SizedBox(width: 8.0),
+                          ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                controller.text = marksScored;
+                                showInputField = false;
+                              });
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: controller,
+                          enabled: false,
+                          decoration: const InputDecoration(
+                            labelText: 'Scored Marks',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8.0),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            showInputField = true;
+                          });
+                        },
+                        icon: const Icon(Icons.edit, size: 16),
+                        label: const Text('Edit'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 8.0),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      showInputField = true;
-                    });
-                  },
-                  icon: const Icon(Icons.edit, size: 16),
-                  label: const Text('Edit'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ],
-            ),
           ),
-        if (showInputField)
+        // Show input field for new marks (when no marks exist yet)
+        if (marksScored.isEmpty && showInputField)
           Padding(
             padding:
                 const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -3284,21 +3381,17 @@ class _ExerciseTileState extends State<ExerciseTile> {
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: marksScored.isNotEmpty
-                              ? Colors.orange
-                              : Colors.green,
+                          backgroundColor: Colors.green,
                           foregroundColor: Colors.white,
                         ),
-                        child:
-                            Text(marksScored.isNotEmpty ? 'Update' : 'Submit'),
+                        child: const Text('Submit'),
                       ),
                     ),
                     const SizedBox(width: 8.0),
                     ElevatedButton(
                       onPressed: () {
                         setState(() {
-                          controller.text =
-                              marksScored; // Reset to original value
+                          controller.text = '';
                           showInputField = false;
                         });
                       },
@@ -5852,7 +5945,7 @@ class _PotholeChecklistLearnerListPageState
       final docScanner = FlutterDocScanner();
 
       // Open document scanner
-      final scannedDoc = await docScanner.getScanDocuments();
+      final scannedDoc = await docScanner.getScanDocuments(page: 25);
 
       if (scannedDoc != null) {
         // Prepare permanent storage location BEFORE processing
@@ -5861,40 +5954,27 @@ class _PotholeChecklistLearnerListPageState
         final fileName = 'pothole_checklist_${learnerId}_$timestamp.pdf';
         final permanentPath = '${appDir.path}/$fileName';
 
-        // Extract path from scanner result
-        String? scannedPath;
-        if (scannedDoc is String) {
-          scannedPath = scannedDoc;
+        String? pdfUri;
+        if (scannedDoc is Map) {
+          pdfUri = scannedDoc['pdfUri']?.toString();
+        } else if (scannedDoc is String) {
+          pdfUri = scannedDoc;
         } else if (scannedDoc is List && scannedDoc.isNotEmpty) {
-          scannedPath = scannedDoc.first.toString();
-        } else if (scannedDoc is Map) {
-          scannedPath = scannedDoc['path']?.toString() ??
-              scannedDoc['scannedPath']?.toString() ??
-              scannedDoc.values.first?.toString();
+          pdfUri = scannedDoc.first.toString();
         }
 
-        if (scannedPath != null && scannedPath.isNotEmpty) {
-          // Remove file:// prefix if present
-          if (scannedPath.startsWith('file://')) {
-            scannedPath = scannedPath.substring(7);
-          }
+        final sourceFile = await resolveFlutterDocScannerPdfFile(pdfUri);
 
+        if (sourceFile != null && await isReadablePdfFile(sourceFile)) {
           try {
-            // CRITICAL: Read file SYNCHRONOUSLY and IMMEDIATELY
-            final sourceFile = File(scannedPath);
-
-            // Use synchronous read to get bytes before file is deleted
             Uint8List? bytes;
             try {
               bytes = sourceFile.readAsBytesSync();
             } catch (e) {
-              // If sync fails, try async immediately
-              if (await sourceFile.exists()) {
-                bytes = await sourceFile.readAsBytes();
-              }
+              bytes = await sourceFile.readAsBytes();
             }
 
-            if (bytes != null && bytes.isNotEmpty) {
+            if (bytes.isNotEmpty) {
               // Write to permanent location synchronously
               final permanentFile = File(permanentPath);
               permanentFile.writeAsBytesSync(bytes);
@@ -5939,7 +6019,7 @@ class _PotholeChecklistLearnerListPageState
             _showError(context, 'Error processing scan: $e');
           }
         } else {
-          _showError(context, 'No valid path from scanner');
+          _showError(context, 'No valid PDF from scanner');
         }
       } else {
         // User cancelled

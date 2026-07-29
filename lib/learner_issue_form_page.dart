@@ -791,12 +791,13 @@ class _LearnerIssueFormPageState extends State<LearnerIssueFormPage> {
                                 setState(() {
                                   selectedLearnerID = newValue;
                                   // Find the selected learner and update the name
-                                  final selectedLearner = learners.firstWhere(
-                                    (learner) =>
-                                        learner['LearnerID'].toString() ==
-                                        newValue,
-                                    orElse: () => null,
-                                  );
+                                  final selectedLearner = learners.any((learner) =>
+                                          learner['LearnerID'].toString() ==
+                                          newValue)
+                                      ? learners.firstWhere((learner) =>
+                                          learner['LearnerID'].toString() ==
+                                          newValue)
+                                      : null;
                                   if (selectedLearner != null) {
                                     learnerFullName =
                                         '${selectedLearner['Name']} ${selectedLearner['Surname']}';

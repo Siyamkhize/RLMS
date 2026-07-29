@@ -1,0 +1,56 @@
+═══════════════════════════════════════════════════════════════
+   COPY-PASTE INSTRUCTIONS - FIX 400 ERROR IN 5 MINUTES
+═══════════════════════════════════════════════════════════════
+
+📋 WHAT TO DO:
+
+1. UPLOAD THIS FILE:
+   ├─ Local: c:\projects\rlmss\mobile\test_toolkit_simple.php
+   └─ To Server: https://rlms.rlms.co.za/mobile/
+
+2. OPEN THIS URL IN BROWSER:
+   https://rlms.rlms.co.za/mobile/test_toolkit_simple.php
+
+3. COPY EVERYTHING YOU SEE ON THE PAGE:
+   ├─ Press: Ctrl+A (Select All)
+   ├─ Press: Ctrl+C (Copy)
+   └─ Paste in your response to me
+
+═══════════════════════════════════════════════════════════════
+
+🔍 WHAT TO LOOK FOR:
+
+   If you see this:
+   ✅ "HTTP Status: 200"
+   ✅ "SUCCESS: Endpoint working!"
+   → Toolkit is FIXED! Test on device.
+
+   If you see this:
+   ❌ "HTTP Status: 400"
+   ❌ "ERROR: Endpoint failed!"
+   → Copy the error message and send to me.
+
+═══════════════════════════════════════════════════════════════
+
+⏱️ TIME: 5 minutes total
+
+1 min - Upload file
+1 min - Open URL
+1 min - Copy output
+2 min - Send to me
+
+═══════════════════════════════════════════════════════════════
+
+🆘 STUCK? Just tell me:
+
+"I'm stuck at [step]" and I'll help!
+
+═══════════════════════════════════════════════════════════════
+
+✅ THAT'S IT!
+
+Upload → Open → Copy → Send
+
+I'll fix the rest!
+
+═══════════════════════════════════════════════════════════════

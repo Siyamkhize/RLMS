@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,24 +9,51 @@ import 'package:image_picker/image_picker.dart';
 import 'package:signature/signature.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'EnrollmentPage.dart';
 import 'database_helper.dart';
 import 'config.dart';
 import 'GuardianDetailsPage.dart';
 import 'WorkExperienceForm.dart';
 import 'services/camera_resource_manager.dart';
+import 'utils/monitoring_mixin.dart';
 
 class LearnerDetailsPage extends StatefulWidget {
   final String learnerID;
+  final bool missingProfileOnlyMode;
+  final List<String>? missingProfileFields;
 
-  const LearnerDetailsPage({super.key, required this.learnerID});
+  const LearnerDetailsPage({
+    super.key,
+    required this.learnerID,
+    this.missingProfileOnlyMode = false,
+    this.missingProfileFields,
+  });
 
   @override
   _LearnerDetailsPageState createState() => _LearnerDetailsPageState();
 }
 
 class _LearnerDetailsPageState extends State<LearnerDetailsPage>
-    with TickerProviderStateMixin, WidgetsBindingObserver {
+    with TickerProviderStateMixin, WidgetsBindingObserver, MonitoringMixin {
+  bool get _isMissingProfileOnlyMode => widget.missingProfileOnlyMode;
+  Set<String> get _missingProfileFieldSet =>
+      (widget.missingProfileFields ?? const <String>[]).toSet();
+  bool get _needsProfileImageCapture =>
+      _missingProfileFieldSet.contains('profile_image');
+  bool get _needsSignatureCapture =>
+      _missingProfileFieldSet.contains('signature') ||
+      _missingProfileFieldSet.contains('witness_signature');
+  bool get _hasMissingDetailsFields {
+    const nonDetailsFields = {
+      'signature',
+      'witness_signature',
+      'profile_image'
+    };
+    return _missingProfileFieldSet
+        .any((field) => !nonDetailsFields.contains(field));
+  }
+
   // Camera resource manager for preventing conflicts
   final CameraResourceManager _cameraManager = CameraResourceManager();
 
@@ -51,7 +79,6 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
   // Dropdown field definitions
   final Map<String, List<String>> _dropdownOptions = {
     'Title': ['Mr', 'Mrs', 'Miss', 'Ms', 'Dr', 'Prof'],
-    'Gender': ['Male', 'Female', 'Other'],
     'Race': ['African', 'Coloured', 'Indian', 'Asian', 'White', 'Other'],
     'Language': [
       'Afrikaans',
@@ -78,9 +105,51 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
   // Required dropdown fields
   final Set<String> _requiredDropdownFields = {
+    'Title',
     'Race',
     'Language',
     'Disability'
+  };
+
+  final Set<String> _requiredTextFields = {
+    'Email',
+    'KinContact',
+    'SchoolName',
+    'SchoolCompletion',
+    'SchoolLocation',
+    'SchoolGrade',
+  };
+
+  /// Mirrors clock_in_page profile validation rules (field key groups).
+  static const List<List<String>> _profileValidationRuleKeys = [
+    ['Title'],
+    ['Name'],
+    ['Surname'],
+    ['IDNumber'],
+    ['Race'],
+    ['Language'],
+    ['Disability'],
+    ['CellphoneNumber', 'PhoneNumber'],
+    ['Email'],
+    ['AddressLine1'],
+    ['AddressLine2'],
+    ['AddressLine3'],
+    ['PostalCode'],
+    ['KinName'],
+    ['KinRelation'],
+    ['KinContact'],
+    ['SchoolName'],
+    ['SchoolCompletion'],
+    ['SchoolLocation'],
+    ['SchoolGrade'],
+    ['profile_image'],
+    ['signature'],
+  ];
+
+  static const Set<String> _nonDetailMissingFields = {
+    'profile_image',
+    'signature',
+    'witness_signature',
   };
 
   @override
@@ -99,7 +168,6 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
     _setupControllerListeners();
   }
 
-  @override
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
@@ -156,18 +224,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
   }
 
   void _addControllerListeners() {
-    // Add listeners to dropdown field controllers for real-time UI updates
-    for (String field in _dropdownOptions.keys) {
-      if (_controllers[field] != null) {
-        _controllers[field]!.addListener(() {
-          if (mounted) {
-            setState(() {}); // Refresh UI when text changes
-          }
-        });
-      }
-    }
-
-    // Add listener to ID number field for automatic age, gender, and DOB calculation
+    // Only keep the ID number listener — remove other dropdown listeners to prevent double-rebuilds
     if (_controllers['IDNumber'] != null) {
       _controllers['IDNumber']!.addListener(() {
         if (mounted) {
@@ -176,12 +233,6 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         }
       });
     }
-  }
-
-  // Check if dropdown should be used
-  bool _shouldUseDropdown(String fieldName) {
-    // Use dropdown when controller text is empty
-    return (_controllers[fieldName]?.text.trim().isEmpty ?? true);
   }
 
   // Calculate and update age, gender, and DOB when ID number changes
@@ -343,8 +394,6 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         final dobString =
             '${dob.year}-${dob.month.toString().padLeft(2, '0')}-${dob.day.toString().padLeft(2, '0')}';
         updateData['DateOfBirth'] = dobString;
-        updateData['DOB'] =
-            dobString; // Also update DOB field for compatibility
       }
 
       if (updateData.isNotEmpty) {
@@ -374,6 +423,8 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         return 'ID Number';
       case 'CellphoneNumber':
         return 'Cellphone Number';
+      case 'Email':
+        return 'Email Address';
       case 'DateOfBirth':
         return 'Date of Birth';
       case 'Title':
@@ -388,6 +439,16 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         return 'Qualification';
       case 'SchoolLocation':
         return 'School Location';
+      case 'SchoolName':
+        return 'School Name';
+      case 'SchoolCompletion':
+        return 'Year of Completion';
+      case 'KinContact':
+        return 'Next of Kin Contact';
+      case 'KinName':
+        return 'Next of Kin Name';
+      case 'KinRelation':
+        return 'Next of Kin Relation';
       case 'School':
         return 'School';
       case 'Institution':
@@ -395,6 +456,187 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       default:
         return fieldName;
     }
+  }
+
+  TextInputType _getFieldKeyboardType(String fieldName) {
+    switch (fieldName) {
+      case 'Email':
+        return TextInputType.emailAddress;
+      case 'KinContact':
+      case 'PhoneNumber':
+      case 'CellphoneNumber':
+        return TextInputType.phone;
+      case 'SchoolCompletion':
+      case 'PostalCode':
+        return TextInputType.number;
+      default:
+        return TextInputType.text;
+    }
+  }
+
+  void _initControllersFrom(Map<String, dynamic> data) {
+    data.forEach((key, value) {
+      String raw = value?.toString() ?? '';
+      if (_dropdownOptions.containsKey(key) && raw.isNotEmpty) {
+        final options = _dropdownOptions[key] ?? [];
+        String? matchedOption;
+        for (final option in options) {
+          if (option.toLowerCase() == raw.trim().toLowerCase()) {
+            matchedOption = option;
+            break;
+          }
+        }
+        if (matchedOption != null) {
+          raw = matchedOption;
+          learnerData![key] = matchedOption;
+        } else {
+          raw = '';
+          learnerData![key] = '';
+        }
+      }
+
+      if (key == 'SchoolCompletion' && raw.startsWith('1900-01-01')) {
+        raw = '';
+        learnerData![key] = '';
+      }
+
+      if (_dropdownOptions.containsKey(key) &&
+          (raw.toLowerCase() == 'n/a' || raw.toLowerCase() == 'null')) {
+        raw = '';
+        learnerData![key] = '';
+      }
+
+      if (_dropdownOptions.containsKey(key)) {
+        return;
+      }
+      _controllers[key] = TextEditingController(text: raw);
+    });
+
+    _applyCalculatedDateOfBirthFromId();
+    final dobText = learnerData?['DateOfBirth']?.toString() ?? '';
+    if (dobText.isNotEmpty) {
+      _controllers['DateOfBirth'] = TextEditingController(text: dobText);
+    }
+
+    _addControllerListeners();
+  }
+
+  void _applyCalculatedDateOfBirthFromId() {
+    if (learnerData == null) return;
+
+    final idNumber = learnerData!['IDNumber']?.toString();
+    if (idNumber == null || idNumber.length < 6) return;
+
+    final currentDob = learnerData!['DateOfBirth']?.toString() ?? '';
+    if (!_isMissingValue(currentDob) && !currentDob.startsWith('1900-01-01')) {
+      return;
+    }
+
+    final dob = _calculateDOBFromID(idNumber);
+    if (dob == null) return;
+
+    final dobString =
+        '${dob.year}-${dob.month.toString().padLeft(2, '0')}-${dob.day.toString().padLeft(2, '0')}';
+    learnerData!['DateOfBirth'] = dobString;
+    learnerData!['DOB'] = dobString;
+  }
+
+  bool _isProfileRuleMissing(List<String> keys) {
+    if (learnerData == null) return true;
+    for (final key in keys) {
+      if (!_isMissingValue(learnerData![key])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  String _resolveProfileFieldKey(List<String> keys) {
+    if (learnerData == null) return keys.first;
+    for (final key in keys) {
+      if (learnerData!.containsKey(key)) {
+        return key;
+      }
+    }
+    return keys.first;
+  }
+
+  Set<String> _getCurrentlyMissingFieldKeys() {
+    if (learnerData == null) return {};
+    final missing = <String>{};
+    for (final keys in _profileValidationRuleKeys) {
+      if (_isProfileRuleMissing(keys)) {
+        final key = _resolveProfileFieldKey(keys);
+        print(
+            '[DEBUG] _getCurrentlyMissingFieldKeys: missing rule $keys, key: $key');
+        missing.add(key);
+      }
+    }
+    print('[DEBUG] _getCurrentlyMissingFieldKeys: final missing: $missing');
+    return missing;
+  }
+
+  bool _areEditableDetailsComplete() {
+    return _getCurrentlyMissingFieldKeys()
+        .where((field) => !_nonDetailMissingFields.contains(field))
+        .isEmpty;
+  }
+
+  bool _canCloseMissingProfileFlow() {
+    final missing = _getCurrentlyMissingFieldKeys();
+    print('[DEBUG] _canCloseMissingProfileFlow: missing fields: $missing');
+    print(
+        '[DEBUG] _areEditableDetailsComplete(): ${_areEditableDetailsComplete()}');
+    print(
+        '[DEBUG] _needsProfileImageCapture: $_needsProfileImageCapture, missing profile_image: ${missing.contains('profile_image')}');
+    print(
+        '[DEBUG] _needsSignatureCapture: $_needsSignatureCapture, missing signature: ${missing.contains('signature')}');
+    if (!_areEditableDetailsComplete()) return false;
+    if (_needsProfileImageCapture && missing.contains('profile_image')) {
+      return false;
+    }
+    if (_needsSignatureCapture && missing.contains('signature')) {
+      return false;
+    }
+    return true;
+  }
+
+  void _mergeCalculatedFieldsFromId(Map<String, dynamic> updateData) {
+    final idNumber = learnerData?['IDNumber']?.toString().trim();
+    if (idNumber == null || idNumber.length < 6) return;
+
+    final age = _calculateAgeFromID(idNumber);
+    final dob = _calculateDOBFromID(idNumber);
+    final gender =
+        idNumber.length >= 10 ? _calculateGenderFromID(idNumber) : null;
+
+    if (age != null) {
+      updateData['Age'] = age.toString();
+    }
+    if (gender != null) {
+      updateData['Gender'] = gender;
+    }
+    if (dob != null) {
+      final dobString =
+          '${dob.year}-${dob.month.toString().padLeft(2, '0')}-${dob.day.toString().padLeft(2, '0')}';
+      updateData['DateOfBirth'] = dobString;
+    }
+  }
+
+  Future<void> _refreshLearnerDataFromLocal() async {
+    final localLearnerData =
+        await DatabaseHelper().fetchLearnerByID(widget.learnerID);
+    if (!mounted || localLearnerData == null) return;
+
+    // Use a completer to wait for setState to complete
+    final completer = Completer<void>();
+    setState(() {
+      learnerData = localLearnerData;
+      _controllers.clear();
+      _initControllersFrom(learnerData!);
+      completer.complete();
+    });
+    await completer.future;
   }
 
   void _updateTabController() {
@@ -568,6 +810,35 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
   Future<void> fetchLearnerDetails() async {
     try {
+      // Missing-profile edits are saved locally first — do not overwrite them
+      // with a potentially stale online payload.
+      if (_isMissingProfileOnlyMode) {
+        final localFirst =
+            await DatabaseHelper().fetchLearnerByID(widget.learnerID);
+        if (localFirst != null) {
+          setState(() {
+            learnerData = localFirst;
+            isLoading = false;
+            _initControllersFrom(learnerData!);
+          });
+          await _calculateAndUpdateFromIDNumber();
+          initMonitoring(int.parse(widget.learnerID));
+          setState(() {
+            int? age;
+            if (learnerData!['Age'] != null) {
+              age = int.tryParse(learnerData!['Age'].toString());
+            } else {
+              age = _calculateAgeFromID(learnerData!['IDNumber']);
+            }
+            _isMinor = age != null && age < 18;
+            _updateTabController();
+          });
+          await fetchBankDetails();
+          await fetchGuardianData();
+          return;
+        }
+      }
+
       bool hasConnectivity = await _checkConnectivity();
       if (hasConnectivity) {
         // Try to fetch from online database first
@@ -582,17 +853,14 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
               learnerData = Map<String, dynamic>.from(
                   jsonResponse['data']); // Create mutable copy
               isLoading = false;
-              // Initialize controllers with fetched data
-              learnerData!.forEach((key, value) {
-                _controllers[key] =
-                    TextEditingController(text: value?.toString() ?? '');
-              });
-              // Set up controller listeners after controllers are initialized
-              _addControllerListeners();
+              _initControllersFrom(learnerData!);
             });
 
             // Perform initial calculations from ID number (outside setState)
             await _calculateAndUpdateFromIDNumber();
+
+            // Initialize monitoring for this learner
+            initMonitoring(int.parse(widget.learnerID));
 
             setState(() {
               // Check if learner is a minor - use Age field from data or calculate from ID
@@ -631,17 +899,14 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         setState(() {
           learnerData = localLearnerData;
           isLoading = false;
-          // Initialize controllers with local data
-          learnerData!.forEach((key, value) {
-            _controllers[key] =
-                TextEditingController(text: value?.toString() ?? '');
-          });
-          // Set up controller listeners after controllers are initialized
-          _addControllerListeners();
+          _initControllersFrom(learnerData!);
         });
 
         // Perform initial calculations from ID number (outside setState)
         await _calculateAndUpdateFromIDNumber();
+
+        // Initialize monitoring for this learner
+        initMonitoring(int.parse(widget.learnerID));
 
         setState(() {
           // Check if learner is a minor - use Age field from data or calculate from ID
@@ -720,6 +985,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
     _witnessInitialsController.dispose();
     _cameraController?.dispose();
     _controllers.forEach((_, controller) => controller.dispose());
+    disposeMonitoring();
     super.dispose();
   }
 
@@ -823,9 +1089,11 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       }
 
       final age = _calculateAgeFromID(idNumber);
-      final gender = _calculateGenderFromID(idNumber);
+      final gender =
+          idNumber.length >= 10 ? _calculateGenderFromID(idNumber) : null;
+      final dob = _calculateDOBFromID(idNumber);
 
-      if (age != null || gender != null) {
+      if (age != null || gender != null || dob != null) {
         Map<String, dynamic> forceUpdateData = {};
 
         if (age != null) {
@@ -834,8 +1102,14 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         if (gender != null) {
           forceUpdateData['Gender'] = gender;
         }
+        if (dob != null) {
+          final dobString =
+              '${dob.year}-${dob.month.toString().padLeft(2, '0')}-${dob.day.toString().padLeft(2, '0')}';
+          forceUpdateData['DateOfBirth'] = dobString;
+        }
 
-        print('[FORCE_UPDATE] Force updating Age: $age, Gender: $gender');
+        print(
+            '[FORCE_UPDATE] Force updating Age: $age, Gender: $gender, DOB: $dob');
 
         // Update local data first
         setState(() {
@@ -846,6 +1120,13 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
           if (gender != null) {
             learnerData!['Gender'] = gender;
             _controllers['Gender']?.text = gender;
+          }
+          if (dob != null) {
+            final dobString =
+                '${dob.year}-${dob.month.toString().padLeft(2, '0')}-${dob.day.toString().padLeft(2, '0')}';
+            learnerData!['DateOfBirth'] = dobString;
+            learnerData!['DOB'] = dobString;
+            _controllers['DateOfBirth']?.text = dobString;
           }
         });
 
@@ -881,34 +1162,52 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
   Future<void> _updateLearnerInformation() async {
     try {
-      // Prepare the data to update
       Map<String, dynamic> updateData = {};
 
-      // Add all the form fields that have been modified
       _controllers.forEach((key, controller) {
-        if (controller.text.isNotEmpty) {
-          // For dropdown fields (Title, Race, Language, Disability), always include if not empty
-          // For other fields, only include if different from original database value
-          if (_dropdownOptions.containsKey(key)) {
-            // This is a dropdown field - include if controller has a value
-            updateData[key] = controller.text;
-          } else {
-            // Regular field - only include if different from original database value
-            if (controller.text != learnerData?[key]?.toString()) {
-              updateData[key] = controller.text;
-            }
-          }
+        if (_dropdownOptions.containsKey(key)) return;
+
+        final text = controller.text.trim();
+        if (text.isEmpty) return;
+
+        final previous = learnerData?[key]?.toString().trim() ?? '';
+        if (text != previous || _isMissingValue(previous)) {
+          updateData[key] = text;
         }
       });
 
-      // Always update Age and Gender if calculable from ID number
-      await _updateAgeRelatedFields();
-      await _forceUpdateAgeAndGender();
+      for (final key in _dropdownOptions.keys) {
+        final value = learnerData?[key]?.toString().trim() ?? '';
+        if (value.isNotEmpty && !_isMissingValue(value)) {
+          updateData[key] = value;
+        }
+      }
 
-      // If there's data to update, send it to the server
-      if (updateData.isNotEmpty) {
-        bool isConnected = await _checkConnectivity();
-        if (isConnected) {
+      _mergeCalculatedFieldsFromId(updateData);
+      updateData.remove('DOB');
+
+      if (updateData.isEmpty) {
+        print('[UPDATE] No learner fields to save');
+        return;
+      }
+
+      await DatabaseHelper().updateLearnerLocally(widget.learnerID, updateData);
+
+      if (mounted) {
+        setState(() {
+          updateData.forEach((key, value) {
+            learnerData![key] = value;
+          });
+          if (updateData.containsKey('DateOfBirth')) {
+            _controllers['DateOfBirth']?.text =
+                updateData['DateOfBirth']?.toString() ?? '';
+          }
+        });
+      }
+
+      final isConnected = await _checkConnectivity();
+      if (isConnected) {
+        try {
           final response = await http.post(
             Uri.parse(AppConfig.updateLearnerUrl),
             headers: {'Content-Type': 'application/json'},
@@ -921,35 +1220,20 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
           if (response.statusCode == 200) {
             final jsonResponse = jsonDecode(response.body);
             if (jsonResponse['success'] == true) {
-              print('Learner information updated successfully');
-              // Update local learnerData map with the new values
-              setState(() {
-                updateData.forEach((key, value) {
-                  learnerData![key] = value;
-                });
-              });
+              print('Learner information synced online successfully');
             } else {
               print(
-                  'Failed to update learner information: ${jsonResponse['message']}');
-              throw Exception(jsonResponse['message']);
+                  'Online sync rejected (local copy kept): ${jsonResponse['message']}');
             }
           } else {
             print(
-                'Failed to update learner information: HTTP ${response.statusCode}');
-            throw Exception('Server error: ${response.statusCode}');
+                'Online sync failed (local copy kept): HTTP ${response.statusCode}');
           }
-        } else {
-          // Save locally if no internet connection
-          await DatabaseHelper()
-              .updateLearnerLocally(widget.learnerID, updateData);
-          print('Learner information saved locally');
-          // Update local learnerData map with the new values
-          setState(() {
-            updateData.forEach((key, value) {
-              learnerData![key] = value;
-            });
-          });
+        } catch (e) {
+          print('Online sync error (local copy kept): $e');
         }
+      } else {
+        print('Learner information saved locally (offline)');
       }
     } catch (e) {
       print('Error updating learner information: $e');
@@ -1054,8 +1338,8 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         }
       }
 
-      // Refresh the data to show updated information
-      await fetchLearnerDetails();
+      // Refresh from local DB so a stale online fetch does not undo the save
+      await _refreshLearnerDataFromLocal();
 
       final isConnected = await _checkConnectivity();
       if (mounted) {
@@ -1067,6 +1351,14 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
             backgroundColor: isConnected ? Colors.green : Colors.blue,
           ),
         );
+
+        print('[DEBUG] _updateData: checking _canCloseMissingProfileFlow()...');
+        if (_isMissingProfileOnlyMode && _canCloseMissingProfileFlow()) {
+          print('[DEBUG] _updateData: closing missing profile flow!');
+          Navigator.pop(context, true);
+        } else {
+          print('[DEBUG] _updateData: NOT closing missing profile flow!');
+        }
       }
     } catch (e) {
       print('Error updating data: $e');
@@ -1078,6 +1370,54 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
   @override
   Widget build(BuildContext context) {
+    if (_isMissingProfileOnlyMode) {
+      final tabs = <Tab>[];
+      final views = <Widget>[];
+      final tabKeys = <String>[];
+
+      if (_hasMissingDetailsFields || _needsProfileImageCapture) {
+        tabs.add(const Tab(text: 'Profile'));
+        views.add(_buildDetailsTab());
+        tabKeys.add('profile');
+      }
+      if (_needsSignatureCapture) {
+        tabs.add(const Tab(text: 'Signature'));
+        views.add(_buildSignatureTab());
+        tabKeys.add('signature');
+      }
+
+      if (tabs.isEmpty) {
+        tabs.add(const Tab(text: 'Profile'));
+        views.add(_buildDetailsTab());
+        tabKeys.add('profile');
+      }
+
+      int initialIndex = 0;
+      final onlySignatureMissing = _needsSignatureCapture &&
+          !_hasMissingDetailsFields &&
+          !_needsProfileImageCapture;
+      if (onlySignatureMissing) {
+        final sigIdx = tabKeys.indexOf('signature');
+        if (sigIdx >= 0) initialIndex = sigIdx;
+      }
+
+      return DefaultTabController(
+        length: tabs.length,
+        initialIndex: initialIndex,
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Complete Profile'),
+            bottom: tabs.length > 1 ? TabBar(tabs: tabs) : null,
+          ),
+          body: isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : tabs.length == 1
+                  ? views.first
+                  : TabBarView(children: views),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Learner Details'),
@@ -1146,17 +1486,23 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       'Race',
       'Language',
       'Disability',
+      'PhoneNumber',
       'CellphoneNumber', // Phone number above email
       'Email',
       'AddressLine1', // Street Name
       'AddressLine2', // Suburb
       'AddressLine3', // City/Town
       'PostalCode', // Postal Code
-      'SchoolLocation', // School location (if it exists)
+      'KinName',
+      'KinRelation',
+      'KinContact',
+      'SchoolName',
+      'SchoolCompletion',
+      'SchoolLocation',
+      'SchoolGrade',
       'School', // Alternative school field name
       'Institution', // Institution field
-      'Grade', // School grade below school location
-      'SchoolGrade', // Alternative school grade field name
+      'Grade', // Legacy school grade field name
       'EducationLevel', // Education level field
       'Qualification', // Qualification field
       'classID', // classID comes after school grade
@@ -1167,9 +1513,9 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
     // First add fields in the specified order
     for (final fieldName in fieldOrder) {
-      final entry = allEntries
-          .where((e) => e.key == fieldName)
-          .firstWhere((e) => true, orElse: () => const MapEntry('', null));
+      final entry = allEntries.where((e) => e.key == fieldName).any((e) => true)
+          ? allEntries.firstWhere((e) => e.key == fieldName)
+          : const MapEntry('', null);
       if (entry.key.isNotEmpty && !hiddenFields.contains(entry.key)) {
         orderedEntries.add(entry);
       }
@@ -1183,31 +1529,102 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       }
     }
 
-    final entries = orderedEntries;
+    // In full details mode, ensure dropdown fields exist even if omitted from API/DB.
+    if (!_isMissingProfileOnlyMode) {
+      for (final dropdownKey in _dropdownOptions.keys) {
+        if (hiddenFields.contains(dropdownKey)) continue;
+        if (orderedEntries.any((entry) => entry.key == dropdownKey)) continue;
+        orderedEntries.add(MapEntry(
+          dropdownKey,
+          learnerData!.containsKey(dropdownKey)
+              ? learnerData![dropdownKey]
+              : null,
+        ));
+      }
+      for (final fieldKey in {'Email'}) {
+        if (orderedEntries.any((entry) => entry.key == fieldKey)) continue;
+        orderedEntries.add(MapEntry(
+          fieldKey,
+          learnerData!.containsKey(fieldKey) ? learnerData![fieldKey] : null,
+        ));
+      }
+    }
+
+    List<MapEntry<String, dynamic>> entries = orderedEntries;
+    if (_isMissingProfileOnlyMode) {
+      final fieldsToShow = _getCurrentlyMissingFieldKeys()
+          .where((field) => !_nonDetailMissingFields.contains(field))
+          .toList()
+        ..sort((a, b) {
+          final ai = fieldOrder.indexOf(a);
+          final bi = fieldOrder.indexOf(b);
+          if (ai == -1 && bi == -1) return a.compareTo(b);
+          if (ai == -1) return 1;
+          if (bi == -1) return -1;
+          return ai.compareTo(bi);
+        });
+
+      entries = fieldsToShow
+          .map(
+            (fieldName) => MapEntry(
+              fieldName,
+              learnerData!.containsKey(fieldName)
+                  ? learnerData![fieldName]
+                  : null,
+            ),
+          )
+          .toList();
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Profile Image Section
-          Center(
-            child: _buildProfileImage(),
-          ),
-          const SizedBox(height: 20),
-
-          // Age Display
-          _buildAgeDisplay(),
-          const SizedBox(height: 20),
-
-          // Bank Details (if available)
-          if (bankDetails != null) ...[
-            _buildBankDetails(),
+          if (_isMissingProfileOnlyMode) ...[
+            Text(
+              _needsSignatureCapture &&
+                      !_hasMissingDetailsFields &&
+                      !_needsProfileImageCapture
+                  ? 'Capture the missing signature, then press Update Data.'
+                  : _needsProfileImageCapture && !_hasMissingDetailsFields
+                      ? 'Capture the missing profile image, then press Update Data.'
+                      : 'Fill in the missing profile fields below, then press Update Data.',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            if (_needsProfileImageCapture) ...[
+              Center(
+                child: _buildProfileImage(),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ] else ...[
+            // Profile Image Section
+            Center(
+              child: _buildProfileImage(),
+            ),
             const SizedBox(height: 20),
+
+            // Age Display
+            _buildAgeDisplay(),
+            const SizedBox(height: 20),
+
+            // Bank Details (if available)
+            if (bankDetails != null) ...[
+              _buildBankDetails(),
+              const SizedBox(height: 20),
+            ],
           ],
 
           // Learner Data Fields
-          _buildDataList(entries),
+          if (entries.isEmpty && _isMissingProfileOnlyMode)
+            const Text(
+              'All required profile fields are complete. Press Update Data or capture signature/image if prompted.',
+              style: TextStyle(color: Colors.green),
+            )
+          else
+            _buildDataList(entries),
 
           const SizedBox(height: 20),
 
@@ -1228,6 +1645,89 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         ],
       ),
     );
+  }
+
+  bool _isEntryCurrentlyMissing(MapEntry<String, dynamic> entry) {
+    if (_dropdownOptions.containsKey(entry.key)) {
+      return _isMissingValue(learnerData?[entry.key]);
+    }
+    final controllerValue = _controllers[entry.key]?.text;
+    if (controllerValue != null && !_isMissingValue(controllerValue)) {
+      return false;
+    }
+    return _isMissingValue(learnerData?[entry.key] ?? entry.value);
+  }
+
+  String? _resolveDropdownValue(String fieldKey) {
+    final options = _dropdownOptions[fieldKey] ?? [];
+    if (options.isEmpty) return null;
+
+    final raw = learnerData?[fieldKey]?.toString().trim() ?? '';
+    if (raw.isEmpty || raw.toLowerCase() == 'null') return null;
+
+    for (final option in options) {
+      if (option.toLowerCase() == raw.toLowerCase()) {
+        return option;
+      }
+    }
+    return null;
+  }
+
+  Widget _buildDropdownField(String fieldKey, bool isRequired) {
+    final options = _dropdownOptions[fieldKey] ?? [];
+    final resolvedValue = _resolveDropdownValue(fieldKey);
+
+    return DropdownButtonFormField<String>(
+      key: ValueKey('dropdown_$fieldKey'),
+      value: resolvedValue,
+      decoration: InputDecoration(
+        labelText: _getFieldLabel(fieldKey),
+        border: const OutlineInputBorder(),
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 8.0,
+          horizontal: 8.0,
+        ),
+        isDense: true,
+        hintText: 'Select ${_getFieldLabel(fieldKey)}',
+        suffixIcon: isRequired
+            ? const Icon(Icons.star, color: Colors.red, size: 16)
+            : null,
+      ),
+      items: options
+          .map(
+            (value) => DropdownMenuItem<String>(
+              value: value,
+              child: Text(value),
+            ),
+          )
+          .toList(),
+      onChanged: (String? newValue) {
+        if (newValue == null) return;
+        setState(() {
+          learnerData![fieldKey] = newValue;
+        });
+      },
+      validator: isRequired
+          ? (value) {
+              if (value == null || value.isEmpty) {
+                return '${_getFieldLabel(fieldKey)} is required';
+              }
+              return null;
+            }
+          : null,
+      isExpanded: true,
+    );
+  }
+
+  bool _isMissingValue(dynamic value) {
+    final normalized = value?.toString().trim().toLowerCase() ?? '';
+    return normalized.isEmpty ||
+        normalized == 'null' ||
+        normalized == 'n/a' ||
+        normalized == 'na' ||
+        normalized == '-' ||
+        normalized == 'unknown' ||
+        normalized.startsWith('1900-01-01');
   }
 
   Widget _buildProfileImage() {
@@ -1275,22 +1775,28 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
   Widget _getImageWidget(String? imagePath) {
     if (imagePath != null && imagePath.isNotEmpty && imagePath != 'null') {
-      return Image.network(
-        '${AppConfig.learnerImagesUrl}/$imagePath',
-        fit: BoxFit.cover,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return Center(
-            child: CircularProgressIndicator(
-              value: loadingProgress.expectedTotalBytes != null
-                  ? loadingProgress.cumulativeBytesLoaded /
-                      loadingProgress.expectedTotalBytes!
-                  : null,
-            ),
+      return FutureBuilder<String>(
+        future: AppConfig.buildServeFileUrl(imagePath),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            debugPrint('[IMAGE] Error building URL: ${snapshot.error}');
+            return _buildDefaultImageContent();
+          }
+          final imageUrl = snapshot.data!;
+          debugPrint('[IMAGE] Loading image from: $imageUrl');
+          return CachedNetworkImage(
+            imageUrl: imageUrl,
+            fit: BoxFit.cover,
+            placeholder: (context, url) =>
+                const Center(child: CircularProgressIndicator()),
+            errorWidget: (context, url, error) {
+              debugPrint('[IMAGE ERROR] Failed to load $imageUrl: $error');
+              return _buildDefaultImageContent();
+            },
           );
-        },
-        errorBuilder: (context, error, stackTrace) {
-          return _buildDefaultImageContent();
         },
       );
     }
@@ -1576,9 +2082,9 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         // Check if this field should be read-only
         final bool isReadOnly = readOnlyFields.contains(entry.key);
         final bool isDropdownField = _dropdownOptions.containsKey(entry.key);
-        final bool shouldUseDropdown =
-            isDropdownField && _shouldUseDropdown(entry.key);
-        final bool isRequired = _requiredDropdownFields.contains(entry.key);
+        final bool shouldUseDropdown = isDropdownField;
+        final bool isRequired = _requiredDropdownFields.contains(entry.key) ||
+            _requiredTextFields.contains(entry.key);
 
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -1640,55 +2146,45 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
                   // Show dropdown or text field based on conditions
                   if (shouldUseDropdown) ...[
-                    // Dropdown widget
-                    DropdownButtonFormField<String>(
-                      value: null, // Always start with null for empty dropdowns
-                      decoration: InputDecoration(
-                        labelText: _getFieldLabel(entry.key),
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 8.0,
-                          horizontal: 8.0,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: _buildDropdownField(entry.key, isRequired),
                         ),
-                        isDense: true,
-                        hintText: 'Select ${_getFieldLabel(entry.key)}',
-                        suffixIcon: isRequired
-                            ? const Icon(Icons.star,
-                                color: Colors.red, size: 16)
-                            : null,
-                      ),
-                      items: _dropdownOptions[entry.key]!.map((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        if (newValue != null) {
-                          setState(() {
-                            _controllers[entry.key]!.text = newValue;
-                            // Don't update learnerData here - let _updateLearnerInformation handle it
-                          });
-                        }
-                      },
-                      validator: isRequired
-                          ? (value) {
-                              if (value == null || value.isEmpty) {
-                                return '${_getFieldLabel(entry.key)} is required';
-                              }
-                              return null;
-                            }
-                          : null,
+                        if ((learnerData![entry.key]?.toString() ?? '')
+                            .trim()
+                            .isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.clear, size: 20),
+                            onPressed: () {
+                              setState(() {
+                                learnerData![entry.key] = '';
+                              });
+                            },
+                            tooltip: 'Clear selection',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                  ] else ...[
-                    // Regular text field
+                  ] else if (!isDropdownField) ...[
+                    // Regular text field (non-dropdown only)
                     Row(
                       children: [
                         Expanded(
                           child: TextFormField(
-                            controller: _controllers[entry.key],
+                            controller: _controllers[entry.key] ??
+                                TextEditingController(
+                                    text: entry.value?.toString() ?? ''),
                             enabled: !isReadOnly,
                             readOnly: isReadOnly,
+                            keyboardType: _getFieldKeyboardType(entry.key),
                             maxLines: isReadOnly &&
                                     (entry.value?.toString().length ?? 0) > 50
                                 ? 3
@@ -1729,25 +2225,6 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                                 : null,
                           ),
                         ),
-                        // Clear button for dropdown fields when they have content
-                        if (isDropdownField &&
-                            !_shouldUseDropdown(entry.key)) ...[
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: const Icon(Icons.clear, size: 20),
-                            onPressed: () {
-                              setState(() {
-                                _controllers[entry.key]!.clear();
-                              });
-                            },
-                            tooltip: 'Clear to show dropdown',
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(
-                              minWidth: 32,
-                              minHeight: 32,
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                   ],
@@ -1756,7 +2233,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                   if (isDropdownField && shouldUseDropdown) ...[
                     const SizedBox(height: 4),
                     Text(
-                      'Select from dropdown or type to search',
+                      'Select from dropdown',
                       style: TextStyle(
                         fontSize: 10,
                         color: Colors.grey[600],
@@ -2050,49 +2527,74 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
     String? signaturePath = learnerData?[signatureField]?.toString();
 
     if (signaturePath != null && signaturePath.isNotEmpty) {
-      return Container(
-        height: 150,
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            '${AppConfig.signaturesUrl}/$signaturePath',
-            fit: BoxFit.contain,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Center(
-                child: CircularProgressIndicator(
-                  value: loadingProgress.expectedTotalBytes != null
-                      ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
-                      : null,
+      return FutureBuilder<String>(
+        future: AppConfig.buildServeFileUrl(signaturePath),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            debugPrint('[SIGNATURE] Error building URL: ${snapshot.error}');
+            return Container(
+              height: 150,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error, color: Colors.grey[600], size: 40),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Signature not found',
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                  ],
                 ),
-              );
-            },
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                height: 150,
-                color: Colors.grey[200],
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error, color: Colors.grey[600], size: 40),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Signature not found',
-                        style: TextStyle(color: Colors.grey[600]),
+              ),
+            );
+          }
+          final signatureUrl = snapshot.data!;
+          return Container(
+            height: 150,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: CachedNetworkImage(
+                imageUrl: signatureUrl,
+                fit: BoxFit.contain,
+                placeholder: (context, url) =>
+                    const Center(child: CircularProgressIndicator()),
+                errorWidget: (context, url, error) {
+                  debugPrint(
+                      '[SIGNATURE ERROR] Failed to load $signatureUrl: $error');
+                  return Container(
+                    height: 150,
+                    color: Colors.grey[200],
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error, color: Colors.grey[600], size: 40),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Signature not found',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
       );
     } else {
       return Container(

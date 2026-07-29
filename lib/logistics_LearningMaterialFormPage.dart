@@ -1307,17 +1307,7 @@ class _LogisticsLearningMaterialFormPageState
                                   // All Materials Button / Verify Button
                                   // Hide Verify button when PPE is selected (verification is in PPE dialog)
                                   if (showUnitStandards)
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.arrow_forward_ios,
-                                        size: 16,
-                                        color: Colors.blue,
-                                      ),
-                                      onPressed: () =>
-                                          _navigateToLearnerMaterialSelection(
-                                              learner),
-                                      tooltip: 'All Materials',
-                                    )
+                                    const SizedBox.shrink()
                                   else if (!showPPE)
                                     ElevatedButton.icon(
                                       onPressed: isVerifying
@@ -1458,17 +1448,29 @@ class _LogisticsUnitStandardsDialogState
   Future<void> _loadExistingSubmissions() async {
     try {
       // Load from server what this specific learner has already received
+      // STRICTLY use internal LearnerID for database consistency
+      final learnerIdentifier =
+          widget.learner['LearnerID']?.toString() ?? widget.learner['IDNumber'];
+      final url = AppConfig.buildUrl(
+          'get_logistics_checkbox_status.php?classID=${widget.classID}&learnerID=$learnerIdentifier');
+      debugPrint('Loading existing from: $url');
       final response = await http.get(
-        Uri.parse(AppConfig.buildUrl(
-            'get_logistics_checkbox_status.php?classID=${widget.classID}&learnerID=${widget.learner['IDNumber']}')),
+        Uri.parse(url),
       );
+
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        debugPrint('Decoded data: $data');
         if (data['success'] == true) {
           final checkboxStatus = data['checkboxStatus'] ?? {};
           final quantities = data['quantities'] ?? {};
           final representatives = data['representatives'] ?? {};
+
+          debugPrint('checkboxStatus: $checkboxStatus');
+          debugPrint('quantities: $quantities');
 
           setState(() {
             checkboxStatus.forEach((key, value) {
@@ -1485,11 +1487,17 @@ class _LogisticsUnitStandardsDialogState
             representatives.forEach((key, value) {
               existingUnitStandardRepresentatives[key] = value.toString();
             });
+
+            debugPrint(
+                'selectedUnitStandards after load: $selectedUnitStandards');
+            debugPrint(
+                'existingUnitStandardQuantities after load: $existingUnitStandardQuantities');
           });
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('Error loading existing submissions: $e');
+      debugPrint('Stack trace: $stackTrace');
     } finally {
       setState(() => isLoading = false);
     }
