@@ -20,7 +20,8 @@ import 'utils/scanner_pdf_resolver.dart';
 import 'ArplClassDetailsPage.dart';
 import 'ArplAssessorMarkingPage.dart';
 import 'ArplHierarchicalNavigatorPage.dart';
-import 'ArplToolkitViewerPage.dart';
+import 'ArplToolkitRouter.dart';
+import 'arpl_assessor_clocking_page.dart';
 
 class ArplAssessorPage extends StatefulWidget {
   final String facilitator_id;
@@ -35,11 +36,37 @@ class _ArplAssessorPageState extends State<ArplAssessorPage> {
   late Future<List<dynamic>> _classes;
   int _selectedIndex = 0;
   String? _pathwayType; // Store 'ARPL' or other pathway types
+  String? _ofoNumber; // Store OFO code for ARPL assessor
 
   @override
   void initState() {
     super.initState();
+    print('[ArplAssessorPage] ===== INITIALIZATION =====');
+    print('[ArplAssessorPage] Facilitator ID: ${widget.facilitator_id}');
+    print('[ArplAssessorPage] Starting fetchClasses...');
     _classes = fetchClasses(widget.facilitator_id);
+  }
+
+  Future<String> _getFacilitatorName() async {
+    try {
+      final db = await DatabaseHelper().database;
+      final result = await db.query(
+        'facilitator',
+        where: 'facilitator_id = ?',
+        whereArgs: [widget.facilitator_id],
+        limit: 1,
+      );
+
+      if (result.isNotEmpty) {
+        final firstName = result.first['firstName'] ?? '';
+        final lastName = result.first['lastName'] ?? '';
+        return '$firstName $lastName'.trim();
+      }
+      return 'Assessor';
+    } catch (e) {
+      print('[ArplAssessorPage] Error fetching facilitator name: $e');
+      return 'Assessor';
+    }
   }
 
   Future<List<dynamic>> fetchClasses(String facilitatorId) async {
@@ -71,14 +98,53 @@ class _ArplAssessorPageState extends State<ArplAssessorPage> {
                           .toUpperCase() ??
                       '';
 
-              if (pathway.contains('ARPL')) {
+              print(
+                  '[ArplAssessorPage] DEBUG: Raw pathway from data: "${data[0]['Project_pathway']}"');
+              print('[ArplAssessorPage] DEBUG: Uppercased pathway: "$pathway"');
+
+              // Try to parse OFO code from Project_pathway JSON
+              try {
+                String rawPathway =
+                    data[0]['Project_pathway']?.toString() ?? '';
+                if (rawPathway.isNotEmpty && rawPathway.startsWith('[')) {
+                  // Parse as JSON array
+                  List<dynamic> pathwayList = jsonDecode(rawPathway);
+                  if (pathwayList.isNotEmpty &&
+                      pathwayList[0]['ofo_code'] != null) {
+                    _ofoNumber = pathwayList[0]['ofo_code'].toString();
+                    print('[ArplAssessorPage] Extracted OFO Code: $_ofoNumber');
+                  }
+                }
+              } catch (e) {
+                print('[ArplAssessorPage] Could not parse OFO code: $e');
+              }
+
+              // Check for ARPL detection in multiple formats:
+              // 1. Full JSON format: [{"type":"ARPL",...}]
+              // 2. Trade names (these are ARPL trades): ELECTRICIAN, BRICKLAYING, BRICKLAYER, PLUMBING, PLUMBER, ELECTRICITY
+              // Note: pathway is already uppercased, so we check against uppercase keywords
+              bool isARPL = pathway.contains('ARPL') ||
+                  pathway.contains('ELECTRICIAN') ||
+                  pathway.contains('BRICKLAYING') ||
+                  pathway.contains('BRICKLAYER') ||
+                  pathway.contains('PLUMBING') ||
+                  pathway.contains('PLUMBER') ||
+                  pathway.contains('ELECTRICITY');
+
+              print('[ArplAssessorPage] DEBUG: isARPL check result: $isARPL');
+              print(
+                  '[ArplAssessorPage] DEBUG: Contains ARPL? ${pathway.contains('ARPL')}');
+              print(
+                  '[ArplAssessorPage] DEBUG: Contains BRICKLAYER? ${pathway.contains('BRICKLAYER')}');
+
+              if (isARPL) {
                 _pathwayType = 'ARPL';
               } else {
                 _pathwayType = pathway;
               }
 
               print(
-                  '[AssessorPage] Detected Pathway: $_pathwayType (from data: $pathway)');
+                  '[ArplAssessorPage] Detected Pathway: $_pathwayType (from data: $pathway, isARPL: $isARPL)');
             });
           }
           return data;
@@ -123,12 +189,28 @@ class _ArplAssessorPageState extends State<ArplAssessorPage> {
         case 20:
           return ARPLAssessorReviewPage(facilitatorId: widget.facilitator_id);
         case 21:
-          return ARPLAppendixHPage(facilitatorId: widget.facilitator_id);
+          return ARPLAppendixHPage(
+              facilitatorId: widget.facilitator_id, ofoNumber: _ofoNumber);
         case 22:
           return ARPLEvidenceChecklistPage(
               facilitatorId: widget.facilitator_id);
         case 23:
           return RemedialsPage(facilitatorId: widget.facilitator_id);
+        case 24:
+          return ViewCompleteToolkitPage(facilitatorId: widget.facilitator_id);
+        case 25:
+          return FutureBuilder(
+            future: _getFacilitatorName(),
+            builder: (context, snapshot) {
+              if (snapshot.hasData) {
+                return ArplAssessorClockingPage(
+                  facilitatorId: widget.facilitator_id,
+                  facilitatorName: snapshot.data as String,
+                );
+              }
+              return const Center(child: CircularProgressIndicator());
+            },
+          );
         default:
           return _buildARPLDashboard();
       }
@@ -330,6 +412,14 @@ class _ArplAssessorPageState extends State<ArplAssessorPage> {
 
   @override
   Widget build(BuildContext context) {
+    print('[ArplAssessorPage] ===== BUILD METHOD =====');
+    print('[ArplAssessorPage] _pathwayType: "$_pathwayType"');
+    print(
+        '[ArplAssessorPage] Will show ${_pathwayType == 'ARPL' ? 'ARPL' : 'DEFAULT'} dashboard');
+    print(
+        '[ArplAssessorPage] Will use ${_pathwayType == 'ARPL' ? '_buildARPLDrawerItems' : '_buildDefaultDrawerItems'}');
+    print('[ArplAssessorPage] ===========================');
+
     return Scaffold(
       appBar: AppBar(
           title: Text(_pathwayType == 'ARPL'
@@ -434,6 +524,24 @@ class _ArplAssessorPageState extends State<ArplAssessorPage> {
         leading: const Icon(Icons.medical_services),
         onTap: () {
           _onItemTapped(23);
+          Navigator.pop(context);
+        },
+      ),
+      ListTile(
+        title: const Text('Clock In/Out'),
+        selected: _selectedIndex == 25,
+        leading: const Icon(Icons.access_time),
+        onTap: () {
+          Navigator.of(context).pop();
+          _onItemTapped(25);
+        },
+      ),
+      ListTile(
+        title: const Text('View Complete Toolkit'),
+        selected: _selectedIndex == 24,
+        leading: const Icon(Icons.description),
+        onTap: () {
+          _onItemTapped(24);
           Navigator.pop(context);
         },
       ),
@@ -9504,15 +9612,29 @@ class _ARPLAssessorReviewPageState extends State<ARPLAssessorReviewPage> {
         }
       }
 
+      // FIX: Fetch OFO for this class
+      String? ofoNumber;
+      if (classId != null && classId.isNotEmpty) {
+        print('[ARPL] Fetching OFO for classID: $classId');
+        ofoNumber = await _fetchOfoFromClassData(classId);
+        print('[ARPL] Fetched OFO: $ofoNumber');
+      }
+
       setState(() {
         _classId = classId;
         _siteId = siteId;
         _projectId = projectId;
+        _ofoNumber = ofoNumber; // Set OFO number
       });
       print(
-          '[ARPL] Traceability data: Class=$_classId, Site=$_siteId, Project=$_projectId');
+          '[ARPL] Traceability data: Class=$_classId, Site=$_siteId, Project=$_projectId, OFO=$_ofoNumber');
 
       _loadExistingARPLData(learnerId);
+
+      // Load activities now that we have OFO
+      if (ofoNumber != null && ofoNumber.isNotEmpty) {
+        _loadActivitiesFromAPI(learnerId);
+      }
     } catch (e) {
       print('[ARPL] Error fetching traceability data: $e');
     }
@@ -9800,7 +9922,7 @@ class _ARPLAssessorReviewPageState extends State<ARPLAssessorReviewPage> {
       final payload = {
         'learnerID': int.parse(_selectedLearnerId!),
         'assessor_id': int.parse(widget.facilitatorId),
-        'ofo_number': _ofoNumber ?? '671101',
+        'ofo_number': _ofoNumber ?? '', // Empty if not set - don't default
         'activities': activities,
       };
 
@@ -9961,18 +10083,31 @@ class _ARPLAssessorReviewPageState extends State<ARPLAssessorReviewPage> {
         print('[ARPL DEBUG] Full response: $data');
 
         if (data['status'] == 'success') {
+          // First try to get OFO from API
+          var ofoValue = data['ofo_number'];
+          print(
+              '[ARPL DEBUG] Raw OFO value from API: $ofoValue (type: ${ofoValue.runtimeType})');
+
+          String? finalOfoNumber;
+          if (ofoValue != null && ofoValue.toString().isNotEmpty) {
+            finalOfoNumber = ofoValue.toString();
+          } else if (_classId != null && _classId!.isNotEmpty) {
+            // If API didn't return OFO, fetch from class data
+            print('[ARPL] API missing OFO, fetching from class $_classId');
+            finalOfoNumber = await _fetchOfoFromClassData(_classId!);
+          }
+
+          // Final fallback - if still no OFO, throw error instead of defaulting
+          if (finalOfoNumber == null || finalOfoNumber.isEmpty) {
+            print(
+                '[ARPL] ERROR: No OFO found for learner. Cannot determine trade.');
+            throw Exception(
+                'Could not determine trade for learner. ClassID: $_classId');
+          }
+
           setState(() {
             _appendixBActivities = data['appxb_activities'] ?? [];
-
-            // Fix: Ensure OFO number is converted to string properly
-            var ofoValue = data['ofo_number'];
-            print(
-                '[ARPL DEBUG] Raw OFO value: $ofoValue (type: ${ofoValue.runtimeType})');
-            if (ofoValue != null) {
-              _ofoNumber = ofoValue.toString();
-            } else {
-              _ofoNumber = '671101'; // Default fallback
-            }
+            _ofoNumber = finalOfoNumber;
             print('[ARPL DEBUG] Final _ofoNumber: $_ofoNumber');
 
             // Map ratings by activity_id for quick lookup
@@ -10002,6 +10137,47 @@ class _ARPLAssessorReviewPageState extends State<ARPLAssessorReviewPage> {
     }
   }
 
+  /// Fetch OFO for a given class
+  Future<String?> _fetchOfoFromClassData(String classId) async {
+    try {
+      print('[ARPL] Fetching OFO for classID: $classId');
+
+      final response = await http.post(
+        Uri.parse(
+          '${AppConfig.baseUrl}/get_class_trade_info.php',
+        ),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'classID': int.parse(classId),
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        try {
+          final data = jsonDecode(response.body);
+          if (data['status'] == 'success' && data['ofo_number'] != null) {
+            final ofo = data['ofo_number'].toString();
+            final tradeName = data['trade_name'] ?? 'Unknown';
+            print('[ARPL] Class OFO retrieved: $ofo for trade: $tradeName');
+            return ofo;
+          } else {
+            print('[ARPL] API returned no OFO: ${data['message']}');
+            return null;
+          }
+        } catch (e) {
+          print('[ARPL] Error parsing OFO response: $e');
+          return null;
+        }
+      } else {
+        print('[ARPL] Failed to fetch OFO: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('[ARPL] Exception fetching OFO: $e');
+      return null;
+    }
+  }
+
   // Load Appendix E electrician activities and ratings
   Future<void> _loadAppendixEData() async {
     try {
@@ -10017,7 +10193,7 @@ class _ARPLAssessorReviewPageState extends State<ARPLAssessorReviewPage> {
         Uri.parse(AppConfig.getArplAppendixEUrl),
         body: {
           'learnerID': _selectedLearnerId!,
-          'ofo_number': _ofoNumber ?? '671101',
+          'ofo_number': _ofoNumber ?? '', // Don't default to 671101
           'facilitator_id': '1', // TODO: Get from user session
         },
       );
@@ -10901,6 +11077,21 @@ class _ARPLAssessorReviewPageState extends State<ARPLAssessorReviewPage> {
     }
   }
 
+  /// Get trade name from OFO number
+  /// Maps OFO codes to their corresponding trade names
+  String _getTradeName(String? ofoNumber) {
+    switch (ofoNumber) {
+      case '671101':
+        return 'Electrician';
+      case '642601':
+        return 'Plumber';
+      case '641201':
+        return 'Bricklayer';
+      default:
+        return 'Unknown Trade';
+    }
+  }
+
   Widget _buildAppendixE() {
     print('[ARPL-E BUILD] _buildAppendixE() called');
     print(
@@ -11626,8 +11817,8 @@ class _ARPLAssessorReviewPageState extends State<ARPLAssessorReviewPage> {
 
       final requestBody = {
         'learner_id': int.parse(_selectedLearnerId!),
-        'ofo_code': _ofoNumber ?? '671101',
-        'trade': 'Electrician',
+        'ofo_code': _ofoNumber ?? '',
+        'trade': _getTradeName(_ofoNumber),
         'recommendations': recommendations,
       };
 
@@ -11717,16 +11908,31 @@ class _ARPLAssessorReviewPageState extends State<ARPLAssessorReviewPage> {
                           print(
                               '[APPX H] Navigating with learnerID: $learnerId, classID: $classId');
 
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ArplToolkitViewerPage(
-                                learnerID: learnerId,
-                                classID: classId,
-                                ofoNumber: _ofoNumber ?? '671101',
+                          if (_ofoNumber == null || _ofoNumber!.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content: Text(
+                                      'Error: OFO number not set. Cannot proceed.')),
+                            );
+                          } else if (_ofoNumber != null &&
+                              _ofoNumber!.isNotEmpty) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ArplToolkitRouter(
+                                  learnerID: learnerId,
+                                  classID: classId,
+                                  ofoNumber: _ofoNumber!,
+                                ),
                               ),
-                            ),
-                          );
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content: Text(
+                                      'Error: OFO code not loaded. Please try again.')),
+                            );
+                          }
                         } catch (e) {
                           print('[APPX H] ERROR: $e');
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -11783,8 +11989,8 @@ class _ARPLAssessorReviewPageState extends State<ARPLAssessorReviewPage> {
       final requestBody = {
         'learner_id': int.parse(_selectedLearnerId!),
         'recommendation_id': recommendationId,
-        'ofo_code': _ofoNumber ?? '671101',
-        'trade': 'Electrician',
+        'ofo_code': _ofoNumber ?? '',
+        'trade': _getTradeName(_ofoNumber),
         'unit_standards': selectedUS,
       };
 
@@ -11806,8 +12012,13 @@ class _ARPLAssessorReviewPageState extends State<ARPLAssessorReviewPage> {
 
 class ARPLAppendixHPage extends StatefulWidget {
   final String facilitatorId;
+  final String? ofoNumber;
 
-  const ARPLAppendixHPage({super.key, required this.facilitatorId});
+  const ARPLAppendixHPage({
+    super.key,
+    required this.facilitatorId,
+    this.ofoNumber,
+  });
 
   @override
   _ARPLAppendixHPageState createState() => _ARPLAppendixHPageState();
@@ -11818,6 +12029,7 @@ class _ARPLAppendixHPageState extends State<ARPLAppendixHPage> {
   List<dynamic> _learners = [];
   bool _isLoading = true;
   bool _isRecommended = false;
+  String? _ofoNumber;
 
   final SignatureController _learnerSig = SignatureController(
       penColor: Colors.black, exportBackgroundColor: Colors.white);
@@ -11827,6 +12039,7 @@ class _ARPLAppendixHPageState extends State<ARPLAppendixHPage> {
   @override
   void initState() {
     super.initState();
+    _ofoNumber = widget.ofoNumber;
     _fetchLearners();
   }
 
@@ -12021,15 +12234,26 @@ class _ARPLAppendixHPageState extends State<ARPLAppendixHPage> {
                     final int classId = int.parse(_classId!);
 
                     print(
-                        '[APPX H] Navigating with learnerID: $learnerId, classID: $classId');
+                        '[APPX H] Navigating with learnerID: $learnerId, classID: $classId, OFO: $_ofoNumber');
+
+                    if (_ofoNumber == null || _ofoNumber!.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                              'Error: OFO code not loaded. Please try again.'),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                      return;
+                    }
 
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => ArplToolkitViewerPage(
+                        builder: (context) => ArplToolkitRouter(
                           learnerID: learnerId,
                           classID: classId,
-                          ofoNumber: '671101', // Default to Electrician
+                          ofoNumber: _ofoNumber!,
                         ),
                       ),
                     );
@@ -12397,6 +12621,453 @@ class _RemedialsPageState extends State<RemedialsPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// VIEW COMPLETE TOOLKIT PAGE
+// ══════════════════════════════════════════════════════════
+class ViewCompleteToolkitPage extends StatefulWidget {
+  final String facilitatorId;
+
+  const ViewCompleteToolkitPage({super.key, required this.facilitatorId});
+
+  @override
+  _ViewCompleteToolkitPageState createState() =>
+      _ViewCompleteToolkitPageState();
+}
+
+class _ViewCompleteToolkitPageState extends State<ViewCompleteToolkitPage> {
+  String? _selectedLearnerId;
+  List<dynamic> _learners = [];
+  bool _isLoadingLearners = true;
+  String? _selectedClassId;
+  String? _selectedOfoNumber;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLearners();
+  }
+
+  Future<void> _fetchLearners() async {
+    try {
+      final db = await DatabaseHelper().database;
+      final facilitatorClasses = await db.query(
+        'facilitator',
+        columns: ['classID'],
+        where: 'facilitator_id = ?',
+        whereArgs: [widget.facilitatorId],
+      );
+
+      Set<String> classIds = {};
+      for (var row in facilitatorClasses) {
+        String ids = row['classID']?.toString() ?? '';
+        if (ids.isNotEmpty) {
+          classIds.addAll(ids.split(',').map((e) => e.trim()));
+        }
+      }
+
+      if (classIds.isNotEmpty) {
+        final learnersList = await db.query(
+          'learnerdetails',
+          where: 'classID IN (${classIds.map((_) => '?').join(',')})',
+          whereArgs: classIds.toList(),
+        );
+
+        setState(() {
+          _learners = learnersList;
+          _isLoadingLearners = false;
+        });
+      } else {
+        setState(() => _isLoadingLearners = false);
+      }
+    } catch (e) {
+      print('Error fetching learners: $e');
+      setState(() => _isLoadingLearners = false);
+    }
+  }
+
+  Future<String?> _fetchOfoForClass(String classId) async {
+    try {
+      print('[TOOLKIT_DEBUG] Fetching OFO for classID: $classId');
+
+      // Call dedicated API endpoint for class trade info
+      final response = await http.post(
+        Uri.parse(
+          '${AppConfig.baseUrl}/get_class_trade_info.php',
+        ),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'classID': int.parse(classId)}),
+      );
+
+      print('[TOOLKIT_DEBUG] API Response Code: ${response.statusCode}');
+      print('[TOOLKIT_DEBUG] API Response Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        try {
+          final data = jsonDecode(response.body);
+          if (data['status'] == 'success' && data['ofo_number'] != null) {
+            final ofo = data['ofo_number'].toString();
+            final tradeName = data['trade_name'] ?? 'Unknown';
+            print(
+                '[TOOLKIT_DEBUG] API returned OFO: $ofo for trade: $tradeName');
+            return ofo;
+          } else {
+            print(
+                '[TOOLKIT_DEBUG] API error response: ${data['message'] ?? 'Unknown error'}, throwing exception');
+            throw Exception('Failed to get OFO number from API');
+          }
+        } catch (e) {
+          print('[TOOLKIT_DEBUG] JSON decode error: $e, returning null');
+          return null;
+        }
+      } else {
+        print(
+            '[TOOLKIT_DEBUG] API error: ${response.statusCode}, body: ${response.body}, returning null');
+        return null;
+      }
+    } catch (e) {
+      print('[TOOLKIT_DEBUG] Exception fetching OFO: $e, returning null');
+      return null;
+    }
+  }
+
+  void _openToolkit() {
+    print('[TOOLKIT_DEBUG] === _openToolkit called ===');
+    print('[TOOLKIT_DEBUG] _selectedLearnerId: $_selectedLearnerId');
+    print('[TOOLKIT_DEBUG] _selectedClassId: $_selectedClassId');
+    print('[TOOLKIT_DEBUG] _selectedOfoNumber: $_selectedOfoNumber');
+    print('[TOOLKIT_DEBUG] _learners.length: ${_learners.length}');
+
+    // Ensure all required fields are set
+    if (_selectedLearnerId == null || _selectedLearnerId!.isEmpty) {
+      print('[TOOLKIT_DEBUG] ERROR: _selectedLearnerId is null or empty');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a candidate to continue'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    print(
+        '[TOOLKIT_DEBUG] _selectedClassId check: $_selectedClassId (isEmpty: ${_selectedClassId?.isEmpty ?? 'null'})');
+    if (_selectedClassId == null || _selectedClassId!.isEmpty) {
+      print('[TOOLKIT_DEBUG] ERROR: _selectedClassId is null or empty');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Class not found for this candidate'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    // OFO number must be set - error if empty
+    final ofoNumber =
+        (_selectedOfoNumber == null || _selectedOfoNumber!.isEmpty)
+            ? (throw Exception('OFO number not set. Cannot load ARPL toolkit'))
+            : _selectedOfoNumber!;
+    print('[TOOLKIT_DEBUG] Using OFO number: $ofoNumber');
+
+    // Find the learner by IDNumber to get LearnerID
+    print(
+        '[TOOLKIT_DEBUG] Searching for learner with IDNumber: $_selectedLearnerId');
+
+    final learner = _learners.firstWhere(
+      (l) {
+        final idNum = l['IDNumber']?.toString() ?? '';
+        return idNum == _selectedLearnerId;
+      },
+      orElse: () => <String, dynamic>{},
+    );
+
+    print(
+        '[TOOLKIT_DEBUG] Learner search result: ${learner.isEmpty ? 'NOT FOUND' : 'FOUND'}');
+
+    if (learner.isEmpty) {
+      print('[TOOLKIT_DEBUG] ERROR: learner is empty after search');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Candidate record not found'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    print(
+        '[TOOLKIT_DEBUG] Found learner: ${learner['Name']} ${learner['Surname']}');
+    print('[TOOLKIT_DEBUG] Learner LearnerID: ${learner['LearnerID']}');
+    print('[TOOLKIT_DEBUG] Learner IDNumber: ${learner['IDNumber']}');
+    print('[TOOLKIT_DEBUG] Learner classID: ${learner['classID']}');
+
+    int learnerId = int.tryParse(learner['LearnerID']?.toString() ?? '0') ?? 0;
+    int classId = int.tryParse(_selectedClassId ?? '0') ?? 0;
+
+    print('[TOOLKIT_DEBUG] Parsed learnerId: $learnerId, classId: $classId');
+
+    if (learnerId == 0) {
+      print('[TOOLKIT_DEBUG] ERROR: learnerId is 0, cannot proceed');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid candidate ID'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    if (classId == 0) {
+      print('[TOOLKIT_DEBUG] ERROR: classId is 0, cannot proceed');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid class ID'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    print('[TOOLKIT_DEBUG] All checks passed, navigating to toolkit');
+    print(
+        '[TOOLKIT_DEBUG] Final parameters: learnerId=$learnerId, classId=$classId, ofoNumber=$ofoNumber');
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ArplToolkitRouter(
+          learnerID: learnerId,
+          classID: classId,
+          ofoNumber: ofoNumber,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedLearner = _selectedLearnerId == null
+        ? null
+        : _learners.isEmpty
+            ? null
+            : _learners
+                    .any((l) => l['LearnerID'].toString() == _selectedLearnerId)
+                ? _learners.firstWhere(
+                    (l) => l['LearnerID'].toString() == _selectedLearnerId)
+                : null;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('View Complete Toolkit'),
+        backgroundColor: Colors.indigo,
+      ),
+      body: _isLoadingLearners
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Select Candidate to View Toolkit',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.indigo,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Candidate:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButton<String>(
+                    value: _selectedLearnerId,
+                    hint: const Text('Choose a candidate'),
+                    isExpanded: true,
+                    items: _learners.map((learner) {
+                      final idNumber = learner['IDNumber'] ?? 'Unknown';
+                      return DropdownMenuItem<String>(
+                        value: learner['IDNumber'].toString(),
+                        child: Text(
+                            '${learner['Name']} ${learner['Surname']} ($idNumber)'),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      print('[TOOLKIT_DEBUG] Dropdown onChanged: value=$value');
+                      if (value != null) {
+                        // Find learner BEFORE setState
+                        final learner = _learners.firstWhere(
+                          (l) => l['IDNumber'].toString() == value,
+                          orElse: () => <String, dynamic>{},
+                        );
+
+                        print(
+                            '[TOOLKIT_DEBUG] Found learner in dropdown: ${learner.isNotEmpty}');
+                        if (learner.isNotEmpty) {
+                          print(
+                              '[TOOLKIT_DEBUG] Learner Name: ${learner['Name']} ${learner['Surname']}');
+                          print(
+                              '[TOOLKIT_DEBUG] Learner classID: ${learner['classID']}');
+                          print(
+                              '[TOOLKIT_DEBUG] Learner LearnerID: ${learner['LearnerID']}');
+                        }
+
+                        if (learner.isNotEmpty) {
+                          final classId = learner['classID']?.toString() ?? '';
+
+                          // Fetch OFO from API based on classID
+                          _fetchOfoForClass(classId).then((ofo) {
+                            setState(() {
+                              _selectedLearnerId = value;
+                              print(
+                                  '[TOOLKIT_DEBUG] Set _selectedLearnerId=$value');
+                              _selectedClassId = classId;
+                              print(
+                                  '[TOOLKIT_DEBUG] Set _selectedClassId=$classId');
+                              _selectedOfoNumber =
+                                  ofo; // ← FIX: Actually assign the OFO value
+                              print(
+                                  '[TOOLKIT_DEBUG] Set _selectedOfoNumber=$ofo (actual from class)');
+                              if (ofo == null || ofo.isEmpty) {
+                                print(
+                                    '[TOOLKIT_DEBUG] WARNING: OFO is empty for this class!');
+                              }
+                            });
+                          });
+                        } else {
+                          print(
+                              '[TOOLKIT_DEBUG] ERROR: Learner not found for value=$value');
+                          setState(() {
+                            _selectedLearnerId = null;
+                            _selectedClassId = null;
+                            _selectedOfoNumber = null;
+                          });
+                        }
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  if (_selectedLearnerId != null) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.indigo.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border:
+                            Border.all(color: Colors.indigo.withOpacity(0.3)),
+                      ),
+                      child: _learners.isNotEmpty
+                          ? (() {
+                              final selectedLearner = _learners.firstWhere(
+                                (l) =>
+                                    l['IDNumber'].toString() ==
+                                    _selectedLearnerId,
+                                orElse: () => <String, dynamic>{},
+                              );
+                              if (selectedLearner == null ||
+                                  selectedLearner.isEmpty) {
+                                return const Text(
+                                  'Learner data not found',
+                                  style: TextStyle(color: Colors.red),
+                                );
+                              }
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Candidate: ${selectedLearner['Name'] ?? ''} ${selectedLearner['Surname'] ?? ''}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.indigo,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'ID Number: ${selectedLearner['IDNumber'] ?? ''}',
+                                    style:
+                                        const TextStyle(color: Colors.indigo),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Class: ${selectedLearner['classID'] ?? ''}',
+                                    style:
+                                        const TextStyle(color: Colors.indigo),
+                                  ),
+                                ],
+                              );
+                            })()
+                          : const Text(
+                              'No learner data available',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'OFO Number:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        _selectedOfoNumber ?? 'Not Set',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _openToolkit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.indigo,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: const Text(
+                          'Open Complete Toolkit',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ] else if (_selectedLearnerId == null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24.0),
+                      child: Center(
+                        child: Text(
+                          _learners.isEmpty
+                              ? 'No candidates available in your classes'
+                              : 'Select a candidate to continue',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
     );
   }
 }

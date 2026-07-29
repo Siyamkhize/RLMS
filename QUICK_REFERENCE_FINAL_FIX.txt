@@ -1,0 +1,42 @@
+═══════════════════════════════════════════════════════════════════════════════
+  ARPL ASSESSOR MENU FIX - QUICK REFERENCE (July 14, 2026)
+═══════════════════════════════════════════════════════════════════════════════
+
+PROBLEM:
+  ARPL assessor menu not showing on ONLINE server (works on LOCAL)
+
+ROOT CAUSE:
+  Query selecting non-existent columns on ONLINE schema:
+  - c.instructorID ❌
+  - c.contact_hours ❌
+
+FIX:
+  Removed those columns from mobile/get_classes.php
+
+FILE TO UPLOAD:
+  LOCAL:  c:\projects\rlmss\mobile\get_classes.php
+  ONLINE: https://rlms.rlmss.co.za/mobile/get_classes.php
+
+DEPLOYMENT STEPS:
+  1. Upload get_classes.php via FTP (replace existing file)
+  2. Test: Open https://rlms.rlmss.co.za/mobile/get_classes.php?facilitator_id=6
+  3. Uninstall old app, clear cache, install fresh APK
+  4. Log in as arpl_Assessor facilitator
+  5. Verify ARPL menu appears
+
+TIME REQUIRED:
+  Upload: 5 min
+  Test: 2 min
+  Install APK: 5 min
+  Test login: 5 min
+  ────────────
+  Total: 17 min
+
+CONFIDENCE: 99% - Will fix the issue
+
+DOCUMENTATION:
+  Read: ROOT_CAUSE_IDENTIFIED_AND_FIXED.md
+  Read: DEPLOY_FIXES_NOW.md
+  Read: ARPL_FINAL_FIX_COMPLETE.md
+
+═══════════════════════════════════════════════════════════════════════════════

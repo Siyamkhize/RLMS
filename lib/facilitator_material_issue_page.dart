@@ -223,8 +223,12 @@ class _FacilitatorMaterialIssuePageState
       List<Map<String, dynamic>> issuanceRecords = [];
 
       learnerMaterials.forEach((learnerId, materials) {
-        final learner =
-            learners.firstWhere((l) => l['learnerID'].toString() == learnerId);
+        final learner = learners
+                .any((l) => l['learnerID'].toString() == learnerId)
+            ? learners.firstWhere((l) => l['learnerID'].toString() == learnerId)
+            : null;
+
+        if (learner == null) return;
 
         issuanceRecords.add({
           'classID': widget.classId,
@@ -320,8 +324,12 @@ class _FacilitatorMaterialIssuePageState
               onChanged: (value) {
                 setState(() {
                   selectedLearnerId = value;
-                  selectedLearnerName = learners.firstWhere(
-                      (l) => l['learnerID'].toString() == value)['learnerName'];
+                  selectedLearnerName = learners.any(
+                          (l) => l['learnerID'].toString() == value.toString())
+                      ? learners.firstWhere((l) =>
+                          l['learnerID'].toString() ==
+                          value.toString())['learnerName']
+                      : '';
                 });
               },
               validator: (value) {
@@ -448,8 +456,10 @@ class _FacilitatorMaterialIssuePageState
       children: learnerMaterials.entries.map((entry) {
         final learnerId = entry.key;
         final materials = entry.value;
-        final learner =
-            learners.firstWhere((l) => l['learnerID'].toString() == learnerId);
+        final learner = learners
+                .any((l) => l['learnerID'].toString() == learnerId)
+            ? learners.firstWhere((l) => l['learnerID'].toString() == learnerId)
+            : {'learnerName': 'Unknown'};
 
         return Card(
           margin: const EdgeInsets.only(bottom: 16),

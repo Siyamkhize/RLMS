@@ -11,6 +11,7 @@ import 'package:signature/signature.dart';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_doc_scanner/flutter_doc_scanner.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'PotholeChecklistPage.dart';
 import 'database_helper.dart';
 import 'config.dart';
@@ -18,8 +19,10 @@ import 'utils/scanner_pdf_resolver.dart';
 
 class AssessorPage extends StatefulWidget {
   final String facilitator_id;
+  final String? forcePathwayType;
 
-  const AssessorPage({super.key, required this.facilitator_id});
+  const AssessorPage(
+      {super.key, required this.facilitator_id, this.forcePathwayType});
 
   @override
   _AssessorPageState createState() => _AssessorPageState();
@@ -28,10 +31,17 @@ class AssessorPage extends StatefulWidget {
 class _AssessorPageState extends State<AssessorPage> {
   late Future<List<dynamic>> _classes;
   int _selectedIndex = 0;
+  String? _pathwayType; // Store 'ARPL' or other pathway types
 
   @override
   void initState() {
     super.initState();
+    print(
+        '[AssessorPage] Initializing with forcePathwayType: ${widget.forcePathwayType}');
+    if (widget.forcePathwayType != null) {
+      _pathwayType = widget.forcePathwayType;
+      print('[AssessorPage] Set _pathwayType to: $_pathwayType');
+    }
     _classes = fetchClasses(widget.facilitator_id);
   }
 
@@ -45,19 +55,55 @@ class _AssessorPageState extends State<AssessorPage> {
 
       final response = await http.get(Uri.parse(url));
 
-      print('[AssessorPage] Response Status: ${response.statusCode}');
-      print('[AssessorPage] Response Body: ${response.body}');
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // Check if response is an error object
         if (data is Map && data['status'] == 'error') {
           throw Exception('Server error: ${data['message']}');
         }
 
-        // Return the data (should be a list)
         if (data is List) {
+          // Detect pathway type from the first class (if available) only if not forced
+          if (data.isNotEmpty && widget.forcePathwayType == null) {
+            setState(() {
+              // Check both possible keys: Project_pathway (from mobile/get_classes.php)
+              // and learning_pathway (from root get_classes.php)
+              String pathway =
+                  (data[0]['Project_pathway'] ?? data[0]['learning_pathway'])
+                          ?.toString()
+                          .toUpperCase() ??
+                      '';
+
+              print(
+                  '[AssessorPage] DEBUG: First class data keys: ${data[0].keys.toList()}');
+              print(
+                  '[AssessorPage] DEBUG: Project_pathway raw: ${data[0]['Project_pathway']}');
+              print('[AssessorPage] DEBUG: Pathway uppercase: $pathway');
+
+              // Check for ARPL detection in multiple formats:
+              // 1. Full JSON format: [{"type":"ARPL",...}]
+              // 2. Trade names (these are ARPL trades): ELECTRICIAN, BRICKLAYING, BRICKLAYER, PLUMBING, PLUMBER, ELECTRICITY
+              bool isARPL = pathway.contains('ARPL') ||
+                  pathway.contains('ELECTRICIAN') ||
+                  pathway.contains('BRICKLAYING') ||
+                  pathway.contains('BRICKLAYER') ||
+                  pathway.contains('PLUMBING') ||
+                  pathway.contains('PLUMBER') ||
+                  pathway.contains('ELECTRICITY');
+
+              if (isARPL) {
+                _pathwayType = 'ARPL';
+              } else {
+                _pathwayType = pathway;
+              }
+
+              print(
+                  '[AssessorPage] Detected Pathway: $_pathwayType (from data: $pathway) (isARPL=$isARPL)');
+            });
+          } else if (widget.forcePathwayType != null) {
+            print(
+                '[AssessorPage] Using forced pathway type: ${widget.forcePathwayType}');
+          }
           return data;
         } else {
           throw Exception('Unexpected response format');
@@ -79,6 +125,37 @@ class _AssessorPageState extends State<AssessorPage> {
   }
 
   Widget _buildContent() {
+    // Branching logic for ARPL pathway
+    if (_pathwayType == 'ARPL') {
+      switch (_selectedIndex) {
+        case 0:
+          return _buildClassesContent();
+        case 10:
+          return _buildARPLDashboard();
+        case 11:
+          return AssessmentPreparationPage(
+              facilitatorId: widget.facilitator_id, isARPL: true);
+        case 12:
+          return AssessmentPlanPage(facilitatorId: widget.facilitator_id);
+        case 13:
+          return AssessorReportPage(
+              facilitatorId: widget.facilitator_id, isARPL: true);
+        case 14:
+          return AssessmentReviewPage(
+              facilitatorId: widget.facilitator_id, isARPL: true);
+        case 20:
+          return ARPLAssessorReviewPage(facilitatorId: widget.facilitator_id);
+        case 21:
+          return ARPLAppendixHPage(facilitatorId: widget.facilitator_id);
+        case 22:
+          return ARPLEvidenceChecklistPage(
+              facilitatorId: widget.facilitator_id);
+        default:
+          return _buildARPLDashboard();
+      }
+    }
+
+    // Default Assessor view
     switch (_selectedIndex) {
       case 0:
         return _buildClassesContent();
@@ -90,22 +167,105 @@ class _AssessorPageState extends State<AssessorPage> {
         return AssessorReportPage(facilitatorId: widget.facilitator_id);
       case 4:
         return _buildAssessorFeedback(facilitatorId: widget.facilitator_id);
-      case 5: // New case for Assessment Review
+      case 5:
         return AssessmentReviewPage(facilitatorId: widget.facilitator_id);
       case 6:
-        return AppealFormPage(facilitatorId: widget.facilitator_id); // New case
+        return AppealFormPage(facilitatorId: widget.facilitator_id);
       case 7:
         return NonComplianceAndFeedbackPage(
-            facilitatorId: widget.facilitator_id,
-            learnerId:
-                'LEARNER_ID'); // Replace 'LEARNER_ID' with actual learner ID
+            facilitatorId: widget.facilitator_id, learnerId: 'LEARNER_ID');
       case 8:
         return PotholeChecklistClassListPage(
-          facilitatorId: widget.facilitator_id,
-        );
+            facilitatorId: widget.facilitator_id);
       default:
         return _buildClassesContent();
     }
+  }
+
+  Widget _buildARPLDashboard() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'ARPL Assessor Dashboard',
+            style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.indigo),
+          ),
+          const SizedBox(height: 8),
+          const Text('Recognition of Prior Learning Management'),
+          const SizedBox(height: 24),
+          _buildDashboardCard(
+            title: 'Assigned Classes',
+            icon: Icons.class_,
+            color: Colors.blue,
+            onTap: () => _onItemTapped(0),
+          ),
+          _buildDashboardCard(
+            title: 'Evidence Verification',
+            icon: Icons.checklist,
+            color: Colors.indigo,
+            onTap: () => _onItemTapped(22),
+          ),
+          _buildDashboardCard(
+            title: 'Assessment Preparation',
+            icon: Icons.assignment_outlined,
+            color: Colors.orange,
+            onTap: () => _onItemTapped(11),
+          ),
+          _buildDashboardCard(
+            title: 'Portfolio Review (PoE)',
+            icon: Icons.folder_shared,
+            color: Colors.teal,
+            onTap: () => _onItemTapped(14),
+          ),
+          _buildDashboardCard(
+            title: 'Assessor Review (D,E,F)',
+            icon: Icons.fact_check,
+            color: Colors.green,
+            onTap: () => _onItemTapped(20),
+          ),
+          _buildDashboardCard(
+            title: 'Access Recommendation (H)',
+            icon: Icons.recommend,
+            color: Colors.purple,
+            onTap: () => _onItemTapped(21),
+          ),
+          _buildDashboardCard(
+            title: 'Portfolio Report',
+            icon: Icons.picture_as_pdf,
+            color: Colors.redAccent,
+            onTap: () => _onItemTapped(13),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashboardCard({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: CircleAvatar(
+          backgroundColor: color.withOpacity(0.1),
+          child: Icon(icon, color: color),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: onTap,
+      ),
+    );
   }
 
   Widget _buildClassesContent() {
@@ -192,106 +352,199 @@ class _AssessorPageState extends State<AssessorPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Assessor Dashboard')),
+      appBar: AppBar(
+          title: Text(_pathwayType == 'ARPL'
+              ? 'ARPL Dashboard'
+              : 'Assessor Dashboard')),
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
-          children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(
-                color: Colors.blue,
-              ),
-              child: Text(
-                'Assessor Menu',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                ),
-              ),
-            ),
-            ListTile(
-              title: const Text('Classes'),
-              selected: _selectedIndex == 0,
-              onTap: () {
-                _onItemTapped(0);
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('Assessment Preparation'),
-              selected: _selectedIndex == 1,
-              onTap: () {
-                _onItemTapped(1);
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('Assessment Plan'),
-              selected: _selectedIndex == 2,
-              onTap: () {
-                _onItemTapped(2);
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('Assessor Report'),
-              selected: _selectedIndex == 3,
-              onTap: () {
-                _onItemTapped(3);
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('Assessor Feedback'),
-              selected: _selectedIndex == 4, // Update the index to 4
-              onTap: () {
-                _onItemTapped(4); // Update the index to 4
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('Assessment Review'), // New menu item
-              selected: _selectedIndex == 5,
-              onTap: () {
-                _onItemTapped(5);
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-                title: const Text('Appeal Form'),
-                selected: _selectedIndex == 6,
-                onTap: () {
-                  _onItemTapped(6);
-                  Navigator.pop(context);
-                }), // New item
-            ListTile(
-              title: const Text('Non-Compliance & Feedback'),
-              selected: _selectedIndex == 7,
-              onTap: () {
-                _onItemTapped(7);
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('Pothole Checklist'),
-              selected: _selectedIndex == 8,
-              onTap: () {
-                _onItemTapped(8);
-                Navigator.pop(context);
-              },
-            ),
-          ],
+          children: _pathwayType == 'ARPL'
+              ? _buildARPLDrawerItems(context)
+              : _buildDefaultDrawerItems(context),
         ),
       ),
       body: _buildContent(),
     );
   }
+
+  List<Widget> _buildARPLDrawerItems(BuildContext context) {
+    return [
+      const DrawerHeader(
+        decoration: BoxDecoration(color: Colors.indigo),
+        child: Text('ARPL Assessor',
+            style: TextStyle(color: Colors.white, fontSize: 24)),
+      ),
+      ListTile(
+        title: const Text('ARPL Dashboard'),
+        selected: _selectedIndex == 10,
+        leading: const Icon(Icons.dashboard),
+        onTap: () {
+          _onItemTapped(10);
+          Navigator.pop(context);
+        },
+      ),
+      ListTile(
+        title: const Text('Assigned Classes'),
+        selected: _selectedIndex == 0,
+        leading: const Icon(Icons.class_),
+        onTap: () {
+          _onItemTapped(0);
+          Navigator.pop(context);
+        },
+      ),
+      ListTile(
+        title: const Text('Candidate Preparation'),
+        selected: _selectedIndex == 11,
+        leading: const Icon(Icons.people_outline),
+        onTap: () {
+          _onItemTapped(11);
+          Navigator.pop(context);
+        },
+      ),
+      ListTile(
+        title: const Text('Evidence Collection'),
+        selected: _selectedIndex == 13,
+        leading: const Icon(Icons.assignment_turned_in),
+        onTap: () {
+          _onItemTapped(13);
+          Navigator.pop(context);
+        },
+      ),
+      ListTile(
+        title: const Text('Portfolio Review'),
+        selected: _selectedIndex == 14,
+        leading: const Icon(Icons.rate_review),
+        onTap: () {
+          _onItemTapped(14);
+          Navigator.pop(context);
+        },
+      ),
+      const Divider(),
+      ListTile(
+        title: const Text('Assessor Review (D,E,F)'),
+        selected: _selectedIndex == 20,
+        leading: const Icon(Icons.fact_check),
+        onTap: () {
+          _onItemTapped(20);
+          Navigator.pop(context);
+        },
+      ),
+      ListTile(
+        title: const Text('Access Recommendation (H)'),
+        selected: _selectedIndex == 21,
+        leading: const Icon(Icons.recommend),
+        onTap: () {
+          _onItemTapped(21);
+          Navigator.pop(context);
+        },
+      ),
+      ListTile(
+        title: const Text('Evidence Checklist'),
+        selected: _selectedIndex == 22,
+        leading: const Icon(Icons.checklist),
+        onTap: () {
+          _onItemTapped(22);
+          Navigator.pop(context);
+        },
+      ),
+    ];
+  }
+
+  List<Widget> _buildDefaultDrawerItems(BuildContext context) {
+    return [
+      const DrawerHeader(
+        decoration: BoxDecoration(color: Colors.blue),
+        child: Text('Assessor Menu',
+            style: TextStyle(color: Colors.white, fontSize: 24)),
+      ),
+      ListTile(
+        title: const Text('Classes'),
+        selected: _selectedIndex == 0,
+        onTap: () {
+          _onItemTapped(0);
+          Navigator.pop(context);
+        },
+      ),
+      ListTile(
+        title: const Text('Assessment Preparation'),
+        selected: _selectedIndex == 1,
+        onTap: () {
+          _onItemTapped(1);
+          Navigator.pop(context);
+        },
+      ),
+      ListTile(
+        title: const Text('Assessment Plan'),
+        selected: _selectedIndex == 2,
+        onTap: () {
+          _onItemTapped(2);
+          Navigator.pop(context);
+        },
+      ),
+      ListTile(
+        title: const Text('Assessor Report'),
+        selected: _selectedIndex == 3,
+        onTap: () {
+          _onItemTapped(3);
+          Navigator.pop(context);
+        },
+      ),
+      ListTile(
+        title: const Text('Assessor Feedback'),
+        selected: _selectedIndex == 4,
+        onTap: () {
+          _onItemTapped(4);
+          Navigator.pop(context);
+        },
+      ),
+      ListTile(
+        title: const Text('Assessment Review'),
+        selected: _selectedIndex == 5,
+        onTap: () {
+          _onItemTapped(5);
+          Navigator.pop(context);
+        },
+      ),
+      ListTile(
+        title: const Text('Appeal Form'),
+        selected: _selectedIndex == 6,
+        onTap: () {
+          _onItemTapped(6);
+          Navigator.pop(context);
+        },
+      ),
+      ListTile(
+        title: const Text('Non-Compliance & Feedback'),
+        selected: _selectedIndex == 7,
+        onTap: () {
+          _onItemTapped(7);
+          Navigator.pop(context);
+        },
+      ),
+      ListTile(
+        title: const Text('Pothole Checklist'),
+        selected: _selectedIndex == 8,
+        onTap: () {
+          _onItemTapped(8);
+          Navigator.pop(context);
+        },
+      ),
+    ];
+  }
 }
 
 class AssessmentPreparationPage extends StatefulWidget {
   final String facilitatorId;
+  final String? learnerId;
+  final bool isARPL;
 
-  const AssessmentPreparationPage({super.key, required this.facilitatorId});
+  const AssessmentPreparationPage({
+    super.key,
+    required this.facilitatorId,
+    this.learnerId,
+    this.isARPL = false,
+  });
 
   @override
   _AssessmentPreparationPageState createState() =>
@@ -300,19 +553,74 @@ class AssessmentPreparationPage extends StatefulWidget {
 
 class _AssessmentPreparationPageState extends State<AssessmentPreparationPage> {
   late Future<List<dynamic>> _unitStandards;
+  String? _selectedLearnerId;
+  List<dynamic> _learners = [];
+  bool _isLoadingLearners = true;
+
+  final SignatureController _learnerSig = SignatureController(
+      penColor: Colors.black, exportBackgroundColor: Colors.white);
+  final SignatureController _assessorSig = SignatureController(
+      penColor: Colors.black, exportBackgroundColor: Colors.white);
 
   @override
   void initState() {
     super.initState();
-    _unitStandards = fetchUnitStandards(widget.facilitatorId);
+    _selectedLearnerId = widget.learnerId;
+    _fetchLearners();
+    if (_selectedLearnerId != null) {
+      _unitStandards =
+          fetchUnitStandards(widget.facilitatorId, _selectedLearnerId);
+    } else {
+      _unitStandards = Future.value([]);
+    }
   }
 
-  Future<List<dynamic>> fetchUnitStandards(String facilitatorId) async {
+  Future<void> _fetchLearners() async {
     try {
-      final response = await http.get(
-        Uri.parse(
-            'https://rlms.rlms.co.za/mobile/get_assessment_preparation.php?facilitator_id=$facilitatorId'),
+      final db = await DatabaseHelper().database;
+      final facilitatorClasses = await db.query(
+        'facilitator',
+        columns: ['classID'],
+        where: 'facilitator_id = ?',
+        whereArgs: [widget.facilitatorId],
       );
+
+      Set<String> classIds = {};
+      for (var row in facilitatorClasses) {
+        String ids = row['classID']?.toString() ?? '';
+        if (ids.isNotEmpty) {
+          classIds.addAll(ids.split(',').map((e) => e.trim()));
+        }
+      }
+
+      if (classIds.isNotEmpty) {
+        final learnersList = await db.query(
+          'learnerdetails',
+          where: 'classID IN (${classIds.map((_) => '?').join(',')})',
+          whereArgs: classIds.toList(),
+        );
+
+        setState(() {
+          _learners = learnersList;
+          _isLoadingLearners = false;
+        });
+      } else {
+        setState(() => _isLoadingLearners = false);
+      }
+    } catch (e) {
+      print('Error fetching learners: $e');
+      setState(() => _isLoadingLearners = false);
+    }
+  }
+
+  Future<List<dynamic>> fetchUnitStandards(
+      String facilitatorId, String? learnerId) async {
+    if (learnerId == null) return [];
+    try {
+      String url =
+          '${AppConfig.baseUrl}/get_assessment_preparation.php?facilitator_id=$facilitatorId&learner_id=$learnerId';
+
+      final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         var data = jsonDecode(response.body);
@@ -331,123 +639,156 @@ class _AssessmentPreparationPageState extends State<AssessmentPreparationPage> {
 
   @override
   Widget build(BuildContext context) {
+    final selectedLearner = _selectedLearnerId == null
+        ? null
+        : _learners.isEmpty
+            ? null
+            : _learners
+                    .any((l) => l['LearnerID'].toString() == _selectedLearnerId)
+                ? _learners.firstWhere(
+                    (l) => l['LearnerID'].toString() == _selectedLearnerId)
+                : null;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Assessment Preparation'),
-        backgroundColor: Colors.blue,
+        title:
+            Text(widget.isARPL ? 'ARPL Preparation' : 'Assessment Preparation'),
+        backgroundColor: widget.isARPL ? Colors.indigo : Colors.blue,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8.0),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.blue, Colors.indigo],
-                    ),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.assessment, color: Colors.white),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Assessment Preparation',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Facilitator ID: ${widget.facilitatorId}',
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: Card(
-                elevation: 4,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: FutureBuilder<List<dynamic>>(
-                    future: _unitStandards,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      } else if (snapshot.hasError) {
-                        return Center(
-                          child: Text(
-                            'Error: ${snapshot.error}',
-                            style: const TextStyle(
-                                color: Colors.red, fontWeight: FontWeight.bold),
-                          ),
-                        );
-                      } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return const Center(
-                          child: Text(
-                            'No unit standards found.',
-                            style: TextStyle(fontSize: 16, color: Colors.grey),
-                          ),
-                        );
-                      } else {
-                        List<dynamic> unitStandards = snapshot.data!;
-                        return ListView.builder(
-                          itemCount: unitStandards.length,
-                          itemBuilder: (context, index) {
-                            var unitStandard = unitStandards[index];
-                            return Card(
-                              margin: const EdgeInsets.symmetric(vertical: 8.0),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: Colors.blue,
-                                  foregroundColor: Colors.white,
-                                  child: Text(unitStandard['unitstandard_id']
-                                      .toString()),
-                                ),
-                                title: Text(
-                                  unitStandard['unitstandard_name'] ??
-                                      'Unknown Unit Standard',
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                trailing: ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            UnitStandardDetailPage(
-                                          unitStandardId:
-                                              unitStandard['unitstandard_id']
-                                                  .toString(),
-                                          facilitatorId: widget.facilitatorId,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blue,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 8),
-                                  ),
-                                  child: const Text('Open'),
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      }
+      body: _isLoadingLearners
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Select Candidate',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _selectedLearnerId,
+                    hint: const Text(
+                        'Choose a learner to see their unit standards'),
+                    isExpanded: true,
+                    items: _learners.map((learner) {
+                      return DropdownMenuItem<String>(
+                        value: learner['LearnerID'].toString(),
+                        child: Text('${learner['Name']} ${learner['Surname']}'),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedLearnerId = value;
+                        _unitStandards = fetchUnitStandards(
+                            widget.facilitatorId, _selectedLearnerId);
+                      });
                     },
+                    decoration: const InputDecoration(
+                        border: OutlineInputBorder(), isDense: true),
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  if (_selectedLearnerId != null) ...[
+                    if (selectedLearner != null)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.indigo.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border:
+                              Border.all(color: Colors.indigo.withOpacity(0.3)),
+                        ),
+                        child: Text(
+                          'Candidate: ${selectedLearner['Name']} ${selectedLearner['Surname']}',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.indigo),
+                        ),
+                      ),
+                    Expanded(
+                      child: FutureBuilder<List<dynamic>>(
+                        future: _unitStandards,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                                child: CircularProgressIndicator());
+                          } else if (snapshot.hasError) {
+                            return Center(
+                                child: Text('Error: ${snapshot.error}',
+                                    style: const TextStyle(color: Colors.red)));
+                          } else if (!snapshot.hasData ||
+                              snapshot.data!.isEmpty) {
+                            return const Center(
+                                child: Text(
+                                    'No unit standards found for this PoE.',
+                                    style: TextStyle(
+                                        fontSize: 16, color: Colors.grey)));
+                          } else {
+                            List<dynamic> unitStandards = snapshot.data!;
+                            return ListView.builder(
+                              itemCount: unitStandards.length,
+                              itemBuilder: (context, index) {
+                                var unitStandard = unitStandards[index];
+                                return Card(
+                                  margin:
+                                      const EdgeInsets.symmetric(vertical: 8.0),
+                                  child: ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: widget.isARPL
+                                          ? Colors.indigo
+                                          : Colors.blue,
+                                      foregroundColor: Colors.white,
+                                      child: Text(
+                                          unitStandard['unitstandard_id']
+                                              .toString()),
+                                    ),
+                                    title: Text(
+                                        unitStandard['unitstandard_name'] ??
+                                            'Unknown Unit Standard',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold)),
+                                    trailing: ElevatedButton(
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                UnitStandardDetailPage(
+                                              unitStandardId: unitStandard[
+                                                      'unitstandard_id']
+                                                  .toString(),
+                                              facilitatorId:
+                                                  widget.facilitatorId,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: widget.isARPL
+                                            ? Colors.indigo
+                                            : Colors.blue,
+                                        foregroundColor: Colors.white,
+                                      ),
+                                      child: const Text('Open'),
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                  if (_selectedLearnerId != null) ...[
+                    const SizedBox(height: 24),
+                  ],
+                ],
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -528,6 +869,11 @@ class _UnitStandardDetailPageState extends State<UnitStandardDetailPage> {
   String _responseMessage = '';
   bool _isSubmitting = false;
 
+  final SignatureController _learnerSig = SignatureController(
+      penColor: Colors.black, exportBackgroundColor: Colors.white);
+  final SignatureController _assessorSig = SignatureController(
+      penColor: Colors.black, exportBackgroundColor: Colors.white);
+
   @override
   void initState() {
     super.initState();
@@ -541,6 +887,8 @@ class _UnitStandardDetailPageState extends State<UnitStandardDetailPage> {
     for (var controller in _actionControllers) {
       controller.dispose();
     }
+    _learnerSig.dispose();
+    _assessorSig.dispose();
     super.dispose();
   }
 
@@ -707,6 +1055,12 @@ class _UnitStandardDetailPageState extends State<UnitStandardDetailPage> {
                     padding: const EdgeInsets.all(16.0),
                     child: _buildPrepTable(),
                   ),
+                ),
+                const SizedBox(height: 24),
+                DualSignaturePad(
+                  title: 'Preparation Signatures',
+                  learnerController: _learnerSig,
+                  assessorController: _assessorSig,
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(
@@ -1236,8 +1590,13 @@ class _AssessmentPlanDetailPageState extends State<AssessmentPlanDetailPage> {
 
 class AssessorReportPage extends StatefulWidget {
   final String facilitatorId;
+  final bool isARPL;
 
-  const AssessorReportPage({super.key, required this.facilitatorId});
+  const AssessorReportPage({
+    super.key,
+    required this.facilitatorId,
+    this.isARPL = false,
+  });
 
   @override
   _AssessorReportPageState createState() => _AssessorReportPageState();
@@ -1247,58 +1606,106 @@ class _AssessorReportPageState extends State<AssessorReportPage> {
   String _statusMessage = '';
   bool _isGenerating = false;
   String? _pdfPath;
+  String? _selectedLearnerId;
+  List<dynamic> _learners = [];
+  bool _isLoadingLearners = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLearners();
+  }
+
+  Future<void> _fetchLearners() async {
+    try {
+      final db = await DatabaseHelper().database;
+      final facilitatorClasses = await db.query(
+        'facilitator',
+        columns: ['classID'],
+        where: 'facilitator_id = ?',
+        whereArgs: [widget.facilitatorId],
+      );
+
+      Set<String> classIds = {};
+      for (var row in facilitatorClasses) {
+        String ids = row['classID']?.toString() ?? '';
+        if (ids.isNotEmpty) {
+          classIds.addAll(ids.split(',').map((e) => e.trim()));
+        }
+      }
+
+      if (classIds.isNotEmpty) {
+        final learnersList = await db.query(
+          'learnerdetails',
+          where: 'classID IN (${classIds.map((_) => '?').join(',')})',
+          whereArgs: classIds.toList(),
+        );
+
+        setState(() {
+          _learners = learnersList;
+          _isLoadingLearners = false;
+        });
+      } else {
+        setState(() => _isLoadingLearners = false);
+      }
+    } catch (e) {
+      print('Error fetching learners: $e');
+      setState(() => _isLoadingLearners = false);
+    }
+  }
 
   Future<void> _generateAndDownloadReport() async {
+    if (widget.isARPL && _selectedLearnerId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a candidate first')),
+      );
+      return;
+    }
+
     setState(() {
       _isGenerating = true;
       _statusMessage = 'Generating report...';
-      _pdfPath = null; // Reset PDF path
+      _pdfPath = null;
     });
 
     try {
-      final response = await http.get(
-        Uri.parse(
-            'https://rlms.rlms.co.za/mobile/generate_assessor_report.php?facilitator_id=${widget.facilitatorId}'),
-      );
+      String url =
+          '${AppConfig.baseUrl}/generate_assessor_report.php?facilitator_id=${widget.facilitatorId}';
+      if (_selectedLearnerId != null) {
+        url += '&learner_id=$_selectedLearnerId';
+      }
 
-      print('Response Status: ${response.statusCode}');
-      print('Response Headers: ${response.headers}');
-      print(
-          'Response Body (first 100 chars): ${response.body.substring(0, response.body.length < 100 ? response.body.length : 100)}');
+      final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         if (response.body.startsWith('No data found')) {
           setState(() {
-            _statusMessage =
-                'No data found for Facilitator ID: ${widget.facilitatorId}';
+            _statusMessage = 'No data found for this selection.';
             _isGenerating = false;
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(_statusMessage)),
-          );
           return;
         }
 
         if (response.headers['content-type']?.contains('application/pdf') ==
             true) {
           final dir = await getTemporaryDirectory();
-          final file = File(
-              '${dir.path}/Facilitator_${widget.facilitatorId}_Learner_Report_${DateTime.now().toString().substring(0, 10)}.pdf');
+          final fileName = _selectedLearnerId != null
+              ? 'ARPL_Report_${_selectedLearnerId}_${DateTime.now().millisecondsSinceEpoch}.pdf'
+              : 'Facilitator_${widget.facilitatorId}_Report_${DateTime.now().millisecondsSinceEpoch}.pdf';
+
+          final file = File('${dir.path}/$fileName');
           await file.writeAsBytes(response.bodyBytes);
 
           setState(() {
             _statusMessage = 'Report generated successfully!';
             _isGenerating = false;
-            _pdfPath = file.path; // Set the PDF path for viewing
+            _pdfPath = file.path;
           });
         } else {
           setState(() {
             _statusMessage = 'Unexpected response: ${response.body}';
             _isGenerating = false;
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(_statusMessage)),
-          );
         }
       } else {
         setState(() {
@@ -1306,18 +1713,12 @@ class _AssessorReportPageState extends State<AssessorReportPage> {
               'Failed to generate report. Server error: ${response.statusCode}';
           _isGenerating = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_statusMessage)),
-        );
       }
     } catch (e) {
       setState(() {
         _statusMessage = 'Error generating report: $e';
         _isGenerating = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_statusMessage)),
-      );
     }
   }
 
@@ -1325,62 +1726,93 @@ class _AssessorReportPageState extends State<AssessorReportPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Assessor Report'),
+        title:
+            Text(widget.isARPL ? 'ARPL Portfolio Report' : 'Assessor Report'),
+        backgroundColor: widget.isARPL ? Colors.indigo : Colors.blue,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Facilitator ID: ${widget.facilitatorId}'),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _isGenerating ? null : _generateAndDownloadReport,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+      body: _isLoadingLearners
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Select Candidate',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _selectedLearnerId,
+                    hint: const Text('Choose a learner'),
+                    isExpanded: true,
+                    items: _learners.map((learner) {
+                      return DropdownMenuItem<String>(
+                        value: learner['LearnerID'].toString(),
+                        child: Text('${learner['Name']} ${learner['Surname']}'),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedLearnerId = value;
+                        _pdfPath = null;
+                        _statusMessage = '';
+                      });
+                    },
+                    decoration: const InputDecoration(
+                        border: OutlineInputBorder(), isDense: true),
+                  ),
+                  const SizedBox(height: 16),
+                  if (!widget.isARPL)
+                    Text('Facilitator ID: ${widget.facilitatorId}'),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed:
+                          _isGenerating ? null : _generateAndDownloadReport,
+                      icon: const Icon(Icons.picture_as_pdf),
+                      label: Text(_isGenerating
+                          ? 'Generating...'
+                          : 'Generate Portfolio Report'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            widget.isARPL ? Colors.indigo : Colors.blue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  if (_statusMessage.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      _statusMessage,
+                      style: TextStyle(
+                        color: _statusMessage.contains('successfully')
+                            ? Colors.green
+                            : Colors.red,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  if (_pdfPath != null)
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!)),
+                        child: PDFView(
+                          filePath: _pdfPath!,
+                          enableSwipe: true,
+                          swipeHorizontal: true,
+                          autoSpacing: true,
+                          pageFling: true,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              child: _isGenerating
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Generate Report'),
             ),
-            const SizedBox(height: 16),
-            Text(
-              _statusMessage,
-              style: TextStyle(
-                color: _statusMessage.contains('success')
-                    ? Colors.green
-                    : Colors.red,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (_pdfPath != null)
-              Expanded(
-                child: PDFView(
-                  filePath: _pdfPath!,
-                  enableSwipe: true,
-                  swipeHorizontal: true,
-                  autoSpacing: true,
-                  pageFling: true,
-                  onError: (error) {
-                    setState(() {
-                      _statusMessage = 'Error loading PDF: $error';
-                    });
-                  },
-                  onPageError: (page, error) {
-                    setState(() {
-                      _statusMessage = 'Error on page $page: $error';
-                    });
-                  },
-                ),
-              ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -3279,6 +3711,19 @@ class _POETabState extends State<POETab> {
       final exerciseForPayload = Map<String, dynamic>.from(exercise);
       exerciseForPayload['type'] = normalizedType;
 
+      // Truncate exercise name to 255 characters to avoid database length errors
+      if (exerciseForPayload['exercise'] != null) {
+        String name = exerciseForPayload['exercise'].toString();
+        if (name.length > 255) {
+          exerciseForPayload['exercise'] = name.substring(0, 252) + '...';
+        }
+      } else if (exerciseForPayload['exercise_name'] != null) {
+        String name = exerciseForPayload['exercise_name'].toString();
+        if (name.length > 255) {
+          exerciseForPayload['exercise_name'] = name.substring(0, 252) + '...';
+        }
+      }
+
       final payload = {
         'learnerId': learnerId,
         'exercise': exerciseForPayload,
@@ -3533,13 +3978,15 @@ class _ExerciseTileState extends State<ExerciseTile> {
                   IconButton(
                     icon:
                         const Icon(Icons.picture_as_pdf, color: Colors.purple),
-                    onPressed: () {
-                      if (fileUrl.isNotEmpty) {
+                    onPressed: () async {
+                      if (filePath.isNotEmpty) {
+                        final serveUrl =
+                            await AppConfig.buildServeFileUrl(filePath);
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) =>
-                                PdfViewerScreen(pdfUrl: fileUrl),
+                                PdfViewerScreen(pdfUrl: serveUrl),
                           ),
                         );
                       }
@@ -3673,29 +4120,50 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   @override
   void initState() {
     super.initState();
-    _downloadAndSavePdf();
+    _loadPdf();
   }
 
-  Future<void> _downloadAndSavePdf() async {
+  Future<void> _loadPdf() async {
     try {
+      // Create a unique filename based on the URL
+      final fileName = 'pdf_${widget.pdfUrl.hashCode.toString()}.pdf';
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/$fileName');
+
+      // Check if file already exists locally
+      if (await file.exists()) {
+        print('[PDF] Loading existing file found locally: ${file.path}');
+        setState(() {
+          _localPath = file.path;
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // If file doesn't exist, try to download it
+      print('[PDF] Downloading PDF from: ${widget.pdfUrl}');
       final response = await http.get(Uri.parse(widget.pdfUrl));
+      print('[PDF] Response status code: ${response.statusCode}');
+      print('[PDF] Response headers: ${response.headers}');
       if (response.statusCode == 200) {
-        final dir = await getTemporaryDirectory();
-        final file = File('${dir.path}/temp.pdf');
         await file.writeAsBytes(response.bodyBytes);
+        print(
+            '[PDF] PDF saved to: ${file.path}, size: ${response.bodyBytes.length} bytes');
         setState(() {
           _localPath = file.path;
           _isLoading = false;
         });
       } else {
         setState(() {
-          _error = 'Failed to download PDF';
+          _error =
+              'Failed to download PDF (status ${response.statusCode}): ${response.body}';
           _isLoading = false;
         });
       }
     } catch (e) {
+      print('[PDF ERROR] Exception: $e');
       setState(() {
-        _error = 'Error downloading PDF: $e';
+        _error = 'Error loading PDF: $e';
         _isLoading = false;
       });
     }
@@ -3991,8 +4459,13 @@ class ClassInfoPage extends StatelessWidget {
 
 class AssessmentReviewPage extends StatefulWidget {
   final String facilitatorId;
+  final bool isARPL;
 
-  const AssessmentReviewPage({super.key, required this.facilitatorId});
+  const AssessmentReviewPage({
+    super.key,
+    required this.facilitatorId,
+    this.isARPL = false,
+  });
 
   @override
   _AssessmentReviewPageState createState() => _AssessmentReviewPageState();
@@ -4000,19 +4473,63 @@ class AssessmentReviewPage extends StatefulWidget {
 
 class _AssessmentReviewPageState extends State<AssessmentReviewPage> {
   late Future<List<dynamic>> _unitStandards;
+  String? _selectedLearnerId;
+  List<dynamic> _learners = [];
+  bool _isLoadingLearners = true;
 
   @override
   void initState() {
     super.initState();
-    _unitStandards = fetchUnitStandards(widget.facilitatorId);
+    _fetchLearners();
+    _unitStandards = Future.value([]);
   }
 
-  Future<List<dynamic>> fetchUnitStandards(String facilitatorId) async {
+  Future<void> _fetchLearners() async {
     try {
-      final response = await http.get(
-        Uri.parse(
-            'https://rlms.rlms.co.za/mobile/get_assessment_preparation.php?facilitator_id=$facilitatorId'),
+      final db = await DatabaseHelper().database;
+      final facilitatorClasses = await db.query(
+        'facilitator',
+        columns: ['classID'],
+        where: 'facilitator_id = ?',
+        whereArgs: [widget.facilitatorId],
       );
+
+      Set<String> classIds = {};
+      for (var row in facilitatorClasses) {
+        String ids = row['classID']?.toString() ?? '';
+        if (ids.isNotEmpty) {
+          classIds.addAll(ids.split(',').map((e) => e.trim()));
+        }
+      }
+
+      if (classIds.isNotEmpty) {
+        final learnersList = await db.query(
+          'learnerdetails',
+          where: 'classID IN (${classIds.map((_) => '?').join(',')})',
+          whereArgs: classIds.toList(),
+        );
+
+        setState(() {
+          _learners = learnersList;
+          _isLoadingLearners = false;
+        });
+      } else {
+        setState(() => _isLoadingLearners = false);
+      }
+    } catch (e) {
+      print('Error fetching learners: $e');
+      setState(() => _isLoadingLearners = false);
+    }
+  }
+
+  Future<List<dynamic>> fetchUnitStandards(
+      String facilitatorId, String? learnerId) async {
+    if (learnerId == null) return [];
+    try {
+      String url =
+          '${AppConfig.baseUrl}/get_assessment_preparation.php?facilitator_id=$facilitatorId&learner_id=$learnerId';
+
+      final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         var data = jsonDecode(response.body);
@@ -4031,123 +4548,156 @@ class _AssessmentReviewPageState extends State<AssessmentReviewPage> {
 
   @override
   Widget build(BuildContext context) {
+    final selectedLearner = _selectedLearnerId == null
+        ? null
+        : _learners.isEmpty
+            ? null
+            : _learners
+                    .any((l) => l['LearnerID'].toString() == _selectedLearnerId)
+                ? _learners.firstWhere(
+                    (l) => l['LearnerID'].toString() == _selectedLearnerId)
+                : null;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Assessment Review'),
-        backgroundColor: Colors.blue,
+        title:
+            Text(widget.isARPL ? 'ARPL Portfolio Review' : 'Assessment Review'),
+        backgroundColor: widget.isARPL ? Colors.indigo : Colors.blue,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8.0),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.blue, Colors.indigo],
-                    ),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.reviews, color: Colors.white),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Assessment Review',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Facilitator ID: ${widget.facilitatorId}',
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: Card(
-                elevation: 4,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: FutureBuilder<List<dynamic>>(
-                    future: _unitStandards,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      } else if (snapshot.hasError) {
-                        return Center(
-                          child: Text(
-                            'Error: ${snapshot.error}',
-                            style: const TextStyle(
-                                color: Colors.red, fontWeight: FontWeight.bold),
-                          ),
-                        );
-                      } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return const Center(
-                          child: Text(
-                            'No unit standards found.',
-                            style: TextStyle(fontSize: 16, color: Colors.grey),
-                          ),
-                        );
-                      } else {
-                        List<dynamic> unitStandards = snapshot.data!;
-                        return ListView.builder(
-                          itemCount: unitStandards.length,
-                          itemBuilder: (context, index) {
-                            var unitStandard = unitStandards[index];
-                            return Card(
-                              margin: const EdgeInsets.symmetric(vertical: 8.0),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: Colors.blue,
-                                  foregroundColor: Colors.white,
-                                  child: Text(unitStandard['unitstandard_id']
-                                      .toString()),
-                                ),
-                                title: Text(
-                                  unitStandard['unitstandard_name'] ??
-                                      'Unknown Unit Standard',
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                trailing: ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            AssessmentReviewDetailPage(
-                                          unitStandardId:
-                                              unitStandard['unitstandard_id']
-                                                  .toString(),
-                                          facilitatorId: widget.facilitatorId,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blue,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 8),
-                                  ),
-                                  child: const Text('Open'),
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      }
+      body: _isLoadingLearners
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Select Candidate',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _selectedLearnerId,
+                    hint: const Text(
+                        'Choose a learner to see their unit standards'),
+                    isExpanded: true,
+                    items: _learners.map((learner) {
+                      return DropdownMenuItem<String>(
+                        value: learner['LearnerID'].toString(),
+                        child: Text('${learner['Name']} ${learner['Surname']}'),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedLearnerId = value;
+                        _unitStandards = fetchUnitStandards(
+                            widget.facilitatorId, _selectedLearnerId);
+                      });
                     },
+                    decoration: const InputDecoration(
+                        border: OutlineInputBorder(), isDense: true),
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  if (_selectedLearnerId != null) ...[
+                    if (selectedLearner != null)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.indigo.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border:
+                              Border.all(color: Colors.indigo.withOpacity(0.3)),
+                        ),
+                        child: Text(
+                          'Candidate: ${selectedLearner['Name']} ${selectedLearner['Surname']}',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.indigo),
+                        ),
+                      ),
+                    Expanded(
+                      child: FutureBuilder<List<dynamic>>(
+                        future: _unitStandards,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                                child: CircularProgressIndicator());
+                          } else if (snapshot.hasError) {
+                            return Center(
+                                child: Text('Error: ${snapshot.error}',
+                                    style: const TextStyle(color: Colors.red)));
+                          } else if (!snapshot.hasData ||
+                              snapshot.data!.isEmpty) {
+                            return const Center(
+                                child: Text(
+                                    'No unit standards found for this PoE.',
+                                    style: TextStyle(
+                                        fontSize: 16, color: Colors.grey)));
+                          } else {
+                            List<dynamic> unitStandards = snapshot.data!;
+                            return ListView.builder(
+                              itemCount: unitStandards.length,
+                              itemBuilder: (context, index) {
+                                var unitStandard = unitStandards[index];
+                                return Card(
+                                  margin:
+                                      const EdgeInsets.symmetric(vertical: 8.0),
+                                  child: ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: widget.isARPL
+                                          ? Colors.indigo
+                                          : Colors.blue,
+                                      foregroundColor: Colors.white,
+                                      child: Text(
+                                          unitStandard['unitstandard_id']
+                                              .toString()),
+                                    ),
+                                    title: Text(
+                                        unitStandard['unitstandard_name'] ??
+                                            'Unknown Unit Standard',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold)),
+                                    trailing: ElevatedButton(
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                AssessmentReviewDetailPage(
+                                              unitStandardId: unitStandard[
+                                                      'unitstandard_id']
+                                                  .toString(),
+                                              facilitatorId:
+                                                  widget.facilitatorId,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: widget.isARPL
+                                            ? Colors.indigo
+                                            : Colors.blue,
+                                        foregroundColor: Colors.white,
+                                      ),
+                                      child: const Text('Open'),
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                  if (_selectedLearnerId != null) ...[
+                    const SizedBox(height: 24),
+                  ],
+                ],
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -4178,6 +4728,11 @@ class _AssessmentReviewDetailPageState
   bool _isSubmitting = false;
   bool _showForm = false;
   String? _selectedLearnerId;
+
+  final SignatureController _learnerSig = SignatureController(
+      penColor: Colors.black, exportBackgroundColor: Colors.white);
+  final SignatureController _assessorSig = SignatureController(
+      penColor: Colors.black, exportBackgroundColor: Colors.white);
 
   // Review dimensions with assessor and learner agreements, and action text
   final List<Map<String, dynamic>> _reviewDimensions = [
@@ -4281,6 +4836,8 @@ class _AssessmentReviewDetailPageState
     _learnerNameController.dispose();
     _assessorNameController.dispose();
     _venueController.dispose();
+    _learnerSig.dispose();
+    _assessorSig.dispose();
     for (var dimension in _reviewDimensions) {
       dimension['action'].dispose();
     }
@@ -4613,6 +5170,12 @@ class _AssessmentReviewDetailPageState
                       Text(widget.unitStandardId),
                       const SizedBox(height: 16),
                       _buildReviewTable(),
+                      const SizedBox(height: 24),
+                      DualSignaturePad(
+                        title: 'Review Signatures',
+                        learnerController: _learnerSig,
+                        assessorController: _assessorSig,
+                      ),
                       const SizedBox(height: 24),
                       ElevatedButton(
                         onPressed: _isSubmitting ? null : _saveReview,
@@ -7321,171 +7884,197 @@ class _PotholeChecklistViewPageState extends State<PotholeChecklistViewPage> {
                               itemCount: _potholeImages.length,
                               itemBuilder: (context, index) {
                                 final image = _potholeImages[index];
-                                // Use correct domain for images
-                                final imageUrl =
-                                    'https://rlms.rlms.co.za/mobile/${image['file_path']}';
+                                return FutureBuilder<String>(
+                                  future: AppConfig.buildServeFileUrl(
+                                      image['file_path']),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return const Center(
+                                          child: CircularProgressIndicator());
+                                    }
+                                    if (snapshot.hasError) {
+                                      return const Center(
+                                        child:
+                                            Icon(Icons.broken_image, size: 40),
+                                      );
+                                    }
+                                    final imageUrl = snapshot.data!;
+                                    debugPrint(
+                                        '[POE_IMAGE] Loading evidence image from: $imageUrl');
 
-                                return GestureDetector(
-                                  onTap: () {
-                                    // Show full image with zoom capability
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) => Dialog(
-                                        backgroundColor: Colors.black,
-                                        child: SizedBox(
-                                          width: MediaQuery.of(context)
-                                                  .size
-                                                  .width *
-                                              0.9,
-                                          height: MediaQuery.of(context)
-                                                  .size
-                                                  .height *
-                                              0.8,
-                                          child: Column(
-                                            children: [
-                                              // Header with close button
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.all(8.0),
-                                                child: Row(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment
-                                                          .spaceBetween,
-                                                  children: [
-                                                    Text(
-                                                      'Image ${index + 1}',
-                                                      style: const TextStyle(
-                                                          color: Colors.white,
-                                                          fontSize: 16,
-                                                          fontWeight:
-                                                              FontWeight.bold),
-                                                    ),
-                                                    IconButton(
-                                                      onPressed: () =>
-                                                          Navigator.pop(
-                                                              context),
-                                                      icon: const Icon(
-                                                          Icons.close,
-                                                          color: Colors.white),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              // Zoomable image
-                                              Expanded(
-                                                child: InteractiveViewer(
-                                                  panEnabled: true,
-                                                  boundaryMargin:
-                                                      const EdgeInsets.all(20),
-                                                  minScale: 0.5,
-                                                  maxScale: 4.0,
-                                                  child: Center(
-                                                    child: Image.network(
-                                                      imageUrl,
-                                                      fit: BoxFit.contain,
-                                                      loadingBuilder: (context,
-                                                          child,
-                                                          loadingProgress) {
-                                                        if (loadingProgress ==
-                                                            null) {
-                                                          return child;
-                                                        }
-                                                        return const Center(
-                                                          child:
-                                                              CircularProgressIndicator(
-                                                                  color: Colors
-                                                                      .white),
-                                                        );
-                                                      },
-                                                      errorBuilder: (context,
-                                                          error, stackTrace) {
-                                                        return const Center(
-                                                          child: Icon(
-                                                              Icons
-                                                                  .broken_image,
-                                                              size: 50,
+                                    return GestureDetector(
+                                      onTap: () {
+                                        // Show full image with zoom capability
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => Dialog(
+                                            backgroundColor: Colors.black,
+                                            child: SizedBox(
+                                              width: MediaQuery.of(context)
+                                                      .size
+                                                      .width *
+                                                  0.9,
+                                              height: MediaQuery.of(context)
+                                                      .size
+                                                      .height *
+                                                  0.8,
+                                              child: Column(
+                                                children: [
+                                                  // Header with close button
+                                                  Container(
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                            8.0),
+                                                    child: Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .spaceBetween,
+                                                      children: [
+                                                        Text(
+                                                          'Image ${index + 1}',
+                                                          style: const TextStyle(
+                                                              color:
+                                                                  Colors.white,
+                                                              fontSize: 16,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold),
+                                                        ),
+                                                        IconButton(
+                                                          onPressed: () =>
+                                                              Navigator.pop(
+                                                                  context),
+                                                          icon: const Icon(
+                                                              Icons.close,
                                                               color:
                                                                   Colors.white),
-                                                        );
-                                                      },
+                                                        ),
+                                                      ],
                                                     ),
                                                   ),
-                                                ),
-                                              ),
-                                              // Description
-                                              if (image['description'] !=
-                                                      null &&
-                                                  image['description']
-                                                      .toString()
-                                                      .isNotEmpty)
-                                                Container(
-                                                  padding: const EdgeInsets.all(
-                                                      12.0),
-                                                  child: Text(
-                                                    image['description'] ?? '',
-                                                    style: const TextStyle(
-                                                        fontSize: 12,
-                                                        color: Colors.white),
-                                                    textAlign: TextAlign.center,
+                                                  // Zoomable image
+                                                  Expanded(
+                                                    child: InteractiveViewer(
+                                                      panEnabled: true,
+                                                      boundaryMargin:
+                                                          const EdgeInsets.all(
+                                                              20),
+                                                      minScale: 0.5,
+                                                      maxScale: 4.0,
+                                                      child: Center(
+                                                        child:
+                                                            CachedNetworkImage(
+                                                          imageUrl: imageUrl,
+                                                          fit: BoxFit.contain,
+                                                          placeholder:
+                                                              (context, url) =>
+                                                                  const Center(
+                                                            child:
+                                                                CircularProgressIndicator(
+                                                                    color: Colors
+                                                                        .white),
+                                                          ),
+                                                          errorWidget: (context,
+                                                              error,
+                                                              stackTrace) {
+                                                            return const Center(
+                                                              child: Icon(
+                                                                  Icons
+                                                                      .broken_image,
+                                                                  size: 50,
+                                                                  color: Colors
+                                                                      .white),
+                                                            );
+                                                          },
+                                                        ),
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
-                                              // Instructions
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.all(8.0),
-                                                child: const Text(
-                                                  'Pinch to zoom • Drag to pan • Tap close to exit',
-                                                  style: TextStyle(
-                                                      fontSize: 10,
-                                                      color: Colors.grey),
-                                                  textAlign: TextAlign.center,
-                                                ),
+                                                  // Description
+                                                  if (image['description'] !=
+                                                          null &&
+                                                      image['description']
+                                                          .toString()
+                                                          .isNotEmpty)
+                                                    Container(
+                                                      padding:
+                                                          const EdgeInsets.all(
+                                                              12.0),
+                                                      child: Text(
+                                                        image['description'] ??
+                                                            '',
+                                                        style: const TextStyle(
+                                                            fontSize: 12,
+                                                            color:
+                                                                Colors.white),
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                      ),
+                                                    ),
+                                                  // Instructions
+                                                  Container(
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                            8.0),
+                                                    child: const Text(
+                                                      'Pinch to zoom • Drag to pan • Tap close to exit',
+                                                      style: TextStyle(
+                                                          fontSize: 10,
+                                                          color: Colors.grey),
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
-                                            ],
+                                            ),
                                           ),
+                                        );
+                                      },
+                                      child: Card(
+                                        elevation: 2,
+                                        child: Column(
+                                          children: [
+                                            Expanded(
+                                              child: Image.network(
+                                                imageUrl,
+                                                fit: BoxFit.cover,
+                                                width: double.infinity,
+                                                errorBuilder: (context, error,
+                                                    stackTrace) {
+                                                  return const Center(
+                                                    child: Icon(
+                                                        Icons.broken_image,
+                                                        size: 50,
+                                                        color: Colors.grey),
+                                                  );
+                                                },
+                                                loadingBuilder: (context, child,
+                                                    loadingProgress) {
+                                                  if (loadingProgress == null) {
+                                                    return child;
+                                                  }
+                                                  return const Center(
+                                                      child:
+                                                          CircularProgressIndicator());
+                                                },
+                                              ),
+                                            ),
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.all(4.0),
+                                              child: Text(
+                                                'Image ${index + 1}',
+                                                style: const TextStyle(
+                                                    fontSize: 10),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     );
                                   },
-                                  child: Card(
-                                    elevation: 2,
-                                    child: Column(
-                                      children: [
-                                        Expanded(
-                                          child: Image.network(
-                                            imageUrl,
-                                            fit: BoxFit.cover,
-                                            width: double.infinity,
-                                            errorBuilder:
-                                                (context, error, stackTrace) {
-                                              return const Center(
-                                                child: Icon(Icons.broken_image,
-                                                    size: 50,
-                                                    color: Colors.grey),
-                                              );
-                                            },
-                                            loadingBuilder: (context, child,
-                                                loadingProgress) {
-                                              if (loadingProgress == null) {
-                                                return child;
-                                              }
-                                              return const Center(
-                                                  child:
-                                                      CircularProgressIndicator());
-                                            },
-                                          ),
-                                        ),
-                                        Padding(
-                                          padding: const EdgeInsets.all(4.0),
-                                          child: Text(
-                                            'Image ${index + 1}',
-                                            style:
-                                                const TextStyle(fontSize: 10),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
                                 );
                               },
                             ),
@@ -7994,171 +8583,197 @@ class _PotholeChecklistScannedViewPageState
                               itemCount: _potholeImages.length,
                               itemBuilder: (context, index) {
                                 final image = _potholeImages[index];
-                                // Use correct domain for images
-                                final imageUrl =
-                                    'https://rlms.rlms.co.za/mobile/${image['file_path']}';
+                                return FutureBuilder<String>(
+                                  future: AppConfig.buildServeFileUrl(
+                                      image['file_path']),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return const Center(
+                                          child: CircularProgressIndicator());
+                                    }
+                                    if (snapshot.hasError) {
+                                      return const Center(
+                                        child:
+                                            Icon(Icons.broken_image, size: 40),
+                                      );
+                                    }
+                                    final imageUrl = snapshot.data!;
+                                    debugPrint(
+                                        '[POE_IMAGE] Loading evidence image from: $imageUrl');
 
-                                return GestureDetector(
-                                  onTap: () {
-                                    // Show full image with zoom capability
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) => Dialog(
-                                        backgroundColor: Colors.black,
-                                        child: SizedBox(
-                                          width: MediaQuery.of(context)
-                                                  .size
-                                                  .width *
-                                              0.9,
-                                          height: MediaQuery.of(context)
-                                                  .size
-                                                  .height *
-                                              0.8,
-                                          child: Column(
-                                            children: [
-                                              // Header with close button
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.all(8.0),
-                                                child: Row(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment
-                                                          .spaceBetween,
-                                                  children: [
-                                                    Text(
-                                                      'Image ${index + 1}',
-                                                      style: const TextStyle(
-                                                          color: Colors.white,
-                                                          fontSize: 16,
-                                                          fontWeight:
-                                                              FontWeight.bold),
-                                                    ),
-                                                    IconButton(
-                                                      onPressed: () =>
-                                                          Navigator.pop(
-                                                              context),
-                                                      icon: const Icon(
-                                                          Icons.close,
-                                                          color: Colors.white),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              // Zoomable image
-                                              Expanded(
-                                                child: InteractiveViewer(
-                                                  panEnabled: true,
-                                                  boundaryMargin:
-                                                      const EdgeInsets.all(20),
-                                                  minScale: 0.5,
-                                                  maxScale: 4.0,
-                                                  child: Center(
-                                                    child: Image.network(
-                                                      imageUrl,
-                                                      fit: BoxFit.contain,
-                                                      loadingBuilder: (context,
-                                                          child,
-                                                          loadingProgress) {
-                                                        if (loadingProgress ==
-                                                            null) {
-                                                          return child;
-                                                        }
-                                                        return const Center(
-                                                          child:
-                                                              CircularProgressIndicator(
-                                                                  color: Colors
-                                                                      .white),
-                                                        );
-                                                      },
-                                                      errorBuilder: (context,
-                                                          error, stackTrace) {
-                                                        return const Center(
-                                                          child: Icon(
-                                                              Icons
-                                                                  .broken_image,
-                                                              size: 50,
+                                    return GestureDetector(
+                                      onTap: () {
+                                        // Show full image with zoom capability
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => Dialog(
+                                            backgroundColor: Colors.black,
+                                            child: SizedBox(
+                                              width: MediaQuery.of(context)
+                                                      .size
+                                                      .width *
+                                                  0.9,
+                                              height: MediaQuery.of(context)
+                                                      .size
+                                                      .height *
+                                                  0.8,
+                                              child: Column(
+                                                children: [
+                                                  // Header with close button
+                                                  Container(
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                            8.0),
+                                                    child: Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .spaceBetween,
+                                                      children: [
+                                                        Text(
+                                                          'Image ${index + 1}',
+                                                          style: const TextStyle(
+                                                              color:
+                                                                  Colors.white,
+                                                              fontSize: 16,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold),
+                                                        ),
+                                                        IconButton(
+                                                          onPressed: () =>
+                                                              Navigator.pop(
+                                                                  context),
+                                                          icon: const Icon(
+                                                              Icons.close,
                                                               color:
                                                                   Colors.white),
-                                                        );
-                                                      },
+                                                        ),
+                                                      ],
                                                     ),
                                                   ),
-                                                ),
-                                              ),
-                                              // Description
-                                              if (image['description'] !=
-                                                      null &&
-                                                  image['description']
-                                                      .toString()
-                                                      .isNotEmpty)
-                                                Container(
-                                                  padding: const EdgeInsets.all(
-                                                      12.0),
-                                                  child: Text(
-                                                    image['description'] ?? '',
-                                                    style: const TextStyle(
-                                                        fontSize: 12,
-                                                        color: Colors.white),
-                                                    textAlign: TextAlign.center,
+                                                  // Zoomable image
+                                                  Expanded(
+                                                    child: InteractiveViewer(
+                                                      panEnabled: true,
+                                                      boundaryMargin:
+                                                          const EdgeInsets.all(
+                                                              20),
+                                                      minScale: 0.5,
+                                                      maxScale: 4.0,
+                                                      child: Center(
+                                                        child:
+                                                            CachedNetworkImage(
+                                                          imageUrl: imageUrl,
+                                                          fit: BoxFit.contain,
+                                                          placeholder:
+                                                              (context, url) =>
+                                                                  const Center(
+                                                            child:
+                                                                CircularProgressIndicator(
+                                                                    color: Colors
+                                                                        .white),
+                                                          ),
+                                                          errorWidget: (context,
+                                                              error,
+                                                              stackTrace) {
+                                                            return const Center(
+                                                              child: Icon(
+                                                                  Icons
+                                                                      .broken_image,
+                                                                  size: 50,
+                                                                  color: Colors
+                                                                      .white),
+                                                            );
+                                                          },
+                                                        ),
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
-                                              // Instructions
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.all(8.0),
-                                                child: const Text(
-                                                  'Pinch to zoom • Drag to pan • Tap close to exit',
-                                                  style: TextStyle(
-                                                      fontSize: 10,
-                                                      color: Colors.grey),
-                                                  textAlign: TextAlign.center,
-                                                ),
+                                                  // Description
+                                                  if (image['description'] !=
+                                                          null &&
+                                                      image['description']
+                                                          .toString()
+                                                          .isNotEmpty)
+                                                    Container(
+                                                      padding:
+                                                          const EdgeInsets.all(
+                                                              12.0),
+                                                      child: Text(
+                                                        image['description'] ??
+                                                            '',
+                                                        style: const TextStyle(
+                                                            fontSize: 12,
+                                                            color:
+                                                                Colors.white),
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                      ),
+                                                    ),
+                                                  // Instructions
+                                                  Container(
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                            8.0),
+                                                    child: const Text(
+                                                      'Pinch to zoom • Drag to pan • Tap close to exit',
+                                                      style: TextStyle(
+                                                          fontSize: 10,
+                                                          color: Colors.grey),
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
-                                            ],
+                                            ),
                                           ),
+                                        );
+                                      },
+                                      child: Card(
+                                        elevation: 2,
+                                        child: Column(
+                                          children: [
+                                            Expanded(
+                                              child: Image.network(
+                                                imageUrl,
+                                                fit: BoxFit.cover,
+                                                width: double.infinity,
+                                                errorBuilder: (context, error,
+                                                    stackTrace) {
+                                                  return const Center(
+                                                    child: Icon(
+                                                        Icons.broken_image,
+                                                        size: 50,
+                                                        color: Colors.grey),
+                                                  );
+                                                },
+                                                loadingBuilder: (context, child,
+                                                    loadingProgress) {
+                                                  if (loadingProgress == null) {
+                                                    return child;
+                                                  }
+                                                  return const Center(
+                                                      child:
+                                                          CircularProgressIndicator());
+                                                },
+                                              ),
+                                            ),
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.all(4.0),
+                                              child: Text(
+                                                'Image ${index + 1}',
+                                                style: const TextStyle(
+                                                    fontSize: 10),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     );
                                   },
-                                  child: Card(
-                                    elevation: 2,
-                                    child: Column(
-                                      children: [
-                                        Expanded(
-                                          child: Image.network(
-                                            imageUrl,
-                                            fit: BoxFit.cover,
-                                            width: double.infinity,
-                                            errorBuilder:
-                                                (context, error, stackTrace) {
-                                              return const Center(
-                                                child: Icon(Icons.broken_image,
-                                                    size: 50,
-                                                    color: Colors.grey),
-                                              );
-                                            },
-                                            loadingBuilder: (context, child,
-                                                loadingProgress) {
-                                              if (loadingProgress == null) {
-                                                return child;
-                                              }
-                                              return const Center(
-                                                  child:
-                                                      CircularProgressIndicator());
-                                            },
-                                          ),
-                                        ),
-                                        Padding(
-                                          padding: const EdgeInsets.all(4.0),
-                                          child: Text(
-                                            'Image ${index + 1}',
-                                            style:
-                                                const TextStyle(fontSize: 10),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
                                 );
                               },
                             ),
@@ -8364,5 +8979,1833 @@ class _PotholeChecklistScannedViewPageState
   void dispose() {
     _logbookMarksControllers.forEach((_, controller) => controller.dispose());
     super.dispose();
+  }
+}
+
+class ARPLEvidenceChecklistPage extends StatefulWidget {
+  final String facilitatorId;
+
+  const ARPLEvidenceChecklistPage({super.key, required this.facilitatorId});
+
+  @override
+  _ARPLEvidenceChecklistPageState createState() =>
+      _ARPLEvidenceChecklistPageState();
+}
+
+class _ARPLEvidenceChecklistPageState extends State<ARPLEvidenceChecklistPage> {
+  String? _selectedLearnerId;
+  List<dynamic> _learners = [];
+  bool _isLoading = true;
+
+  // Traceability Data
+  String? _projectId;
+  String? _siteId;
+  String? _classId;
+
+  // Checklist State
+  final Map<String, bool> _checklistState = {};
+
+  final SignatureController _learnerSig = SignatureController(
+      penColor: Colors.black, exportBackgroundColor: Colors.white);
+  final SignatureController _assessorSig = SignatureController(
+      penColor: Colors.black, exportBackgroundColor: Colors.white);
+
+  final Map<String, List<String>> _checklistData = {
+    'Foundational Evidence': [
+      'Certified Copy of Identity Document',
+      'Service Letters from Employers (Plumbing Experience)',
+      'Previous Qualifications / Certificates',
+      'Curriculum Vitae (CV)',
+    ],
+    'Hot & Cold Water Systems': [
+      'Installation of Geysers (Electric/Solar)',
+      'Pipe Work: Copper, PEX, and Multilayer',
+      'Pressure Testing Reports',
+      'Installation of Valves and Controls',
+    ],
+    'Drainage & Sanitation': [
+      'Above-ground Drainage (Stack pipes, Vents)',
+      'Below-ground Drainage (Trenches, Gully, Manholes)',
+      'Sanitaryware Installation (Toilets, Basins, Baths)',
+      'Waste Water Management',
+    ],
+    'Safety & Tools': [
+      'Risk Assessment / Site Safety Report',
+      'Tool Maintenance Log',
+      'PPE Compliance Photos',
+    ],
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLearners();
+  }
+
+  Future<void> _fetchLearners() async {
+    try {
+      final db = await DatabaseHelper().database;
+      final facilitatorClasses = await db.query(
+        'facilitator',
+        columns: ['classID'],
+        where: 'facilitator_id = ?',
+        whereArgs: [widget.facilitatorId],
+      );
+
+      Set<String> classIds = {};
+      for (var row in facilitatorClasses) {
+        String ids = row['classID']?.toString() ?? '';
+        if (ids.isNotEmpty) {
+          classIds.addAll(ids.split(',').map((e) => e.trim()));
+        }
+      }
+
+      if (classIds.isNotEmpty) {
+        final learnersList = await db.query(
+          'learnerdetails',
+          where: 'classID IN (${classIds.map((_) => '?').join(',')})',
+          whereArgs: classIds.toList(),
+        );
+
+        setState(() {
+          _learners = learnersList;
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      print('Error fetching learners: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _fetchTraceabilityData(String learnerId) async {
+    try {
+      final trace = await DatabaseHelper().getLearnerTraceability(learnerId);
+      setState(() {
+        _classId = trace['classID'];
+        _siteId = trace['siteID'];
+        _projectId = trace['project_id'];
+      });
+    } catch (e) {
+      print('[ARPL] Error fetching traceability data: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedLearner = _selectedLearnerId == null
+        ? null
+        : _learners.any((l) => l['LearnerID'].toString() == _selectedLearnerId)
+            ? _learners.firstWhere(
+                (l) => l['LearnerID'].toString() == _selectedLearnerId)
+            : null;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('ARPL Evidence Checklist'),
+        backgroundColor: Colors.indigo,
+        foregroundColor: Colors.white,
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (selectedLearner != null)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      margin: const EdgeInsets.only(bottom: 24),
+                      decoration: BoxDecoration(
+                        color: Colors.indigo.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border:
+                            Border.all(color: Colors.indigo.withOpacity(0.3)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Verifying Evidence for:',
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.indigo)),
+                          Text(
+                            '${selectedLearner['Name']} ${selectedLearner['Surname']}',
+                            style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.indigo),
+                          ),
+                          Text('ID: ${selectedLearner['IDNumber']}',
+                              style: const TextStyle(fontSize: 14)),
+                        ],
+                      ),
+                    ),
+                  const Text(
+                    'Select Candidate',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _selectedLearnerId,
+                    hint: const Text('Select a learner'),
+                    isExpanded: true,
+                    items: _learners.map((learner) {
+                      return DropdownMenuItem<String>(
+                        value: learner['LearnerID'].toString(),
+                        child: Text(
+                            '${learner['Name']} ${learner['Surname']} (${learner['IDNumber']})'),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedLearnerId = value;
+                        // Reset form or load data
+                        if (value != null) {
+                          _fetchTraceabilityData(value);
+                        }
+                      });
+                    },
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                  if (_selectedLearnerId != null) ...[
+                    const SizedBox(height: 24),
+                    ..._checklistData.entries.map((section) =>
+                        _buildChecklistSection(section.key, section.value)),
+                    const SizedBox(height: 24),
+                    DualSignaturePad(
+                      title: 'Evidence Verification Signatures',
+                      learnerController: _learnerSig,
+                      assessorController: _assessorSig,
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('Evidence Verification Saved')),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.indigo,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: const Text('Finalize Evidence Verification'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _buildChecklistSection(String title, List<String> items) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text(
+            title,
+            style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.indigo),
+          ),
+        ),
+        Card(
+          elevation: 2,
+          child: Column(
+            children: items
+                .map((item) => CheckboxListTile(
+                      title: Text(item, style: const TextStyle(fontSize: 14)),
+                      value: _checklistState[item] ?? false,
+                      onChanged: (bool? value) {
+                        setState(() {
+                          _checklistState[item] = value ?? false;
+                        });
+                      },
+                      activeColor: Colors.indigo,
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ))
+                .toList(),
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+}
+
+class DualSignaturePad extends StatelessWidget {
+  final String title;
+  final SignatureController learnerController;
+  final SignatureController assessorController;
+
+  const DualSignaturePad({
+    super.key,
+    required this.title,
+    required this.learnerController,
+    required this.assessorController,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.indigo.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold, color: Colors.indigo)),
+          const SizedBox(height: 12),
+          _buildPad('Learner Signature', learnerController),
+          const SizedBox(height: 16),
+          _buildPad('Assessor Signature', assessorController),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPad(String label, SignatureController controller) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[700])),
+              IconButton(
+                icon: const Icon(Icons.clear, color: Colors.red, size: 20),
+                onPressed: () => controller.clear(),
+                tooltip: 'Clear signature',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 120,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Signature(
+                controller: controller,
+                backgroundColor: Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Center(
+            child: Text('Sign above',
+                style: TextStyle(fontSize: 10, color: Colors.grey)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ARPLAssessorReviewPage extends StatefulWidget {
+  final String facilitatorId;
+
+  const ARPLAssessorReviewPage({super.key, required this.facilitatorId});
+
+  @override
+  _ARPLAssessorReviewPageState createState() => _ARPLAssessorReviewPageState();
+}
+
+class _ARPLAssessorReviewPageState extends State<ARPLAssessorReviewPage> {
+  String? _selectedLearnerId;
+  List<dynamic> _learners = [];
+  bool _isLoading = true;
+
+  // Appendix D State
+  final List<String> _appendixDItems = [
+    'Health, Safety and Environmental Protection',
+    'Organize and Use Plumbing Tools and Equipment',
+    'Install and Maintain Hot Water Systems',
+    'Install and Maintain Cold Water Systems',
+    'Install and Maintain Above-ground Drainage',
+    'Install and Maintain Below-ground Drainage',
+    'Install and Maintain Sanitaryware',
+    'Maintain and Repair Plumbing Systems',
+    'Install and Maintain Rainwater Harvesting',
+    'Install and Maintain Solar Water Heating',
+  ];
+  Map<int, String> _appendixDValues = {}; // 'Yes' or 'No'
+
+  // Appendix E State
+  final List<String> _appendixEQuestions = [
+    'Explain the procedure for pressure testing a new plumbing installation.',
+    'How do you identify and mitigate risks on a construction site?',
+    'What are the common signs of a faulty geyser installation?',
+  ];
+  Map<int, int> _appendixERatings = {}; // 1-5
+  Map<int, TextEditingController> _appendixEControllers = {};
+
+  // Evaluation Criteria State
+  final List<String> _evaluationCriteria = [
+    'Portfolio of Evidence (PoE) completeness and authenticity.',
+    'Successful completion of all practical workshop tasks.',
+    'Knowledge of South African National Standards (SANS 10252/10254).',
+    'Demonstrated ability to interpret technical plumbing drawings.',
+    'Compliance with Health and Safety regulations on site.',
+    'Ability to perform maintenance and repairs on existing systems.',
+  ];
+  Map<int, bool> _evaluationChecks = {};
+  bool _assessorConfirmed = false;
+
+  // Appendix F State
+  final TextEditingController _strengthsController = TextEditingController();
+  final TextEditingController _improvementsController = TextEditingController();
+  final TextEditingController _actionPlanController = TextEditingController();
+  final TextEditingController _assessorCommentsController =
+      TextEditingController();
+
+  // Signature Controllers
+  final SignatureController _learnerSigD = SignatureController(
+      penColor: Colors.black, exportBackgroundColor: Colors.white);
+  final SignatureController _assessorSigD = SignatureController(
+      penColor: Colors.black, exportBackgroundColor: Colors.white);
+  final SignatureController _learnerSigE = SignatureController(
+      penColor: Colors.black, exportBackgroundColor: Colors.white);
+  final SignatureController _assessorSigE = SignatureController(
+      penColor: Colors.black, exportBackgroundColor: Colors.white);
+  final SignatureController _learnerSigF = SignatureController(
+      penColor: Colors.black, exportBackgroundColor: Colors.white);
+  final SignatureController _assessorSigF = SignatureController(
+      penColor: Colors.black, exportBackgroundColor: Colors.white);
+
+  // Traceability Data
+  String? _projectId;
+  String? _siteId;
+  String? _classId;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLearners();
+    for (int i = 0; i < _appendixEQuestions.length; i++) {
+      _appendixEControllers[i] = TextEditingController();
+      _appendixERatings[i] = 0;
+    }
+    for (int i = 0; i < _appendixDItems.length; i++) {
+      _appendixDValues[i] = '';
+    }
+    for (int i = 0; i < _evaluationCriteria.length; i++) {
+      _evaluationChecks[i] = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _appendixEControllers.forEach((_, controller) => controller.dispose());
+    _strengthsController.dispose();
+    _improvementsController.dispose();
+    _actionPlanController.dispose();
+    _assessorCommentsController.dispose();
+    _learnerSigD.dispose();
+    _assessorSigD.dispose();
+    _learnerSigE.dispose();
+    _assessorSigE.dispose();
+    _learnerSigF.dispose();
+    _assessorSigF.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchTraceabilityData(String learnerId) async {
+    try {
+      final trace = await DatabaseHelper().getLearnerTraceability(learnerId);
+
+      String? classId = trace['classID'];
+      String? siteId = trace['siteID'];
+      String? projectId = trace['project_id'];
+
+      if (classId == null || classId.isEmpty) {
+        for (final learner in _learners) {
+          if (learner['LearnerID'].toString() == learnerId) {
+            classId = learner['classID']?.toString();
+            break;
+          }
+        }
+        if (classId != null && classId.isNotEmpty) {
+          final db = await DatabaseHelper().database;
+          final classResults = await db.rawQuery('''
+            SELECT c.siteID, s.project_id
+            FROM class c
+            LEFT JOIN sites s ON c.siteID = s.siteID
+            WHERE c.classID = ?
+          ''', [classId]);
+          if (classResults.isNotEmpty) {
+            siteId ??= classResults.first['siteID']?.toString();
+            projectId ??= classResults.first['project_id']?.toString();
+          }
+        }
+      }
+
+      setState(() {
+        _classId = classId;
+        _siteId = siteId;
+        _projectId = projectId;
+      });
+      print(
+          '[ARPL] Traceability data: Class=$_classId, Site=$_siteId, Project=$_projectId');
+
+      _loadExistingARPLData(learnerId);
+    } catch (e) {
+      print('[ARPL] Error fetching traceability data: $e');
+    }
+  }
+
+  Future<void> _loadExistingARPLData(String learnerId) async {
+    try {
+      final url = '${AppConfig.getArplDataUrl}?learner_id=$learnerId';
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final res = jsonDecode(response.body);
+        if (res['success'] && res['data'] != null) {
+          final data = res['data'];
+          setState(() {
+            // Reset state before loading
+            for (int i = 0; i < _appendixDItems.length; i++) {
+              _appendixDValues[i] = '';
+            }
+            for (int i = 0; i < _appendixEQuestions.length; i++) {
+              _appendixERatings[i] = 0;
+              _appendixEControllers[i]!.clear();
+            }
+            for (int i = 0; i < _evaluationCriteria.length; i++) {
+              _evaluationChecks[i] = false;
+            }
+            _strengthsController.clear();
+            _improvementsController.clear();
+            _actionPlanController.clear();
+            _assessorCommentsController.clear();
+            _assessorConfirmed = false;
+
+            // Load Appendix D
+            if (data['appendix_d'] != null) {
+              final d = data['appendix_d'];
+              final Map<String, dynamic> responses =
+                  jsonDecode(d['responses_json']);
+              responses.forEach((key, value) {
+                _appendixDValues[int.parse(key)] = value.toString();
+              });
+              _assessorCommentsController.text = d['assessor_comments'] ?? '';
+            }
+
+            // Load Appendix E
+            if (data['appendix_e'] != null &&
+                (data['appendix_e'] as List).isNotEmpty) {
+              final eList = data['appendix_e'] as List;
+              for (var e in eList) {
+                int qId = int.parse(e['question_id'].toString()) - 1;
+                if (qId >= 0 && qId < _appendixEQuestions.length) {
+                  _appendixERatings[qId] = int.parse(e['rating'].toString());
+                  _appendixEControllers[qId]!.text = e['comment'] ?? '';
+                }
+              }
+            }
+
+            // Load Appendix F
+            if (data['appendix_f'] != null) {
+              final f = data['appendix_f'];
+              _strengthsController.text = f['strengths'] ?? '';
+              _improvementsController.text = f['improvements'] ?? '';
+              _actionPlanController.text = f['action_plan'] ?? '';
+            }
+
+            // Load Criteria
+            if (data['criteria'] != null) {
+              final c = data['criteria'];
+              final Map<String, dynamic> checks =
+                  jsonDecode(c['criteria_json']);
+              checks.forEach((key, value) {
+                _evaluationChecks[int.parse(key)] = value as bool;
+              });
+              _assessorConfirmed = (c['assessor_confirmation'] == 1);
+            }
+          });
+        }
+      }
+    } catch (e) {
+      print('[ARPL] Error loading existing data: $e');
+    }
+  }
+
+  /// jsonEncode cannot serialize Map<int, T>; keys must be strings.
+  String _encodeIntKeyedMap<V>(Map<int, V> map) {
+    return jsonEncode(map.map((key, value) => MapEntry(key.toString(), value)));
+  }
+
+  Map<String, dynamic> _arplBasePayload() {
+    if (_classId == null ||
+        _classId!.isEmpty ||
+        _siteId == null ||
+        _siteId!.isEmpty ||
+        _projectId == null ||
+        _projectId!.isEmpty) {
+      throw Exception(
+          'Missing class/site/project data. Reselect the candidate and try again.');
+    }
+    return {
+      'learner_id': int.parse(_selectedLearnerId!),
+      'assessor_id': int.parse(widget.facilitatorId),
+      'class_id': int.parse(_classId!),
+      'project_id': int.parse(_projectId!),
+      'site_id': int.parse(_siteId!),
+    };
+  }
+
+  Future<Map<String, dynamic>> _buildArplPayload() async {
+    if (_selectedLearnerId == null) {
+      throw Exception('No candidate selected.');
+    }
+    if (_classId == null ||
+        _siteId == null ||
+        _projectId == null ||
+        _classId!.isEmpty ||
+        _siteId!.isEmpty ||
+        _projectId!.isEmpty) {
+      await _fetchTraceabilityData(_selectedLearnerId!);
+    }
+    return _arplBasePayload();
+  }
+
+  void _showArplSaveResult(Map<String, dynamic> res, String fallback) {
+    final ok = res['success'] == true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(res['message'] ?? fallback),
+        backgroundColor: ok ? null : Colors.red.shade700,
+      ),
+    );
+  }
+
+  Future<void> _saveAppendixD() async {
+    if (_selectedLearnerId == null) return;
+
+    try {
+      showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (c) => const Center(child: CircularProgressIndicator()));
+
+      final learnerSig = await _learnerSigD.toPngBytes();
+      final assessorSig = await _assessorSigD.toPngBytes();
+
+      final payload = {
+        ...(await _buildArplPayload()),
+        'responses_json': _encodeIntKeyedMap(_appendixDValues),
+        'assessor_comments': _assessorCommentsController.text,
+        'learner_signature':
+            learnerSig != null ? base64Encode(learnerSig) : null,
+        'assessor_signature':
+            assessorSig != null ? base64Encode(assessorSig) : null,
+      };
+
+      final response = await http.post(
+        Uri.parse(AppConfig.saveArplAppendixDUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      );
+
+      Navigator.pop(context); // Hide loader
+
+      final res = jsonDecode(response.body);
+      _showArplSaveResult(res, 'Appendix D Saved');
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Future<void> _saveAppendixE() async {
+    if (_selectedLearnerId == null) return;
+
+    try {
+      showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (c) => const Center(child: CircularProgressIndicator()));
+
+      final learnerSig = await _learnerSigE.toPngBytes();
+      final assessorSig = await _assessorSigE.toPngBytes();
+
+      final base = await _buildArplPayload();
+      String? lastError;
+
+      // Save each question as a separate record (endpoint supports ON DUPLICATE KEY UPDATE)
+      for (int i = 0; i < _appendixEQuestions.length; i++) {
+        final payload = {
+          ...base,
+          'question_id': i + 1,
+          'rating': _appendixERatings[i] ?? 0,
+          'comment': _appendixEControllers[i]!.text,
+          'learner_signature':
+              learnerSig != null ? base64Encode(learnerSig) : null,
+          'assessor_signature':
+              assessorSig != null ? base64Encode(assessorSig) : null,
+        };
+
+        final response = await http.post(
+          Uri.parse(AppConfig.saveArplAppendixEUrl),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(payload),
+        );
+
+        if (response.statusCode != 200) {
+          lastError = 'Server error ${response.statusCode}';
+          break;
+        }
+        final res = jsonDecode(response.body);
+        if (res['success'] != true) {
+          lastError = res['message']?.toString() ?? 'Appendix E save failed';
+          break;
+        }
+      }
+
+      Navigator.pop(context);
+      if (lastError != null) {
+        throw Exception(lastError);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Appendix E saved to server')));
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Future<void> _saveAppendixF() async {
+    if (_selectedLearnerId == null) return;
+
+    try {
+      showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (c) => const Center(child: CircularProgressIndicator()));
+
+      final learnerSig = await _learnerSigF.toPngBytes();
+      final assessorSig = await _assessorSigF.toPngBytes();
+
+      final payload = {
+        ...(await _buildArplPayload()),
+        'strengths': _strengthsController.text,
+        'improvements': _improvementsController.text,
+        'action_plan': _actionPlanController.text,
+        'learner_signature':
+            learnerSig != null ? base64Encode(learnerSig) : null,
+        'assessor_signature':
+            assessorSig != null ? base64Encode(assessorSig) : null,
+      };
+
+      final response = await http.post(
+        Uri.parse(AppConfig.saveArplAppendixFUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      );
+
+      Navigator.pop(context);
+      final res = jsonDecode(response.body);
+      _showArplSaveResult(res, 'Feedback Saved');
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Future<void> _saveCriteria() async {
+    if (_selectedLearnerId == null) return;
+
+    try {
+      showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (c) => const Center(child: CircularProgressIndicator()));
+
+      final payload = {
+        ...(await _buildArplPayload()),
+        'criteria_json': _encodeIntKeyedMap(_evaluationChecks),
+        'is_recommended': _assessorConfirmed ? 1 : 0,
+        'assessor_confirmation': _assessorConfirmed ? 1 : 0,
+      };
+
+      final response = await http.post(
+        Uri.parse(AppConfig.saveArplCriteriaUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      );
+
+      Navigator.pop(context);
+      final res = jsonDecode(response.body);
+      _showArplSaveResult(res, 'Criteria Saved');
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Future<void> _fetchLearners() async {
+    try {
+      final db = await DatabaseHelper().database;
+      // Get classes for this facilitator to find their learners
+      final facilitatorClasses = await db.query(
+        'facilitator',
+        columns: ['classID'],
+        where: 'facilitator_id = ?',
+        whereArgs: [widget.facilitatorId],
+      );
+
+      Set<String> classIds = {};
+      for (var row in facilitatorClasses) {
+        String ids = row['classID']?.toString() ?? '';
+        if (ids.isNotEmpty) {
+          classIds.addAll(ids.split(',').map((e) => e.trim()));
+        }
+      }
+
+      if (classIds.isNotEmpty) {
+        final learnersList = await db.query(
+          'learnerdetails',
+          where: 'classID IN (${classIds.map((_) => '?').join(',')})',
+          whereArgs: classIds.toList(),
+        );
+
+        setState(() {
+          _learners = learnersList;
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      print('Error fetching learners: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedLearner = _selectedLearnerId == null
+        ? null
+        : _learners.any((l) => l['LearnerID'].toString() == _selectedLearnerId)
+            ? _learners.firstWhere(
+                (l) => l['LearnerID'].toString() == _selectedLearnerId)
+            : null;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('ARPL Assessor Review'),
+        backgroundColor: Colors.indigo,
+        foregroundColor: Colors.white,
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                // Fixed Header
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (selectedLearner != null)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.indigo.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: Colors.indigo.withOpacity(0.3)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Reviewing Candidate:',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.indigo)),
+                              Text(
+                                '${selectedLearner['Name']} ${selectedLearner['Surname']}',
+                                style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.indigo),
+                              ),
+                              Text('ID: ${selectedLearner['IDNumber']}',
+                                  style: const TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                      const Text(
+                        'Select Candidate',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        value: _selectedLearnerId,
+                        hint: const Text('Select a learner'),
+                        isExpanded: true,
+                        items: _learners.map((learner) {
+                          return DropdownMenuItem<String>(
+                            value: learner['LearnerID'].toString(),
+                            child: Text(
+                                '${learner['Name']} ${learner['Surname']} (${learner['IDNumber']})'),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedLearnerId = value;
+                            if (value != null) {
+                              _fetchTraceabilityData(value);
+                            }
+                          });
+                        },
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          contentPadding:
+                              EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          isDense: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_selectedLearnerId != null)
+                  Expanded(
+                    child: DefaultTabController(
+                      length: 4,
+                      child: Column(
+                        children: [
+                          const TabBar(
+                            labelColor: Colors.indigo,
+                            unselectedLabelColor: Colors.grey,
+                            indicatorColor: Colors.indigo,
+                            isScrollable: true,
+                            tabs: [
+                              Tab(text: 'Eval Criteria'),
+                              Tab(text: 'Appx D (Self-Eval)'),
+                              Tab(text: 'Appx E (Interview)'),
+                              Tab(text: 'Appx F (Feedback)'),
+                            ],
+                          ),
+                          Expanded(
+                            child: TabBarView(
+                              children: [
+                                _buildEvaluationCriteria(),
+                                _buildAppendixD(),
+                                _buildAppendixE(),
+                                _buildAppendixF(),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildEvaluationCriteria() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Section 5: Evaluation Criteria',
+            style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.indigo),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.amber.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.amber.withOpacity(0.3)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.amber, size: 20),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'The candidate must demonstrate competency in the following core areas to be recommended for EISA:',
+                    style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          ..._evaluationCriteria.asMap().entries.map((entry) {
+            int index = entry.key;
+            String criteria = entry.value;
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: BorderSide(color: Colors.grey[200]!),
+              ),
+              child: CheckboxListTile(
+                value: _evaluationChecks[index],
+                onChanged: (val) {
+                  setState(() {
+                    _evaluationChecks[index] = val!;
+                  });
+                },
+                title: Text(
+                  criteria,
+                  style: const TextStyle(fontSize: 14),
+                ),
+                activeColor: Colors.green,
+                controlAffinity: ListTileControlAffinity.leading,
+                dense: true,
+              ),
+            );
+          }).toList(),
+          const SizedBox(height: 20),
+          const Divider(),
+          const SizedBox(height: 12),
+          const Text(
+            'Assessor Confirmation',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.green.withOpacity(0.2)),
+            ),
+            child: CheckboxListTile(
+              title: const Text(
+                'I confirm that I have evaluated the candidate against the above criteria and recommend them for final assessment.',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+              ),
+              value: _assessorConfirmed,
+              onChanged: (val) {
+                setState(() {
+                  _assessorConfirmed = val!;
+                });
+              },
+              activeColor: Colors.green,
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _saveCriteria,
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.indigo,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12))),
+              child: const Text('Save Criteria',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
+          ),
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCriteriaItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.check_circle_outline, size: 18, color: Colors.green),
+          const SizedBox(width: 12),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppendixD() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Appendix D: Review of Self-Evaluation',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.indigo),
+          ),
+          const SizedBox(height: 16),
+          Table(
+            border: TableBorder.all(color: Colors.grey.shade300, width: 1),
+            columnWidths: const {
+              0: FlexColumnWidth(4),
+              1: FixedColumnWidth(70),
+              2: FixedColumnWidth(70),
+            },
+            children: [
+              TableRow(
+                decoration:
+                    BoxDecoration(color: Colors.indigo.withOpacity(0.08)),
+                children: const [
+                  TableCell(
+                    verticalAlignment: TableCellVerticalAlignment.middle,
+                    child: Padding(
+                      padding: EdgeInsets.all(12.0),
+                      child: Text('Self-Evaluation Item',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 13)),
+                    ),
+                  ),
+                  TableCell(
+                    verticalAlignment: TableCellVerticalAlignment.middle,
+                    child: Padding(
+                      padding: EdgeInsets.all(12.0),
+                      child: Text('Yes',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 13),
+                          textAlign: TextAlign.center),
+                    ),
+                  ),
+                  TableCell(
+                    verticalAlignment: TableCellVerticalAlignment.middle,
+                    child: Padding(
+                      padding: EdgeInsets.all(12.0),
+                      child: Text('No',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 13),
+                          textAlign: TextAlign.center),
+                    ),
+                  ),
+                ],
+              ),
+              ..._appendixDItems.asMap().entries.map((entry) {
+                int index = entry.key;
+                String title = entry.value;
+                return TableRow(
+                  children: [
+                    TableCell(
+                      verticalAlignment: TableCellVerticalAlignment.middle,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child:
+                            Text(title, style: const TextStyle(fontSize: 12)),
+                      ),
+                    ),
+                    TableCell(
+                      verticalAlignment: TableCellVerticalAlignment.middle,
+                      child: Center(
+                        child: Checkbox(
+                          value: _appendixDValues[index] == 'Yes',
+                          onChanged: (val) {
+                            setState(() {
+                              _appendixDValues[index] = val! ? 'Yes' : '';
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                    TableCell(
+                      verticalAlignment: TableCellVerticalAlignment.middle,
+                      child: Center(
+                        child: Checkbox(
+                          value: _appendixDValues[index] == 'No',
+                          onChanged: (val) {
+                            setState(() {
+                              _appendixDValues[index] = val! ? 'No' : '';
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _assessorCommentsController,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Assessor Comments on Self-Evaluation',
+              border: OutlineInputBorder(),
+              alignLabelWithHint: true,
+            ),
+          ),
+          const SizedBox(height: 24),
+          DualSignaturePad(
+            title: 'Review Signatures',
+            learnerController: _learnerSigD,
+            assessorController: _assessorSigD,
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _saveAppendixD,
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.indigo,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12))),
+              child: const Text('Save Appendix D',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppendixE() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Appendix E: Assessor Interview Record',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.indigo),
+          ),
+          const SizedBox(height: 16),
+          ..._appendixEQuestions.asMap().entries.map((entry) {
+            int index = entry.key;
+            String question = entry.value;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 24),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[200]!),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Question
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CircleAvatar(
+                        radius: 12,
+                        backgroundColor: Colors.indigo.withOpacity(0.1),
+                        child: Text('${index + 1}',
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.indigo)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          question,
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  // Competence
+                  const Text(
+                    'Candidate Competence (1=Low, 5=High)',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: List.generate(5, (i) {
+                      int val = i + 1;
+                      bool isSelected = _appendixERatings[index] == val;
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _appendixERatings[index] = val;
+                          });
+                        },
+                        child: Column(
+                          children: [
+                            Radio<int>(
+                              value: val,
+                              groupValue: _appendixERatings[index],
+                              onChanged: (v) {
+                                setState(() {
+                                  _appendixERatings[index] = v!;
+                                });
+                              },
+                              activeColor: Colors.indigo,
+                            ),
+                            Text('$val',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                    color: isSelected
+                                        ? Colors.indigo
+                                        : Colors.grey)),
+                          ],
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 20),
+                  // Comment
+                  const Text(
+                    'Assessor Comments',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _appendixEControllers[index],
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      hintText:
+                          'Enter candidate response and assessor notes...',
+                      fillColor: Colors.grey[50],
+                      filled: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey[200]!),
+                      ),
+                      contentPadding: const EdgeInsets.all(12),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+          const SizedBox(height: 16),
+          DualSignaturePad(
+            title: 'Interview Record Signatures',
+            learnerController: _learnerSigE,
+            assessorController: _assessorSigE,
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _saveAppendixE,
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.indigo,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12))),
+              child: const Text('Save Appendix E',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
+          ),
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppendixF() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Appendix F: Feedback to Candidate',
+            style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.indigo),
+          ),
+          const SizedBox(height: 16),
+          _buildFeedbackSection(
+            'Areas of Strength',
+            'Highlight what the candidate did well...',
+            Icons.thumb_up_alt_outlined,
+            Colors.green,
+            _strengthsController,
+          ),
+          _buildFeedbackSection(
+            'Areas for Improvement',
+            'Note technical gaps or safety concerns...',
+            Icons.trending_up_outlined,
+            Colors.orange,
+            _improvementsController,
+          ),
+          _buildFeedbackSection(
+            'Action Plan / Recommended Training',
+            'Describe next steps for the candidate...',
+            Icons.assignment_outlined,
+            Colors.blue,
+            _actionPlanController,
+          ),
+          const SizedBox(height: 16),
+          DualSignaturePad(
+            title: 'Feedback Signatures',
+            learnerController: _learnerSigF,
+            assessorController: _assessorSigF,
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _saveAppendixF,
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.indigo,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12))),
+              child: const Text('Submit Feedback',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
+          ),
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeedbackSection(String title, String hint, IconData icon,
+      Color color, TextEditingController controller) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.05),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(12)),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: color, size: 20),
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 14, color: color),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: TextField(
+              controller: controller,
+              maxLines: 4,
+              decoration: InputDecoration(
+                hintText: hint,
+                border: InputBorder.none,
+                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+              ),
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ARPLAppendixHPage extends StatefulWidget {
+  final String facilitatorId;
+
+  const ARPLAppendixHPage({super.key, required this.facilitatorId});
+
+  @override
+  _ARPLAppendixHPageState createState() => _ARPLAppendixHPageState();
+}
+
+class _ARPLAppendixHPageState extends State<ARPLAppendixHPage> {
+  String? _selectedLearnerId;
+  List<dynamic> _learners = [];
+  bool _isLoading = true;
+  bool _isRecommended = false;
+
+  final SignatureController _learnerSig = SignatureController(
+      penColor: Colors.black, exportBackgroundColor: Colors.white);
+  final SignatureController _assessorSig = SignatureController(
+      penColor: Colors.black, exportBackgroundColor: Colors.white);
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLearners();
+  }
+
+  Future<void> _fetchLearners() async {
+    try {
+      final db = await DatabaseHelper().database;
+      final facilitatorClasses = await db.query(
+        'facilitator',
+        columns: ['classID'],
+        where: 'facilitator_id = ?',
+        whereArgs: [widget.facilitatorId],
+      );
+
+      Set<String> classIds = {};
+      for (var row in facilitatorClasses) {
+        String ids = row['classID']?.toString() ?? '';
+        if (ids.isNotEmpty) {
+          classIds.addAll(ids.split(',').map((e) => e.trim()));
+        }
+      }
+
+      if (classIds.isNotEmpty) {
+        final learnersList = await db.query(
+          'learnerdetails',
+          where: 'classID IN (${classIds.map((_) => '?').join(',')})',
+          whereArgs: classIds.toList(),
+        );
+
+        setState(() {
+          _learners = learnersList;
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      print('Error fetching learners: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  // Traceability Data
+  String? _projectId;
+  String? _siteId;
+  String? _classId;
+
+  final TextEditingController _rationaleController = TextEditingController();
+
+  @override
+  void dispose() {
+    _learnerSig.dispose();
+    _assessorSig.dispose();
+    _rationaleController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchTraceabilityData(String learnerId) async {
+    try {
+      final trace = await DatabaseHelper().getLearnerTraceability(learnerId);
+      String? classId = trace['classID'];
+      String? siteId = trace['siteID'];
+      String? projectId = trace['project_id'];
+
+      if (classId == null || classId.isEmpty) {
+        for (final learner in _learners) {
+          if (learner['LearnerID'].toString() == learnerId) {
+            classId = learner['classID']?.toString();
+            break;
+          }
+        }
+      }
+
+      setState(() {
+        _classId = classId;
+        _siteId = siteId;
+        _projectId = projectId;
+      });
+    } catch (e) {
+      print('[ARPL] Error fetching traceability data: $e');
+    }
+  }
+
+  Future<void> _saveRecommendation() async {
+    if (_selectedLearnerId == null) return;
+
+    try {
+      if (_classId == null ||
+          _siteId == null ||
+          _projectId == null ||
+          _classId!.isEmpty ||
+          _siteId!.isEmpty ||
+          _projectId!.isEmpty) {
+        await _fetchTraceabilityData(_selectedLearnerId!);
+      }
+      if (_classId == null ||
+          _siteId == null ||
+          _projectId == null ||
+          _classId!.isEmpty ||
+          _siteId!.isEmpty ||
+          _projectId!.isEmpty) {
+        throw Exception(
+            'Missing class/site/project data. Reselect the candidate and try again.');
+      }
+
+      showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (c) => const Center(child: CircularProgressIndicator()));
+
+      // Note: Appendix H currently shares the criteria table's is_recommended field
+      final payload = {
+        'learner_id': int.parse(_selectedLearnerId!),
+        'assessor_id': int.parse(widget.facilitatorId),
+        'class_id': int.parse(_classId!),
+        'project_id': int.parse(_projectId!),
+        'site_id': int.parse(_siteId!),
+        'criteria_json': jsonEncode({}), // Empty or existing criteria
+        'is_recommended': _isRecommended ? 1 : 0,
+        'assessor_confirmation': _isRecommended ? 1 : 0,
+        // rationale is currently not in the DB schema, but we can add it to criteria_json if needed
+      };
+
+      final response = await http.post(
+        Uri.parse(AppConfig.saveArplCriteriaUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      );
+
+      Navigator.pop(context);
+      final res = jsonDecode(response.body);
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(res['message'] ?? 'Recommendation Saved')));
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedLearner = _selectedLearnerId == null
+        ? null
+        : _learners.any((l) => l['LearnerID'].toString() == _selectedLearnerId)
+            ? _learners.firstWhere(
+                (l) => l['LearnerID'].toString() == _selectedLearnerId)
+            : null;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Appendix H: Recommendation'),
+        backgroundColor: Colors.indigo,
+        foregroundColor: Colors.white,
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (selectedLearner != null)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      margin: const EdgeInsets.only(bottom: 24),
+                      decoration: BoxDecoration(
+                        color: Colors.indigo.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border:
+                            Border.all(color: Colors.indigo.withOpacity(0.3)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Recommending Candidate:',
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.indigo)),
+                          Text(
+                            '${selectedLearner['Name']} ${selectedLearner['Surname']}',
+                            style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.indigo),
+                          ),
+                          Text('ID: ${selectedLearner['IDNumber']}',
+                              style: const TextStyle(fontSize: 14)),
+                        ],
+                      ),
+                    ),
+                  const Text(
+                    'Select Candidate',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _selectedLearnerId,
+                    hint: const Text('Select a learner'),
+                    isExpanded: true,
+                    items: _learners.map((learner) {
+                      return DropdownMenuItem<String>(
+                        value: learner['LearnerID'].toString(),
+                        child: Text(
+                            '${learner['Name']} ${learner['Surname']} (${learner['IDNumber']})'),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedLearnerId = value;
+                        if (value != null) {
+                          _fetchTraceabilityData(value);
+                        }
+                      });
+                    },
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                  if (_selectedLearnerId != null) ...[
+                    const SizedBox(height: 24),
+                    Card(
+                      elevation: 4,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Access Recommendation for External Integrated Summative Assessment (EISA)',
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.indigo),
+                            ),
+                            const SizedBox(height: 20),
+                            const Text(
+                                'Does the candidate meet the requirements for access to EISA?'),
+                            const SizedBox(height: 8),
+                            SwitchListTile(
+                              title: Text(_isRecommended
+                                  ? 'YES - Recommended'
+                                  : 'NO - Not Recommended'),
+                              value: _isRecommended,
+                              onChanged: (value) =>
+                                  setState(() => _isRecommended = value),
+                              activeColor: Colors.green,
+                              inactiveThumbColor: Colors.red,
+                            ),
+                            const SizedBox(height: 16),
+                            TextField(
+                              controller: _rationaleController,
+                              maxLines: 4,
+                              decoration: const InputDecoration(
+                                labelText: 'Rationale / Supporting Evidence',
+                                hintText:
+                                    'Provide reasons for your recommendation...',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            DualSignaturePad(
+                                title: 'Recommendation Signatures',
+                                learnerController: _learnerSig,
+                                assessorController: _assessorSig),
+                            const SizedBox(height: 20),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: _saveRecommendation,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.indigo,
+                                  foregroundColor: Colors.white,
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 16),
+                                ),
+                                child: const Text(
+                                    'Submit Recommendation (Appendix H)'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+    );
   }
 }

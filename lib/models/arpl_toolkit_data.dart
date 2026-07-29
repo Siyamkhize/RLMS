@@ -34,47 +34,118 @@ class ArplToolkitData {
   });
 
   factory ArplToolkitData.fromJson(Map<String, dynamic> json) {
-    return ArplToolkitData(
-      learner: json['learner'] != null
+    print('[ArplToolkitData.fromJson] ═══ STARTING ═══');
+    try {
+      print('[ArplToolkitData.fromJson] Parsing learner...');
+      final learner = json['learner'] != null
           ? LearnerDetails.fromJson(json['learner'])
-          : null,
-      facilitator: json['facilitator'] != null
+          : null;
+      print('[ArplToolkitData.fromJson] ✓ Learner parsed');
+
+      print('[ArplToolkitData.fromJson] Parsing facilitator...');
+      final facilitator = json['facilitator'] != null
           ? FacilitatorDetails.fromJson(json['facilitator'])
-          : null,
-      classInfo: json['class_info'] != null
+          : null;
+      print('[ArplToolkitData.fromJson] ✓ Facilitator parsed');
+
+      print('[ArplToolkitData.fromJson] Parsing classInfo...');
+      final classInfo = json['class_info'] != null
           ? ClassInfo.fromJson(json['class_info'])
-          : null,
-      appendixA: json['appendixA'] != null
+          : null;
+      print('[ArplToolkitData.fromJson] ✓ ClassInfo parsed');
+
+      print('[ArplToolkitData.fromJson] Parsing appendixA...');
+      final appendixA = json['appendixA'] != null
           ? AppendixAData.fromJson(json['appendixA'])
-          : null,
-      appendixB: (json['appendixB'] as List<dynamic>?)
+          : null;
+      print('[ArplToolkitData.fromJson] ✓ AppendixA parsed');
+
+      print('[ArplToolkitData.fromJson] Parsing appendixB...');
+      final appendixB = (json['appendixB'] as List<dynamic>?)
               ?.map((item) => AppendixBRating.fromJson(item))
               .toList() ??
-          [],
-      appendixC: json['appendixC'] != null
+          [];
+      print(
+          '[ArplToolkitData.fromJson] ✓ AppendixB parsed (${appendixB.length} items)');
+
+      print('[ArplToolkitData.fromJson] Parsing appendixC...');
+      final appendixC = json['appendixC'] != null
           ? AppendixCData.fromJson(json['appendixC'])
-          : null,
-      appendixD: Map<String, String>.from(json['appendixD'] ?? {}),
-      appendixE: (json['appendixE'] as List<dynamic>?)
+          : null;
+      print('[ArplToolkitData.fromJson] ✓ AppendixC parsed');
+
+      print('[ArplToolkitData.fromJson] Parsing appendixD...');
+      final appendixD = Map<String, String>.from(json['appendixD'] ?? {});
+      print('[ArplToolkitData.fromJson] ✓ AppendixD parsed');
+
+      print('[ArplToolkitData.fromJson] Parsing appendixE...');
+      final appendixE = (json['appendixE'] as List<dynamic>?)
               ?.map((item) => AppendixERating.fromJson(item))
               .toList() ??
-          [],
-      appendixF: json['appendixF'] != null
+          [];
+      print(
+          '[ArplToolkitData.fromJson] ✓ AppendixE parsed (${appendixE.length} items)');
+
+      print('[ArplToolkitData.fromJson] Parsing appendixF...');
+      final appendixF = json['appendixF'] != null
           ? AppendixFData.fromJson(json['appendixF'])
-          : null,
-      appendixG: json['appendixG'] != null
+          : null;
+      print('[ArplToolkitData.fromJson] ✓ AppendixF parsed');
+
+      print('[ArplToolkitData.fromJson] Parsing appendixG...');
+      final appendixG = json['appendixG'] != null
           ? AppendixGData.fromJson(json['appendixG'])
-          : null,
-      appendixH: AppendixHData.fromJson(json['appendixH'] ?? {}),
-      appendixI: json['appendixI'] != null
+          : null;
+      print('[ArplToolkitData.fromJson] ✓ AppendixG parsed');
+
+      print('[ArplToolkitData.fromJson] Parsing appendixH...');
+      print(
+          '[ArplToolkitData.fromJson] appendixH raw value: ${json['appendixH']}');
+      print(
+          '[ArplToolkitData.fromJson] appendixH type: ${json['appendixH']?.runtimeType}');
+      final appendixH = AppendixHData.fromJson(json['appendixH'] ?? {});
+      print('[ArplToolkitData.fromJson] ✓ AppendixH parsed');
+
+      print('[ArplToolkitData.fromJson] Parsing appendixI...');
+      final appendixI = json['appendixI'] != null
           ? AppendixIData.fromJson(json['appendixI'])
-          : null,
-      appendixJ: json['appendixJ'] != null
+          : null;
+      print('[ArplToolkitData.fromJson] ✓ AppendixI parsed');
+
+      print('[ArplToolkitData.fromJson] Parsing appendixJ...');
+      final appendixJ = json['appendixJ'] != null
           ? AppendixJData.fromJson(json['appendixJ'])
-          : null,
-      ofoNumber: json['ofo_number'] ?? '671101',
-      learnerID: json['learnerID'] ?? 0,
-    );
+          : null;
+      print('[ArplToolkitData.fromJson] ✓ AppendixJ parsed');
+
+      print('[ArplToolkitData.fromJson] ✅ ALL APPENDICES PARSED SUCCESSFULLY');
+      print('[ArplToolkitData.fromJson] ═══ COMPLETE ═══');
+
+      return ArplToolkitData(
+        learner: learner,
+        facilitator: facilitator,
+        classInfo: classInfo,
+        appendixA: appendixA,
+        appendixB: appendixB,
+        appendixC: appendixC,
+        appendixD: appendixD,
+        appendixE: appendixE,
+        appendixF: appendixF,
+        appendixG: appendixG,
+        appendixH: appendixH,
+        appendixI: appendixI,
+        appendixJ: appendixJ,
+        ofoNumber: json['ofo_number'] ?? '671101',
+        learnerID: json['learnerID'] ?? 0,
+      );
+    } catch (e, stackTrace) {
+      print('[ArplToolkitData.fromJson] ═══ FATAL ERROR ═══');
+      print('[ArplToolkitData.fromJson] Error: $e');
+      print('[ArplToolkitData.fromJson] Stack Trace:');
+      print(stackTrace);
+      print('[ArplToolkitData.fromJson] ═══ END ERROR ═══');
+      rethrow;
+    }
   }
 }
 
@@ -205,6 +276,7 @@ class ClassInfo {
 
 class AppendixBRating {
   final int activityId;
+  final String activityNumber;
   final String activityName;
   final int competencyScaleId;
   final String comments;
@@ -213,6 +285,7 @@ class AppendixBRating {
 
   AppendixBRating({
     required this.activityId,
+    required this.activityNumber,
     required this.activityName,
     required this.competencyScaleId,
     required this.comments,
@@ -225,6 +298,7 @@ class AppendixBRating {
 
     return AppendixBRating(
       activityId: int.tryParse(json['activity_id']?.toString() ?? '0') ?? 0,
+      activityNumber: json['activity_number']?.toString() ?? '',
       activityName: json['activity_name'] ?? '',
       competencyScaleId: rating != null
           ? (int.tryParse(rating['rating_score']?.toString() ?? '0') ?? 0)
@@ -238,6 +312,7 @@ class AppendixBRating {
 
 class AppendixERating {
   final int activityId;
+  final String activityNumber;
   final String activityName;
   final int competencyScaleId;
   final String comments;
@@ -246,6 +321,7 @@ class AppendixERating {
 
   AppendixERating({
     required this.activityId,
+    required this.activityNumber,
     required this.activityName,
     required this.competencyScaleId,
     required this.comments,
@@ -258,6 +334,7 @@ class AppendixERating {
 
     return AppendixERating(
       activityId: int.tryParse(json['activity_id']?.toString() ?? '0') ?? 0,
+      activityNumber: json['activity_number']?.toString() ?? '',
       activityName: json['activity_name'] ?? '',
       competencyScaleId: rating != null
           ? (int.tryParse(rating['rating_score']?.toString() ?? '0') ?? 0)
@@ -281,20 +358,98 @@ class AppendixHData {
   });
 
   factory AppendixHData.fromJson(Map<String, dynamic> json) {
-    return AppendixHData(
-      items: (json['items'] as List<dynamic>?)
-              ?.map((item) => AcrItem.fromJson(item))
-              .toList() ??
-          [],
-      recommendations: (json['recommendations'] as List<dynamic>?)
-              ?.map((item) => AccessRecommendation.fromJson(item))
-              .toList() ??
-          [],
-      gapStandards: (json['gap_standards'] as List<dynamic>?)
-              ?.map((item) => GapStandard.fromJson(item))
-              .toList() ??
-          [],
-    );
+    try {
+      print('[AppendixHData.fromJson] ═══ ENTERING ═══');
+      print('[AppendixHData.fromJson] Input JSON: $json');
+      print('[AppendixHData.fromJson] JSON type: ${json.runtimeType}');
+      print('[AppendixHData.fromJson] JSON keys: ${json.keys.toList()}');
+
+      List<AcrItem> itemsList = [];
+      if (json['items'] != null) {
+        print('[AppendixHData.fromJson] Processing items...');
+        print(
+            '[AppendixHData.fromJson] items type: ${json['items'].runtimeType}');
+        print(
+            '[AppendixHData.fromJson] items is List: ${json['items'] is List}');
+        print('[AppendixHData.fromJson] items value: ${json['items']}');
+
+        if (json['items'] is List) {
+          itemsList = (json['items'] as List<dynamic>).map((item) {
+            print(
+                '[AppendixHData.fromJson] Processing item: $item (type: ${item.runtimeType})');
+            return AcrItem.fromJson(item as Map<String, dynamic>);
+          }).toList();
+          print(
+              '[AppendixHData.fromJson] Successfully parsed ${itemsList.length} items');
+        } else {
+          print(
+              '[AppendixHData.fromJson] ERROR: items is not a List, it is ${json['items'].runtimeType}');
+          throw Exception(
+              'items should be a List, got ${json['items'].runtimeType}');
+        }
+      }
+
+      List<AccessRecommendation> recommendationsList = [];
+      if (json['recommendations'] != null) {
+        print('[AppendixHData.fromJson] Processing recommendations...');
+        print(
+            '[AppendixHData.fromJson] recommendations type: ${json['recommendations'].runtimeType}');
+        print(
+            '[AppendixHData.fromJson] recommendations is List: ${json['recommendations'] is List}');
+        print(
+            '[AppendixHData.fromJson] recommendations value: ${json['recommendations']}');
+
+        if (json['recommendations'] is List) {
+          recommendationsList =
+              (json['recommendations'] as List<dynamic>).map((item) {
+            print(
+                '[AppendixHData.fromJson] Processing recommendation: $item (type: ${item.runtimeType})');
+            return AccessRecommendation.fromJson(item as Map<String, dynamic>);
+          }).toList();
+          print(
+              '[AppendixHData.fromJson] Successfully parsed ${recommendationsList.length} recommendations');
+        } else {
+          print(
+              '[AppendixHData.fromJson] ERROR: recommendations is not a List, it is ${json['recommendations'].runtimeType}');
+          throw Exception(
+              'recommendations should be a List, got ${json['recommendations'].runtimeType}');
+        }
+      }
+
+      List<GapStandard> gapStandardsList = [];
+      if (json['gap_standards'] != null) {
+        print('[AppendixHData.fromJson] Processing gap_standards...');
+        print(
+            '[AppendixHData.fromJson] gap_standards type: ${json['gap_standards'].runtimeType}');
+        print(
+            '[AppendixHData.fromJson] gap_standards is List: ${json['gap_standards'] is List}');
+
+        if (json['gap_standards'] is List) {
+          gapStandardsList = (json['gap_standards'] as List<dynamic>)
+              .map((item) => GapStandard.fromJson(item as Map<String, dynamic>))
+              .toList();
+          print(
+              '[AppendixHData.fromJson] Successfully parsed ${gapStandardsList.length} gap standards');
+        }
+      }
+
+      print('[AppendixHData.fromJson] ✅ Creation successful');
+      print('[AppendixHData.fromJson] ═══ EXITING ═══');
+
+      return AppendixHData(
+        items: itemsList,
+        recommendations: recommendationsList,
+        gapStandards: gapStandardsList,
+      );
+    } catch (e, stackTrace) {
+      print('[AppendixHData.fromJson] ═══ EXCEPTION ═══');
+      print('[AppendixHData.fromJson] Error: $e');
+      print('[AppendixHData.fromJson] Stack Trace:');
+      print(stackTrace);
+      print('[AppendixHData.fromJson] Input JSON was: $json');
+      print('[AppendixHData.fromJson] ═══ END EXCEPTION ═══');
+      rethrow;
+    }
   }
 }
 
@@ -308,10 +463,17 @@ class AcrItem {
   });
 
   factory AcrItem.fromJson(Map<String, dynamic> json) {
-    return AcrItem(
-      acrId: int.tryParse(json['ACRID']?.toString() ?? '0') ?? 0,
-      assessmentType: json['AssessmentType'] ?? '',
-    );
+    try {
+      return AcrItem(
+        acrId: int.tryParse(json['acrId']?.toString() ?? '0') ?? 0,
+        assessmentType: json['assessmentType']?.toString() ?? '',
+      );
+    } catch (e, stackTrace) {
+      print('[AcrItem.fromJson] Error: $e');
+      print('[AcrItem.fromJson] Stack: $stackTrace');
+      print('[AcrItem.fromJson] JSON: $json');
+      rethrow;
+    }
   }
 }
 
@@ -339,18 +501,87 @@ class AccessRecommendation {
   });
 
   factory AccessRecommendation.fromJson(Map<String, dynamic> json) {
-    return AccessRecommendation(
-      recommendationId:
-          int.tryParse(json['RecommendationID']?.toString() ?? '0') ?? 0,
-      learnerId: int.tryParse(json['LearnerID']?.toString() ?? '0') ?? 0,
-      acrId: int.tryParse(json['ACRID']?.toString() ?? '0') ?? 0,
-      trade: json['Trade'] ?? '',
-      ofoCode: json['OFOCode'] ?? '',
-      status: json['Status'] ?? '',
-      remarks: json['Remarks'] ?? '',
-      createdAt: json['CreatedAt'] ?? '',
-      updatedAt: json['UpdatedAt'] ?? '',
+    try {
+      return AccessRecommendation(
+        recommendationId:
+            int.tryParse(json['recommendationId']?.toString() ?? '0') ?? 0,
+        learnerId: int.tryParse(json['learnerId']?.toString() ?? '0') ?? 0,
+        acrId: int.tryParse(json['acrId']?.toString() ?? '0') ?? 0,
+        trade: json['trade']?.toString() ?? '',
+        ofoCode: json['ofoCode']?.toString() ?? '',
+        status: json['status']?.toString() ?? '',
+        remarks: json['remarks']?.toString() ?? '',
+        createdAt: json['createdAt']?.toString() ?? '',
+        updatedAt: json['updatedAt']?.toString() ?? '',
+      );
+    } catch (e, stackTrace) {
+      print('[AccessRecommendation.fromJson] Error: $e');
+      print('[AccessRecommendation.fromJson] Stack: $stackTrace');
+      print('[AccessRecommendation.fromJson] JSON: $json');
+      rethrow;
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GAP CLOSURE: UNIT STANDARD FOR LEARNER TO ATTEND
+// ══════════════════════════════════════════════════════════════════════════════
+class GapUnitStandard {
+  final int id;
+  final int learnerId;
+  final int? recommendationId;
+  final String unitStandardId;
+  final String? unitStandardName;
+  final int qualificationId;
+  final String ofoCode;
+  final String? assignedDate;
+  final String status;
+  final String createdAt;
+
+  GapUnitStandard({
+    required this.id,
+    required this.learnerId,
+    this.recommendationId,
+    required this.unitStandardId,
+    this.unitStandardName,
+    required this.qualificationId,
+    required this.ofoCode,
+    this.assignedDate,
+    required this.status,
+    required this.createdAt,
+  });
+
+  factory GapUnitStandard.fromJson(Map<String, dynamic> json) {
+    return GapUnitStandard(
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      learnerId: int.tryParse(json['learner_id']?.toString() ?? '0') ?? 0,
+      recommendationId: json['recommendation_id'] != null
+          ? int.tryParse(json['recommendation_id'].toString())
+          : null,
+      unitStandardId: json['unit_standard_id']?.toString() ?? '',
+      unitStandardName: json['unit_standard_name'],
+      qualificationId:
+          int.tryParse(json['qualification_id']?.toString() ?? '0') ?? 0,
+      ofoCode: json['ofo_code']?.toString() ?? '',
+      assignedDate: json['assigned_date'],
+      status: json['status']?.toString() ?? 'Pending',
+      createdAt: json['created_at']?.toString() ?? '',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'learner_id': learnerId,
+      'recommendation_id': recommendationId,
+      'unit_standard_id': unitStandardId,
+      'unit_standard_name': unitStandardName,
+      'qualification_id': qualificationId,
+      'ofo_code': ofoCode,
+      'assigned_date': assignedDate,
+      'status': status,
+      'created_at': createdAt,
+    };
   }
 }
 
@@ -535,22 +766,23 @@ class AppendixFData {
 
   factory AppendixFData.fromJson(Map<String, dynamic> json) {
     return AppendixFData(
-      practicalTasks: (json['practical_tasks'] as List<dynamic>?)
+      // PHP sends camelCase keys: practicalTasks, workplaceObservations
+      practicalTasks: (json['practicalTasks'] as List<dynamic>?)
               ?.map((item) => PracticalTask.fromJson(item))
               .toList() ??
           [],
-      workplaceObservations: (json['workplace_observations'] as List<dynamic>?)
+      workplaceObservations: (json['workplaceObservations'] as List<dynamic>?)
               ?.map((item) => WorkplaceObservation.fromJson(item))
               .toList() ??
           [],
-      assessorName: json['assessor_name'],
-      candidateName: json['candidate_name'],
-      witnessName: json['witness_name'],
-      assessorSignature: json['assessor_signature'],
-      candidateSignature: json['candidate_signature'],
-      witnessSignature: json['witness_signature'],
-      assessmentDate: json['assessment_date'],
-      authorizedDate: json['authorized_date'],
+      assessorName: json['assessorName'],
+      candidateName: json['candidateName'],
+      witnessName: json['witnessName'],
+      assessorSignature: json['assessorSignature'],
+      candidateSignature: json['candidateSignature'],
+      witnessSignature: json['witnessSignature'],
+      assessmentDate: json['assessmentDate'],
+      authorizedDate: json['authorizedDate'],
     );
   }
 }

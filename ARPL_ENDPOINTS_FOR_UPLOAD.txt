@@ -1,0 +1,54 @@
+ARPL MOBILE ENDPOINTS FOR UPLOAD
+Generated: 2026-07-13 07:54:45
+
+Total Endpoints: 58
+
+GET ENDPOINTS:
+──────────────────────────────────────────────────
+/assessorReport2/mobile/get_arpl_access_recommendation.php
+/assessorReport2/mobile/get_arpl_appeals.php
+/assessorReport2/mobile/get_arpl_appendix_d.php
+/assessorReport2/mobile/get_arpl_appendix_e.php
+/assessorReport2/mobile/get_arpl_appendix_e_ratings.php
+/assessorReport2/mobile/get_arpl_appendix_f.php
+/assessorReport2/mobile/get_arpl_application.php
+/assessorReport2/mobile/get_arpl_assessment_agreement.php
+/assessorReport2/mobile/get_arpl_competency_data.php
+/assessorReport2/mobile/get_arpl_curriculum.php
+/assessorReport2/mobile/get_arpl_data.php
+/assessorReport2/mobile/get_arpl_gap_analysis.php
+/assessorReport2/mobile/get_arpl_hierarchy.php
+/assessorReport2/mobile/get_arpl_statement_of_results.php
+/assessorReport2/mobile/get_arpl_toolkit_data.php
+/assessorReport2/mobile/get_arpl_upload_status.php
+
+SAVE ENDPOINTS:
+──────────────────────────────────────────────────
+/assessorReport2/mobile/save_arpl_access_recommendation.php
+/assessorReport2/mobile/save_arpl_activity_rating.php
+/assessorReport2/mobile/save_arpl_appendix_a.php
+/assessorReport2/mobile/save_arpl_appendix_b.php
+/assessorReport2/mobile/save_arpl_appendix_c.php
+/assessorReport2/mobile/save_arpl_appendix_d.php
+/assessorReport2/mobile/save_arpl_appendix_e.php
+/assessorReport2/mobile/save_arpl_appendix_e_ratings.php
+/assessorReport2/mobile/save_arpl_appendix_f.php
+/assessorReport2/mobile/save_arpl_appendix_f_assessment.php
+/assessorReport2/mobile/save_arpl_appendix_g.php
+/assessorReport2/mobile/save_arpl_appendix_i.php
+/assessorReport2/mobile/save_arpl_appendix_j.php
+/assessorReport2/mobile/save_arpl_application.php
+/assessorReport2/mobile/save_arpl_criteria.php
+/assessorReport2/mobile/save_arpl_gap_analysis.php
+/assessorReport2/mobile/save_arpl_toolkit_edits.php
+
+OTHER ENDPOINTS:
+──────────────────────────────────────────────────
+/assessorReport2/mobile/check_arpl_data.php
+/assessorReport2/mobile/check_arpl_db.php
+/assessorReport2/mobile/check_arpl_papers.php
+/assessorReport2/mobile/check_arpl_papers_structure.php
+/assessorReport2/mobile/check_arpl_tables.php
+/assessorReport2/mobile/check_arpl_trades.php
+/assessorReport2/mobile/check_learner_16389_arpl.php
+/assessorReport2/mobile/verify_arpl_theory_papers.php

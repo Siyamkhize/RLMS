@@ -1454,22 +1454,20 @@ class _MaterialFormState extends State<MaterialForm> {
               const SizedBox(width: 10),
               SizedBox(
                 width: 80,
-                child: DropdownButton<int>(
-                  isExpanded: true,
-                  value: currentQuantity,
-                  onChanged: (int? newValue) {
-                    if (newValue != null) {
-                      setState(() {
-                        unitStandardQuantities[usId] = newValue;
-                      });
-                    }
+                child: TextFormField(
+                  initialValue: currentQuantity.toString(),
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      unitStandardQuantities[usId] = int.tryParse(value) ?? 0;
+                    });
                   },
-                  items: List.generate(51, (index) => index).map((int value) {
-                    return DropdownMenuItem<int>(
-                      value: value,
-                      child: Text(value.toString()),
-                    );
-                  }).toList(),
                 ),
               ),
               if (existing > 0) ...[
@@ -1604,22 +1602,20 @@ class _MaterialFormState extends State<MaterialForm> {
                       style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: DropdownButton<int>(
-                      isExpanded: true,
-                      value: quantity,
-                      onChanged: (int? newValue) {
-                        if (newValue == null) return;
+                    child: TextFormField(
+                      initialValue: quantity.toString(),
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (value) {
                         setState(() {
-                          quantity = newValue;
+                          quantity = int.tryParse(value) ?? 0;
                         });
                       },
-                      items:
-                          List.generate(51, (index) => index).map((int value) {
-                        return DropdownMenuItem<int>(
-                          value: value,
-                          child: Text(value.toString()),
-                        );
-                      }).toList(),
                     ),
                   ),
                 ],

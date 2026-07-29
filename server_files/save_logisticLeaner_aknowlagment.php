@@ -60,12 +60,17 @@ try {
     foreach ($learners as $learner) {
         $name = $learner['Name'] ?? '';
         $idNumber = $learner['IDNumber'] ?? '';
+        $learnerId = $learner['learnerID'] ?? '';
         $className = $learner['ClassName'] ?? '';
         $received = $learner['Received'] === 'Yes' ? 'Yes' : 'No';
         $quantity = intval($learner['Quantity'] ?? 0);
         $description = $learner['description'] ?? '';
-        $dateReceived = $learner['Date'] ?? date('Y-m-d');
+        $subDescription = $learner['sub_description'] ?? ($learner['subDescription'] ?? '');
+        $dateReceived = $learner['Date'] ?? $learner['date_received'] ?? date('Y-m-d');
+        $dateAorCreated = $learner['date_aor_created'] ?? date('Y-m-d');
+        $practitionerFullName = $learner['practitioner_full_name'] ?? $facilitatorName;
         $signatureBase64 = $learner['Signature'] ?? null;
+        $facilitatorSignatureBase64 = $learner['facilitator_signature'] ?? null;
 
         if (empty($name) || empty($idNumber)) {
             throw new Exception("Missing required fields for learner: $name");
@@ -75,60 +80,79 @@ try {
             continue; // Skip if not marked as "Received"
         }
 
-        // Check if the record already exists based on student_id_number and description
+        // Check if the record already exists based on student_id_number, class_name and description
         $stmtCheck = $conn->prepare("
-            SELECT description FROM material_receipt_form 
-            WHERE student_id_number = ?
+            SELECT id FROM material_receipt_form 
+            WHERE (student_id_number = ? OR learnerID = ?) AND class_name = ? AND description = ?
         ");
-        $stmtCheck->bind_param("s", $idNumber);
+        $stmtCheck->bind_param("ssss", $idNumber, $learnerId, $className, $description);
         $stmtCheck->execute();
         $stmtCheck->store_result();
-        $stmtCheck->bind_result($existingDescription);
-
-        $descriptionExists = false;
-
-        // Fetch existing descriptions
-        while ($stmtCheck->fetch()) {
-            if ($existingDescription === $description) {
-                $descriptionExists = true; // The same description already exists
-                break;
-            }
-        }
-
+        
+        $exists = $stmtCheck->num_rows > 0;
         $stmtCheck->close();
 
-        // If the student already has the same description, do not insert a new record
-        if ($descriptionExists) {
-            $existingLearners[] = $name; // Add the name to the list of existing learners
-            continue;
-        }
-
         // Save learner's signature (if available)
-        $learnerSignature = 'learner_' . $idNumber . '.png';
-        $learnerSignatureFilePath = saveBase64Image($signatureBase64, $signatureDir . $learnerSignature);
-
-        // Insert into material_receipt_form table
-        $stmtMaterialReceipt = $conn->prepare("
-            INSERT INTO material_receipt_form (
-                student_id_number, student_full_name, class_name, received, quantity, description, 
-                date_received, practitioner_full_name, learner_signature, synced
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-
-        if ($stmtMaterialReceipt === false) {
-            throw new Exception("SQL Error: " . $conn->error);
+        $learnerSignature = '';
+        if ($signatureBase64) {
+            $learnerSignature = 'learner_' . $idNumber . '_' . time() . '.png';
+            saveBase64Image($signatureBase64, $signatureDir . $learnerSignature);
+        }
+        
+        // Save facilitator signature (if available)
+        $facilitatorSignature = '';
+        if ($facilitatorSignatureBase64) {
+            $facilitatorSignature = 'facilitator_' . $idNumber . '_' . time() . '.png';
+            saveBase64Image($facilitatorSignatureBase64, $signatureDir . $facilitatorSignature);
         }
 
-        // Bind the parameters
-        $synced = 1; // Set the synced field to 1 (or 0 if needed)
-        $stmtMaterialReceipt->bind_param(
-            "ssssissssi",
-            $idNumber, $name, $className, $received, $quantity, $description, $dateReceived,
-            $facilitatorName, $learnerSignature, $synced
-        );
+        if ($exists) {
+            // Update existing record
+            $stmtUpdate = $conn->prepare("
+                UPDATE material_receipt_form 
+                SET student_full_name = ?, received = ?, quantity = ?, 
+                    sub_description = ?, practitioner_full_name = ?, 
+                    facilitator_signature = ?, date_aor_created = ?,
+                    date_received = ?, learner_signature = ?, synced = ?
+                WHERE (student_id_number = ? OR learnerID = ?) AND class_name = ? AND description = ?
+            ");
+            $stmtUpdate->bind_param(
+                "ssisssssssss",
+                $name, $received, $quantity, $subDescription, $practitionerFullName,
+                $facilitatorSignature, $dateAorCreated, $dateReceived, $learnerSignature, 1,
+                $idNumber, $learnerId, $className, $description
+            );
+            if (!$stmtUpdate->execute()) {
+                throw new Exception("Failed to update data for learner: $name. Error: " . $stmtUpdate->error);
+            }
+            $stmtUpdate->close();
+        } else {
+            // Insert new record
+            $stmtMaterialReceipt = $conn->prepare("
+                INSERT INTO material_receipt_form (
+                    student_id_number, student_full_name, learnerID, class_name, received, quantity, description, 
+                    sub_description, date_received, date_aor_created, practitioner_full_name, 
+                    learner_signature, facilitator_signature, synced
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
 
-        if (!$stmtMaterialReceipt->execute()) {
-            throw new Exception("Failed to insert data for learner: $name. Error: " . $stmtMaterialReceipt->error);
+            if ($stmtMaterialReceipt === false) {
+                throw new Exception("SQL Error: " . $conn->error);
+            }
+
+            // Bind the parameters
+            $synced = 1; // Set the synced field to 1
+            $stmtMaterialReceipt->bind_param(
+                "ssssissssssssi",
+                $idNumber, $name, $learnerId, $className, $received, $quantity, $description,
+                $subDescription, $dateReceived, $dateAorCreated, $practitionerFullName,
+                $learnerSignature, $facilitatorSignature, $synced
+            );
+
+            if (!$stmtMaterialReceipt->execute()) {
+                throw new Exception("Failed to insert data for learner: $name. Error: " . $stmtMaterialReceipt->error);
+            }
+            $stmtMaterialReceipt->close();
         }
     }
 

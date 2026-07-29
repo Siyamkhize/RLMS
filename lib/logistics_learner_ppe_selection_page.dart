@@ -57,7 +57,7 @@ class _LogisticsLearnerPPESelectionPageState
     // Find the PPE item info
     final ppeItem = widget.ppeItems.firstWhere(
       (item) => item['ppe_type'] == widget.ppeType,
-      orElse: () => {
+      orElse: () => <String, dynamic>{
         'sizes': ['One Size'],
         'icon': Icons.category,
         'color': Colors.blue,

@@ -537,16 +537,35 @@ class _LearnerMaterialSelectionPageState
       return _buildSimpleMaterialsList();
     }
 
-    // Show unit standards for Learning Material type
-    if (unitStandards.isEmpty) {
+    // Filter out unit standards that are already fully issued (all 4 items: US, FORM, SUM, LG)
+    final pendingUnitStandards = unitStandards.where((us) {
+      final usId = us['unitstandard_id'].toString();
+      final hasUS = selections[usId] == true;
+      final hasFormative = selections['${usId}_formative'] == true;
+      final hasSummative = selections['${usId}_summative'] == true;
+      final hasLearnerGuide = selections['${usId}_learner_guide'] == true;
+
+      int issuedCount = 0;
+      if (hasUS) issuedCount++;
+      if (hasFormative) issuedCount++;
+      if (hasSummative) issuedCount++;
+      if (hasLearnerGuide) issuedCount++;
+
+      return issuedCount < 4; // Keep if not all 4 are issued
+    }).toList();
+
+    // Show message if no unit standards found or all are already issued
+    if (unitStandards.isEmpty || pendingUnitStandards.isEmpty) {
       return Card(
         color: Colors.orange.shade50,
-        child: const Padding(
-          padding: EdgeInsets.all(16.0),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
           child: Center(
             child: Text(
-              'No unit standards found for this class',
-              style: TextStyle(fontSize: 14),
+              unitStandards.isEmpty
+                  ? 'No unit standards found for this class'
+                  : 'All unit standards for this learner have been issued',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
             ),
           ),
         ),
@@ -561,7 +580,7 @@ class _LearnerMaterialSelectionPageState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Unit Standards (${unitStandards.length})',
+              'Pending Unit Standards (${pendingUnitStandards.length})',
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -576,26 +595,31 @@ class _LearnerMaterialSelectionPageState
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: unitStandards.length,
+              itemCount: pendingUnitStandards.length,
               itemBuilder: (context, index) {
-                final us = unitStandards[index];
+                final us = pendingUnitStandards[index];
                 final usId = us['unitstandard_id'].toString();
                 final usName = us['unit_standard_name'] ?? 'Unknown';
 
                 // Check if any items are already issued for this unit standard
+                final unitStandardKey = usId;
                 final formativeKey = '${usId}_formative';
                 final summativeKey = '${usId}_summative';
                 final learnerGuideKey = '${usId}_learner_guide';
 
+                final hasUnitStandard = selections[unitStandardKey] == true;
                 final hasFormative = selections[formativeKey] == true;
                 final hasSummative = selections[summativeKey] == true;
                 final hasLearnerGuide = selections[learnerGuideKey] == true;
 
-                final hasAnyIssued =
-                    hasFormative || hasSummative || hasLearnerGuide;
+                final hasAnyIssued = hasUnitStandard ||
+                    hasFormative ||
+                    hasSummative ||
+                    hasLearnerGuide;
 
                 // Count how many items are issued
                 int issuedCount = 0;
+                if (hasUnitStandard) issuedCount++;
                 if (hasFormative) issuedCount++;
                 if (hasSummative) issuedCount++;
                 if (hasLearnerGuide) issuedCount++;
@@ -644,7 +668,7 @@ class _LearnerMaterialSelectionPageState
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
-                                  '$issuedCount/3 issued',
+                                  '$issuedCount/4 issued',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 12,
@@ -655,6 +679,8 @@ class _LearnerMaterialSelectionPageState
                           ],
                         ),
                         const SizedBox(height: 12),
+                        _buildCheckboxRow(
+                            usId, 'Unit Standard', '', hasUnitStandard),
                         _buildCheckboxRow(
                             usId, 'Formative', 'formative', hasFormative),
                         _buildCheckboxRow(
@@ -713,7 +739,7 @@ class _LearnerMaterialSelectionPageState
     // Find the received material details
     final receivedMaterial = receivedMaterials.firstWhere(
       (m) => m['description'] == materialType,
-      orElse: () => {},
+      orElse: () => <String, dynamic>{},
     );
 
     // Initialize quantity if not set
@@ -828,7 +854,7 @@ class _LearnerMaterialSelectionPageState
 
   Widget _buildCheckboxRow(
       String usId, String label, String key, bool alreadyIssued) {
-    final selectionKey = '${usId}_$key';
+    final selectionKey = key.isEmpty ? usId : '${usId}_$key';
     final isSelected = selections[selectionKey] ?? false;
     final quantity = quantities[selectionKey] ?? 0;
 

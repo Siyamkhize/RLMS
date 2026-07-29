@@ -44,16 +44,13 @@ if (!isset($_GET['facilitator_id']) || empty($_GET['facilitator_id'])) {
 $facilitator_id = $conn->real_escape_string($_GET['facilitator_id']);
 
 try {
-    // Get all classes for this facilitator
-    // A facilitator can be associated with multiple classes through the facilitator table
-    $sql = "
         SELECT DISTINCT
             c.classID,
             c.className,
             c.siteID,
             s.siteName,
             s.project_id,
-            s.learning_pathway,
+            s.Project_pathway,
             p.Project_name,
             COUNT(DISTINCT ld.LearnerID) as numberOfLearners
         FROM facilitator f
@@ -62,9 +59,8 @@ try {
         LEFT JOIN project p ON s.project_id = p.project_id
         LEFT JOIN learnerdetails ld ON c.classID = ld.classID
         WHERE f.facilitator_id = ?
-        GROUP BY c.classID, c.className, c.siteID, s.siteName, s.project_id, p.Project_name
+        GROUP BY c.classID, c.className, c.siteID, s.siteName, s.project_id, s.Project_pathway, p.Project_name
         ORDER BY c.className
-    ";
     
     $stmt = $conn->prepare($sql);
     
@@ -84,7 +80,7 @@ try {
             'siteID' => $row['siteID'],
             'siteName' => $row['siteName'] ?? '',
             'project_id' => $row['project_id'] ?? '',
-            'learning_pathway' => $row['learning_pathway'] ?? '',
+            'learning_pathway' => $row['Project_pathway'] ?? '',
             'Project_name' => $row['Project_name'] ?? '',
             'numberOfLearners' => (int)$row['numberOfLearners']
         ];

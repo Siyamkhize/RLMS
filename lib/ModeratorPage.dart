@@ -1296,9 +1296,9 @@ class _ModeratorPOETabState extends State<ModeratorPOETab> {
               itemCount: _potholeImages.length,
               itemBuilder: (context, index) {
                 final image = _potholeImages[index];
-                // Use correct domain for images
+                // Use correct domain for images with serve_file.php
                 final imageUrl =
-                    'https://rlms.rlms.co.za/mobile/${image['file_path']}';
+                    '${AppConfig.baseUrl}/serve_file.php?file=' + Uri.encodeComponent(image['file_path']);
 
                 return GestureDetector(
                   onTap: () {

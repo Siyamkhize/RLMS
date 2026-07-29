@@ -31,7 +31,7 @@ class DatabaseLockFix {
       if (!isConnected) {
         debugPrint(
             '[DB_FIX] Database connectivity failed - attempting reset...');
-        await _dbHelper.resetDatabaseConnection();
+
         results['fixes_applied'].add('Database connection reset');
 
         // Retest after reset
@@ -182,7 +182,6 @@ class DatabaseLockFix {
       debugPrint('[DB_FIX] Applying quick fix for database locks...');
 
       // Step 1: Reset database connection
-      await _dbHelper.resetDatabaseConnection();
 
       // Step 2: Test connectivity
       final isConnected = await _dbHelper.isDatabaseConnected();

@@ -109,7 +109,7 @@ class _FacilitatorFingerprintPageState
 
     try {
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      
+
       // Step 1: Check local database
       final attendance = await _databaseHelper.getFacilitatorAttendanceForDay(
           widget.facilitatorId.toString(), today);
@@ -127,17 +127,20 @@ class _FacilitatorFingerprintPageState
         final connectivityResult = await Connectivity().checkConnectivity();
         if (connectivityResult.first != ConnectivityResult.none) {
           try {
-            final url = Uri.parse('${AppConfig.baseUrl}/get_facilitator_attendance.php?facilitator_id=${widget.facilitatorId}&date=$today');
-            final response = await http.get(url).timeout(const Duration(seconds: 10));
-            
+            final url = Uri.parse(
+                '${AppConfig.baseUrl}/get_facilitator_attendance.php?facilitator_id=${widget.facilitatorId}&date=$today');
+            final response =
+                await http.get(url).timeout(const Duration(seconds: 10));
+
             if (response.statusCode == 200) {
               final data = json.decode(response.body);
               if (data['success'] == true && data['attendance'] != null) {
                 final serverAttendance = data['attendance'];
                 if (serverAttendance['clock_in_time'] != null) {
-                  debugPrint('[FAC_CHECK] Found server record - facilitator already clocked in');
+                  debugPrint(
+                      '[FAC_CHECK] Found server record - facilitator already clocked in');
                   alreadyClockedIn = true;
-                  
+
                   // Cache it locally so we don't have to check server again
                   await _databaseHelper.insertFacilitatorClocking({
                     'facilitator_id': widget.facilitatorId,
@@ -226,6 +229,14 @@ class _FacilitatorFingerprintPageState
     if (_hasScannerAvailable != null) {
       debugPrint(
           '[FAC_SCANNER] Scanner availability already determined: $_hasScannerAvailable');
+
+      // If scanner was previously confirmed but not connected, try initializing again
+      if (_hasScannerAvailable == true &&
+          !_isSensorConnected &&
+          !_isInitializing) {
+        debugPrint('[FAC_SCANNER] Re-initializing scanner...');
+        await _initializeSensor();
+      }
       return;
     }
 
@@ -267,9 +278,13 @@ class _FacilitatorFingerprintPageState
 
     if (hasScanner == true) {
       // User has scanner, initialize it
-      _initializeSensor();
+      debugPrint(
+          '[FAC_SCANNER] User confirmed scanner availability - initializing...');
+      await _initializeSensor();
     } else {
       // No scanner, set status accordingly
+      debugPrint(
+          '[FAC_SCANNER] User has no scanner - using signature fallback');
       setState(() {
         _enrollmentStatus = 'Use signature to clock in/out';
         _isSensorConnected = false;
@@ -508,11 +523,13 @@ class _FacilitatorFingerprintPageState
             '[FAC_SYNC] Received ${facilitatorData.length} facilitators from server');
 
         // Find current facilitator
-        final currentFacilitator = facilitatorData.firstWhere(
-          (f) =>
-              f['facilitator_id'].toString() == widget.facilitatorId.toString(),
-          orElse: () => null,
-        );
+        final currentFacilitator = facilitatorData.any((f) =>
+                f['facilitator_id'].toString() ==
+                widget.facilitatorId.toString())
+            ? facilitatorData.firstWhere((f) =>
+                f['facilitator_id'].toString() ==
+                widget.facilitatorId.toString())
+            : null;
 
         if (currentFacilitator != null) {
           debugPrint(
@@ -1178,21 +1195,38 @@ class _FacilitatorFingerprintPageState
 
       await Future.delayed(const Duration(milliseconds: 500));
 
-      final isConnected = await _fingerprintService.isSensorConnected();
+      // CRITICAL FIX: Detect which scanner is connected
+      debugPrint('[FAC_FP] Detecting scanner type...');
+      final detectedScanner = await _detectScanner();
+      debugPrint('[FAC_FP] Detected scanner: $detectedScanner');
+
+      final isConnected = detectedScanner != 'none';
+
       if (!mounted) return;
 
       setState(() {
         _isSensorConnected = isConnected;
-        _enrollmentStatus =
-            isConnected ? 'Sensor connected' : 'Sensor not connected';
+        _activeScanner = detectedScanner;
+        _enrollmentStatus = isConnected
+            ? 'Scanner connected: $detectedScanner'
+            : 'Scanner not connected';
         _isInitializing = false;
       });
 
-      if (!isConnected) {
-        FingerprintErrorHandler.showError(
-            context, 'Scanner not connected. Please check USB connection.');
+      if (isConnected) {
+        debugPrint('[FAC_FP] ✅ Scanner initialized: $detectedScanner');
+        FingerprintErrorHandler.showSuccess(
+            context, 'Scanner connected: $detectedScanner');
+
+        // Check enrolled thumbs after scanner is confirmed
+        await _checkEnrolledThumbs();
+      } else {
+        debugPrint('[FAC_FP] ❌ No scanner detected');
+        FingerprintErrorHandler.showError(context,
+            'Scanner not connected. Please check USB connection and try again.');
       }
     } catch (e) {
+      debugPrint('[FAC_FP] Error initializing sensor: $e');
       if (!mounted) return;
       setState(() {
         _enrollmentStatus = 'Error initializing sensor: $e';
@@ -1200,7 +1234,7 @@ class _FacilitatorFingerprintPageState
         _isInitializing = false;
       });
       FingerprintErrorHandler.showError(
-          context, 'Scanner initialization failed');
+          context, 'Scanner initialization failed: $e');
     }
   }
 

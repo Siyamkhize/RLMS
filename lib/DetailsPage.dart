@@ -163,11 +163,12 @@ class _POETabContentState extends State<POETabContent> {
       int failCount = 0;
 
       for (var poe in unsyncedPOE) {
-        final id = poe['id'] as int;
+        final id = poe['poe_id'] ?? poe['id'] as int;
         final type = poe['type'] as String;
         final exercise = poe['exercise'] as String;
         final filePath = poe['filePath'] as String;
         final logbookText = poe['logbook_text'] as String?;
+        final unitStandard = poe['unitStandard'] as String?;
 
         // Check if file exists
         final file = File(filePath);
@@ -256,8 +257,7 @@ class _POETabContentState extends State<POETabContent> {
               title: const Text('Mark as Uploaded'),
               content: Text(
                 'Are you sure you want to mark this $type exercise as uploaded?\n\n'
-                'Exercise: $exercise\n'
-                'Unit Standard: $unitStandard\n\n'
+                'Exercise: $exercise\n\n'
                 'This will allow you to continue with other exercises, but make sure you have actually completed this exercise.',
               ),
               actions: [
@@ -283,9 +283,13 @@ class _POETabContentState extends State<POETabContent> {
         final dbHelper = DatabaseHelper();
         final timestamp = DateTime.now().toIso8601String();
 
-        // Save a manual entry to local database with synced=1
+        // Save a manual entry to local database with unique exercise name
         await dbHelper.saveManualMarkToLocalPoe(
-            widget.learnerID, type, exercise, 'MANUALLY_MARKED_$timestamp');
+          widget.learnerID,
+          type,
+          exercise,
+          'MANUALLY_MARKED_$timestamp',
+        );
 
         if (type == 'LogBook') {
           await dbHelper.saveLogBookText(widget.learnerID.toString(), type,
@@ -296,6 +300,8 @@ class _POETabContentState extends State<POETabContent> {
         setState(() {
           final uploadKey = _uploadKey(type, exercise, unitStandard);
           uploadedExercises[uploadKey] = true;
+          final rawKey = '$type-$exercise-${widget.learnerID}';
+          uploadedExercises[rawKey] = true;
         });
 
         // Refresh upload status
@@ -325,8 +331,7 @@ class _POETabContentState extends State<POETabContent> {
   // Manual mark all formative questions
   Future<void> _manualMarkAllFormative(BuildContext context,
       List<dynamic> formativeQuestions, String unitStandard) async {
-    print(
-        'DEBUG: _manualMarkAllFormative called for unitStandard: $unitStandard');
+    print('DEBUG: _manualMarkAllFormative called');
     print('DEBUG: formativeQuestions count: ${formativeQuestions.length}');
 
     // Check how many questions are not yet completed
@@ -354,7 +359,6 @@ class _POETabContentState extends State<POETabContent> {
               title: const Text('Manual Mark All Formative'),
               content: Text(
                 'Are you sure you want to manually mark all pending formative questions as uploaded?\n\n'
-                'Unit Standard: $unitStandard\n'
                 'Pending Questions: ${pendingQuestions.length}\n\n'
                 'This will mark all remaining questions as completed without scanning documents.',
               ),
@@ -387,7 +391,7 @@ class _POETabContentState extends State<POETabContent> {
 
       // First, try to find an existing document from a completed formative question
       String? existingDocumentPath = await dbHelper.getExistingDocumentPath(
-          widget.learnerID, 'Formative', unitStandard);
+          widget.learnerID, 'Formative', '');
 
       if (existingDocumentPath == null) {
         // No existing document found, show error
@@ -410,13 +414,18 @@ class _POETabContentState extends State<POETabContent> {
         // Only mark if not already completed
         if (!_isExerciseUploaded('Formative', exercise, unitStandard)) {
           // Use the same document path from the existing scan
-          await dbHelper.saveManualMarkToLocalPoe(widget.learnerID, 'Formative',
-              exercise, existingDocumentPath // Use the actual scanned document
-              );
+          await dbHelper.saveManualMarkToLocalPoe(
+            widget.learnerID,
+            'Formative',
+            exercise,
+            existingDocumentPath, // Use the actual scanned document
+          );
 
           setState(() {
             final uploadKey = _uploadKey('Formative', exercise, unitStandard);
             uploadedExercises[uploadKey] = true;
+            final rawKey = 'Formative-$exercise-${widget.learnerID}';
+            uploadedExercises[rawKey] = true;
           });
 
           markedCount++;
@@ -449,8 +458,7 @@ class _POETabContentState extends State<POETabContent> {
   // Manual mark all logbook items
   Future<void> _manualMarkAllLogBook(BuildContext context,
       List<dynamic> logBookItems, String unitStandard) async {
-    print(
-        'DEBUG: _manualMarkAllLogBook called for unitStandard: $unitStandard');
+    print('DEBUG: _manualMarkAllLogBook called');
     print('DEBUG: logBookItems count: ${logBookItems.length}');
 
     // Check how many logbook items are not yet completed
@@ -478,7 +486,6 @@ class _POETabContentState extends State<POETabContent> {
               title: const Text('Manual Mark All LogBook'),
               content: Text(
                 'Are you sure you want to manually mark all pending logbook items as uploaded?\n\n'
-                'Unit Standard: $unitStandard\n'
                 'Pending Items: ${pendingItems.length}\n\n'
                 'This will mark all remaining logbook items as completed without scanning documents.',
               ),
@@ -511,7 +518,7 @@ class _POETabContentState extends State<POETabContent> {
 
       // First, try to find an existing document from a completed logbook item
       String? existingDocumentPath = await dbHelper.getExistingDocumentPath(
-          widget.learnerID, 'LogBook', unitStandard);
+          widget.learnerID, 'LogBook', '');
 
       if (existingDocumentPath == null) {
         // No existing document found, show error
@@ -534,20 +541,22 @@ class _POETabContentState extends State<POETabContent> {
         // Only mark if not already completed
         if (!_isExerciseUploaded('LogBook', exercise, unitStandard)) {
           // Use the same document path from the existing scan
-          await dbHelper.saveManualMarkToLocalPoe(widget.learnerID, 'LogBook',
-              exercise, existingDocumentPath // Use the actual scanned document
-              );
+          await dbHelper.saveManualMarkToLocalPoe(
+            widget.learnerID,
+            'LogBook',
+            exercise,
+            existingDocumentPath, // Use the actual scanned document
+          );
 
           // Also save logbook text
-          await dbHelper.saveLogBookText(
-              widget.learnerID.toString(),
-              'LogBook',
-              exercise,
-              'Logbook entry for $exercise - $unitStandard (manually marked)');
+          await dbHelper.saveLogBookText(widget.learnerID.toString(), 'LogBook',
+              exercise, 'Logbook entry for $exercise (manually marked)');
 
           setState(() {
             final uploadKey = _uploadKey('LogBook', exercise, unitStandard);
             uploadedExercises[uploadKey] = true;
+            final rawKey = 'LogBook-$exercise-${widget.learnerID}';
+            uploadedExercises[rawKey] = true;
           });
 
           markedCount++;
@@ -580,8 +589,7 @@ class _POETabContentState extends State<POETabContent> {
   // Manual mark all summative questions
   Future<void> _manualMarkAllSummative(BuildContext context,
       List<dynamic> summativeQuestions, String unitStandard) async {
-    print(
-        'DEBUG: _manualMarkAllSummative called for unitStandard: $unitStandard');
+    print('DEBUG: _manualMarkAllSummative called');
     print('DEBUG: summativeQuestions count: ${summativeQuestions.length}');
 
     // Check how many questions are not yet completed
@@ -609,7 +617,6 @@ class _POETabContentState extends State<POETabContent> {
               title: const Text('Manual Mark All Summative'),
               content: Text(
                 'Are you sure you want to manually mark all pending summative questions as uploaded?\n\n'
-                'Unit Standard: $unitStandard\n'
                 'Pending Questions: ${pendingQuestions.length}\n\n'
                 'This will mark all remaining questions as completed without scanning documents.',
               ),
@@ -642,7 +649,7 @@ class _POETabContentState extends State<POETabContent> {
 
       // First, try to find an existing document from a completed summative question
       String? existingDocumentPath = await dbHelper.getExistingDocumentPath(
-          widget.learnerID, 'Summative', unitStandard);
+          widget.learnerID, 'Summative', '');
 
       if (existingDocumentPath == null) {
         // No existing document found, show error
@@ -665,13 +672,18 @@ class _POETabContentState extends State<POETabContent> {
         // Only mark if not already completed
         if (!_isExerciseUploaded('Summative', exercise, unitStandard)) {
           // Use the same document path from the existing scan
-          await dbHelper.saveManualMarkToLocalPoe(widget.learnerID, 'Summative',
-              exercise, existingDocumentPath // Use the actual scanned document
-              );
+          await dbHelper.saveManualMarkToLocalPoe(
+            widget.learnerID,
+            'Summative',
+            exercise,
+            existingDocumentPath, // Use the actual scanned document
+          );
 
           setState(() {
             final uploadKey = _uploadKey('Summative', exercise, unitStandard);
             uploadedExercises[uploadKey] = true;
+            final rawKey = 'Summative-$exercise-${widget.learnerID}';
+            uploadedExercises[rawKey] = true;
           });
 
           markedCount++;
@@ -974,7 +986,7 @@ class _POETabContentState extends State<POETabContent> {
         url,
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: {'learnerID': widget.learnerID.toString()},
-      ).timeout(const Duration(seconds: 30), onTimeout: () {
+      ).timeout(const Duration(seconds: 60), onTimeout: () {
         throw Exception('Request timed out');
       });
       print(
@@ -1322,7 +1334,7 @@ class _POETabContentState extends State<POETabContent> {
         url,
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: {'learnerID': widget.learnerID.toString()},
-      ).timeout(const Duration(seconds: 10), onTimeout: () {
+      ).timeout(const Duration(seconds: 60), onTimeout: () {
         throw Exception('Request timed out');
       });
 
@@ -1461,7 +1473,37 @@ class _POETabContentState extends State<POETabContent> {
     }
   }
 
-  String _uploadKey(String type, String exercise, String unitStandard) {
+  String _uploadKey(String type, String exercise, String? unitStandard) {
+    // Normalize type for consistency
+    String normalizedType = type;
+    if (type.toLowerCase() == 'formative') normalizedType = 'Formative';
+    if (type.toLowerCase() == 'summative') normalizedType = 'Summative';
+    if (type.toLowerCase() == 'logbook') normalizedType = 'LogBook';
+    if (type.toLowerCase() == 'formativeremedial')
+      normalizedType = 'FormativeRemedial';
+    if (type.toLowerCase() == 'summativeremedial')
+      normalizedType = 'SummativeRemedial';
+
+    // Extract unit standard ID if available
+    String unitId = '';
+    if (unitStandard != null && unitStandard.isNotEmpty) {
+      final idMatch = RegExp(r'\d{4,10}').firstMatch(unitStandard);
+      if (idMatch != null) {
+        unitId = idMatch.group(0)!;
+      }
+    }
+
+    // Generate key with unit standard ID for isolation
+    if (unitId.isNotEmpty) {
+      return '$normalizedType-$exercise-$unitId-${widget.learnerID}';
+    }
+    // Fallback to old format for backwards compatibility
+    return '$normalizedType-$exercise-${widget.learnerID}';
+  }
+
+  // Helper function to normalize type, exercise, unit standard for consistent key generation
+  Map<String, String> _normalizeKeyComponents(
+      String type, String exercise, String unitStandard) {
     // Normalize type for consistency
     String normalizedType = type;
     if (type.toLowerCase() == 'formative') normalizedType = 'Formative';
@@ -1476,34 +1518,19 @@ class _POETabContentState extends State<POETabContent> {
     final normalizedExercise =
         exercise.replaceAll(RegExp(r'\s+'), '').toLowerCase();
 
-    // Normalize unit standard name: remove extra spaces and common prefixes
+    // Normalize unit standard name: trim whitespace
     String normalizedUnit = unitStandard.trim();
 
-    return '$normalizedType-$normalizedExercise-$normalizedUnit-${widget.learnerID}';
+    return {
+      'type': normalizedType,
+      'exercise': normalizedExercise,
+      'unitStandard': normalizedUnit,
+    };
   }
 
   // Robust check for exercise completion that handles both old and new key formats
-  bool _isExerciseUploaded(String type, String exercise, String unitStandard) {
-    // Check if this unit standard has a bulk "All Questions" upload
-    if (_isBulkCompleted(type, unitStandard)) return true;
-
-    // Check normalized format first (robust)
-    final normKey = _uploadKey(type, exercise, unitStandard);
-    if (uploadedExercises[normKey] == true) return true;
-
-    // Check literal format (fallback)
-    final literalKey = '$type-$exercise-$unitStandard-${widget.learnerID}';
-    if (uploadedExercises[literalKey] == true) return true;
-
-    // Check old format (backward compatibility for users with old data)
-    final oldKey = '$type-$exercise-${widget.learnerID}';
-    if (uploadedExercises[oldKey] == true) return true;
-
-    return false;
-  }
-
-  bool _isBulkCompleted(String type, String unitStandard) {
-    // Normalize type and unit standard for searching
+  bool _isExerciseUploaded(String type, String exercise, String? unitStandard) {
+    // Normalize type for all key checks!
     String normalizedType = type;
     if (type.toLowerCase() == 'formative') normalizedType = 'Formative';
     if (type.toLowerCase() == 'summative') normalizedType = 'Summative';
@@ -1513,83 +1540,200 @@ class _POETabContentState extends State<POETabContent> {
     if (type.toLowerCase() == 'summativeremedial')
       normalizedType = 'SummativeRemedial';
 
-    final normalizedUnit =
-        unitStandard.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+    // FIRST: Check key with unit standard ID (strict isolation!)
+    if (unitStandard != null && unitStandard.isNotEmpty) {
+      final unitIdMatch = RegExp(r'\d{4,10}').firstMatch(unitStandard);
+      if (unitIdMatch != null) {
+        final unitId = unitIdMatch.group(0)!;
+
+        // Check key with explicit unit ID
+        final keyWithUnit =
+            '$normalizedType-$exercise-$unitId-${widget.learnerID}';
+        if (uploadedExercises[keyWithUnit] == true) {
+          return true;
+        }
+
+        // Also check server's normalized format with unit ID
+        final normalizedExercise =
+            exercise.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+        final normKeyWithUnit =
+            '$normalizedType-$normalizedExercise-$unitId-${widget.learnerID}';
+        if (uploadedExercises[normKeyWithUnit] == true) {
+          return true;
+        }
+
+        // SAFETY: If there's a key that matches this exercise but with a DIFFERENT unit ID, reject it!
+        // This prevents cross-matching between unit standards
+        final currentKeyNoUnit =
+            '$normalizedType-$exercise-${widget.learnerID}';
+        if (uploadedExercises[currentKeyNoUnit] == true) {
+          // Check if this key is actually for a different unit standard
+          bool isForOtherUnit = false;
+          for (var key in uploadedExercises.keys) {
+            if (key.contains('-$exercise-') ||
+                key.contains('-$normalizedExercise-')) {
+              for (var otherUnitId in [
+                '9964',
+                '9965',
+                '9966',
+                '9968',
+                '9986',
+                '13958',
+                '14336',
+                '14555',
+                '14580',
+                '116534'
+              ]) {
+                if (otherUnitId != unitId &&
+                    (key.contains('-$otherUnitId-') ||
+                        key.startsWith('$otherUnitId-') ||
+                        key.endsWith('-$otherUnitId'))) {
+                  isForOtherUnit = true;
+                  break;
+                }
+              }
+            }
+          }
+          if (!isForOtherUnit) {
+            return true; // It's a generic old key, allow it
+          }
+          // If it IS for another unit, don't return true - we want isolation!
+          return false;
+        }
+      }
+    }
+
+    // Fallback: Check normalized key without unit (backwards compatibility)
+    final key = _uploadKey(type, exercise, null);
+    if (uploadedExercises[key] == true) {
+      return true;
+    }
+
+    // Check raw type key (backwards compatibility)
+    final rawKey = '$type-$exercise-${widget.learnerID}';
+    if (uploadedExercises[rawKey] == true) {
+      return true;
+    }
+
+    return false;
+  }
+
+  bool _isBulkCompleted(String type, String unitStandard) {
+    // Normalize type for searching
+    String normalizedType = type;
+    if (type.toLowerCase() == 'formative') normalizedType = 'Formative';
+    if (type.toLowerCase() == 'summative') normalizedType = 'Summative';
+    if (type.toLowerCase() == 'logbook') normalizedType = 'LogBook';
+    if (type.toLowerCase() == 'formativeremedial')
+      normalizedType = 'FormativeRemedial';
+    if (type.toLowerCase() == 'summativeremedial')
+      normalizedType = 'SummativeRemedial';
 
     // Look for any key that indicates a bulk completion for this unit and type
     for (var key in uploadedExercises.keys) {
       final normalizedKey = key.toLowerCase();
 
-      // Check if key contains the type and 'allquestions' and the unit standard ID
+      // Check if key contains the type and 'allquestions'
       bool typeMatch = normalizedKey.contains(normalizedType.toLowerCase());
       bool bulkMatch = normalizedKey.contains('allquestions') ||
           normalizedKey.contains('all questions');
 
-      // Extract numeric ID from unitStandard for more robust matching
+      if (!typeMatch || !bulkMatch) continue;
+
+      // Extract numeric ID from unitStandard for strict matching
       final idMatch = RegExp(r'\d{4,10}').firstMatch(unitStandard);
       bool unitMatch = false;
+
       if (idMatch != null) {
-        unitMatch = normalizedKey.contains(idMatch.group(0)!);
+        final unitId = idMatch.group(0)!;
+        // The key MUST contain the unit ID
+        unitMatch = normalizedKey.contains(unitId);
+
+        if (unitMatch) {
+          // EXTREME ISOLATION: The key MUST NOT contain any OTHER known US ID
+          // This prevents "All Questions - 14580" from matching US 9966
+          final allIdsInKey = RegExp(r'(^|[^0-9])(\d{4,10})([^0-9]|$)')
+              .allMatches(normalizedKey);
+          for (var m in allIdsInKey) {
+            final foundId = m.group(2)!;
+            // Ignore learner ID (usually 5 digits)
+            if (foundId != unitId && foundId != widget.learnerID.toString()) {
+              // Found another ID! This is a cross-match.
+              unitMatch = false;
+              break;
+            }
+          }
+        }
       } else {
+        // Fallback to text match if no ID found
+        final normalizedUnit =
+            unitStandard.replaceAll(RegExp(r'\s+'), '').toLowerCase();
         unitMatch = normalizedKey.contains(normalizedUnit);
       }
 
-      if (typeMatch && bulkMatch && unitMatch) {
+      if (unitMatch) {
+        debugPrint('[POE] Bulk match found: $key for US $unitStandard');
         return uploadedExercises[key] == true;
       }
     }
     return false;
   }
 
-  bool _isExerciseAllowed(String type, String exercise, String unitStandard) {
+  bool _isExerciseAllowed(String type, String exercise, String? unitStandard) {
+    final currentKey = _uploadKey(type, exercise, unitStandard);
+    print(
+        'DEBUG: _isExerciseAllowed called for type: $type, exercise: $exercise');
+    print('DEBUG: currentKey: $currentKey');
+    print('DEBUG: exerciseSequence length: ${exerciseSequence.length}');
+    print('DEBUG: uploadedExercises: $uploadedExercises');
+
     // If this exercise is already completed, don't allow re-upload
-    if (_isExerciseUploaded(type, exercise, unitStandard)) {
-      print('DEBUG: Exercise already completed: $type-$exercise');
+    if (uploadedExercises[currentKey] == true) {
+      print('DEBUG: Exercise already completed: $currentKey');
       return false;
     }
 
-    // If exercise sequence is empty, allow the first exercise
-    if (exerciseSequence.isEmpty) {
-      print('DEBUG: Exercise sequence is empty, allowing if not uploaded');
-      return !_isExerciseUploaded(type, exercise, unitStandard);
-    }
-
-    final currentKey = _uploadKey(type, exercise, unitStandard);
-    print(
-        'DEBUG: _isExerciseAllowed called for type: $type, exercise: $exercise, unitStandard: $unitStandard');
-    print('DEBUG: currentKey: $currentKey');
-    print('DEBUG: exerciseSequence length: ${exerciseSequence.length}');
-
-    // Check if this is the first exercise in the sequence
-    if (exerciseSequence.isNotEmpty &&
-        exerciseSequence[0]['key'] == currentKey) {
-      print('DEBUG: This is the first exercise in sequence');
-      return !_isExerciseUploaded(type, exercise, unitStandard);
-    }
-
-    // Find the current exercise in the sequence
-    int currentIndex =
-        exerciseSequence.indexWhere((e) => e['key'] == currentKey);
-    print('DEBUG: currentIndex in sequence: $currentIndex');
-
-    // If exercise not found in sequence, allow it (might be first unit standard)
-    if (currentIndex == -1) {
-      // Check if any exercises have been completed yet
-      bool anyExercisesCompleted =
-          uploadedExercises.values.any((completed) => completed);
-      print(
-          'DEBUG: Exercise not in sequence, anyExercisesCompleted: $anyExercisesCompleted');
-      if (!anyExercisesCompleted) {
-        print('DEBUG: No exercises completed yet, allowing this exercise');
-        return !_isExerciseUploaded(type, exercise, unitStandard);
+    // Find the unit standard for this exercise
+    String? currentUnitStandard;
+    for (var seq in exerciseSequence) {
+      if (seq['key'] == currentKey) {
+        currentUnitStandard = seq['unitStandard']?.toString();
+        break;
       }
+    }
 
+    // Special handling for Summative exercises: check if all formative in this unit are completed
+    if (type == 'Summative') {
+      print(
+          'DEBUG: This is a Summative exercise, checking formative completion for unit: $currentUnitStandard');
+      if (currentUnitStandard != null) {
+        bool allFormativeCompleted = true;
+        for (var seq in exerciseSequence) {
+          if (seq['type'] == 'Formative' &&
+              seq['unitStandard']?.toString() == currentUnitStandard) {
+            String formativeKey = seq['key']!.toString();
+            if (!(uploadedExercises[formativeKey] ?? false)) {
+              allFormativeCompleted = false;
+              print('DEBUG: Formative exercise not completed: $formativeKey');
+              break;
+            }
+          }
+        }
+        bool currentNotCompleted = !(uploadedExercises[currentKey] ?? false);
+        print(
+            'DEBUG: allFormativeCompleted: $allFormativeCompleted, currentNotCompleted: $currentNotCompleted');
+        return allFormativeCompleted && currentNotCompleted;
+      }
+    }
+
+    // For Formative and LogBook exercises: allow if any in the unit are not completed (or first in unit)
+    if (currentUnitStandard != null) {
       // Check if any exercise in this unit standard is already completed
       bool anyInUnitCompleted = false;
       for (var seq in exerciseSequence) {
-        if (seq['unitStandard']?.toString() == unitStandard) {
-          if (_isExerciseUploaded(
-              seq['type']!, seq['exercise']!, unitStandard)) {
+        if (seq['unitStandard']?.toString() == currentUnitStandard) {
+          String seqKey = seq['key']!.toString();
+          if (uploadedExercises[seqKey] == true) {
             anyInUnitCompleted = true;
             break;
           }
@@ -1598,134 +1742,37 @@ class _POETabContentState extends State<POETabContent> {
 
       if (anyInUnitCompleted) {
         print(
-            'DEBUG: Some exercises in unit $unitStandard already completed, allowing');
+            'DEBUG: Some exercises in unit $currentUnitStandard already completed, allowing $type-$exercise');
         return true;
       }
 
+      // If no exercises in this unit are completed yet, allow this one
       print(
-          'DEBUG: Some exercises completed elsewhere, not allowing this exercise');
-      return false;
-    }
-
-    // If it's the first exercise in the sequence
-    if (currentIndex == 0) {
-      print('DEBUG: This is the first exercise in sequence (index 0)');
-      return !_isExerciseUploaded(type, exercise, unitStandard);
-    }
-
-    // Special handling for Summative exercises
-    if (type == 'Summative') {
-      print(
-          'DEBUG: This is a Summative exercise, checking formative completion');
-
-      // Check if all formative exercises in this unit standard are completed
-      bool allFormativeCompleted = true;
-      for (var seq in exerciseSequence) {
-        if (seq['type'] == 'Formative' &&
-            seq['unitStandard']?.toString() == unitStandard) {
-          if (!_isExerciseUploaded(
-              'Formative', seq['exercise']!, unitStandard)) {
-            allFormativeCompleted = false;
-            print(
-                'DEBUG: Formative exercise not completed: ${seq['exercise']}');
-            break;
-          }
-        }
-      }
-
-      bool currentNotCompleted =
-          !_isExerciseUploaded(type, exercise, unitStandard);
-      print(
-          'DEBUG: allFormativeCompleted: $allFormativeCompleted, currentNotCompleted: $currentNotCompleted');
-      return allFormativeCompleted && currentNotCompleted;
-    }
-
-    // For Formative and LogBook exercises, check if the previous one is completed
-    // But allow the first exercise of a new unit standard
-    final previousExercise = exerciseSequence[currentIndex - 1];
-    final currentExercise = exerciseSequence[currentIndex];
-
-    // Check if this is the first exercise of a new unit standard
-    bool isFirstExerciseOfNewUnit = false;
-    if (previousExercise['unitStandard'] != currentExercise['unitStandard']) {
-      isFirstExerciseOfNewUnit = true;
-      print('DEBUG: This is the first exercise of a new unit standard');
-    }
-
-    // For formative exercises within the same unit standard, allow them in any order
-    if (type == 'Formative' && !isFirstExerciseOfNewUnit) {
-      // Check if we're still in the same unit standard
-      if (previousExercise['unitStandard'] == currentExercise['unitStandard']) {
-        print(
-            'DEBUG: Formative exercise in same unit standard - allowing if not completed');
-        return !_isExerciseUploaded(type, exercise, unitStandard);
-      }
-    }
-
-    // Special case: Allow any exercise within the same unit standard if some exercises in that unit are already completed
-    // Check if any exercise in this unit standard is already completed
-    bool anyInUnitCompleted = false;
-    for (var seq in exerciseSequence) {
-      if (seq['unitStandard']?.toString() == unitStandard) {
-        if (_isExerciseUploaded(seq['type']!, seq['exercise']!, unitStandard)) {
-          anyInUnitCompleted = true;
-          break;
-        }
-      }
-    }
-
-    if (anyInUnitCompleted) {
-      print(
-          'DEBUG: Some exercises in unit $unitStandard already completed, allowing $type-$exercise');
+          'DEBUG: No exercises in unit $currentUnitStandard completed yet, allowing this exercise');
       return true;
     }
 
-    print('DEBUG: Checking previous exercise: ${previousExercise['exercise']}');
-    bool previousCompleted = _isExerciseUploaded(previousExercise['type']!,
-        previousExercise['exercise']!, previousExercise['unitStandard']!);
-    bool currentNotCompleted =
-        !_isExerciseUploaded(type, exercise, unitStandard);
-    print(
-        'DEBUG: previousCompleted: $previousCompleted, currentNotCompleted: $currentNotCompleted, isFirstExerciseOfNewUnit: $isFirstExerciseOfNewUnit');
-
-    // If this is the first exercise of a new unit standard, allow it if not completed
-    if (isFirstExerciseOfNewUnit) {
-      return currentNotCompleted;
-    }
-
-    // Otherwise, check if the previous exercise is completed
-    return previousCompleted && currentNotCompleted;
+    // Fallback: allow if exercise sequence is empty
+    return !(uploadedExercises[currentKey] ?? false);
   }
 
   // New method to determine if this exercise should show the camera icon
   bool _shouldShowCameraIcon(
       String type, String exercise, String unitStandard) {
-    // Find the next available exercise in the sequence
-    String? nextAvailableExercise = _getNextAvailableExercise();
-
-    if (nextAvailableExercise == null) {
-      // All exercises are completed
-      return false;
-    }
-
-    // Check if this exercise is the next available one
-    // Try to match against either format
-    final newKey = _uploadKey(type, exercise, unitStandard);
-    final oldKey = '$type-$exercise-${widget.learnerID}';
-
-    return newKey == nextAvailableExercise || oldKey == nextAvailableExercise;
+    // Check if this exercise is allowed
+    return _isExerciseAllowed(type, exercise, unitStandard);
   }
 
-  // Method to get the next available exercise in the sequence
+  // Method to get the next available exercise in the sequence (per unit standard)
   String? _getNextAvailableExercise() {
     if (exerciseSequence.isEmpty) return null;
 
     for (var exercise in exerciseSequence) {
       final type = exercise['type']!;
       final ex = exercise['exercise']!;
-      final unit = exercise['unitStandard']!;
+      final unitStd = exercise['unitStandard']?.toString();
 
-      if (!_isExerciseUploaded(type, ex, unit)) {
+      if (!_isExerciseUploaded(type, ex, unitStd)) {
         return exercise['key'];
       }
     }
@@ -2007,7 +2054,7 @@ class _POETabContentState extends State<POETabContent> {
   Future<void> openCamera(
       BuildContext context, String assessmentType, String exercise,
       {String? unitStandard}) async {
-    if (!_isExerciseAllowed(assessmentType, exercise, unitStandard ?? '')) {
+    if (!_isExerciseAllowed(assessmentType, exercise, unitStandard)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text(
@@ -2027,9 +2074,7 @@ class _POETabContentState extends State<POETabContent> {
     }
 
     String? logbookText;
-    final controllerKey = unitStandard != null
-        ? _uploadKey('LogBook', exercise, unitStandard)
-        : 'LogBook-$exercise-${widget.learnerID}';
+    final controllerKey = _uploadKey('LogBook', exercise, unitStandard);
     if (assessmentType == 'LogBook') {
       final controller = logBookControllers[controllerKey];
       logbookText = controller?.text;
@@ -2099,6 +2144,7 @@ class _POETabContentState extends State<POETabContent> {
               type: assessmentType,
               exercise: exercise,
               learnerID: widget.learnerID,
+              unitStandard: unitStandard,
               logbookText: logbookText,
               autoUpload: false,
             ),
@@ -2209,7 +2255,7 @@ class _POETabContentState extends State<POETabContent> {
         return;
       }
 
-      if (_isExerciseAllowed(assessmentType, exercise, unitStandard ?? '')) {
+      if (_isExerciseAllowed(assessmentType, exercise, unitStandard)) {
         bool isConnected = await _checkConnectivity();
         if (isConnected) {
           final url = Uri.parse(AppConfig.buildUrl('save_metadata.php'));
@@ -2268,10 +2314,11 @@ class _POETabContentState extends State<POETabContent> {
 
             if (decoded['status'] == 'success') {
               setState(() {
-                final uploadKey = unitStandard != null
-                    ? _uploadKey(assessmentType, exercise, unitStandard)
-                    : '$assessmentType-$exercise-${widget.learnerID}';
+                final uploadKey =
+                    _uploadKey(assessmentType, exercise, unitStandard);
                 uploadedExercises[uploadKey] = true;
+                final rawKey = '$assessmentType-$exercise-${widget.learnerID}';
+                uploadedExercises[rawKey] = true;
               });
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -2280,14 +2327,13 @@ class _POETabContentState extends State<POETabContent> {
               // Save locally as synced
               await _saveLocally(document, assessmentType, exercise,
                   updatedLogbookText ?? logbookText,
-                  unitStandard: unitStandard, showSnackBar: false, synced: 1);
+                  showSnackBar: false, synced: 1);
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Server error: ${decoded['message']}')),
               );
               await _saveLocally(document, assessmentType, exercise,
-                  updatedLogbookText ?? logbookText,
-                  unitStandard: unitStandard);
+                  updatedLogbookText ?? logbookText);
             }
           } catch (e) {
             // Close processing dialog if open
@@ -2298,13 +2344,11 @@ class _POETabContentState extends State<POETabContent> {
               SnackBar(content: Text('Upload failed: $e. Saving locally.')),
             );
             await _saveLocally(document, assessmentType, exercise,
-                updatedLogbookText ?? logbookText,
-                unitStandard: unitStandard);
+                updatedLogbookText ?? logbookText);
           }
         } else {
           await _saveLocally(document, assessmentType, exercise,
-              updatedLogbookText ?? logbookText,
-              unitStandard: unitStandard);
+              updatedLogbookText ?? logbookText);
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2519,11 +2563,30 @@ class _POETabContentState extends State<POETabContent> {
       // Upload the same document for all formative questions
       bool isConnected = await _checkConnectivity();
 
+      // Generate single target file path for all exercises
+      final appDir = await getApplicationDocumentsDirectory();
+      final poeDir = Directory('${appDir.path}/POE');
+      if (!poeDir.existsSync()) {
+        poeDir.createSync(recursive: true);
+      }
+
+      String unitStandardId = 'UNKNOWN';
+      final idMatch = RegExp(r'\d{4,10}').firstMatch(unitStandard);
+      if (idMatch != null) {
+        unitStandardId = idMatch.group(0)!;
+      }
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final targetFileName =
+          'All_Questions_${unitStandardId}_Formative_$timestamp.pdf';
+      final targetFilePath = '${poeDir.path}/$targetFileName';
+
       print('📊 FORMATIVE UPLOAD DEBUG:');
       print('   Total questions to process: ${formativeQuestions.length}');
       print(
           '   Questions list: ${formativeQuestions.map((q) => q['exercise']).toList()}');
       print('   Is connected: $isConnected');
+      print('   Target file path: $targetFilePath');
 
       if (isConnected) {
         final url = Uri.parse(AppConfig.buildUrl('save_metadata.php'));
@@ -2541,11 +2604,20 @@ class _POETabContentState extends State<POETabContent> {
           ..fields['exercises'] = json.encode(formativeQuestions
               .map((item) => item['exercise']?.toString() ?? 'N/A')
               .toList())
-          ..fields['unit_standard_upload'] = 'true'
-          ..fields['unit_standard_name'] = unitStandard;
+          ..fields['unit_standard_upload'] = 'true';
 
         print(
             'Uploading single formative document for ${formativeQuestions.length} questions: ${document.path}, Size: ${await document.length()} bytes');
+
+        final standardizedName = targetFileName;
+
+        request.files.add(await http.MultipartFile.fromPath(
+          'files[]',
+          document.path,
+          filename: standardizedName,
+        ));
+
+        print('Assigned filename for formative: $standardizedName');
 
         // Show processing dialog
         showDialog(
@@ -2570,9 +2642,6 @@ class _POETabContentState extends State<POETabContent> {
           ),
         );
 
-        request.files
-            .add(await http.MultipartFile.fromPath('files[]', document.path));
-
         try {
           // Add timeout to prevent hanging - increased to 120 seconds for bulk scan
           final response = await request.send().timeout(
@@ -2593,7 +2662,9 @@ class _POETabContentState extends State<POETabContent> {
             for (var item in formativeQuestions) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
               await _saveLocally(document, 'Formative', exercise, null,
-                  unitStandard: unitStandard, showSnackBar: false, synced: 1);
+                  showSnackBar: false,
+                  synced: 1,
+                  targetFilePath: targetFilePath);
             }
             successfulUploads = formativeQuestions.length;
             ScaffoldMessenger.of(context).showSnackBar(
@@ -2608,7 +2679,7 @@ class _POETabContentState extends State<POETabContent> {
             for (var item in formativeQuestions) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
               await _saveLocally(document, 'Formative', exercise, null,
-                  unitStandard: unitStandard, showSnackBar: false);
+                  showSnackBar: false, targetFilePath: targetFilePath);
             }
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -2627,7 +2698,7 @@ class _POETabContentState extends State<POETabContent> {
           for (var item in formativeQuestions) {
             final exercise = item['exercise']?.toString() ?? 'N/A';
             await _saveLocally(document, 'Formative', exercise, null,
-                unitStandard: unitStandard, showSnackBar: false);
+                showSnackBar: false, targetFilePath: targetFilePath);
           }
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -2644,6 +2715,8 @@ class _POETabContentState extends State<POETabContent> {
           setState(() {
             final uploadKey = _uploadKey('Formative', exercise, unitStandard);
             uploadedExercises[uploadKey] = true;
+            final rawKey = 'Formative-$exercise-${widget.learnerID}';
+            uploadedExercises[rawKey] = true;
           });
         }
 
@@ -2656,6 +2729,8 @@ class _POETabContentState extends State<POETabContent> {
             final exercise = item['exercise']?.toString() ?? 'N/A';
             final uploadKey = _uploadKey('Formative', exercise, unitStandard);
             uploadedExercises[uploadKey] = true;
+            final rawKey = 'Formative-$exercise-${widget.learnerID}';
+            uploadedExercises[rawKey] = true;
           }
         });
 
@@ -2684,7 +2759,7 @@ class _POETabContentState extends State<POETabContent> {
               '[OFFLINE_SCAN] Processing question $localSaveCount/${formativeQuestions.length}: $exercise');
 
           await _saveLocally(document, 'Formative', exercise, null,
-              unitStandard: unitStandard);
+              targetFilePath: targetFilePath);
           localSaveCount++;
 
           // Verify it was marked
@@ -2702,6 +2777,8 @@ class _POETabContentState extends State<POETabContent> {
             final exercise = item['exercise']?.toString() ?? 'N/A';
             final uploadKey = _uploadKey('Formative', exercise, unitStandard);
             uploadedExercises[uploadKey] = true;
+            final rawKey = 'Formative-$exercise-${widget.learnerID}';
+            uploadedExercises[rawKey] = true;
           }
         });
 
@@ -2756,50 +2833,42 @@ class _POETabContentState extends State<POETabContent> {
     bool allAllowed = true;
     for (var item in summativeQuestions) {
       final exercise = item['exercise']?.toString() ?? 'N/A';
-      if (isFirstUnitStandard) {
-        // This is the first unit standard, check if all formative questions in this unit are complete
-        bool allFormativeCompleted = true;
+      // Always check if all Formative in THIS unit are completed, regardless of first unit status
+      bool allFormativeCompleted = true;
 
-        // Find all formative questions for this unit standard from pathwaysData
-        if (pathwaysData != null) {
-          pathwaysData!.forEach((pathwayName, pathwayData) {
-            if (pathwayData['qualifications'] != null) {
-              (pathwayData['qualifications'] as Map)
-                  .forEach((qualificationName, qualData) {
-                if (qualData['unitstandards'] != null) {
-                  (qualData['unitstandards'] as Map)
-                      .forEach((unitStandardName, unitData) {
-                    if (unitStandardName == unitStandard) {
-                      final formative = unitData['formative'] ?? [];
-                      for (var formativeItem in formative) {
-                        final formativeExercise =
-                            formativeItem['exercise']?.toString() ?? 'N/A';
-                        if (!_isExerciseUploaded(
-                            'Formative', formativeExercise, unitStandard)) {
-                          allFormativeCompleted = false;
-                          print(
-                              'DEBUG: Formative exercise not completed: $formativeExercise');
-                          return;
-                        }
+      // Find all formative questions for this unit standard from pathwaysData
+      if (pathwaysData != null) {
+        pathwaysData!.forEach((pathwayName, pathwayData) {
+          if (pathwayData['qualifications'] != null) {
+            (pathwayData['qualifications'] as Map)
+                .forEach((qualificationName, qualData) {
+              if (qualData['unitstandards'] != null) {
+                (qualData['unitstandards'] as Map)
+                    .forEach((unitStandardName, unitData) {
+                  if (unitStandardName == unitStandard) {
+                    final formative = unitData['formative'] ?? [];
+                    for (var formativeItem in formative) {
+                      final formativeExercise =
+                          formativeItem['exercise']?.toString() ?? 'N/A';
+                      if (!_isExerciseUploaded(
+                          'Formative', formativeExercise, unitStandard)) {
+                        allFormativeCompleted = false;
+                        print(
+                            'DEBUG: Formative exercise not completed: $formativeExercise');
+                        return;
                       }
                     }
-                  });
-                }
-              });
-            }
-          });
-        }
+                  }
+                });
+              }
+            });
+          }
+        });
+      }
 
-        if (!allFormativeCompleted) {
-          allAllowed = false;
-          break;
-        }
-      } else {
-        // Check if previous unit standard is completed
-        if (!_isExerciseAllowed('Summative', exercise, unitStandard)) {
-          allAllowed = false;
-          break;
-        }
+      if (!allFormativeCompleted) {
+        allAllowed = false;
+        break;
       }
     }
 
@@ -2927,11 +2996,30 @@ class _POETabContentState extends State<POETabContent> {
       // Upload the same document for all summative questions
       bool isConnected = await _checkConnectivity();
 
+      // Generate single target file path for all exercises
+      final appDir = await getApplicationDocumentsDirectory();
+      final poeDir = Directory('${appDir.path}/POE');
+      if (!poeDir.existsSync()) {
+        poeDir.createSync(recursive: true);
+      }
+
+      String unitStandardId = 'UNKNOWN';
+      final idMatch = RegExp(r'\d{4,10}').firstMatch(unitStandard);
+      if (idMatch != null) {
+        unitStandardId = idMatch.group(0)!;
+      }
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final targetFileName =
+          'All_Questions_${unitStandardId}_Summative_$timestamp.pdf';
+      final targetFilePath = '${poeDir.path}/$targetFileName';
+
       print('📊 SUMMATIVE UPLOAD DEBUG:');
       print('   Total questions to process: ${summativeQuestions.length}');
       print(
           '   Questions list: ${summativeQuestions.map((q) => q['exercise']).toList()}');
       print('   Is connected: $isConnected');
+      print('   Target file path: $targetFilePath');
 
       if (isConnected) {
         final url = Uri.parse(AppConfig.buildUrl('save_metadata.php'));
@@ -2949,11 +3037,20 @@ class _POETabContentState extends State<POETabContent> {
           ..fields['exercises'] = json.encode(summativeQuestions
               .map((item) => item['exercise']?.toString() ?? 'N/A')
               .toList())
-          ..fields['unit_standard_upload'] = 'true'
-          ..fields['unit_standard_name'] = unitStandard;
+          ..fields['unit_standard_upload'] = 'true';
 
         print(
             'Uploading single summative document for ${summativeQuestions.length} questions: ${document.path}, Size: ${await document.length()} bytes');
+
+        final standardizedName = targetFileName;
+
+        request.files.add(await http.MultipartFile.fromPath(
+          'files[]',
+          document.path,
+          filename: standardizedName,
+        ));
+
+        print('Assigned filename for summative: $standardizedName');
 
         // Show processing dialog
         showDialog(
@@ -2978,9 +3075,6 @@ class _POETabContentState extends State<POETabContent> {
           ),
         );
 
-        request.files
-            .add(await http.MultipartFile.fromPath('files[]', document.path));
-
         try {
           // Add timeout to prevent hanging - increased to 120 seconds for bulk scan
           final response = await request.send().timeout(
@@ -3001,7 +3095,9 @@ class _POETabContentState extends State<POETabContent> {
             for (var item in summativeQuestions) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
               await _saveLocally(document, 'Summative', exercise, null,
-                  unitStandard: unitStandard, showSnackBar: false, synced: 1);
+                  showSnackBar: false,
+                  synced: 1,
+                  targetFilePath: targetFilePath);
             }
             successfulUploads = summativeQuestions.length;
             ScaffoldMessenger.of(context).showSnackBar(
@@ -3016,7 +3112,7 @@ class _POETabContentState extends State<POETabContent> {
             for (var item in summativeQuestions) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
               await _saveLocally(document, 'Summative', exercise, null,
-                  unitStandard: unitStandard, showSnackBar: false);
+                  showSnackBar: false, targetFilePath: targetFilePath);
             }
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -3035,7 +3131,7 @@ class _POETabContentState extends State<POETabContent> {
           for (var item in summativeQuestions) {
             final exercise = item['exercise']?.toString() ?? 'N/A';
             await _saveLocally(document, 'Summative', exercise, null,
-                unitStandard: unitStandard, showSnackBar: false);
+                showSnackBar: false, targetFilePath: targetFilePath);
           }
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -3052,6 +3148,8 @@ class _POETabContentState extends State<POETabContent> {
           setState(() {
             final uploadKey = _uploadKey('Summative', exercise, unitStandard);
             uploadedExercises[uploadKey] = true;
+            final rawKey = 'Summative-$exercise-${widget.learnerID}';
+            uploadedExercises[rawKey] = true;
           });
         }
 
@@ -3064,6 +3162,8 @@ class _POETabContentState extends State<POETabContent> {
             final exercise = item['exercise']?.toString() ?? 'N/A';
             final uploadKey = _uploadKey('Summative', exercise, unitStandard);
             uploadedExercises[uploadKey] = true;
+            final rawKey = 'Summative-$exercise-${widget.learnerID}';
+            uploadedExercises[rawKey] = true;
           }
         });
 
@@ -3092,7 +3192,7 @@ class _POETabContentState extends State<POETabContent> {
               '[OFFLINE_SCAN] Processing question $localSaveCount/${summativeQuestions.length}: $exercise');
 
           await _saveLocally(document, 'Summative', exercise, null,
-              unitStandard: unitStandard);
+              targetFilePath: targetFilePath);
           localSaveCount++;
 
           // Verify it was marked
@@ -3110,6 +3210,8 @@ class _POETabContentState extends State<POETabContent> {
             final exercise = item['exercise']?.toString() ?? 'N/A';
             final uploadKey = _uploadKey('Summative', exercise, unitStandard);
             uploadedExercises[uploadKey] = true;
+            final rawKey = 'Summative-$exercise-${widget.learnerID}';
+            uploadedExercises[rawKey] = true;
           }
         });
 
@@ -3481,6 +3583,27 @@ class _POETabContentState extends State<POETabContent> {
         print(
             'Uploading single logbook document for ${logBookItems.length} items: ${document.path}, Size: ${await document.length()} bytes');
 
+        // Generate standardized filename for server
+        String unitStandardId = 'UNKNOWN';
+        final idMatch = RegExp(r'\d{4,10}').firstMatch(unitStandard);
+        if (idMatch != null) {
+          unitStandardId = idMatch.group(0)!;
+        }
+
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final sanitizedExercise =
+            'All_Questions_${unitStandard.replaceAll(RegExp(r'[^A-Za-z0-9]'), '_')}';
+        final standardizedName =
+            'LogBook_${unitStandardId}_${sanitizedExercise}_$timestamp.pdf';
+
+        request.files.add(await http.MultipartFile.fromPath(
+          'files[]',
+          document.path,
+          filename: standardizedName,
+        ));
+
+        print('Assigned filename for logbook: $standardizedName');
+
         // Show upload progress dialog
         showDialog(
           context: context,
@@ -3504,9 +3627,6 @@ class _POETabContentState extends State<POETabContent> {
           ),
         );
 
-        request.files
-            .add(await http.MultipartFile.fromPath('files[]', document.path));
-
         try {
           // Add timeout to prevent hanging - increased to 120 seconds
           final response = await request.send().timeout(
@@ -3526,9 +3646,9 @@ class _POETabContentState extends State<POETabContent> {
             // Save to local database for all exercises
             for (var item in logBookItems) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
-              await _saveLocally(document, 'LogBook', exercise,
-                  'Logbook entry for $exercise - $unitStandard',
-                  unitStandard: unitStandard, showSnackBar: false, synced: 1);
+              await _saveLocally(
+                  document, 'LogBook', exercise, 'Logbook entry for $exercise',
+                  showSnackBar: false, synced: 1);
             }
             successfulUploads = logBookItems.length;
             ScaffoldMessenger.of(context).showSnackBar(
@@ -3543,9 +3663,9 @@ class _POETabContentState extends State<POETabContent> {
             // Save locally for all exercises
             for (var item in logBookItems) {
               final exercise = item['exercise']?.toString() ?? 'N/A';
-              await _saveLocally(document, 'LogBook', exercise,
-                  'Logbook entry for $exercise - $unitStandard',
-                  unitStandard: unitStandard, showSnackBar: false);
+              await _saveLocally(
+                  document, 'LogBook', exercise, 'Logbook entry for $exercise',
+                  showSnackBar: false);
             }
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -3563,9 +3683,8 @@ class _POETabContentState extends State<POETabContent> {
           // Save locally for all exercises
           for (var item in logBookItems) {
             final exercise = item['exercise']?.toString() ?? 'N/A';
-            await _saveLocally(document, 'LogBook', exercise,
-                'Logbook entry for $exercise - $unitStandard',
-                unitStandard: unitStandard);
+            await _saveLocally(
+                document, 'LogBook', exercise, 'Logbook entry for $exercise');
           }
           failedUploads = logBookItems.length;
         }
@@ -3576,6 +3695,8 @@ class _POETabContentState extends State<POETabContent> {
           setState(() {
             final uploadKey = _uploadKey('LogBook', exercise, unitStandard);
             uploadedExercises[uploadKey] = true;
+            final rawKey = 'LogBook-$exercise-${widget.learnerID}';
+            uploadedExercises[rawKey] = true;
           });
         }
 
@@ -3588,6 +3709,8 @@ class _POETabContentState extends State<POETabContent> {
             final exercise = item['exercise']?.toString() ?? 'N/A';
             final uploadKey = _uploadKey('LogBook', exercise, unitStandard);
             uploadedExercises[uploadKey] = true;
+            final rawKey = 'LogBook-$exercise-${widget.learnerID}';
+            uploadedExercises[rawKey] = true;
           }
         });
 
@@ -3610,9 +3733,8 @@ class _POETabContentState extends State<POETabContent> {
           print(
               '[OFFLINE_SCAN] Processing logbook item $localSaveCount/${logBookItems.length}: $exercise');
 
-          await _saveLocally(document, 'LogBook', exercise,
-              'Logbook entry for $exercise - $unitStandard',
-              unitStandard: unitStandard);
+          await _saveLocally(
+              document, 'LogBook', exercise, 'Logbook entry for $exercise');
           localSaveCount++;
 
           // Verify it was marked
@@ -3630,6 +3752,8 @@ class _POETabContentState extends State<POETabContent> {
             final exercise = item['exercise']?.toString() ?? 'N/A';
             final uploadKey = _uploadKey('LogBook', exercise, unitStandard);
             uploadedExercises[uploadKey] = true;
+            final rawKey = 'LogBook-$exercise-${widget.learnerID}';
+            uploadedExercises[rawKey] = true;
           }
         });
 
@@ -3726,8 +3850,26 @@ class _POETabContentState extends State<POETabContent> {
         request.fields['unit_standard_name'] = unitStandard;
       }
 
-      request.files
-          .add(await http.MultipartFile.fromPath('files[]', pdfFile.path));
+      // Generate standardized filename for server
+      String unitStandardId = 'UNKNOWN';
+      if (unitStandard != null) {
+        final idMatch = RegExp(r'\d{4,10}').firstMatch(unitStandard);
+        if (idMatch != null) {
+          unitStandardId = idMatch.group(0)!;
+        }
+      }
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final sanitizedExercise =
+          exercise.replaceAll(RegExp(r'[^A-Za-z0-9]'), '_');
+      final standardizedName =
+          '${assessmentType}_${unitStandardId}_${sanitizedExercise}_$timestamp.pdf';
+
+      request.files.add(await http.MultipartFile.fromPath(
+        'files[]',
+        pdfFile.path,
+        filename: standardizedName,
+      ));
       request.files.add(http.MultipartFile.fromBytes('signature', signature));
 
       try {
@@ -3737,10 +3879,11 @@ class _POETabContentState extends State<POETabContent> {
 
         if (decoded['status'] == 'success') {
           setState(() {
-            final uploadKey = unitStandard != null
-                ? _uploadKey(assessmentType, exercise, unitStandard)
-                : '$assessmentType-$exercise-${widget.learnerID}';
+            final uploadKey =
+                _uploadKey(assessmentType, exercise, unitStandard);
             uploadedExercises[uploadKey] = true;
+            final rawKey = '$assessmentType-$exercise-${widget.learnerID}';
+            uploadedExercises[rawKey] = true;
           });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -3750,8 +3893,7 @@ class _POETabContentState extends State<POETabContent> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Server error: ${decoded['message']}')),
           );
-          await _saveLocally(pdfFile, assessmentType, exercise, null,
-              unitStandard: unitStandard);
+          await _saveLocally(pdfFile, assessmentType, exercise, null);
         }
       } catch (e) {
         print('Upload error: $e');
@@ -3769,7 +3911,10 @@ class _POETabContentState extends State<POETabContent> {
 
   Future<void> _saveLocally(File document, String assessmentType,
       String exercise, String? logbookText,
-      {String? unitStandard, bool showSnackBar = true, int synced = 0}) async {
+      {String? unitStandard,
+      bool showSnackBar = true,
+      int synced = 0,
+      String? targetFilePath}) async {
     final dbHelper = DatabaseHelper();
     String filePath = document.path;
 
@@ -3781,36 +3926,34 @@ class _POETabContentState extends State<POETabContent> {
         poeDir.createSync(recursive: true);
       }
 
-      final extension = filePath.split('.').last;
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-
-      // Extract unit standard ID from unit standard name or use a simple approach
-      String unitStandardId = 'UNKNOWN';
-      if (unitStandard != null && unitStandard.isNotEmpty) {
-        // Try to extract numeric ID from unit standard name
-        RegExp idPattern = RegExp(r'(?:US|Unit\s*Standard\s*)?(\d{4,10})\b');
-        Match? match = idPattern.firstMatch(unitStandard);
-        if (match != null) {
-          unitStandardId = match.group(1)!;
-        } else {
-          // Fallback: use a simple hash
-          unitStandardId = (unitStandard.hashCode.abs() % 99999).toString();
+      // If targetFilePath is provided, use that
+      if (targetFilePath != null) {
+        // Check if file already exists at targetFilePath; if not, copy it there
+        final targetFile = File(targetFilePath);
+        if (!await targetFile.exists()) {
+          await document.copy(targetFilePath);
         }
-      }
-
-      final newFileName =
-          '${assessmentType}_${unitStandardId}_${exercise.replaceAll(' ', '_')}_$timestamp.$extension';
-      final newFilePath = '${poeDir.path}/$newFileName';
-
-      // Check if document is already in the POE directory to avoid redundant copies
-      if (!document.path.startsWith(poeDir.path)) {
-        await document.copy(newFilePath);
-        filePath = newFilePath;
-        print('[POE_OFFLINE] Document copied to: $filePath');
+        filePath = targetFilePath;
+        print('[POE_OFFLINE] Using target file path: $filePath');
       } else {
-        print(
-            '[POE_OFFLINE] Document already in POE directory: ${document.path}');
-        filePath = document.path;
+        final extension = filePath.split('.').last;
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final sanitizedExercise =
+            exercise.replaceAll(RegExp(r'[^A-Za-z0-9]'), '_');
+        final newFileName =
+            '${assessmentType}_${sanitizedExercise}_$timestamp.$extension';
+        final newFilePath = '${poeDir.path}/$newFileName';
+
+        // Check if document is already in the POE directory to avoid redundant copies
+        if (!document.path.startsWith(poeDir.path)) {
+          await document.copy(newFilePath);
+          filePath = newFilePath;
+          print('[POE_OFFLINE] Document copied to: $filePath');
+        } else {
+          print(
+              '[POE_OFFLINE] Document already in POE directory: ${document.path}');
+          filePath = document.path;
+        }
       }
     } catch (e) {
       print('[POE_OFFLINE] Error copying file: $e');
@@ -3819,8 +3962,7 @@ class _POETabContentState extends State<POETabContent> {
 
     // Save to local database with the provided synced status
     await dbHelper.saveUploadToLocalPoe(
-        widget.learnerID, assessmentType, exercise, filePath,
-        unitStandard: unitStandard, synced: synced);
+        widget.learnerID, assessmentType, exercise, filePath);
 
     if (assessmentType == 'LogBook' && logbookText != null) {
       await dbHelper.saveLogBookText(
@@ -3829,10 +3971,10 @@ class _POETabContentState extends State<POETabContent> {
 
     // Mark as uploaded in UI
     setState(() {
-      final uploadKey = unitStandard != null
-          ? _uploadKey(assessmentType, exercise, unitStandard)
-          : '$assessmentType-$exercise-${widget.learnerID}';
+      final uploadKey = _uploadKey(assessmentType, exercise, unitStandard);
       uploadedExercises[uploadKey] = true;
+      final rawKey = '$assessmentType-$exercise-${widget.learnerID}';
+      uploadedExercises[rawKey] = true;
     });
 
     if (showSnackBar && mounted) {
@@ -4028,14 +4170,19 @@ class _POETabContentState extends State<POETabContent> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
-                                    formative.where((item) {
+                                    '${formative.where((item) {
                                       final exercise =
                                           item['exercise']?.toString() ?? 'N/A';
-                                      return _isExerciseUploaded(
-                                          'Formative', exercise, unitEntry.key);
-                                    }).isNotEmpty
-                                        ? '${formative.length}/${formative.length}'
-                                        : '0/${formative.length}',
+                                      // Count as uploaded if:
+                                      // 1. Local/Server upload map says so (marks/poe table records)
+                                      // 2. OR the item already has a filePath (from server poe.php)
+                                      return _isExerciseUploaded('Formative',
+                                              exercise, unitEntry.key) ||
+                                          (item['filePath'] != null &&
+                                              item['filePath']
+                                                  .toString()
+                                                  .isNotEmpty);
+                                    }).length}/${formative.length}',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 12,
@@ -4143,9 +4290,13 @@ class _POETabContentState extends State<POETabContent> {
                                                       ?.toString() ??
                                                   'N/A';
                                               return _isExerciseUploaded(
-                                                  'Formative',
-                                                  exercise,
-                                                  unitEntry.key);
+                                                      'Formative',
+                                                      exercise,
+                                                      unitEntry.key) ||
+                                                  (item['filePath'] != null &&
+                                                      item['filePath']
+                                                          .toString()
+                                                          .isNotEmpty);
                                             }).length ==
                                             formative.length
                                         ? null // Disable if all completed
@@ -4158,9 +4309,13 @@ class _POETabContentState extends State<POETabContent> {
                                                             ?.toString() ??
                                                         'N/A';
                                                 return _isExerciseUploaded(
-                                                    'Formative',
-                                                    exercise,
-                                                    unitEntry.key);
+                                                        'Formative',
+                                                        exercise,
+                                                        unitEntry.key) ||
+                                                    (item['filePath'] != null &&
+                                                        item['filePath']
+                                                            .toString()
+                                                            .isNotEmpty);
                                               }).length ==
                                               formative.length
                                           ? Icons.check_circle
@@ -4173,9 +4328,13 @@ class _POETabContentState extends State<POETabContent> {
                                                             ?.toString() ??
                                                         'N/A';
                                                 return _isExerciseUploaded(
-                                                    'Formative',
-                                                    exercise,
-                                                    unitEntry.key);
+                                                        'Formative',
+                                                        exercise,
+                                                        unitEntry.key) ||
+                                                    (item['filePath'] != null &&
+                                                        item['filePath']
+                                                            .toString()
+                                                            .isNotEmpty);
                                               }).length ==
                                               formative.length
                                           ? 'All Formative Completed ✓'
@@ -4188,9 +4347,13 @@ class _POETabContentState extends State<POETabContent> {
                                                             ?.toString() ??
                                                         'N/A';
                                                 return _isExerciseUploaded(
-                                                    'Formative',
-                                                    exercise,
-                                                    unitEntry.key);
+                                                        'Formative',
+                                                        exercise,
+                                                        unitEntry.key) ||
+                                                    (item['filePath'] != null &&
+                                                        item['filePath']
+                                                            .toString()
+                                                            .isNotEmpty);
                                               }).length ==
                                               formative.length
                                           ? Colors.green
@@ -4212,9 +4375,13 @@ class _POETabContentState extends State<POETabContent> {
                                                       ?.toString() ??
                                                   'N/A';
                                               return _isExerciseUploaded(
-                                                  'Formative',
-                                                  exercise,
-                                                  unitEntry.key);
+                                                      'Formative',
+                                                      exercise,
+                                                      unitEntry.key) ||
+                                                  (item['filePath'] != null &&
+                                                      item['filePath']
+                                                          .toString()
+                                                          .isNotEmpty);
                                             }).length ==
                                             formative.length
                                         ? null // Disable if all completed
@@ -4227,9 +4394,13 @@ class _POETabContentState extends State<POETabContent> {
                                                             ?.toString() ??
                                                         'N/A';
                                                 return _isExerciseUploaded(
-                                                    'Formative',
-                                                    exercise,
-                                                    unitEntry.key);
+                                                        'Formative',
+                                                        exercise,
+                                                        unitEntry.key) ||
+                                                    (item['filePath'] != null &&
+                                                        item['filePath']
+                                                            .toString()
+                                                            .isNotEmpty);
                                               }).length ==
                                               formative.length
                                           ? Icons.check_circle
@@ -4242,9 +4413,13 @@ class _POETabContentState extends State<POETabContent> {
                                                             ?.toString() ??
                                                         'N/A';
                                                 return _isExerciseUploaded(
-                                                    'Formative',
-                                                    exercise,
-                                                    unitEntry.key);
+                                                        'Formative',
+                                                        exercise,
+                                                        unitEntry.key) ||
+                                                    (item['filePath'] != null &&
+                                                        item['filePath']
+                                                            .toString()
+                                                            .isNotEmpty);
                                               }).length ==
                                               formative.length
                                           ? 'All Formative Completed ✓'
@@ -4257,9 +4432,13 @@ class _POETabContentState extends State<POETabContent> {
                                                             ?.toString() ??
                                                         'N/A';
                                                 return _isExerciseUploaded(
-                                                    'Formative',
-                                                    exercise,
-                                                    unitEntry.key);
+                                                        'Formative',
+                                                        exercise,
+                                                        unitEntry.key) ||
+                                                    (item['filePath'] != null &&
+                                                        item['filePath']
+                                                            .toString()
+                                                            .isNotEmpty);
                                               }).length ==
                                               formative.length
                                           ? Colors.green
@@ -4318,14 +4497,19 @@ class _POETabContentState extends State<POETabContent> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
-                                    summative.where((item) {
+                                    '${summative.where((item) {
                                       final exercise =
                                           item['exercise']?.toString() ?? 'N/A';
-                                      return _isExerciseUploaded(
-                                          'Summative', exercise, unitEntry.key);
-                                    }).isNotEmpty
-                                        ? '${summative.length}/${summative.length}'
-                                        : '0/${summative.length}',
+                                      // Count as uploaded if:
+                                      // 1. Local/Server upload map says so (marks/poe table records)
+                                      // 2. OR the item already has a filePath (from server poe.php)
+                                      return _isExerciseUploaded('Summative',
+                                              exercise, unitEntry.key) ||
+                                          (item['filePath'] != null &&
+                                              item['filePath']
+                                                  .toString()
+                                                  .isNotEmpty);
+                                    }).length}/${summative.length}',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 12,
@@ -4432,13 +4616,14 @@ class _POETabContentState extends State<POETabContent> {
                                               final exercise = item['exercise']
                                                       ?.toString() ??
                                                   'N/A';
-                                              final uploadKey = _uploadKey(
-                                                  'Summative',
-                                                  exercise,
-                                                  unitEntry.key);
-                                              return uploadedExercises[
-                                                      uploadKey] ??
-                                                  false;
+                                              return _isExerciseUploaded(
+                                                      'Summative',
+                                                      exercise,
+                                                      unitEntry.key) ||
+                                                  (item['filePath'] != null &&
+                                                      item['filePath']
+                                                          .toString()
+                                                          .isNotEmpty);
                                             }).length ==
                                             summative.length
                                         ? null // Disable if all completed
@@ -4451,9 +4636,13 @@ class _POETabContentState extends State<POETabContent> {
                                                             ?.toString() ??
                                                         'N/A';
                                                 return _isExerciseUploaded(
-                                                    'Summative',
-                                                    exercise,
-                                                    unitEntry.key);
+                                                        'Summative',
+                                                        exercise,
+                                                        unitEntry.key) ||
+                                                    (item['filePath'] != null &&
+                                                        item['filePath']
+                                                            .toString()
+                                                            .isNotEmpty);
                                               }).length ==
                                               summative.length
                                           ? Icons.check_circle
@@ -4466,9 +4655,13 @@ class _POETabContentState extends State<POETabContent> {
                                                             ?.toString() ??
                                                         'N/A';
                                                 return _isExerciseUploaded(
-                                                    'Summative',
-                                                    exercise,
-                                                    unitEntry.key);
+                                                        'Summative',
+                                                        exercise,
+                                                        unitEntry.key) ||
+                                                    (item['filePath'] != null &&
+                                                        item['filePath']
+                                                            .toString()
+                                                            .isNotEmpty);
                                               }).length ==
                                               summative.length
                                           ? 'All Summative Completed ✓'
@@ -4481,9 +4674,13 @@ class _POETabContentState extends State<POETabContent> {
                                                             ?.toString() ??
                                                         'N/A';
                                                 return _isExerciseUploaded(
-                                                    'Summative',
-                                                    exercise,
-                                                    unitEntry.key);
+                                                        'Summative',
+                                                        exercise,
+                                                        unitEntry.key) ||
+                                                    (item['filePath'] != null &&
+                                                        item['filePath']
+                                                            .toString()
+                                                            .isNotEmpty);
                                               }).length ==
                                               summative.length
                                           ? Colors.green
@@ -4809,14 +5006,15 @@ class _POETabContentState extends State<POETabContent> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        logBookItems.where((item) {
+                        '${logBookItems.where((item) {
                           final exercise =
                               item['exercise']?.toString() ?? 'N/A';
-                          return _isExerciseUploaded(
-                              'LogBook', exercise, unitStandard);
-                        }).isNotEmpty
-                            ? '${logBookItems.length}/${logBookItems.length}'
-                            : '0/${logBookItems.length}',
+                          final isUploaded = _isExerciseUploaded(
+                                  'LogBook', exercise, unitStandard) ||
+                              (item['filePath'] != null &&
+                                  item['filePath'].toString().isNotEmpty);
+                          return isUploaded;
+                        }).length}/${logBookItems.length}',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12,

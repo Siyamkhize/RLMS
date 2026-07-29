@@ -88,6 +88,12 @@ class _ClockInPageState extends State<ClockInPage>
   StreamSubscription? _enrollStatusSubscription;
   StreamSubscription? _enrollSuccessSubscription;
   StreamSubscription? _connectivitySubscription;
+  StreamSubscription? _serviceAccuracySub;
+  StreamSubscription? _liveGpsSub;
+  double? _currentGpsAccuracy;
+  double? _siteLat;
+  double? _siteLon;
+  bool _isWithinRange = false;
   Timer? _autoSyncTimer; // Periodic auto-sync timer
   bool _isSensorConnected = false;
   bool _isInitializing = false;
@@ -119,8 +125,64 @@ class _ClockInPageState extends State<ClockInPage>
     _initializeSensor(); // Add sensor initialization
     _setupStreams();
     _setupConnectivityListener();
+    _setupGpsListener(); // Listen for GPS accuracy
     _checkInitialConnectivity(); // Check initial connectivity status
     _setupAutoSync(); // Re-enabled with improved database lock management
+    _warmUpGPS(); // Proactively start GPS acquisition
+  }
+
+  void _setupGpsListener() {
+    // Listen to the shared accuracy stream from the service
+    _serviceAccuracySub =
+        SecureLocationService.accuracyStream.listen((accuracy) {
+      if (mounted) {
+        setState(() {
+          _currentGpsAccuracy = accuracy;
+        });
+      }
+    });
+
+    // Also start a low-intensity tracking stream to keep the GPS "warm" and UI updated
+    _startLiveGpsTracking();
+  }
+
+  void _startLiveGpsTracking() {
+    _liveGpsSub = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5, // Update every 5 meters
+      ),
+    ).listen((pos) {
+      if (mounted) {
+        bool withinRange = false;
+        if (_siteLat != null && _siteLon != null) {
+          final distance = _calculateDistance(
+              pos.latitude, pos.longitude, _siteLat!, _siteLon!);
+          // Use the same dynamic radius logic as the geofence check
+          final effectiveRadius = (50.0 + pos.accuracy).clamp(50.0, 60.0);
+          withinRange = distance <= effectiveRadius;
+        }
+
+        setState(() {
+          _currentGpsAccuracy = pos.accuracy;
+          _isWithinRange = withinRange;
+        });
+      }
+    }, onError: (e) {
+      print('[GPS_LIVE] Tracking error: $e');
+    });
+  }
+
+  void _warmUpGPS() {
+    // Start getting position in background so it's ready when they click
+    print('[GPS_WARMUP] Proactively warming up GPS for clock-in...');
+    SecureLocationService.getSecurePosition().then((result) {
+      print(
+          '[GPS_WARMUP] Warm-up complete: ${result.position.accuracy.toStringAsFixed(1)}m');
+    }).catchError((e) {
+      print(
+          '[GPS_WARMUP] Warm-up failed (expected if permissions missing): $e');
+    });
   }
 
   @override
@@ -150,6 +212,16 @@ class _ClockInPageState extends State<ClockInPage>
         debugPrint('[CLOCK_IN] Cancelling _connectivitySubscription...');
         _connectivitySubscription?.cancel();
         debugPrint('[CLOCK_IN] _connectivitySubscription cancelled');
+      }
+      if (_serviceAccuracySub != null) {
+        debugPrint('[CLOCK_IN] Cancelling _serviceAccuracySub...');
+        _serviceAccuracySub?.cancel();
+        debugPrint('[CLOCK_IN] _serviceAccuracySub cancelled');
+      }
+      if (_liveGpsSub != null) {
+        debugPrint('[CLOCK_IN] Cancelling _liveGpsSub...');
+        _liveGpsSub?.cancel();
+        debugPrint('[CLOCK_IN] _liveGpsSub cancelled');
       }
       if (_autoSyncTimer != null) {
         debugPrint('[CLOCK_IN] Cancelling _autoSyncTimer...');
@@ -496,6 +568,15 @@ class _ClockInPageState extends State<ClockInPage>
       if (mounted) {
         setState(() {
           _statusMessage = status;
+
+          // If we receive any non-error status, the sensor is clearly connected
+          if (!status.toLowerCase().contains('error') &&
+              !status.toLowerCase().contains('failed') &&
+              !status.toLowerCase().contains('timed out') &&
+              !status.toLowerCase().contains('not connected')) {
+            _isSensorConnected = true;
+          }
+
           if (status.toLowerCase().contains('error') ||
               status.toLowerCase().contains('failed') ||
               status.toLowerCase().contains('timed out')) {
@@ -1605,98 +1686,27 @@ class _ClockInPageState extends State<ClockInPage>
 
   Future<bool> _checkLocationAndRadius() async {
     try {
-      print('[GEOFENCE] Checking location permissions...');
+      print('[GEOFENCE] Acquiring secure GPS position (foreground stream)...');
+      final secure = await SecureLocationService.getSecurePosition();
+      final position = secure.position;
 
-      // Check if location services are enabled
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content:
-                  Text('Location services are disabled. Please enable GPS.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return false;
-      }
-
-      // Check location permissions
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Location permissions are denied'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-          return false;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
+      if (secure.isMockDetected) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                  'Location permissions are permanently denied. Please enable in settings.'),
+                  'Mock or emulator location detected. Use a real device with GPS.'),
               backgroundColor: Colors.red,
             ),
           );
         }
         return false;
-      }
-
-      // Get current position with extended timeout and fallback
-      print('[GEOFENCE] Getting current position...');
-      Position? position;
-
-      try {
-        position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 20), // Increased from 10s to 20s
-        );
-      } catch (e) {
-        print('[GEOFENCE] High accuracy failed, trying cached position: $e');
-        // Fallback to cached position
-        position = await Geolocator.getLastKnownPosition();
-        if (position != null) {
-          final age = DateTime.now().difference(position.timestamp);
-          if (age.inMinutes > 5) {
-            print(
-                '[GEOFENCE] Cached position too old (${age.inMinutes}min), trying medium accuracy');
-            // Try medium accuracy as last resort
-            position = await Geolocator.getCurrentPosition(
-              desiredAccuracy: LocationAccuracy.medium,
-              timeLimit: const Duration(seconds: 15),
-            );
-          } else {
-            print('[GEOFENCE] Using cached position (${age.inSeconds}s old)');
-          }
-        } else {
-          // Final fallback to medium accuracy
-          print('[GEOFENCE] No cached position, trying medium accuracy');
-          position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.medium,
-            timeLimit: const Duration(seconds: 15),
-          );
-        }
-      }
-
-      if (position == null) {
-        throw Exception('Could not obtain location after all attempts');
       }
 
       print(
           '[GEOFENCE] Current position: ${position.latitude}, ${position.longitude}');
       print('[GEOFENCE] Accuracy: ${position.accuracy} meters');
 
-      // Check if within site radius (50 meters)
       return await _isWithinSiteRadius(
         widget.classID,
         position.latitude,
@@ -1851,13 +1861,27 @@ class _ClockInPageState extends State<ClockInPage>
 
   Future<String> _detectScanner() async {
     // Try ZKTeco first
+    String scanner = 'none';
     try {
       final isZkConnected = await _fingerprintService.isSensorConnected();
-      if (isZkConnected) return 'zkteco';
+      if (isZkConnected) {
+        scanner = 'zkteco';
+      }
     } catch (_) {}
 
-    // Enhanced Futronic detection with retry
-    return await _detectFutronicWithRetry();
+    if (scanner == 'none') {
+      // Enhanced Futronic detection with retry
+      scanner = await _detectFutronicWithRetry();
+    }
+
+    // Update global sensor connection state based on detection
+    if (mounted) {
+      setState(() {
+        _isSensorConnected = scanner != 'none';
+      });
+    }
+
+    return scanner;
   }
 
   Future<String> _detectFutronicWithRetry() async {
@@ -1872,6 +1896,11 @@ class _ClockInPageState extends State<ClockInPage>
 
         if (isFutronicConnected) {
           print('[DETECT] ✅ Futronic detected on attempt $attempt!');
+          if (mounted) {
+            setState(() {
+              _isSensorConnected = true;
+            });
+          }
           return 'futronic';
         }
 
@@ -2465,7 +2494,18 @@ class _ClockInPageState extends State<ClockInPage>
 
   Future<Map<String, dynamic>?> _getLearnerForValidation(
       String learnerId) async {
-    if (await _checkConnectivity()) {
+    // Prefer local DB — profile edits are saved locally first and the server
+    // response can still be stale and overwrite unsynced changes.
+    final localLearner = await DatabaseHelper().getLearnerById(learnerId);
+    bool hasUnsyncedChanges =
+        localLearner != null && localLearner['synced'] == 0;
+
+    if (localLearner != null) {
+      print(
+          '[DEBUG clock_in_page] _getLearnerForValidation for learnerId $learnerId, got localLearner: $localLearner');
+    }
+
+    if (await _checkConnectivity() && !hasUnsyncedChanges) {
       try {
         final response = await http
             .get(
@@ -2477,25 +2517,45 @@ class _ClockInPageState extends State<ClockInPage>
           if (decoded is Map &&
               decoded['success'] == true &&
               decoded['data'] != null) {
-            return Map<String, dynamic>.from(decoded['data']);
+            print(
+                '[DEBUG clock_in_page] _getLearnerForValidation - updating local from server!');
+            final learnerData = Map<String, dynamic>.from(decoded['data']);
+            await DatabaseHelper().upsertLearner(learnerData);
+            return learnerData;
           }
         }
       } catch (_) {
         // Fall through to offline/local data
       }
+    } else if (hasUnsyncedChanges) {
+      print(
+          '[DEBUG clock_in_page] _getLearnerForValidation - local has synced=0, skipping server update!');
     }
 
-    return await DatabaseHelper().getLearnerById(learnerId);
+    // Always return local data if available!
+    if (localLearner != null) {
+      print(
+          '[DEBUG clock_in_page] _getLearnerForValidation - returning local data!');
+      return localLearner;
+    }
+
+    return null;
   }
 
   List<String> _getMissingRequiredProfileFieldLabels(
       Map<String, dynamic> learner) {
+    print(
+        '[DEBUG clock_in_page] _getMissingRequiredProfileFieldLabels called with learner: $learner');
     final missing = <String>[];
     for (final rule in _requiredProfileRules) {
       if (_isRuleMissing(learner, rule.keys)) {
+        print(
+            '[DEBUG clock_in_page] _getMissingRequiredProfileFieldLabels found missing rule: ${rule.label}');
         missing.add(rule.label);
       }
     }
+    print(
+        '[DEBUG clock_in_page] _getMissingRequiredProfileFieldLabels returning: $missing');
     return missing;
   }
 
@@ -2511,11 +2571,17 @@ class _ClockInPageState extends State<ClockInPage>
   }
 
   bool _isRuleMissing(Map<String, dynamic> learner, List<String> keys) {
+    print(
+        '[DEBUG clock_in_page] _isRuleMissing checking keys: $keys against learner keys: ${learner.keys}');
     for (final key in keys) {
-      if (!isMissingValue(learner[key])) {
+      final value = learner[key];
+      print(
+          '[DEBUG clock_in_page] _isRuleMissing - checking key $key, value: $value, isMissingValue: ${isMissingValue(value)}');
+      if (!isMissingValue(value)) {
         return false;
       }
     }
+    print('[DEBUG clock_in_page] _isRuleMissing - ALL keys missing!');
     return true;
   }
 
@@ -2534,7 +2600,9 @@ class _ClockInPageState extends State<ClockInPage>
         normalized == 'null' ||
         normalized == 'n/a' ||
         normalized == 'na' ||
-        normalized == '-';
+        normalized == '-' ||
+        normalized == 'unknown' ||
+        normalized.startsWith('1900-01-01');
   }
 
   Future<bool> _ensureLearnerBankDetailsComplete(
@@ -2709,13 +2777,19 @@ class _ClockInPageState extends State<ClockInPage>
               '[ONLINE_BANK] Found online bank details: ${bankDetails['bank_name']}');
 
           // Convert server response to format expected by the app
-          return {
+          final localBankData = {
+            'LearnerID': learnerId,
             'BankName': bankDetails['bank_name'],
             'bankType': bankDetails['bank_type'],
             'BankAccount': bankDetails['account_number'],
             'BankCode': bankDetails['bank_code'],
             'synced': bankDetails['synced'],
           };
+
+          // Update the local database
+          await DatabaseHelper().upsertBankDetails(localBankData);
+
+          return localBankData;
         } else {
           print('[ONLINE_BANK] No bank details found on server');
           return null;
@@ -2745,21 +2819,12 @@ class _ClockInPageState extends State<ClockInPage>
       text: existingBank['BankCode']?.toString() ?? '',
     );
 
-    String? selectedBank = existingBank['BankName']?.toString();
-    String? selectedAccountType = existingBank['bankType']?.toString();
-    String? errorMessage;
+    String? initialSelectedBank = existingBank['BankName']?.toString();
+    String? initialSelectedAccountType = existingBank['bankType']?.toString();
 
-    print('[BANK_DIALOG] Controllers initialized successfully');
-    print(
-        '[BANK_DIALOG] Account controller text: "${accountNumberController.text}"');
-    print(
-        '[BANK_DIALOG] Branch controller text: "${branchCodeController.text}"');
-    print('[BANK_DIALOG] Selected bank: $selectedBank');
-    print('[BANK_DIALOG] Selected account type: $selectedAccountType');
-
-    if (selectedBank != null && selectedBank.isNotEmpty) {
+    if (initialSelectedBank != null && initialSelectedBank.isNotEmpty) {
       branchCodeController.text =
-          _bankCodes[selectedBank] ?? branchCodeController.text;
+          _bankCodes[initialSelectedBank] ?? branchCodeController.text;
       print(
           '[BANK_DIALOG] Updated branch code from bank selection: "${branchCodeController.text}"');
     }
@@ -2786,6 +2851,11 @@ class _ClockInPageState extends State<ClockInPage>
               '[BANK_DIALOG] Dialog builder called - dialogContext: ${dialogContext.hashCode}');
           print(
               '[BANK_DIALOG] Dialog context widget: ${dialogContext.widget.runtimeType}');
+
+          // Declare state variables INSIDE the StatefulBuilder's scope
+          String? selectedBank = initialSelectedBank;
+          String? selectedAccountType = initialSelectedAccountType;
+          String? errorMessage;
 
           return StatefulBuilder(
             builder: (builderContext, setDialogState) {
@@ -3260,6 +3330,7 @@ class _ClockInPageState extends State<ClockInPage>
   }
 
   final List<_RequiredProfileRule> _requiredProfileRules = const [
+    _RequiredProfileRule(label: 'Title', keys: ['Title']),
     _RequiredProfileRule(label: 'Name', keys: ['Name']),
     _RequiredProfileRule(label: 'Surname', keys: ['Surname']),
     _RequiredProfileRule(label: 'ID Number', keys: ['IDNumber']),
@@ -3268,12 +3339,14 @@ class _ClockInPageState extends State<ClockInPage>
     _RequiredProfileRule(label: 'Disability', keys: ['Disability']),
     _RequiredProfileRule(
         label: 'Cellphone Number', keys: ['CellphoneNumber', 'PhoneNumber']),
+    _RequiredProfileRule(label: 'Email', keys: ['Email']),
     _RequiredProfileRule(label: 'Address Line 1', keys: ['AddressLine1']),
     _RequiredProfileRule(label: 'Address Line 2', keys: ['AddressLine2']),
     _RequiredProfileRule(label: 'Address Line 3', keys: ['AddressLine3']),
     _RequiredProfileRule(label: 'Postal Code', keys: ['PostalCode']),
     _RequiredProfileRule(label: 'Next of Kin Name', keys: ['KinName']),
     _RequiredProfileRule(label: 'Next of Kin Relation', keys: ['KinRelation']),
+    _RequiredProfileRule(label: 'Next of Kin Contact', keys: ['KinContact']),
     _RequiredProfileRule(label: 'School Name', keys: ['SchoolName']),
     _RequiredProfileRule(
         label: 'School Completion', keys: ['SchoolCompletion']),
@@ -4511,6 +4584,11 @@ class _ClockInPageState extends State<ClockInPage>
         // Continue with local data even if sync fails
       }
 
+      // Sync unsynced learner profiles
+      print('[INIT] Syncing unsynced learner profiles...');
+      await dbHelper.syncUnsyncedLearnerProfiles();
+      print('[INIT] Learner profile sync completed');
+
       // CRITICAL FIX: Sync ALL offline records from previous days when coming online
       // This ensures previous day's records are uploaded before allowing new clock-ins
       print('[INIT] Checking for offline records from previous days...');
@@ -4522,6 +4600,7 @@ class _ClockInPageState extends State<ClockInPage>
     }
 
     await _loadLearnersFromLocalDatabase();
+    await _fetchSiteCoordinates(); // Fetch site coordinates for distance monitoring
 
     // DISABLED: Automatic server fetch on page load causes all learners to appear clocked in
     // This was fetching ALL server records and inserting them into local DB
@@ -4537,6 +4616,30 @@ class _ClockInPageState extends State<ClockInPage>
 
     // Initialize search
     _setupSearch();
+  }
+
+  Future<void> _fetchSiteCoordinates() async {
+    try {
+      final dbHelper = DatabaseHelper();
+      final db = await dbHelper.database;
+      final result = await db.rawQuery(
+        'SELECT s.latitude, s.longitude FROM class c JOIN sites s ON c.siteID = s.siteID WHERE c.classID = ?',
+        [widget.classID.toString()],
+      );
+
+      if (result.isNotEmpty) {
+        setState(() {
+          _siteLat = double.tryParse(result.first['latitude'].toString());
+          _siteLon = double.tryParse(result.first['longitude'].toString());
+        });
+        print('[INIT] Fetched site coordinates: $_siteLat, $_siteLon');
+      } else {
+        print(
+            '[INIT] No site coordinates found for classID: ${widget.classID}');
+      }
+    } catch (e) {
+      print('[INIT] Error fetching site coordinates: $e');
+    }
   }
 
   Future<void> _checkForUnsyncedRecords() async {
@@ -5114,21 +5217,15 @@ class _ClockInPageState extends State<ClockInPage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Learner List: Class ${widget.classID}'),
-        actions: [
-          // Status indicator for connectivity and queue
-          GestureDetector(
-            onTap: () {
-              _showQueueStatus();
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              margin: const EdgeInsets.only(right: 8),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: _isConnected
-                    ? Colors.green.withOpacity(0.2)
-                    : Colors.red.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
+                    ? Colors.green.withOpacity(0.1)
+                    : Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: _isConnected ? Colors.green : Colors.red,
                   width: 1,
@@ -5142,81 +5239,39 @@ class _ClockInPageState extends State<ClockInPage>
                     size: 16,
                     color: _isConnected ? Colors.green : Colors.red,
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 6),
                   Text(
                     _isConnected ? 'Online' : 'Offline',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
                       color: _isConnected ? Colors.green : Colors.red,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  if (_activeRequests > 0) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.orange, width: 1),
-                      ),
-                      child: Text(
-                        '$_activeRequests',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Colors.orange,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                  if (_requestQueue.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.blue, width: 1),
-                      ),
-                      child: Text(
-                        'Q:${_requestQueue.length}',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Colors.blue,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
-          ),
+          ],
+        ),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.black,
+        actions: [
           IconButton(
             icon: const Icon(Icons.sync, color: Colors.orange),
             onPressed: _isConnected
                 ? () async {
-                    // Show loading indicator
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Syncing offline data...'),
                         backgroundColor: Colors.blue,
-                        duration: Duration(seconds: 1),
                       ),
                     );
-
-                    // Trigger fast sync
                     await _syncOfflineClockIns(showMessages: true);
-
-                    // Refresh UI immediately after sync
                     await _loadLearnersFromLocalDatabase();
                   }
                 : null,
-            tooltip:
-                _isConnected ? 'Sync Offline Data' : 'No Internet Connection',
+            tooltip: 'Sync Clock-ins',
           ),
           IconButton(
             icon: const Icon(Icons.description, color: Colors.teal),
@@ -5226,37 +5281,29 @@ class _ClockInPageState extends State<ClockInPage>
                       const SnackBar(
                         content: Text('Syncing unsynced documents...'),
                         backgroundColor: Colors.blue,
-                        duration: Duration(seconds: 1),
                       ),
                     );
                     await _syncAllUnsyncedDocuments();
                   }
                 : null,
-            tooltip: _isConnected ? 'Sync Documents' : 'No Internet Connection',
+            tooltip: 'Sync Docs',
           ),
           IconButton(
             icon: const Icon(Icons.download, color: Colors.green),
             onPressed: _isConnected
                 ? () async {
-                    // Show loading indicator
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content:
                             Text('Syncing current day records from server...'),
                         backgroundColor: Colors.blue,
-                        duration: Duration(seconds: 2),
                       ),
                     );
-
-                    // Sync CURRENT DAY clocking records from server only
                     try {
                       final syncService = SyncService();
                       await syncService
                           .syncClassClockingFromServer(widget.classID);
-
-                      // Refresh local data to show the synced records
                       await _loadAllLearnersFromLocalDatabase();
-
                       if (mounted) {
                         FingerprintErrorHandler.showSuccess(
                             context, 'Current day records synced from server!');
@@ -5269,35 +5316,27 @@ class _ClockInPageState extends State<ClockInPage>
                     }
                   }
                 : null,
-            tooltip: _isConnected
-                ? 'Sync Current Day Records from Server'
-                : 'No Internet Connection',
+            tooltip: 'Pull Server Records',
           ),
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.orange),
             onPressed: _isConnected
                 ? () async {
-                    // Show loading indicator
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Syncing learners from server...'),
                         backgroundColor: Colors.blue,
-                        duration: Duration(seconds: 1),
                       ),
                     );
-
-                    // Sync learners from server
                     try {
                       final dbHelper = DatabaseHelper();
                       await dbHelper.syncLearnersFromServer(widget.classID);
                       await _loadLearnersFromLocalDatabase();
-
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('Learners synced successfully'),
                             backgroundColor: Colors.green,
-                            duration: Duration(seconds: 2),
                           ),
                         );
                       }
@@ -5309,117 +5348,222 @@ class _ClockInPageState extends State<ClockInPage>
                     }
                   }
                 : null,
-            tooltip: _isConnected
-                ? 'Sync Learners from Server'
-                : 'No Internet Connection',
+            tooltip: 'Update Learners',
+          ),
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            onPressed: () {
+              _showQueueStatus();
+            },
+            tooltip: 'View Sync Queue Status',
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Class Information for ${widget.classID}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Learner Actions: Clock In/Out, Upload Sick Notes, View Details',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            FutureBuilder<int>(
-              future: _getUnsyncedCount(),
-              builder: (context, snapshot) {
-                if (snapshot.hasData && snapshot.data! > 0) {
-                  return Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
-                      border: Border.all(color: Colors.orange),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.warning,
-                            color: Colors.orange, size: 16),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${snapshot.data} offline record(s) waiting to sync',
-                          style: const TextStyle(
-                              color: Colors.orange, fontSize: 14),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
-            const SizedBox(height: 8),
-            // Connectivity status indicator
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: _isConnected
-                    ? Colors.green.withOpacity(0.1)
-                    : Colors.red.withOpacity(0.1),
-                border: Border.all(
-                  color: _isConnected ? Colors.green : Colors.red,
-                  width: 1,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Class Information for ${widget.classID}',
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.bold),
                 ),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _isConnected ? Icons.wifi : Icons.wifi_off,
-                    color: _isConnected ? Colors.green : Colors.red,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 8),
+                const SizedBox(height: 16),
+                const Text(
+                  'Learner Actions: Clock In/Out, Upload Sick Notes, View Details',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 16),
+                // Status Chips (GPS & Sensor)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    // GPS Status Chip
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _currentGpsAccuracy == null
+                            ? Colors.grey.withOpacity(0.1)
+                            : (!_isWithinRange && _siteLat != null
+                                ? Colors.red.withOpacity(0.1)
+                                : (_currentGpsAccuracy! <= 25
+                                    ? Colors.green.withOpacity(0.1)
+                                    : (_currentGpsAccuracy! <= 60
+                                        ? Colors.orange.withOpacity(0.1)
+                                        : Colors.red.withOpacity(0.1)))),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: _currentGpsAccuracy == null
+                              ? Colors.grey
+                              : (!_isWithinRange && _siteLat != null
+                                  ? Colors.red
+                                  : (_currentGpsAccuracy! <= 25
+                                      ? Colors.green
+                                      : (_currentGpsAccuracy! <= 60
+                                          ? Colors.orange
+                                          : Colors.red))),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            !_isWithinRange && _siteLat != null
+                                ? Icons.location_off
+                                : Icons.location_on,
+                            size: 18,
+                            color: _currentGpsAccuracy == null
+                                ? Colors.grey
+                                : (!_isWithinRange && _siteLat != null
+                                    ? Colors.red
+                                    : (_currentGpsAccuracy! <= 25
+                                        ? Colors.green
+                                        : (_currentGpsAccuracy! <= 60
+                                            ? Colors.orange
+                                            : Colors.red))),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _currentGpsAccuracy == null
+                                ? 'GPS: --'
+                                : (!_isWithinRange && _siteLat != null
+                                    ? 'OUT OF RANGE'
+                                    : 'GPS Accuracy: ${_currentGpsAccuracy!.toStringAsFixed(0)}m'),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: _currentGpsAccuracy == null
+                                  ? Colors.grey
+                                  : (!_isWithinRange && _siteLat != null
+                                      ? Colors.red
+                                      : (_currentGpsAccuracy! <= 25
+                                          ? Colors.green
+                                          : (_currentGpsAccuracy! <= 60
+                                              ? Colors.orange
+                                              : Colors.red))),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.refresh,
+                              size: 16, color: Colors.grey),
+                        ],
+                      ),
+                    ),
+                    // Sensor Status Button
+                    InkWell(
+                      onTap: _initializeSensor,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _isSensorConnected
+                              ? Colors.green.withOpacity(0.1)
+                              : Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color:
+                                _isSensorConnected ? Colors.green : Colors.red,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _isSensorConnected
+                                  ? Icons.check_circle
+                                  : Icons.usb_off,
+                              size: 18,
+                              color: _isSensorConnected
+                                  ? Colors.green
+                                  : Colors.red,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _isSensorConnected
+                                  ? 'Sensor OK'
+                                  : 'Reconnect Sensor',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: _isSensorConnected
+                                    ? Colors.green
+                                    : Colors.red,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (_statusMessage.isNotEmpty &&
+                    !_statusMessage.contains('Sensor'))
                   Text(
-                    _isConnected
-                        ? 'Connected to Internet'
-                        : 'No Internet Connection',
+                    _statusMessage,
                     style: TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: _isConnected ? Colors.green : Colors.red,
+                      color: _statusMessage.toLowerCase().contains('error') ||
+                              _statusMessage.toLowerCase().contains('failed')
+                          ? Colors.red
+                          : Colors.black,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: _refreshConnectivityStatus,
-                    child: Icon(
-                      Icons.refresh,
-                      color: _isConnected ? Colors.green : Colors.red,
-                      size: 16,
-                    ),
+              ],
+            ),
+          ),
+
+          // ==========================================
+          // 3. MAIN CONTENT
+          // ==========================================
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  FutureBuilder<int>(
+                    future: _getUnsyncedCount(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData && snapshot.data! > 0) {
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.1),
+                            border: Border.all(color: Colors.orange),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.warning,
+                                  color: Colors.orange, size: 16),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${snapshot.data} offline record(s) waiting to sync',
+                                style: const TextStyle(
+                                    color: Colors.orange, fontSize: 14),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _statusMessage,
-              style: TextStyle(
-                fontSize: 14,
-                color: _statusMessage.contains('error') ||
-                        _statusMessage.contains('failed')
-                    ? Colors.red
-                    : Colors.black,
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Search bar
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
+
+                  // Search bar
+                  TextField(
                     controller: _searchController,
                     decoration: InputDecoration(
                       labelText: 'Search by ID Number',
@@ -5432,7 +5576,7 @@ class _ClockInPageState extends State<ClockInPage>
                             )
                           : null,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -5440,335 +5584,232 @@ class _ClockInPageState extends State<ClockInPage>
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Results count
-            if (_searchQuery.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  'Found ${_filteredLearners.length} learner(s) matching "$_searchQuery"',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontStyle: FontStyle.italic,
-                    color: Colors.grey,
-                  ),
-                ),
-              ),
-            const SizedBox(height: 8),
-            _filteredLearners.isEmpty
-                ? Center(
-                    child: Text(
-                      _searchQuery.isEmpty
-                          ? 'No data available for this class'
-                          : 'No learners found matching "$_searchQuery"',
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  )
-                : Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.vertical,
-                        child: DataTable(
-                          columns: const [
-                            DataColumn(label: Text('Name')),
-                            DataColumn(label: Text('Surname')),
-                            DataColumn(label: Text('ID Number')),
-                            DataColumn(label: Text('Fingerprint')),
-                            DataColumn(label: Text('Clock In')),
-                            DataColumn(label: Text('Clock Out')),
-                            DataColumn(label: Text('Contact Time')),
-                            DataColumn(label: Text('Sick Note')),
-                            DataColumn(
-                              label: SizedBox.shrink(), // Hidden Action header
-                            ),
-                          ],
-                          rows: _filteredLearners.map((learner) {
-                            String learnerId =
-                                learner['LearnerID']?.toString() ?? 'N/A';
-                            String name = learner['Name']?.toString() ?? 'N/A';
-                            String surname =
-                                learner['Surname']?.toString() ?? 'N/A';
-                            String clockInTime = clockInTimes[learnerId] ?? '';
-                            String clockOutTime =
-                                clockOutTimes[learnerId] ?? '';
-                            String contactTime = contactTimes[learnerId] ?? '';
-                            bool hasClocking =
-                                (learner['has_clocking']?.toString() ==
-                                        'true') ??
-                                    false;
 
-                            return DataRow(
-                              cells: [
-                                DataCell(Text(name)),
-                                DataCell(Text(surname)),
-                                DataCell(Text(
-                                    learner['IDNumber']?.toString() ?? 'N/A')),
-                                // Fingerprint status column
-                                DataCell(
-                                  FutureBuilder<Map<String, String?>>(
-                                    future: DatabaseHelper()
-                                        .getFingerprints(int.parse(learnerId)),
-                                    builder: (context, snapshot) {
-                                      if (snapshot.connectionState ==
-                                          ConnectionState.waiting) {
-                                        return const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                              strokeWidth: 2),
-                                        );
-                                      }
+                  const SizedBox(height: 12),
 
-                                      if (snapshot.hasError) {
-                                        return const Icon(Icons.error,
-                                            color: Colors.red, size: 16);
-                                      }
-
-                                      final templates = snapshot.data ??
-                                          {'left': null, 'right': null};
-                                      final hasLeft =
-                                          templates['left'] != null &&
-                                              templates['left']!.isNotEmpty;
-                                      final hasRight =
-                                          templates['right'] != null &&
-                                              templates['right']!.isNotEmpty;
-
-                                      if (hasLeft || hasRight) {
-                                        return Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(Icons.fingerprint,
-                                                color: Colors.green, size: 16),
-                                            Text(
-                                                hasLeft && hasRight
-                                                    ? 'Both'
-                                                    : hasLeft
-                                                        ? 'Left'
-                                                        : 'Right',
-                                                style: const TextStyle(
-                                                    fontSize: 12,
-                                                    color: Colors.green)),
-                                          ],
-                                        );
-                                      } else {
-                                        return const Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.fingerprint,
-                                                color: Colors.red, size: 16),
-                                            Text('None',
-                                                style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: Colors.red)),
-                                          ],
-                                        );
-                                      }
-                                    },
-                                  ),
-                                ),
-                                // Clock In column: show button or time
-                                DataCell(
-                                  Builder(
-                                    builder: (context) {
-                                      // Check if learner has clocked in (either in memory OR in database)
-                                      final currentClockInTime =
-                                          clockInTimes[learnerId];
-                                      final hasCurrentClockIn =
-                                          currentClockInTime != null &&
-                                              currentClockInTime.isNotEmpty;
-
-                                      if (!hasCurrentClockIn) {
-                                        // No clock-in time - show button
-                                        return Tooltip(
-                                          message: hasClocking
-                                              ? 'Clock in for today'
-                                              : 'Learner has never clocked in',
-                                          child: ElevatedButton(
-                                            onPressed:
-                                                _isClockingIn[learnerId] == true
-                                                    ? null
-                                                    : () => _verifyAndClockIn(
-                                                        learnerId),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.green,
-                                            ),
-                                            child: const Text('Clock In'),
-                                          ),
-                                        );
-                                      } else {
-                                        // Has clock-in time - show it
-                                        return Tooltip(
-                                          message: hasClocking
-                                              ? 'Earliest clock-in: $currentClockInTime'
-                                              : 'Clocked in today',
-                                          child: Text(
-                                            currentClockInTime,
-                                            style: const TextStyle(
-                                                color: Colors.green,
-                                                fontWeight: FontWeight.bold),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                  ),
-                                ),
-                                // Clock Out column: show button, time, or status
-                                DataCell(
-                                  Builder(
-                                    builder: (context) {
-                                      // Check current state from memory
-                                      final currentClockInTime =
-                                          clockInTimes[learnerId];
-                                      final currentClockOutTime =
-                                          clockOutTimes[learnerId];
-                                      final hasCurrentClockIn =
-                                          currentClockInTime != null &&
-                                              currentClockInTime.isNotEmpty;
-                                      final hasCurrentClockOut =
-                                          currentClockOutTime != null &&
-                                              currentClockOutTime.isNotEmpty;
-
-                                      // Debug logging
-                                      if (learnerId ==
-                                          widget.learners.first['LearnerID']) {
-                                        print(
-                                            '[CLOCK_OUT_UI] LearnerID: $learnerId');
-                                        print(
-                                            '[CLOCK_OUT_UI] currentClockInTime: $currentClockInTime');
-                                        print(
-                                            '[CLOCK_OUT_UI] currentClockOutTime: $currentClockOutTime');
-                                        print(
-                                            '[CLOCK_OUT_UI] hasCurrentClockIn: $hasCurrentClockIn');
-                                        print(
-                                            '[CLOCK_OUT_UI] hasCurrentClockOut: $hasCurrentClockOut');
-                                        print(
-                                            '[CLOCK_OUT_UI] hasClocking: $hasClocking');
-                                      }
-
-                                      if (!hasCurrentClockIn) {
-                                        // No clock-in yet - can't clock out
-                                        return Text(
-                                          hasClocking
-                                              ? '-'
-                                              : 'Never clocked in',
-                                          style: const TextStyle(
-                                              color: Colors.grey,
-                                              fontStyle: FontStyle.italic),
-                                        );
-                                      } else if (hasCurrentClockOut) {
-                                        // Has clocked out - show time
-                                        return Text(
-                                          currentClockOutTime,
-                                          style: const TextStyle(
-                                              color: Colors.red,
-                                              fontWeight: FontWeight.bold),
-                                        );
-                                      } else {
-                                        // Clocked in but not out - show clock out button
-                                        print(
-                                            '[CLOCK_OUT_UI] Showing Clock Out button for learner $learnerId');
-                                        return Tooltip(
-                                          message: 'Clock out learner',
-                                          child: ElevatedButton(
-                                            onPressed:
-                                                _isClockingIn[learnerId] == true
-                                                    ? null
-                                                    : () => _verifyAndClockOut(
-                                                        learnerId),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.red,
-                                            ),
-                                            child: const Text('Clock Out'),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                  ),
-                                ),
-                                // Contact Time column
-                                DataCell(
-                                  Builder(
-                                    builder: (context) {
-                                      // Check current state from memory (redefine here for this scope)
-                                      final currentClockInTime =
-                                          clockInTimes[learnerId];
-                                      final currentContactTime =
-                                          contactTimes[learnerId];
-                                      final hasCurrentClockIn =
-                                          currentClockInTime != null &&
-                                              currentClockInTime.isNotEmpty;
-                                      final hasCurrentContact =
-                                          currentContactTime != null &&
-                                              currentContactTime.isNotEmpty;
-
-                                      if (!hasCurrentClockIn) {
-                                        // No clock-in - no contact time possible
-                                        return Text(
-                                          hasClocking ? '-' : 'No records',
-                                          style: const TextStyle(
-                                              color: Colors.grey,
-                                              fontStyle: FontStyle.italic),
-                                        );
-                                      } else if (hasCurrentContact) {
-                                        // Has contact time - show it
-                                        return Text(
-                                          currentContactTime,
-                                          style: const TextStyle(
-                                              color: Colors.blue,
-                                              fontWeight: FontWeight.bold),
-                                        );
-                                      } else {
-                                        // Clocked in but no contact time yet
-                                        return const Text('-',
-                                            style:
-                                                TextStyle(color: Colors.grey));
-                                      }
-                                    },
-                                  ),
-                                ),
-                                // Sick Note column
-                                DataCell(
-                                  Tooltip(
-                                    message:
-                                        'Upload a sick note for this learner',
-                                    child: ElevatedButton.icon(
-                                      onPressed: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => SickNotePage(
-                                              learnerID: int.parse(learnerId),
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.blue[100],
-                                      ),
-                                      icon: const Icon(Icons.medical_services,
-                                          size: 18),
-                                      label: const Text('Sick Note'),
-                                    ),
-                                  ),
-                                ),
-                                // Action column: Empty cell (Details button hidden)
-                                const DataCell(
-                                  SizedBox.shrink(), // Empty cell
-                                ),
-                              ],
-                            );
-                          }).toList(),
+                  // Results count
+                  if (_searchQuery.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        'Found ${_filteredLearners.length} learner(s) matching "$_searchQuery"',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontStyle: FontStyle.italic,
+                          color: Colors.grey,
                         ),
                       ),
                     ),
-                  )
-          ],
-        ),
+
+                  // Learners List
+                  Expanded(
+                    child: _filteredLearners.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.person_off,
+                                    size: 64, color: Colors.grey.shade300),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _searchQuery.isEmpty
+                                      ? 'No learners found for this class'
+                                      : 'No learners match your search',
+                                  style: TextStyle(
+                                      color: Colors.grey.shade500,
+                                      fontSize: 16),
+                                ),
+                              ],
+                            ),
+                          )
+                        : SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.vertical,
+                              child: DataTable(
+                                columns: const [
+                                  DataColumn(label: Text('Name')),
+                                  DataColumn(label: Text('Surname')),
+                                  DataColumn(label: Text('ID Number')),
+                                  DataColumn(label: Text('Fingerprint')),
+                                  DataColumn(label: Text('Clock In')),
+                                  DataColumn(label: Text('Clock Out')),
+                                  DataColumn(label: Text('Contact Time')),
+                                  DataColumn(label: Text('Sick Note')),
+                                ],
+                                rows: _filteredLearners.map((learner) {
+                                  String learnerId =
+                                      learner['LearnerID']?.toString() ?? 'N/A';
+                                  String name =
+                                      learner['Name']?.toString() ?? 'N/A';
+                                  String surname =
+                                      learner['Surname']?.toString() ?? 'N/A';
+                                  String clockInTime =
+                                      clockInTimes[learnerId] ?? '';
+                                  String clockOutTime =
+                                      clockOutTimes[learnerId] ?? '';
+                                  String contactTime =
+                                      contactTimes[learnerId] ?? '';
+
+                                  return DataRow(
+                                    cells: [
+                                      DataCell(Text(name)),
+                                      DataCell(Text(surname)),
+                                      DataCell(Text(
+                                          learner['IDNumber']?.toString() ??
+                                              'N/A')),
+                                      // Fingerprint status column
+                                      DataCell(_buildFingerprintStatusIndicator(
+                                          learnerId)),
+                                      // Clock In column
+                                      DataCell(
+                                        clockInTime.isEmpty
+                                            ? ElevatedButton(
+                                                onPressed:
+                                                    _isClockingIn[learnerId] ==
+                                                            true
+                                                        ? null
+                                                        : () =>
+                                                            _verifyAndClockIn(
+                                                                learnerId),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.green,
+                                                  foregroundColor: Colors.white,
+                                                ),
+                                                child: const Text('Clock In'),
+                                              )
+                                            : Text(
+                                                clockInTime,
+                                                style: const TextStyle(
+                                                    color: Colors.green,
+                                                    fontWeight:
+                                                        FontWeight.bold),
+                                              ),
+                                      ),
+                                      // Clock Out column
+                                      DataCell(
+                                        clockInTime.isEmpty
+                                            ? const Text('-')
+                                            : (clockOutTime.isEmpty
+                                                ? ElevatedButton(
+                                                    onPressed: _isClockingIn[
+                                                                learnerId] ==
+                                                            true
+                                                        ? null
+                                                        : () =>
+                                                            _verifyAndClockOut(
+                                                                learnerId),
+                                                    style: ElevatedButton
+                                                        .styleFrom(
+                                                      backgroundColor:
+                                                          Colors.red,
+                                                      foregroundColor:
+                                                          Colors.white,
+                                                    ),
+                                                    child:
+                                                        const Text('Clock Out'),
+                                                  )
+                                                : Text(
+                                                    clockOutTime,
+                                                    style: const TextStyle(
+                                                        color: Colors.red,
+                                                        fontWeight:
+                                                            FontWeight.bold),
+                                                  )),
+                                      ),
+                                      // Contact Time column
+                                      DataCell(Text(contactTime.isEmpty
+                                          ? '-'
+                                          : contactTime)),
+                                      // Sick Note column
+                                      DataCell(
+                                        ElevatedButton.icon(
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    SickNotePage(
+                                                  learnerID:
+                                                      int.parse(learnerId),
+                                                  learnerName: '$name $surname',
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.blue[100],
+                                          ),
+                                          icon: const Icon(
+                                              Icons.medical_services,
+                                              size: 18),
+                                          label: const Text('Sick'),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildTimeInfo(String label, String time, Color color) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          const SizedBox(height: 4),
+          Text(
+            time.isNotEmpty ? time : '--:--',
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: time.isNotEmpty ? color : Colors.grey.shade400),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFingerprintStatusIndicator(String learnerId) {
+    return FutureBuilder<Map<String, String?>>(
+      future: DatabaseHelper().getFingerprints(int.parse(learnerId)),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2));
+        }
+        final templates = snapshot.data ?? {'left': null, 'right': null};
+        final hasLeft =
+            templates['left'] != null && templates['left']!.isNotEmpty;
+        final hasRight =
+            templates['right'] != null && templates['right']!.isNotEmpty;
+
+        if (hasLeft || hasRight) {
+          return Tooltip(
+            message: hasLeft && hasRight
+                ? 'Both hands'
+                : (hasLeft ? 'Left hand' : 'Right hand'),
+            child: const Icon(Icons.fingerprint, color: Colors.green, size: 24),
+          );
+        } else {
+          return const Tooltip(
+            message: 'No fingerprints enrolled',
+            child: Icon(Icons.fingerprint, color: Colors.red, size: 24),
+          );
+        }
+      },
     );
   }
 }

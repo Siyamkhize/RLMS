@@ -88,6 +88,12 @@ try {
     }
 
     $exerciseName = $exercise['exercise'];
+    
+    // Safety check: Truncate exercise name if it's too long for VARCHAR(255)
+    if (strlen($exerciseName) > 255) {
+        $exerciseName = substr($exerciseName, 0, 252) . '...';
+    }
+    
     $specificOutcomeStr = implode(',', $specificOutcome);
 
     // Check database connection

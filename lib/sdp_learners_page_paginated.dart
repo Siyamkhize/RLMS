@@ -473,7 +473,7 @@ class _SdpLearnersPagePaginatedState extends State<SdpLearnersPagePaginated> {
     try {
       final learnerData = _learners.firstWhere(
         (l) => l['LearnerID'].toString() == learnerId.toString(),
-        orElse: () => {},
+        orElse: () => <String, dynamic>{},
       );
       
       final classId = learnerData['classID']?.toString();

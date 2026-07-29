@@ -28,6 +28,7 @@ if ($conn->connect_error) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $learnerID = $_POST['learnerID'] ?? '';
     $type = $_POST['type'] ?? '';
+    $unit_standard_name = $_POST['unit_standard_name'] ?? '';
     
     // Check if this is a bulk upload or individual upload
     $isBulkUpload = isset($_POST['exercises']) && !empty($_POST['exercises']);
@@ -158,13 +159,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         error_log("Processing $totalFiles files for " . count($exercises) . " exercises");
 
-        // Validate file count matches exercise count
-        if ($totalFiles !== count($exercises)) {
+        // Validate file count matches exercise count OR it's a unit standard upload (one file)
+        if (!$isUnitStandardUpload && $totalFiles !== count($exercises)) {
             error_log("File count mismatch: Expected " . count($exercises) . " files, received $totalFiles");
             ob_end_clean();
             echo json_encode([
                 'status' => 'error', 
                 'message' => "File count mismatch. Expected " . count($exercises) . " files, received $totalFiles"
+            ]);
+            $conn->close();
+            exit;
+        }
+
+        if ($isUnitStandardUpload && $totalFiles !== 1) {
+            error_log("Unit standard upload requires exactly one file, received $totalFiles");
+            ob_end_clean();
+            echo json_encode([
+                'status' => 'error', 
+                'message' => "Unit standard upload requires exactly one file, received $totalFiles"
             ]);
             $conn->close();
             exit;
@@ -307,31 +319,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         if ($isUnitStandardUpload) {
-            // For unit standard uploads, save only one document entry with a special exercise name
-            $unitStandardExercise = 'All ' . $type . ' Questions';
-            $filePath = $filePaths[0]; // Use the first file since they're all the same
+            // For unit standard uploads, save one document entry for each exercise, all using the same file path
+            $filePath = $filePaths[0]; // Use the first (and only) file
             
-            $stmt = $conn->prepare('INSERT INTO poe (learnerID, exercise, type, filePath, logbook_text) VALUES (?, ?, ?, ?, ?)');
-            if (!$stmt) {
-                throw new Exception('Database prepare error: ' . $conn->error);
-            }
+            // Check if unitStandard column exists first
+            $checkColumnStmt = $conn->query("SHOW COLUMNS FROM poe LIKE 'unitStandard'");
+            $hasUnitStandardColumn = $checkColumnStmt->num_rows > 0;
+            $checkColumnStmt->close();
             
-            $logbookText = '';
-            $stmt->bind_param('sssss', $learnerID, $unitStandardExercise, $type, $filePath, $logbookText);
-            
-            if ($stmt->execute()) {
-                $successCount = 1;
-                $insertedExercises = [$unitStandardExercise];
-                $insertedFiles = [$filePath];
-                error_log("Successfully inserted unit standard upload: learnerID=$learnerID, exercise=$unitStandardExercise, type=$type, filePath=$filePath");
+            if ($hasUnitStandardColumn) {
+                $stmt = $conn->prepare('INSERT INTO poe (learnerID, exercise, type, filePath, logbook_text, unitStandard) VALUES (?, ?, ?, ?, ?, ?)');
+                if (!$stmt) {
+                    throw new Exception('Database prepare error: ' . $conn->error);
+                }
             } else {
-                throw new Exception('Failed to insert unit standard upload: ' . $stmt->error);
+                $stmt = $conn->prepare('INSERT INTO poe (learnerID, exercise, type, filePath, logbook_text) VALUES (?, ?, ?, ?, ?)');
+                if (!$stmt) {
+                    throw new Exception('Database prepare error: ' . $conn->error);
+                }
             }
+            
+            $successCount = 0;
+            $insertedExercises = [];
+            $insertedFiles = [];
+            
+            // Insert each exercise with the same file
+            for ($i = 0; $i < count($exercises); $i++) {
+                $exercise = $exercises[$i];
+                $logbookText = '';
+                
+                if ($hasUnitStandardColumn) {
+                    $stmt->bind_param('ssssss', $learnerID, $exercise, $type, $filePath, $logbookText, $unit_standard_name);
+                } else {
+                    $stmt->bind_param('sssss', $learnerID, $exercise, $type, $filePath, $logbookText);
+                }
+                
+                if ($stmt->execute()) {
+                    $successCount++;
+                    $insertedExercises[] = $exercise;
+                    $insertedFiles[] = $filePath;
+                    error_log("Successfully inserted: learnerID=$learnerID, exercise=$exercise, type=$type, filePath=$filePath" . ($hasUnitStandardColumn ? ", unitStandard=$unit_standard_name" : ""));
             
             $stmt->close();
         } else {
             // Regular bulk upload - insert each exercise with its corresponding file
-            $stmt = $conn->prepare('INSERT INTO poe (learnerID, exercise, type, filePath, logbook_text) VALUES (?, ?, ?, ?, ?)');
+            // Check if unitStandard column exists first
+            $checkColumnStmt = $conn->query("SHOW COLUMNS FROM poe LIKE 'unitStandard'");
+            $hasUnitStandardColumn = $checkColumnStmt->num_rows > 0;
+            $checkColumnStmt->close();
+            
+            if ($hasUnitStandardColumn) {
+                $stmt = $conn->prepare('INSERT INTO poe (learnerID, exercise, type, filePath, logbook_text, unitStandard) VALUES (?, ?, ?, ?, ?, ?)');
+            } else {
+                $stmt = $conn->prepare('INSERT INTO poe (learnerID, exercise, type, filePath, logbook_text) VALUES (?, ?, ?, ?, ?)');
+            }
+            
             if (!$stmt) {
                 throw new Exception('Database prepare error: ' . $conn->error);
             }
@@ -346,13 +388,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $filePath = $filePaths[$i];
                 $logbookText = $isBulkUpload ? '' : ($logbookTexts[$i] ?? '');
                 
-                $stmt->bind_param('sssss', $learnerID, $exercise, $type, $filePath, $logbookText);
+                if ($hasUnitStandardColumn) {
+                    $stmt->bind_param('ssssss', $learnerID, $exercise, $type, $filePath, $logbookText, $unit_standard_name);
+                } else {
+                    $stmt->bind_param('sssss', $learnerID, $exercise, $type, $filePath, $logbookText);
+                }
                 
                 if ($stmt->execute()) {
                     $successCount++;
                     $insertedExercises[] = $exercise;
                     $insertedFiles[] = $filePath;
-                    error_log("Successfully inserted: learnerID=$learnerID, exercise=$exercise, type=$type, filePath=$filePath");
+                    error_log("Successfully inserted: learnerID=$learnerID, exercise=$exercise, type=$type, filePath=$filePath" . ($hasUnitStandardColumn ? ", unitStandard=$unit_standard_name" : ""));
                 } else {
                     throw new Exception('Failed to insert exercise: ' . $exercise . ' - ' . $stmt->error);
                 }

@@ -664,7 +664,7 @@ class DatabaseHelper {
 
   Future<Database> _initDatabase() async {
     final path = await getDatabasesPath();
-    return openDatabase(join(path, _dbName), version: 9,
+    return openDatabase(join(path, _dbName), version: 10,
         onUpgrade: (db, oldVersion, newVersion) async {
       debugPrint(
           '[DB] Upgrading database from version $oldVersion to $newVersion');
@@ -889,6 +889,46 @@ class DatabaseHelper {
           debugPrint('[DB] Created monitoring_records table for version 9');
         } catch (e) {
           debugPrint('[DB] Error creating monitoring_records table: $e');
+        }
+      }
+
+      if (oldVersion < 10) {
+        // Add missing columns to material_receipt_form table
+        try {
+          // Check if each column exists before adding
+          final columns =
+              await db.rawQuery("PRAGMA table_info('material_receipt_form')");
+          final existingColumns =
+              columns.map((c) => c['name']?.toString().toLowerCase()).toSet();
+
+          if (!existingColumns.contains('sub_description')) {
+            await db.execute(
+                'ALTER TABLE material_receipt_form ADD COLUMN sub_description TEXT');
+            debugPrint(
+                '[DB] Added sub_description column to material_receipt_form');
+          }
+
+          if (!existingColumns.contains('date_aor_created')) {
+            await db.execute(
+                'ALTER TABLE material_receipt_form ADD COLUMN date_aor_created TEXT');
+            debugPrint(
+                '[DB] Added date_aor_created column to material_receipt_form');
+          }
+
+          if (!existingColumns.contains('facilitator_signature')) {
+            await db.execute(
+                'ALTER TABLE material_receipt_form ADD COLUMN facilitator_signature TEXT');
+            debugPrint(
+                '[DB] Added facilitator_signature column to material_receipt_form');
+          }
+
+          if (!existingColumns.contains('learnerid')) {
+            await db.execute(
+                'ALTER TABLE material_receipt_form ADD COLUMN learnerID TEXT');
+            debugPrint('[DB] Added learnerID column to material_receipt_form');
+          }
+        } catch (e) {
+          debugPrint('[DB] Error adding columns to material_receipt_form: $e');
         }
       }
     }, onCreate: (db, dbVersion) async {
@@ -1191,13 +1231,11 @@ class DatabaseHelper {
          learnerID INTEGER,
          exercise TEXT,
          type TEXT,
-         unitStandard TEXT,
          filePath TEXT,
          submitted_at timestamp,
          synced INTEGER DEFAULT 0,
          logbook_text TEXT 
 )
-
           ''',
       );
 
@@ -1238,17 +1276,21 @@ updated_at TIMESTAMP
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       student_id_number TEXT NOT NULL,
       student_full_name TEXT NOT NULL,
+      learnerID TEXT,
       class_name TEXT NOT NULL,
        received TEXT NOT NULL CHECK(received IN ('Yes', 'No')) DEFAULT 'No',
       quantity INTEGER NOT NULL DEFAULT 1,
       description TEXT,
+      sub_description TEXT,
       date_received TEXT,
+      date_aor_created TEXT,
       practitioner_full_name TEXT,  -- Matches MySQL
       learner_signature TEXT,  -- Matches MySQL
+      facilitator_signature TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       synced INTEGER NOT NULL DEFAULT 0
     )
-    ''');
+''');
 
       // Create monitoring_records table for offline monitoring support
       await db.execute('''
@@ -1907,6 +1949,53 @@ updated_at TIMESTAMP
     );
   }
 
+  /// Resolve classID, siteID, and project_id for a learner via local SQLite.
+  Future<Map<String, String?>> getLearnerTraceability(String learnerId) async {
+    final db = await database;
+
+    final results = await db.rawQuery('''
+      SELECT ld.classID, c.siteID, s.project_id
+      FROM learnerdetails ld
+      LEFT JOIN class c ON ld.classID = c.classID
+      LEFT JOIN sites s ON c.siteID = s.siteID
+      WHERE ld.LearnerID = ?
+    ''', [learnerId]);
+
+    String? classId;
+    String? siteId;
+    String? projectId;
+
+    if (results.isNotEmpty) {
+      classId = results.first['classID']?.toString();
+      siteId = results.first['siteID']?.toString();
+      projectId = results.first['project_id']?.toString();
+    }
+
+    if (classId != null &&
+        classId.isNotEmpty &&
+        (siteId == null ||
+            siteId.isEmpty ||
+            projectId == null ||
+            projectId.isEmpty)) {
+      final classResults = await db.rawQuery('''
+        SELECT c.siteID, s.project_id
+        FROM class c
+        LEFT JOIN sites s ON c.siteID = s.siteID
+        WHERE c.classID = ?
+      ''', [classId]);
+      if (classResults.isNotEmpty) {
+        siteId ??= classResults.first['siteID']?.toString();
+        projectId ??= classResults.first['project_id']?.toString();
+      }
+    }
+
+    return {
+      'classID': classId,
+      'siteID': siteId,
+      'project_id': projectId,
+    };
+  }
+
   //get data with clockindata
   Future<List<Map<String, dynamic>>> getLearnersWithClockingData(
       String classID) async {
@@ -2398,6 +2487,18 @@ updated_at TIMESTAMP
       siteData,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+  // Insert or replace bank details for a learner
+  Future<void> upsertBankDetails(Map<String, dynamic> bankData) async {
+    final db = await database;
+    await db.insert(
+      'bankdetails',
+      bankData,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    print(
+        '[DB_HELPER] Upserted bank details for learner: ${bankData['LearnerID']}');
   }
 
   // Get all sites from the database
@@ -3216,16 +3317,17 @@ updated_at TIMESTAMP
     try {
       final db = await database;
 
+      // Remove unitStandard handling (we don't use it anymore)
+      String uniqueExercise = exercise;
+
       // Check if record already exists
       final existing = await db.query(
         'poe',
-        where:
-            'learnerID = ? AND type = ? AND exercise = ? AND unitStandard = ?',
+        where: 'learnerID = ? AND type = ? AND exercise = ?',
         whereArgs: [
           learnerID.toString(),
           type,
-          exercise,
-          (unitStandard ?? '').trim(),
+          uniqueExercise,
         ],
       );
 
@@ -3237,19 +3339,16 @@ updated_at TIMESTAMP
             'filePath': filePath,
             'submitted_at': DateTime.now().toIso8601String(),
             'synced': synced,
-            'unitStandard': (unitStandard ?? '').trim(),
           },
-          where:
-              'learnerID = ? AND type = ? AND exercise = ? AND unitStandard = ?',
+          where: 'learnerID = ? AND type = ? AND exercise = ?',
           whereArgs: [
             learnerID.toString(),
             type,
-            exercise,
-            (unitStandard ?? '').trim(),
+            uniqueExercise,
           ],
         );
         print(
-            "POE upload updated (synced=$synced): learnerID=$learnerID, type=$type, exercise=$exercise, filePath=$filePath");
+            "POE upload updated (synced=$synced): learnerID=$learnerID, type=$type, exercise=$uniqueExercise, filePath=$filePath");
       } else {
         // Insert new record
         await db.insert(
@@ -3257,15 +3356,14 @@ updated_at TIMESTAMP
           {
             'learnerID': learnerID.toString(),
             'type': type,
-            'exercise': exercise,
-            'unitStandard': (unitStandard ?? '').trim(),
+            'exercise': uniqueExercise,
             'filePath': filePath,
             'submitted_at': DateTime.now().toIso8601String(),
             'synced': synced,
           },
         );
         print(
-            "POE upload inserted (synced=$synced): learnerID=$learnerID, type=$type, exercise=$exercise, filePath=$filePath");
+            "POE upload inserted (synced=$synced): learnerID=$learnerID, type=$type, exercise=$uniqueExercise, filePath=$filePath");
       }
     } catch (e, stackTrace) {
       print("Error saving POE upload: $e\nStackTrace: $stackTrace");
@@ -3279,16 +3377,16 @@ updated_at TIMESTAMP
     try {
       final db = await database;
 
+      String uniqueExercise = exercise;
+
       // Check if record already exists
       final existing = await db.query(
         'poe',
-        where:
-            'learnerID = ? AND type = ? AND exercise = ? AND unitStandard = ?',
+        where: 'learnerID = ? AND type = ? AND exercise = ?',
         whereArgs: [
           learnerID.toString(),
           type,
-          exercise,
-          (unitStandard ?? '').trim(),
+          uniqueExercise,
         ],
       );
 
@@ -3301,19 +3399,16 @@ updated_at TIMESTAMP
             'submitted_at': DateTime.now().toIso8601String(),
             'synced':
                 0, // Set to 0 for manual entries so they can be updated later by a scan
-            'unitStandard': (unitStandard ?? '').trim(),
           },
-          where:
-              'learnerID = ? AND type = ? AND exercise = ? AND unitStandard = ?',
+          where: 'learnerID = ? AND type = ? AND exercise = ?',
           whereArgs: [
             learnerID.toString(),
             type,
-            exercise,
-            (unitStandard ?? '').trim(),
+            uniqueExercise,
           ],
         );
         print(
-            "Manual POE entry updated: learnerID=$learnerID, type=$type, exercise=$exercise, filePath=$filePath");
+            "Manual POE entry updated: learnerID=$learnerID, type=$type, exercise=$uniqueExercise, filePath=$filePath");
       } else {
         // Insert new record
         await db.insert(
@@ -3321,8 +3416,7 @@ updated_at TIMESTAMP
           {
             'learnerID': learnerID.toString(),
             'type': type,
-            'exercise': exercise,
-            'unitStandard': (unitStandard ?? '').trim(),
+            'exercise': uniqueExercise,
             'filePath': filePath,
             'submitted_at': DateTime.now().toIso8601String(),
             'synced':
@@ -3330,7 +3424,7 @@ updated_at TIMESTAMP
           },
         );
         print(
-            "Manual POE entry inserted: learnerID=$learnerID, type=$type, exercise=$exercise, filePath=$filePath");
+            "Manual POE entry inserted: learnerID=$learnerID, type=$type, exercise=$uniqueExercise, filePath=$filePath");
       }
     } catch (e, stackTrace) {
       print("Error saving manual POE entry: $e\nStackTrace: $stackTrace");
@@ -3348,119 +3442,30 @@ updated_at TIMESTAMP
       );
       final uploadStatus = <String, bool>{};
 
-      // Get unit standard mapping from exercise names
-      final unitStandardMapping = await _extractUnitStandardFromExercise();
-
-      // Get all formative/summative questions from API for proper key generation
-      final apiQuestions = await _getAllQuestionsFromAPI(learnerID);
-
       for (var upload in uploads) {
         final type = upload['type']?.toString() ?? '';
         final exercise = upload['exercise']?.toString() ?? '';
 
-        // Generate old format key (for backward compatibility)
-        final oldKey = '$type-$exercise-$learnerID';
-        uploadStatus[oldKey] = true;
+        // Generate old-style keys (type-exercise-learnerID) for maximum compatibility
+        final oldKeyRaw = '$type-$exercise-$learnerID';
+        uploadStatus[oldKeyRaw] = true;
 
-        // Check if this is an "All Questions" record
-        final isAllQuestionsFormat = exercise.contains('All Questions');
+        String normalizedTypeOld = type;
+        if (type.toLowerCase() == 'formative') normalizedTypeOld = 'Formative';
+        if (type.toLowerCase() == 'summative') normalizedTypeOld = 'Summative';
+        if (type.toLowerCase() == 'logbook') normalizedTypeOld = 'LogBook';
+        if (type.toLowerCase() == 'formativeremedial')
+          normalizedTypeOld = 'FormativeRemedial';
+        if (type.toLowerCase() == 'summativeremedial')
+          normalizedTypeOld = 'SummativeRemedial';
 
-        if (isAllQuestionsFormat) {
-          // Extract unit standard ID from "All Questions" exercise
-          final unitIdMatch = RegExp(r'- (\d{4,10}) -').firstMatch(exercise);
-          if (unitIdMatch != null) {
-            final unitId = unitIdMatch.group(1)!;
-            // Try to get full name from the mapping we'll build or the hardcoded list
-            String? fullUnitName = _getFullUnitStandardName(unitId);
-
-            // If not in hardcoded list, try to find it in the exercise string itself
-            if (fullUnitName == null) {
-              final fullNameMatch =
-                  RegExp(r'- (\d{4,10} - [^-]+)').firstMatch(exercise);
-              if (fullNameMatch != null) {
-                fullUnitName = fullNameMatch.group(1);
-              }
-            }
-
-            if (fullUnitName != null) {
-              // Mark all individual questions for this unit standard and type as completed
-              final questionsForUnit = apiQuestions
-                  .where((q) =>
-                          q['unitStandardId'] == unitId &&
-                          q['type'] ==
-                              type.replaceAll(
-                                  'Remedial', '') // Remove Remedial suffix
-                      )
-                  .toList();
-
-              for (var question in questionsForUnit) {
-                final questionText = question['exercise'] as String;
-
-                // Generate keys for individual questions
-                final oldQuestionKey = '$type-$questionText-$learnerID';
-                final newQuestionKey =
-                    '$type-$questionText-$fullUnitName-$learnerID';
-
-                uploadStatus[oldQuestionKey] = true;
-                uploadStatus[newQuestionKey] = true;
-
-                // Also generate keys without Remedial suffix for compatibility
-                if (type.contains('Remedial')) {
-                  final baseType = type.replaceAll('Remedial', '');
-                  final baseOldKey = '$baseType-$questionText-$learnerID';
-                  final baseNewKey =
-                      '$baseType-$questionText-$fullUnitName-$learnerID';
-                  uploadStatus[baseOldKey] = true;
-                  uploadStatus[baseNewKey] = true;
-                }
-              }
-
-              print(
-                  'Expanded All Questions for $unitId $type: ${questionsForUnit.length} individual questions marked as completed');
-            }
-          }
-        }
-
-        // Try to extract unit standard from exercise name or use mapping
-        String? unitStandard;
-
-        // Check if exercise contains unit standard info (like "All Questions - 9964 - Apply health...")
-        final unitStandardMatch =
-            RegExp(r'- (\d{4,10} - [^-]+)').firstMatch(exercise);
-        if (unitStandardMatch != null) {
-          unitStandard = unitStandardMatch.group(1);
-        } else {
-          // Try to find unit standard from mapping based on exercise content
-          unitStandard = unitStandardMapping[exercise];
-        }
-
-        // Generate new format key if unit standard is available
-        if (unitStandard != null && unitStandard.isNotEmpty) {
-          final newKey = '$type-$exercise-$unitStandard-$learnerID';
-          uploadStatus[newKey] = true;
-        }
-
-        // Also try to match with known unit standards for individual questions
-        if (unitStandard == null) {
-          // Extract potential unit standard ID from exercise content
-          final idMatch = RegExp(r'\b(\d{4,10})\b').firstMatch(exercise);
-          if (idMatch != null) {
-            final unitId = idMatch.group(1);
-            final fullUnitName = _getFullUnitStandardName(unitId!);
-            if (fullUnitName != null) {
-              final newKey = '$type-$exercise-$fullUnitName-$learnerID';
-              uploadStatus[newKey] = true;
-            }
-          }
-        }
+        final oldKeyNorm = '$normalizedTypeOld-$exercise-$learnerID';
+        uploadStatus[oldKeyNorm] = true;
       }
 
-      print(
-          "Local upload status for learnerID $learnerID: ${uploadStatus.length} keys generated");
-      print("Sample keys: ${uploadStatus.keys.take(5).toList()}");
       return uploadStatus;
-    } catch (e, stackTrace) {
-      print("Error fetching local upload status: $e\nStackTrace: $stackTrace");
+    } catch (e) {
+      print('Error getting local upload status: $e');
       return {};
     }
   }
@@ -5381,25 +5386,45 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
         for (var learner in learnersData) {
           try {
             String learnerId = learner['LearnerID']?.toString() ?? '';
+            // Check if learner exists locally
+            final existingLearner = existingLearnersMap[learnerId];
+
+            // Build learner data, merging server and existing local data
+            // For each field: use server value if present, otherwise use existing local value
             Map<String, dynamic> learnerData = {
               'LearnerID': learnerId,
-              'Name': learner['Name']?.toString() ?? '',
-              'Surname': learner['Surname']?.toString() ?? '',
-              'IDNumber': learner['IDNumber']?.toString() ?? '',
-              'DateOfBirth': learner['DateOfBirth']?.toString() ?? '',
-              'PhoneNumber': learner['PhoneNumber']?.toString() ?? '',
-              'Email': learner['Email']?.toString() ?? '',
-              'Title': learner['Title']?.toString() ?? '',
               'classID': classID,
               'synced': 1, // Mark as synced since it came from server
             };
 
+            // List of all fields we want to merge
+            final fieldsToMerge = [
+              'Title', 'Name', 'Surname', 'IDNumber', 'DateOfBirth',
+              'PhoneNumber', 'Email', 'Age', 'Gender', 'Race',
+              'Language', 'Disability', 'AddressLine1', 'AddressLine2',
+              'AddressLine3', 'PostalCode', 'KinName', 'KinRelation',
+              'KinContact', 'SchoolName', 'SchoolCompletion',
+              'SchoolLocation', 'SchoolGrade', 'profile_image',
+              'signature', 'imagePath', 'activity_statu',
+              'witness_initials', 'learner_initials', 'witness_signature',
+              // Fingerprint fields handled separately below
+            ];
+
+            for (var field in fieldsToMerge) {
+              final serverValue = learner[field]?.toString();
+              final localValue = existingLearner?[field]?.toString();
+
+              // Use server value if it's present and not empty, otherwise use local value
+              if (serverValue != null && serverValue.isNotEmpty) {
+                learnerData[field] = serverValue;
+              } else if (localValue != null && localValue.isNotEmpty) {
+                learnerData[field] = localValue;
+              }
+            }
+
             // Process fingerprint templates - merge server data with existing local data
             // Server data takes priority, but preserve local data if server has none
             Map<String, String> fingerprintData = {};
-
-            // Check if learner exists locally
-            final existingLearner = existingLearnersMap[learnerId];
 
             // Start with existing local templates if any
             if (existingLearner != null) {
@@ -5593,6 +5618,159 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
     } catch (e) {
       debugPrint('[SYNC] Error syncing learners: $e');
       throw Exception('Failed to sync learners: $e');
+    }
+  }
+
+  Future<void> syncUnsyncedLearnerProfiles() async {
+    try {
+      debugPrint(
+          '[SYNC-LEARNER-PROFILE] Starting sync of unsynced learner profiles');
+
+      final db = await database;
+      final unsyncedLearners = await db.query(
+        'learnerdetails',
+        where: 'synced = ?',
+        whereArgs: [0],
+      );
+
+      if (unsyncedLearners.isEmpty) {
+        debugPrint('[SYNC-LEARNER-PROFILE] No unsynced learner profiles found');
+        return;
+      }
+
+      debugPrint(
+          '[SYNC-LEARNER-PROFILE] Found ${unsyncedLearners.length} unsynced learner profiles');
+
+      // Check internet connectivity
+      bool hasInternet = false;
+      try {
+        final connectivityResult = await Connectivity().checkConnectivity();
+        hasInternet = connectivityResult.isNotEmpty &&
+            connectivityResult.first != ConnectivityResult.none;
+      } catch (e) {
+        debugPrint('[SYNC-LEARNER-PROFILE] Error checking connectivity: $e');
+      }
+
+      if (!hasInternet) {
+        debugPrint(
+            '[SYNC-LEARNER-PROFILE] No internet - skipping sync of learner profiles');
+        return;
+      }
+
+      int syncedCount = 0;
+      for (var learner in unsyncedLearners) {
+        try {
+          final learnerId = learner['LearnerID'].toString();
+
+          // Build update data with all non-null, non-empty fields
+          Map<String, dynamic> updateData = {};
+
+          // List of fields we want to sync
+          final fieldsToSync = [
+            'Title',
+            'Name',
+            'Surname',
+            'IDNumber',
+            'DateOfBirth',
+            'PhoneNumber',
+            'Email',
+            'Age',
+            'Gender',
+            'Race',
+            'Language',
+            'Disability',
+            'AddressLine1',
+            'AddressLine2',
+            'AddressLine3',
+            'PostalCode',
+            'KinName',
+            'KinRelation',
+            'KinContact',
+            'SchoolName',
+            'SchoolCompletion',
+            'SchoolLocation',
+            'SchoolGrade',
+            'profile_image',
+            'signature',
+            'imagePath',
+            'activity_statu',
+            'witness_initials',
+            'learner_initials',
+            'witness_signature',
+            'zkteco_left_template',
+            'zkteco_right_template',
+            'futronic_left_template',
+            'futronic_right_template',
+            'sourceafis_template',
+            'fingerprint_template',
+            'isLeftHand',
+          ];
+
+          for (var field in fieldsToSync) {
+            final value = learner[field];
+            if (value != null && value.toString().isNotEmpty) {
+              updateData[field] = value;
+            }
+          }
+
+          if (updateData.isEmpty) {
+            debugPrint(
+                '[SYNC-LEARNER-PROFILE] No fields to sync for learner $learnerId - marking as synced');
+            await db.update(
+              'learnerdetails',
+              {'synced': 1},
+              where: 'LearnerID = ?',
+              whereArgs: [learnerId],
+            );
+            syncedCount++;
+            continue;
+          }
+
+          debugPrint(
+              '[SYNC-LEARNER-PROFILE] Syncing learner profile for $learnerId with fields: ${updateData.keys}');
+
+          final response = await http
+              .post(
+                Uri.parse(AppConfig.updateLearnerUrl),
+                headers: {'Content-Type': 'application/json'},
+                body: jsonEncode({
+                  'LearnerID': learnerId,
+                  'data': updateData,
+                }),
+              )
+              .timeout(const Duration(seconds: 10));
+
+          if (response.statusCode == 200) {
+            final jsonResponse = jsonDecode(response.body);
+            if (jsonResponse['success'] == true) {
+              debugPrint(
+                  '[SYNC-LEARNER-PROFILE] Successfully synced learner profile for $learnerId');
+              await db.update(
+                'learnerdetails',
+                {'synced': 1},
+                where: 'LearnerID = ?',
+                whereArgs: [learnerId],
+              );
+              syncedCount++;
+            } else {
+              debugPrint(
+                  '[SYNC-LEARNER-PROFILE] Server rejected update for learner $learnerId: ${jsonResponse['message']}');
+            }
+          } else {
+            debugPrint(
+                '[SYNC-LEARNER-PROFILE] Failed to sync learner $learnerId: HTTP ${response.statusCode}');
+          }
+        } catch (e) {
+          debugPrint(
+              '[SYNC-LEARNER-PROFILE] Error syncing learner profile: $e');
+        }
+      }
+
+      debugPrint(
+          '[SYNC-LEARNER-PROFILE] Successfully synced $syncedCount/${unsyncedLearners.length} learner profiles');
+    } catch (e) {
+      debugPrint(
+          '[SYNC-LEARNER-PROFILE] Error syncing unsynced learner profiles: $e');
     }
   }
 
@@ -6917,6 +7095,9 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
       String learnerID, Map<String, dynamic> updateData) async {
     try {
       final db = await database;
+
+      // learnerdetails uses DateOfBirth — there is no DOB column locally.
+      updateData.remove('DOB');
 
       // Add synced status to indicate this needs to be synced later
       updateData['synced'] = 0;

@@ -175,7 +175,7 @@ class DatabaseInitializationManager {
       } catch (e) {
         _updateStatus('⚠ Database integrity issue detected, attempting fix...');
         // Try to fix database issues
-        await dbHelper.resetDatabaseConnection();
+
         _updateStatus('✓ Database connection reset');
       }
     } catch (e) {

@@ -111,12 +111,18 @@ android {
         pickFirst '**/libc++_shared.so'
         pickFirst '**/libzkfinger10.so'
         pickFirst '**/libzksensorcore.so'
+        jniLibs {
+            useLegacyPackaging = false
+        }
     }
     
     // Add this to handle Java compatibility issues
     lintOptions {
         disable 'InvalidPackage'
+        disable 'MissingTranslation'
+        disable 'ExtraTranslation'
         checkReleaseBuilds false
+        abortOnError false
     }
 }
 

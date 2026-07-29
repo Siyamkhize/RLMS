@@ -1,0 +1,92 @@
+╔════════════════════════════════════════════════════════════════╗
+║         APPENDIX I FIX - NOW SHOWING RECOMMENDATION DATA      ║
+╚════════════════════════════════════════════════════════════════╝
+
+PROBLEM:
+Appendix I was showing "Not Yet Recorded" instead of displaying 
+the recommendation data that exists in the database.
+
+ROOT CAUSE:
+The system didn't know which trade the learner was enrolled in,
+so it couldn't query the correct recommendation table.
+
+SOLUTION:
+Auto-detect the learner's trade from their class enrollment,
+then query the correct trade-specific recommendation table.
+
+────────────────────────────────────────────────────────────────
+
+WHAT WAS CHANGED:
+
+File: web/arpl_pdf.php (Lines 23-61)
+
+Before:
+  $ofo_code defaults to '642601' (Plumber)
+  Result: Wrong table queried → No data found
+
+After:
+  1. Check if ofo_code in URL
+  2. If not: Look up class → Get trade/qualification_id
+  3. Use correct OFO code to query right table
+  4. Result: Correct data found and displayed
+
+────────────────────────────────────────────────────────────────
+
+HOW IT WORKS NOW:
+
+1. PDF receives: learnerID=20286, classID=782
+2. System looks up: classID 782 → qualification_id 671101
+3. System knows: 671101 = Electrician  
+4. System queries: arplelectrician_access_recommendation
+5. Result: Finds Status="Ready"
+6. Display: ✓ APPROVED FOR TRADE TEST
+
+────────────────────────────────────────────────────────────────
+
+WHAT YOU'LL SEE:
+
+When generating PDF for Learner 20286, Appendix I now shows:
+
+  ✓ APPROVED FOR TRADE TEST
+  Status: Ready 🟢 GREEN
+  Recommendation ID: 129
+  Last Updated: 9 Jul 2026 14:31
+  
+  Data Source: arplelectrician_access_recommendation
+
+────────────────────────────────────────────────────────────────
+
+DEBUG OUTPUT:
+
+At the bottom of Appendix I, you can see:
+
+  DEBUG: OFO: 671101, Learner: 20286, Table: 
+         arplelectrician_access_recommendation, FOUND
+
+This tells you:
+  - OFO: 671101 = Electrician (auto-detected)
+  - Table: Which table was queried
+  - FOUND = Data was found and displayed
+
+────────────────────────────────────────────────────────────────
+
+VERIFICATION:
+
+✓ PHP Syntax: No errors
+✓ Auto-detection: Working
+✓ Database query: Returns correct data
+✓ Display: Shows recommendation properly
+
+────────────────────────────────────────────────────────────────
+
+READY TO USE ✓
+
+Generate the PDF and the Appendix I section should now display:
+- ✓ Recommendation status (APPROVED or NOT READY)
+- ✓ Status color coding (Green, Red, or Gray)
+- ✓ Recommendation ID
+- ✓ All details from the database
+
+No more "Not Yet Recorded" when data exists!
+
+════════════════════════════════════════════════════════════════

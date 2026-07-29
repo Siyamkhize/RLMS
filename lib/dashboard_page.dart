@@ -13,6 +13,7 @@ import 'sync_service.dart' show syncSingleClockIn, syncSingleClockOut;
 import 'EnrollmentPage.dart';
 import 'facilitator_fingerprint_page.dart';
 import 'attendance_page.dart';
+import 'POECollectionPage.dart';
 import 'monitoring_service.dart';
 // import 'random_prompt_service.dart';
 // import 'random_biometric_prompt_page.dart';
@@ -1875,8 +1876,9 @@ class _DashboardPageState extends State<DashboardPage> {
                 _buildMenuItem(Icons.monitor, 'Learner Material', 4),
                 _buildMenuItem(Icons.monitor, 'Learning Material Form', 5),
                 _buildMenuItem(Icons.fingerprint, 'Fingerprint Clock In', 6),
-                // _buildMenuItem(Icons.fingerprint, 'Contact Less Clock In', 7),
-                _buildMenuItem(Icons.people, 'Attendance', 8),
+                _buildMenuItem(Icons.folder, 'POE Collection', 7),
+                // _buildMenuItem(Icons.fingerprint, 'Contact Less Clock In', 8),
+                _buildMenuItem(Icons.people, 'Attendance', 9),
                 // _buildMenuItem(Icons.fingerprint_outlined, 'My Fingerprints', 9),
                 _buildMenuItem(Icons.logout, 'Logout', 11),
               ],
@@ -2061,18 +2063,17 @@ class _DashboardPageState extends State<DashboardPage> {
         );
         break;
       case 7:
-        // Navigate to ContactlessClockInPage
+        // Navigate to POE Collection Page
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ContactlessClockInPage(
+            builder: (context) => POECollectionPage(
               classID: widget.classID,
-              learners: currentLearners,
             ),
           ),
         );
         break;
-      case 8:
+      case 9:
         // Navigate to Attendance Page
         Navigator.push(
           context,
@@ -2083,7 +2084,7 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         );
         break;
-      case 9:
+      case 10:
         // Navigate to Facilitator Fingerprint Management
         _navigateToFacilitatorFingerprints();
         break;

@@ -1,0 +1,98 @@
+================================================================================
+ARPL ASSESSOR UI ISSUE - QUICK REFERENCE
+================================================================================
+
+PROBLEM:
+--------
+ARPL assessor logs in → sees NORMAL assessor UI instead of ARPL UI
+- No ARPL Toolkit
+- No Appendices A-H
+- Wrong menu items
+
+ROOT CAUSE:
+-----------
+mobile/get_classes.php on online server is missing Project_pathway field
+
+VISUAL FLOW:
+------------
+
+CURRENT (BROKEN):
+  Assessor Login
+       ↓
+  get_classes.php (missing Project_pathway)
+       ↓
+  Response: {project_id, classID, className, ...}  ← NO Project_pathway
+       ↓
+  App checks: if pathway contains 'ARPL'
+       ↓
+  Pathway = null/empty → NOT ARPL
+       ↓
+  Show NORMAL assessor menu ❌
+
+AFTER FIX (CORRECT):
+  Assessor Login
+       ↓
+  get_classes.php (INCLUDES Project_pathway)
+       ↓
+  Response: {project_id, Project_pathway: "ARPL", classID, ...}  ✓
+       ↓
+  App checks: if pathway contains 'ARPL'
+       ↓
+  Pathway = "ARPL" → IS ARPL ✓
+       ↓
+  Show ARPL assessor menu ✅
+
+SOLUTION:
+---------
+File: mobile/get_classes.php on online server
+
+ADD THIS LINE:
+  s.Project_pathway,
+
+TO THIS QUERY (line ~19):
+  SELECT 
+      s.project_id, 
+      s.Project_pathway,     ← ADD THIS
+      c.* 
+  FROM class c
+  JOIN sites s ON s.siteID = c.siteID
+  WHERE f.facilitator_id = ?
+
+AFTER FIX - TEST:
+-----------------
+1. Update file on online server
+2. Run: curl "https://rlms.rlms.co.za/mobile/get_classes.php?facilitator_id=123"
+3. Check response includes: "Project_pathway": "ARPL"
+4. Clear app cache: adb shell pm clear com.example.rlmss
+5. Login again → ARPL menu should appear
+
+TIME TO FIX:
+------------
+5 minutes to update
+2 minutes to test
+= 7 minutes total
+
+IMPACT:
+-------
+HIGH - Blocks all ARPL functionality until fixed
+
+FILES AFFECTED:
+---------------
+1. mobile/get_classes.php (on online server) ← CRITICAL
+2. All other 57 endpoints (pending deployment)
+3. 26 database tables (pending deployment)
+
+STATUS:
+-------
+Local: ✅ Fixed
+Online: 🚨 AWAITING DEPLOYMENT
+
+NEXT STEPS:
+-----------
+1. SSH to online server
+2. Edit mobile/get_classes.php
+3. Add s.Project_pathway to SELECT
+4. Save & test
+5. Retest ARPL login on device
+
+================================================================================

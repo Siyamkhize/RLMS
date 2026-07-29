@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Button Enabling</title>
+    <style>
+        .item { border: 1px solid #ccc; padding: 10px; margin: 5px; cursor: pointer; }
+        .item.active { background: blue; color: white; }
+        .btn { padding: 10px 20px; margin: 10px; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <h1>Test: Button Enable/Disable on Click</h1>
+    
+    <h2>Items</h2>
+    <div id="itemsList"></div>
+    
+    <h2>Controls</h2>
+    <button id="btnContinue" onclick="goNext()" disabled>Continue</button>
+    
+    <h2>Debug</h2>
+    <div id="debug"></div>
+    
+    <script>
+        let selectedItem = null;
+        
+        function selectItem(element, id) {
+            // Remove active from all
+            document.querySelectorAll('.item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Add active to clicked
+            element.classList.add('active');
+            selectedItem = id;
+            
+            // Enable button
+            const btn = document.getElementById('btnContinue');
+            if (btn) {
+                btn.disabled = false;
+            }
+            
+            document.getElementById('debug').innerHTML = `Selected: ${id}<br>Button disabled: ${btn.disabled}`;
+        }
+        
+        function goNext() {
+            alert('Going to next page with: ' + selectedItem);
+        }
+        
+        // Simulate loading items
+        function loadItems() {
+            const items = [
+                {id: 1, name: 'Item 1'},
+                {id: 2, name: 'Item 2'},
+                {id: 3, name: 'Item 3'}
+            ];
+            
+            let html = '';
+            items.forEach(item => {
+                html += `<div class="item" onclick="selectItem(this, ${item.id})">${item.name}</div>`;
+            });
+            
+            document.getElementById('itemsList').innerHTML = html;
+        }
+        
+        // Initialize
+        window.addEventListener('DOMContentLoaded', function() {
+            loadItems();
+        });
+    </script>
+</body>
+</html>

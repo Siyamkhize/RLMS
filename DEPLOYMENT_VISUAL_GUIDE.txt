@@ -1,0 +1,395 @@
+================================================================================
+                 VISUAL DEPLOYMENT GUIDE
+         Web ARPL Portfolio Generator → Apache XAMPP
+================================================================================
+
+                            CURRENT STATE
+================================================================================
+
+BEFORE DEPLOYMENT:
+
+    Your Computer
+    ├─ C:\projects\rlmss\
+    │  └─ web/
+    │     ├─ index.php
+    │     ├─ classes.php
+    │     ├─ learners.php
+    │     ├─ api/
+    │     │  ├─ get_arpl_trades.php
+    │     │  ├─ get_arpl_classes.php
+    │     │  ├─ get_arpl_class_learners.php
+    │     │  └─ get_arpl_complete_data.php
+    │     ├─ assets/
+    │     └─ ... (other files)
+    │
+    └─ C:\xampp\
+       └─ htdocs/
+          ├─ assessorReport2/           ✅ WORKING
+          └─ ... (other existing apps)
+
+
+WHAT USER TRIED:
+    Browser: http://localhost:8080/rlmss/web/index.php
+    Apache looked here: C:\xampp\htdocs\rlmss\web\
+    Result: 404 NOT FOUND ❌
+
+    Why? Apache doesn't have access to C:\projects\
+
+
+================================================================================
+                           SOLUTION
+================================================================================
+
+COPY FILES FROM PROJECT TO APACHE:
+
+    C:\projects\rlmss\web\*
+            ↓
+            ↓  COPY
+            ↓
+    C:\xampp\htdocs\web\*
+
+
+RESULT AFTER DEPLOYMENT:
+
+    Your Computer
+    ├─ C:\projects\rlmss\                      (Source - unchanged)
+    │  └─ web/
+    │
+    └─ C:\xampp\
+       └─ htdocs/                               (Apache serves from here)
+          ├─ assessorReport2/                   ✅ Still works
+          ├─ web/                               ✅ NEW - Your portal
+          │  ├─ index.php
+          │  ├─ classes.php
+          │  ├─ learners.php
+          │  ├─ api/
+          │  └─ assets/
+          └─ ... (other files)
+
+
+NEW CORRECT URL:
+    Browser: http://localhost:8080/web/index.php  ✅ WORKS
+    Apache finds: C:\xampp\htdocs\web\index.php
+
+
+================================================================================
+                      HOW TO COPY FILES
+================================================================================
+
+OPTION 1: WINDOWS EXPLORER (EASIEST)
+═════════════════════════════════════
+
+Step 1: Open File Explorer
+        [Start] → [File Explorer]
+
+Step 2: Navigate to Source
+        C:\projects\rlmss\web\
+        
+        You should see:
+        ├─ index.php
+        ├─ classes.php
+        ├─ api/ folder
+        ├─ assets/ folder
+        └─ ... (other files)
+
+Step 3: Select All Files
+        [Ctrl + A]
+        
+Step 4: Copy
+        [Ctrl + C]
+        
+Step 5: Navigate to Destination
+        C:\xampp\htdocs\
+        
+Step 6: Paste
+        [Ctrl + V]
+        
+        If asked "Replace files?" → Click YES
+        
+Step 7: Wait for copy to complete
+        
+Step 8: Done ✓
+
+
+OPTION 2: POWERSHELL (FASTEST - RECOMMENDED)
+═════════════════════════════════════════════
+
+Step 1: Open PowerShell as Administrator
+        [Right-click Start] → [Windows PowerShell (Admin)]
+        
+Step 2: Copy entire command block below:
+
+        $ts = Get-Date -Format "yyyyMMdd_HHmmss"
+        if (Test-Path "C:\xampp\htdocs\web") { 
+            Write-Host "Backing up existing files..." -ForegroundColor Yellow
+            Rename-Item "C:\xampp\htdocs\web" "web_backup_$ts" -Force
+        }
+        Copy-Item -Path "C:\projects\rlmss\web\*" -Destination "C:\xampp\htdocs\web" -Recurse -Force
+        if (Test-Path "C:\xampp\htdocs\web\index.php") {
+            Write-Host "✓ SUCCESS: Files deployed" -ForegroundColor Green
+            Write-Host "✓ URL: http://localhost:8080/web/index.php" -ForegroundColor Green
+        } else {
+            Write-Host "✗ ERROR: Deployment failed" -ForegroundColor Red
+        }
+        
+Step 3: Right-click in PowerShell → [Paste]
+        
+Step 4: Press [Enter]
+        
+Step 5: Wait for success message
+        
+Step 6: Done ✓
+
+
+OPTION 3: COMMAND PROMPT (SIMPLE)
+═════════════════════════════════
+
+Step 1: Open Command Prompt as Administrator
+        [Right-click Start] → [Command Prompt (Admin)]
+        
+Step 2: Paste this command:
+        xcopy "C:\projects\rlmss\web\*" "C:\xampp\htdocs\web\" /E /I /Y
+        
+Step 3: Press [Enter]
+        
+Step 4: Wait for completion message
+        
+Step 5: Done ✓
+
+
+================================================================================
+                         AFTER DEPLOYMENT
+================================================================================
+
+VERIFY FILES COPIED
+═══════════════════
+
+Open File Explorer → Navigate to: C:\xampp\htdocs\web\
+
+You should see:
+├─ index.php              ✓
+├─ classes.php            ✓
+├─ learners.php           ✓
+├─ generate_pdf.php       ✓
+├─ api/                   ✓ (folder)
+├─ assets/                ✓ (folder)
+└─ README.md              ✓
+
+If all exist → COPY SUCCESSFUL ✓
+
+
+TEST IN BROWSER
+═══════════════
+
+1. Open Web Browser (Chrome, Firefox, Edge, etc.)
+
+2. Type URL: http://localhost:8080/web/index.php
+
+3. You should see:
+
+    ┌────────────────────────────────────────┐
+    │  ARPL Portfolio Generator              │
+    │                                        │
+    │  ┌──────────────┐  ┌──────────────┐   │
+    │  │ Electrician  │  │ Bricklaying  │   │
+    │  │              │  │              │   │
+    │  │    671101    │  │    641201    │   │
+    │  └──────────────┘  └──────────────┘   │
+    │                                        │
+    │  ┌──────────────┐                      │
+    │  │  Plumbing    │                      │
+    │  │              │                      │
+    │  │    671102    │                      │
+    │  └──────────────┘                      │
+    │                                        │
+    │      [Continue to Classes] ▶           │
+    └────────────────────────────────────────┘
+
+✓ If you see this → DEPLOYMENT SUCCESSFUL
+
+
+TEST FULL WORKFLOW
+═══════════════════
+
+1. Click "Electrician" card
+   ↓ (Should highlight)
+
+2. Click "Continue to Classes" button
+   ↓ (Page loads classes)
+
+3. Wait for classes to load
+   ↓ (You should see class list)
+
+4. Click on a class
+   ↓ (Page loads learners)
+
+5. You should see:
+
+   ┌─────────────────────────────────────────┐
+   │ Selected: Electrician - Class A          │
+   │                                          │
+   │ ┌──────┬──────┬────┬──────┬──────────┐  │
+   │ │Name  │ ID   │ Age│Gend │ Status   │  │
+   │ ├──────┼──────┼────┼──────┼──────────┤  │
+   │ │John D│12345 │ 25 │ M   │Enrolled  │  │
+   │ │ Generate ARPL ▶                    │  │
+   │ ├──────┼──────┼────┼──────┼──────────┤  │
+   │ │Jane S│12346 │ 28 │ F   │Enrolled  │  │
+   │ │ Generate ARPL ▶                    │  │
+   │ └──────┴──────┴────┴──────┴──────────┘  │
+   └─────────────────────────────────────────┘
+
+✓ If you see learners with "Generate ARPL ▶" → DEPLOYMENT VERIFIED
+
+
+================================================================================
+                        TROUBLESHOOTING
+================================================================================
+
+PROBLEM: Still getting 404 error
+─────────────────────────────────
+
+CHECK:
+□ Apache is running
+  - XAMPP Control Panel should show Apache as "Running"
+  - If not: Click [Start] button next to Apache
+  
+□ Files actually copied to C:\xampp\htdocs\web\
+  - Open File Explorer
+  - Navigate to C:\xampp\htdocs\web\
+  - Should see index.php file there
+  
+□ Try restarting Apache
+  - XAMPP Control Panel
+  - Click [Stop] Apache
+  - Wait 2 seconds
+  - Click [Start] Apache
+  
+□ Clear browser cache
+  - In browser: Ctrl + F5
+  - (Hard refresh - clears cache)
+
+
+PROBLEM: Can see trade cards but classes won't load
+────────────────────────────────────────────────────
+
+CHECK:
+□ MySQL is running
+  - XAMPP Control Panel should show MySQL as "Running"
+  - If not: Click [Start] button
+  
+□ Database exists
+  - Database name: rlmsrlmsco_ezxcmacd_rlms
+  - Should be from your RLMS mobile app
+  
+□ Check browser console for errors
+  - Press F12 on keyboard
+  - Click "Console" tab
+  - Look for red error messages
+
+
+PROBLEM: Getting "Database Connection Failed"
+──────────────────────────────────────────────
+
+CHECK:
+□ MySQL is running (check XAMPP)
+□ Database name is correct in connection.php
+□ Database has "class" table
+□ class table has data with trades:
+   - ofoNumber 671101 (Electrician)
+   - ofoNumber 641201 (Bricklaying)
+   - ofoNumber 671102 (Plumbing)
+
+
+PROBLEM: Files won't copy / Permission denied
+──────────────────────────────────────────────
+
+SOLUTION:
+□ Run as Administrator
+  - Right-click Command Prompt/PowerShell
+  - Select "Run as Administrator"
+  
+□ If C:\xampp\htdocs\web\ locked:
+  - Restart Apache (Stop → Wait → Start)
+  - Then try copying again
+
+
+================================================================================
+                        SUCCESS CHECKLIST
+================================================================================
+
+You know deployment worked when:
+
+☐ Can access http://localhost:8080/web/index.php
+☐ See 3 trade cards (Electrician, Bricklaying, Plumbing)
+☐ Can click a trade card
+☐ Classes list loads
+☐ Can select a class
+☐ Learners appear in a table
+☐ See "Generate ARPL ▶" button next to each learner
+☐ SessionStorage shows selected trade & class
+☐ No red errors in browser console (F12)
+
+✓ ALL ABOVE = DEPLOYMENT VERIFIED ✓✓✓
+
+
+================================================================================
+                          WHAT'S NEXT
+================================================================================
+
+Once deployment is verified:
+
+PHASE 3 → PDF GENERATION
+
+Features to implement:
+• Click "Generate ARPL ▶" → PDF downloads
+• PDF contains 24 pages:
+  - Cover page
+  - Portfolio checklist
+  - Supporting documents (ID, CV, certs)
+  - Appendices A-I
+  - Gap closure report
+  - Assessment registers
+  - Trade test results
+
+Timeline: 1-2 sessions after deployment verification
+
+
+================================================================================
+                         QUICK REFERENCE
+================================================================================
+
+COPY FROM:      C:\projects\rlmss\web\*
+COPY TO:        C:\xampp\htdocs\web\*
+TEST URL:       http://localhost:8080/web/index.php
+DATABASE:       rlmsrlmsco_ezxcmacd_rlms (auto from connection.php)
+TIME TO DEPLOY: 5 minutes
+TIME TO TEST:   2 minutes
+TOTAL TIME:     ~7 minutes
+
+
+================================================================================
+                        FINAL STEPS
+================================================================================
+
+1. Choose one copy method (Explorer, PowerShell, or Command Prompt)
+2. Run the copy command or manually copy files
+3. Open browser to: http://localhost:8080/web/index.php
+4. Verify you see trade cards
+5. Click through the workflow
+6. Tell me "It works!" ✓
+
+That's it! Easy deployment in 7 minutes.
+
+================================================================================
+Questions? Check these files:
+
+START_HERE_DEPLOYMENT.md ........... Quick start (READ FIRST)
+DEPLOY_COMMANDS.txt ............... Copy-paste commands
+DEPLOY_STEP_BY_STEP.txt ........... Detailed steps
+DEPLOYMENT_STATUS_JULY_10.md ...... Full status report
+
+
+Created: July 10, 2026
+Status: Ready for Deployment
+================================================================================

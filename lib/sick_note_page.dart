@@ -2,550 +2,783 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_doc_scanner/flutter_doc_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:intl/intl.dart';
-import 'package:sqflite/sqflite.dart';
-import 'database_helper.dart';
 import 'config.dart';
+import 'services/camera_resource_manager.dart';
 import 'utils/scanner_pdf_resolver.dart';
 
 class SickNotePage extends StatefulWidget {
   final int learnerID;
+  final String learnerName;
 
   const SickNotePage({
-    super.key,
+    Key? key,
     required this.learnerID,
-  });
+    required this.learnerName,
+  }) : super(key: key);
 
   @override
-  State<SickNotePage> createState() => _SickNotePageState();
+  _SickNotePageState createState() => _SickNotePageState();
 }
 
 class _SickNotePageState extends State<SickNotePage> {
-  static const _practitionerTypes = ['Doctor', 'Nurse', 'Other'];
-  static const _maxFileSize = 5 * 1024 * 1024; // 5MB
-  static const _minFileSize = 100 * 1024; // 100KB
+  final TextEditingController _practiceNameController = TextEditingController();
+  final TextEditingController _practitionerNameController =
+      TextEditingController();
+  final TextEditingController _dateFromController = TextEditingController();
+  final TextEditingController _dateToController = TextEditingController();
 
-  bool _isScanning = false;
+  String _practitionerType = 'Doctor';
+  DateTime? _selectedDateFrom;
+  DateTime? _selectedDateTo;
   File? _scannedPdf;
-  String? _learnerName;
-  String? _learnerSurname;
-  String? _selectedPractitionerType = 'Doctor';
-  bool _showOtherPractitionerField = false;
+  String? _pdfFileName;
 
-  final _formKey = GlobalKey<FormState>();
-  final _practiceNameController = TextEditingController();
-  final _medicalPractitionerController = TextEditingController();
-  final _practitionerNameController = TextEditingController();
-  final _dateFromController = TextEditingController();
-  final _dateToController = TextEditingController();
+  bool _isSubmitting = false;
+  bool _isScanning = false;
+  bool _isCheckingEligibility = true;
+  bool _isEligible = false;
+  String? _eligibilityMessage;
+  List<String> _validDates = []; // List of valid selectable dates
+  Map<String, bool> _clockedDates = {}; // Map of dates where learner clocked in
+
+  final CameraResourceManager _cameraManager = CameraResourceManager();
 
   @override
   void initState() {
     super.initState();
-    _fetchLearnerDetails();
+    _checkEligibility();
   }
 
   @override
   void dispose() {
     _practiceNameController.dispose();
-    _medicalPractitionerController.dispose();
     _practitionerNameController.dispose();
     _dateFromController.dispose();
     _dateToController.dispose();
+    _cameraManager.markMLKitScannerInactive();
     super.dispose();
   }
 
-  // UI Methods
+  /// Check eligibility and get valid dates from backend
+  Future<void> _checkEligibility() async {
+    setState(() => _isCheckingEligibility = true);
 
-  void _showSnackBar(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message, style: const TextStyle(color: Colors.white)),
-        backgroundColor: isError ? Colors.red : Colors.green,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-
-  Future<bool> _showScanningInstructions() async {
-    return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Scanning Instructions'),
-        content: const Text(
-          '1. Place document on a flat, contrasting surface (e.g., dark table).\n'
-              '2. Ensure even, moderate lighting (avoid glare or shadows).\n'
-              '3. Position camera to capture entire page.\n'
-              '4. Scanner will auto-detect edges and focus on text.\n'
-              '5. Hold steady until scan is captured.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Proceed'),
-          ),
-        ],
-      ),
-    ) ??
-        false;
-  }
-
-  void _clearForm() {
-    _practiceNameController.clear();
-    _medicalPractitionerController.clear();
-    _practitionerNameController.clear();
-    _dateFromController.clear();
-    _dateToController.clear();
-    setState(() {
-      _selectedPractitionerType = 'Doctor';
-      _showOtherPractitionerField = false;
-      _scannedPdf = null;
-    });
-  }
-
-  // Data Validation Methods
-
-  String? _validateDateFrom(String? value) {
-    if (value == null || value.isEmpty) return 'Required';
     try {
-      final selectedDate = DateFormat('yyyy-MM-dd').parse(value);
-      final now = DateTime.now();
-      final fiveDaysAgo = now.subtract(const Duration(days: 5));
-      return selectedDate.isBefore(fiveDaysAgo)
-          ? 'Date must be within 5 days from today'
-          : null;
-    } catch (e) {
-      return 'Invalid date format';
-    }
-  }
-
-  String? _validateDateTo(String? value) {
-    if (value == null || value.isEmpty) return 'Required';
-    try {
-      final dateTo = DateFormat('yyyy-MM-dd').parse(value);
-      final dateFrom = DateFormat('yyyy-MM-dd').parse(_dateFromController.text);
-      return dateTo.isBefore(dateFrom)
-          ? 'Date To must be on or after Date From'
-          : null;
-    } catch (e) {
-      return 'Invalid date format';
-    }
-  }
-
-  // Data Handling Methods
-
-  Future<void> _fetchLearnerDetails() async {
-    try {
-      final dbHelper = DatabaseHelper();
-      final db = await dbHelper.database;
-      final result = await db.query(
-        'learnerdetails',
-        where: 'LearnerID = ?',
-        whereArgs: [widget.learnerID.toString()],
+      final response = await http.post(
+        Uri.parse(AppConfig.getSickNoteEligibleDatesUrl),
+        body: {'learner_id': widget.learnerID.toString()},
       );
 
-      if (result.isNotEmpty) {
-        setState(() {
-          _learnerName = result.first['Name']?.toString() ?? 'Unknown';
-          _learnerSurname = result.first['Surname']?.toString() ?? 'Unknown';
-        });
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data['status'] == 'success' && data['is_eligible'] == true) {
+          // Extract valid dates
+          List<String> validDates = [];
+          Map<String, bool> clockedDates = {};
+
+          if (data['dates'] != null) {
+            for (var dateObj in data['dates']) {
+              String date = dateObj['date'];
+              bool isSelectable = dateObj['is_selectable'] == true;
+
+              if (isSelectable) {
+                validDates.add(date);
+              } else {
+                // Mark as clocked/unavailable
+                clockedDates[date] = true;
+              }
+            }
+          }
+
+          setState(() {
+            _isEligible = true;
+            _validDates = validDates;
+            _clockedDates = clockedDates;
+          });
+        } else {
+          setState(() {
+            _isEligible = false;
+            _eligibilityMessage =
+                data['message'] ?? 'You are not eligible to upload sick notes.';
+          });
+        }
       } else {
-        _showSnackBar('Learner not found in database', isError: true);
+        setState(() {
+          _isEligible = false;
+          _eligibilityMessage = 'Server error. Please try again later.';
+        });
       }
     } catch (e) {
-      _showSnackBar('Error fetching learner details: $e', isError: true);
+      setState(() {
+        _isEligible = false;
+        _eligibilityMessage = 'Connection error: $e';
+      });
+    } finally {
+      setState(() => _isCheckingEligibility = false);
     }
   }
 
-  String _sanitizeFileName(String input) {
-    return input.replaceAll(RegExp(r'[^A-Za-z0-9.-]'), '_').trim();
-  }
-
-  Future<bool> _checkConnectivity() async {
-    try {
-      final result = await Connectivity().checkConnectivity();
-      return result != ConnectivityResult.none;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  // Submission Methods
-
-  Future<void> _scanAndUploadSickNote() async {
-    if (_isScanning || !_formKey.currentState!.validate()) {
-      _showSnackBar('Please fill all required fields', isError: true);
+  /// Select Date From with validation
+  Future<void> _selectDateFrom() async {
+    if (_validDates.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No valid dates available for sick note upload'),
+          backgroundColor: Colors.orange,
+        ),
+      );
       return;
     }
 
-    final status = await Permission.camera.request();
+    // Parse valid dates to DateTime
+    List<DateTime> validDateTimes =
+        _validDates.map((d) => DateTime.parse(d)).toList();
+    DateTime firstDate = validDateTimes.reduce((a, b) => a.isBefore(b) ? a : b);
+    DateTime lastDate = validDateTimes.reduce((a, b) => a.isAfter(b) ? a : b);
+
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: firstDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      selectableDayPredicate: (DateTime date) {
+        String dateStr = DateFormat('yyyy-MM-dd').format(date);
+        return _validDates.contains(dateStr);
+      },
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF006341),
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      String pickedStr = DateFormat('yyyy-MM-dd').format(picked);
+
+      // Validate again
+      if (!_validDates.contains(pickedStr)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Selected date is not valid. You may have already clocked in on this day.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      setState(() {
+        _selectedDateFrom = picked;
+        _dateFromController.text = pickedStr;
+
+        // Auto-set Date To to same date
+        _selectedDateTo = picked;
+        _dateToController.text = pickedStr;
+      });
+    }
+  }
+
+  /// Select Date To with validation
+  Future<void> _selectDateTo() async {
+    if (_selectedDateFrom == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select Date From first'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (_validDates.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No valid dates available'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Parse valid dates to DateTime
+    List<DateTime> validDateTimes =
+        _validDates.map((d) => DateTime.parse(d)).toList();
+    DateTime firstDate = validDateTimes.reduce((a, b) => a.isBefore(b) ? a : b);
+    DateTime lastDate = validDateTimes.reduce((a, b) => a.isAfter(b) ? a : b);
+
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDateFrom!,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      selectableDayPredicate: (DateTime date) {
+        String dateStr = DateFormat('yyyy-MM-dd').format(date);
+        // Must be >= Date From and must be valid
+        return date.isAfter(_selectedDateFrom!) ||
+            date.isAtSameMomentAs(_selectedDateFrom!) &&
+                _validDates.contains(dateStr);
+      },
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF006341),
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      String pickedStr = DateFormat('yyyy-MM-dd').format(picked);
+
+      // Validate
+      if (!_validDates.contains(pickedStr)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Selected date is not valid. You may have already clocked in on this day.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      setState(() {
+        _selectedDateTo = picked;
+        _dateToController.text = pickedStr;
+      });
+    }
+  }
+
+  /// Scan document using camera
+  Future<void> _scanDocument() async {
+    if (_isScanning) return;
+
+    const String requester = 'SickNoteScanner';
+
+    // Check camera permissions
+    var status = await Permission.camera.status;
     if (!status.isGranted) {
-      _showSnackBar('Camera permission denied. Please enable it in settings.',
-          isError: true);
-      await openAppSettings();
+      status = await Permission.camera.request();
+      if (!status.isGranted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Camera permission denied'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    // Request camera access
+    final bool hasAccess = await _cameraManager.requestCameraAccess(requester,
+        timeout: const Duration(seconds: 10));
+
+    if (!hasAccess) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _cameraManager.currentUser != null
+                  ? 'Camera is being used by ${_cameraManager.currentUser}. Please wait.'
+                  : 'Camera is currently busy. Please wait.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
       return;
     }
 
-    if (!await _showScanningInstructions()) return;
-
+    if (!mounted) return;
     setState(() => _isScanning = true);
 
     try {
-      final scanResult =
+      _cameraManager.markMLKitScannerActive();
+
+      final dynamic scanResult =
           await FlutterDocScanner().getScanDocuments(page: 80);
+
       if (scanResult is! Map ||
           !scanResult.containsKey('pdfUri') ||
           scanResult['pdfUri'] == null) {
-        throw 'Invalid scan result';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Scanner returned invalid data'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
       }
 
-      final file = await resolveFlutterDocScannerPdfFile(
-          scanResult['pdfUri'] as String?);
+      final String? pdfUri = scanResult['pdfUri'] as String?;
+      final file = await resolveFlutterDocScannerPdfFile(pdfUri);
+
       if (file == null || !await isReadablePdfFile(file)) {
-        throw 'Invalid or missing PDF file';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Scanner returned unreadable file. Try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
       }
 
-      final fileSize = await file.length();
-      if (fileSize > _maxFileSize) {
-        throw 'File size exceeds 5MB limit';
-      }
-      if (fileSize < _minFileSize) {
-        throw 'The scanned page may not be clear. Ensure text is sharp and entire page is captured.';
-      }
-
-      setState(() => _scannedPdf = file);
-
-      final details = {
-        'practice_name': _practiceNameController.text,
-        'medical_practitioner': _medicalPractitionerController.text,
-        'practitioner_name': _selectedPractitionerType == 'Other'
-            ? _practitionerNameController.text
-            : _selectedPractitionerType!,
-        'date_from': _dateFromController.text,
-        'date_to': _dateToController.text,
-      };
-
-      final learnerIDString = widget.learnerID.toString();
-      final pdfPath = file.path;
-      if (await _checkConnectivity()) {
-        await _sendSickNoteToBackend(learnerIDString, pdfPath, details);
-      } else {
-        await _saveSickNoteLocally(learnerIDString, pdfPath, details);
-      }
-    } catch (e) {
-      _showSnackBar('$e', isError: true);
-      _clearForm();
-    } finally {
-      setState(() => _isScanning = false);
-    }
-  }
-
-  Future<void> _sendSickNoteToBackend(
-      String learnerID, String filePath, Map<String, dynamic> details) async {
-    try {
-      final file = File(filePath);
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse(AppConfig.uploadSickNoteUrl),
-      );
-
-      request.files.add(http.MultipartFile(
-        'sick_note',
-        file.openRead(),
-        await file.length(),
-        filename: _sanitizeFileName(file.path.split('/').last),
-        contentType: MediaType('application', 'pdf'),
-      ));
-
-      request.fields.addAll({
-        'learner_id': learnerID,
-        ...details,
+      if (!mounted) return;
+      setState(() {
+        _scannedPdf = file;
+        _pdfFileName = 'sick_note_${DateTime.now().millisecondsSinceEpoch}.pdf';
       });
 
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-      final responseData = jsonDecode(responseBody);
-
-      if (response.statusCode == 200 && responseData['success'] == true) {
-        final dbHelper = DatabaseHelper();
-        final db = await dbHelper.database;
-        await db.insert(
-          'sick_note',
-          {
-            'learner_id': learnerID,
-            'document_path': responseData['file_path'] ?? filePath,
-            ...details,
-            'upload_date': DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
-            'status': 'PENDING',
-            'synced': 1,
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Document scanned successfully!'),
+            backgroundColor: Colors.green,
+          ),
         );
-
-        _showSnackBar('Sick note uploaded successfully to server and saved locally');
-        _clearForm();
-      } else {
-        final errorMessage = responseData['message'] ?? 'Unknown server error';
-        throw 'Upload failed: $errorMessage';
       }
     } catch (e) {
-      _showSnackBar('$e', isError: true);
-      _clearForm();
-      await _saveSickNoteLocally(learnerID, filePath, details);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Scan error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isScanning = false);
+      }
+      _cameraManager.markMLKitScannerInactive();
+      _cameraManager.releaseCameraAccess(requester);
     }
   }
 
-  Future<void> _saveSickNoteLocally(
-      String learnerID, String filePath, Map<String, dynamic> details) async {
-    try {
-      final file = File(filePath);
-      final directory = await getApplicationDocumentsDirectory();
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final fileName = _sanitizeFileName('${learnerID}_sick_note_$timestamp.pdf');
-      final savedPath = '${directory.path}/$fileName';
-      await file.copy(savedPath);
+  /// Validate form
+  bool _validateForm() {
+    if (_practitionerNameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter medical practitioner name'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return false;
+    }
 
-      final dbHelper = DatabaseHelper();
-      final db = await dbHelper.database;
-      await db.insert(
-        'sick_note',
-        {
-          'learner_id': learnerID,
-          'document_path': savedPath,
-          ...details,
-          'upload_date': DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
-          'status': 'PENDING',
-          'synced': 0,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
+    if (_selectedDateFrom == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select Date From'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return false;
+    }
+
+    if (_selectedDateTo == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select Date To'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return false;
+    }
+
+    if (_scannedPdf == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please scan sick note document'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return false;
+    }
+
+    // Validate file size (max 10MB)
+    final fileSizeInMB = _scannedPdf!.lengthSync() / (1024 * 1024);
+    if (fileSizeInMB > 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('File size must be less than 10MB'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return false;
+    }
+
+    return true;
+  }
+
+  /// Submit sick note
+  Future<void> _submitSickNote() async {
+    if (!_validateForm()) return;
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse(AppConfig.submitSickNoteUrl),
       );
 
-      _showSnackBar('Sick note saved locally, pending sync when online');
-      _clearForm();
+      request.fields['learner_id'] = widget.learnerID.toString();
+      request.fields['date_from'] = _dateFromController.text;
+      request.fields['date_to'] = _dateToController.text;
+      request.fields['practice_name'] = _practiceNameController.text.trim();
+      request.fields['practitioner_name'] =
+          _practitionerNameController.text.trim();
+
+      request.files.add(
+        await http.MultipartFile.fromPath('document', _scannedPdf!.path),
+      );
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data['status'] == 'success') {
+          if (mounted) {
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => AlertDialog(
+                title: Row(
+                  children: const [
+                    Icon(Icons.check_circle, color: Colors.green, size: 32),
+                    SizedBox(width: 12),
+                    Text('Success'),
+                  ],
+                ),
+                content:
+                    Text(data['message'] ?? 'Sick note submitted successfully'),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(data['message'] ?? 'Submission failed'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Server error: ${response.statusCode}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     } catch (e) {
-      _showSnackBar('Error saving sick note locally: $e', isError: true);
-      _clearForm();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Split learner name
+    List<String> nameParts = widget.learnerName.split(' ');
+    String name = nameParts.isNotEmpty ? nameParts.first : '';
+    String surname = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Upload Sick Note'),
-        elevation: 0,
-        backgroundColor: Colors.grey[800],
+        backgroundColor: const Color(0xFF006341),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Learner Information',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).primaryColor,
+      body: _isCheckingEligibility
+          ? const Center(child: CircularProgressIndicator())
+          : !_isEligible
+              ? _buildNotEligibleView()
+              : _buildFormView(name, surname),
+      floatingActionButton: _isEligible && !_isCheckingEligibility
+          ? FloatingActionButton(
+              onPressed: _isScanning ? null : _scanDocument,
+              backgroundColor: const Color(0xFF673AB7),
+              child: _isScanning
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text('Name: ${_learnerName ?? 'Loading...'}', style: const TextStyle(fontSize: 16)),
-                    const SizedBox(height: 4),
-                    Text('Surname: ${_learnerSurname ?? 'Loading...'}', style: const TextStyle(fontSize: 16)),
-                  ],
-                ),
-              ),
+                    )
+                  : const Icon(Icons.camera_alt, color: Colors.white),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildNotEligibleView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.block, size: 80, color: Colors.red[300]),
+            const SizedBox(height: 24),
+            Text(
+              _eligibilityMessage ?? 'Not Eligible',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Sick Note Details',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).primaryColor,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _practiceNameController,
-                        decoration: _inputDecoration('Practice Name'),
-                        validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _medicalPractitionerController,
-                        decoration: _inputDecoration('Medical Practitioner'),
-                        validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        value: _selectedPractitionerType,
-                        decoration: _inputDecoration('Practitioner Type'),
-                        items: _practitionerTypes
-                            .map((type) => DropdownMenuItem(value: type, child: Text(type)))
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedPractitionerType = value;
-                            _showOtherPractitionerField = value == 'Other';
-                            if (value != 'Other') _practitionerNameController.clear();
-                          });
-                        },
-                        validator: (value) => value == null ? 'Required' : null,
-                      ),
-                      if (_showOtherPractitionerField) ...[
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _practitionerNameController,
-                          decoration: _inputDecoration('Other Practitioner Name'),
-                          validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                        ),
-                      ],
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _dateFromController,
-                        decoration: _inputDecoration('Date From (YYYY-MM-DD)', Icons.calendar_today),
-                        readOnly: true,
-                        onTap: () async {
-                          final now = DateTime.now();
-                          final fiveDaysAgo = now.subtract(const Duration(days: 5));
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: now,
-                            firstDate: fiveDaysAgo,
-                            lastDate: now,
-                          );
-                          if (picked != null) {
-                            _dateFromController.text = DateFormat('yyyy-MM-dd').format(picked);
-                          }
-                        },
-                        validator: _validateDateFrom,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _dateToController,
-                        decoration: _inputDecoration('Date To (YYYY-MM-DD)', Icons.calendar_today),
-                        readOnly: true,
-                        onTap: () async {
-                          final dateFrom = _dateFromController.text.isNotEmpty
-                              ? DateFormat('yyyy-MM-dd').parse(_dateFromController.text)
-                              : DateTime.now();
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: dateFrom,
-                            firstDate: dateFrom,
-                            lastDate: DateTime(2100),
-                          );
-                          if (picked != null) {
-                            _dateToController.text = DateFormat('yyyy-MM-dd').format(picked);
-                          }
-                        },
-                        validator: _validateDateTo,
-                      ),
-                      const SizedBox(height: 24),
-                      if (_scannedPdf != null)
-                        Column(
-                          children: [
-                            Container(
-                              width: 120,
-                              height: 150,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[300],
-                                borderRadius: BorderRadius.circular(8),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.grey.withOpacity(0.2),
-                                    spreadRadius: 2,
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(Icons.picture_as_pdf, size: 50, color: Colors.red),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Scanned PDF: ${_scannedPdf!.path.split('/').last}',
-                              style: const TextStyle(fontSize: 16),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        )
-                      else
-                        Center(
-                          child: Text(
-                            'Tap the camera button to scan a sick note',
-                            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                          ),
-                        ),
-                      if (_isScanning)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 16),
-                          child: Center(
-                            child: Column(
-                              children: [
-                                CircularProgressIndicator(),
-                                SizedBox(height: 8),
-                                Text('Scanning document...'),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF006341)),
+              child: const Text('Go Back'),
             ),
           ],
         ),
       ),
-      floatingActionButton: _isScanning
-          ? null
-          : FloatingActionButton(
-        onPressed: _scanAndUploadSickNote,
-        tooltip: 'Scan Sick Note',
-        backgroundColor: Theme.of(context).primaryColor,
-        child: const Icon(Icons.document_scanner),
-      ),
     );
   }
 
-  InputDecoration _inputDecoration(String label, [IconData? suffixIcon]) {
-    return InputDecoration(
-      labelText: label,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-      filled: true,
-      fillColor: Colors.grey[100],
-      suffixIcon: suffixIcon != null ? Icon(suffixIcon) : null,
+  Widget _buildFormView(String name, String surname) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Learner Information Card
+          Card(
+            elevation: 2,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Learner Information',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF5E35B1),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text('Name: $name', style: const TextStyle(fontSize: 14)),
+                  Text('Surname: $surname',
+                      style: const TextStyle(fontSize: 14)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Sick Note Details Card
+          Card(
+            elevation: 2,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Sick Note Details',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF5E35B1),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Practice Name
+                  TextField(
+                    controller: _practiceNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Practice Name',
+                      hintText: 'Practice Name',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Medical Practitioner
+                  TextField(
+                    controller: _practitionerNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Medical Practitioner',
+                      hintText: 'Medical Practitioner',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Practitioner Type Dropdown
+                  DropdownButtonFormField<String>(
+                    value: _practitionerType,
+                    decoration: const InputDecoration(
+                      labelText: 'Practitioner Type',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: ['Doctor', 'Nurse', 'Other']
+                        .map((type) =>
+                            DropdownMenuItem(value: type, child: Text(type)))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() => _practitionerType = value!);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Date From
+                  TextField(
+                    controller: _dateFromController,
+                    readOnly: true,
+                    decoration: InputDecoration(
+                      labelText: 'Date From (YYYY-MM-DD)',
+                      hintText: 'Date From (YYYY-MM-DD)',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.calendar_today),
+                        onPressed: _selectDateFrom,
+                      ),
+                    ),
+                    onTap: _selectDateFrom,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Date To
+                  TextField(
+                    controller: _dateToController,
+                    readOnly: true,
+                    decoration: InputDecoration(
+                      labelText: 'Date To (YYYY-MM-DD)',
+                      hintText: 'Date To (YYYY-MM-DD)',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.calendar_today),
+                        onPressed: _selectDateTo,
+                      ),
+                    ),
+                    onTap: _selectDateTo,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Instruction Text
+                  const Text(
+                    'Tap the camera button to scan a sick note',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+
+                  // Scanned document indicator
+                  if (_scannedPdf != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.green[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.green),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle, color: Colors.green),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Document scanned: $_pdfFileName',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Submit Button
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _isSubmitting ? null : _submitSickNote,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF006341),
+                disabledBackgroundColor: Colors.grey,
+              ),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text('Submit', style: TextStyle(fontSize: 16)),
+            ),
+          ),
+          const SizedBox(height: 80), // Space for FAB
+        ],
+      ),
     );
   }
 }

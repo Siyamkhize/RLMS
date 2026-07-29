@@ -1,0 +1,17 @@
+# Disable directory listing globally
+Options -Indexes
+
+# Prevent access to sensitive files
+<FilesMatch "(^\.|\.env|config\.php|connection\.php|database\.sql|\.bak|\.log)">
+    Require all denied
+</FilesMatch>
+
+# Set secure headers
+<IfModule mod_headers.c>
+    # Prevent clickjacking
+    Header set X-Frame-Options "SAMEORIGIN"
+    # Prevent MIME type sniffing
+    Header set X-Content-Type-Options "nosniff"
+    # XSS protection
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>

@@ -1,0 +1,289 @@
+================================================================================
+STEP-BY-STEP DEPLOYMENT GUIDE
+Web ARPL Portfolio Generator to Apache XAMPP
+================================================================================
+
+Date: July 10, 2026
+Status: CRITICAL - DEPLOYMENT PENDING
+Expected Result: http://localhost:8080/web/index.php working
+
+================================================================================
+STEP 1: VERIFY APACHE IS RUNNING
+================================================================================
+
+1. Check XAMPP Control Panel is open
+2. Verify "Apache" shows as RUNNING (green indicator)
+3. If not running:
+   - Click "Start" button next to Apache
+   - Wait for status to change to "Running"
+4. Test: Open browser to http://localhost:8080/
+   - You should see XAMPP landing page or one of your existing apps
+   - If you see assessorReport2 working, Apache is running ✓
+
+================================================================================
+STEP 2: BACKUP EXISTING WEB FOLDER (if it exists)
+================================================================================
+
+Option A: Using Windows Explorer (Easy)
+------------------------------------------
+1. Open File Explorer (Win+E)
+2. Navigate to: C:\xampp\htdocs\
+3. Look for a folder named "web"
+4. If it EXISTS:
+   - Right-click on "web" folder
+   - Click "Rename"
+   - Change name to: web_backup_20260710_160000
+   - (Use format: web_backup_YYYYMMDD_HHMMSS)
+   - Press Enter
+5. If it DOESN'T EXIST, skip to Step 3
+
+Option B: Using Command Prompt (Automatic with Timestamp)
+------------------------------------------
+1. Right-click Start → Command Prompt (Admin)
+2. Copy and paste this command:
+   
+   for /f "tokens=2-4 delims=/ " %%a in ('date /t') do (set mydate=%%c%%a%%b)
+   for /f "tokens=1-2 delims=/:" %%a in ('time /t') do (set mytime=%%a%%b)
+   if exist "C:\xampp\htdocs\web" ren "C:\xampp\htdocs\web" "web_backup_%mydate%_%mytime%"
+
+3. Press Enter
+4. If you see output, backup was successful
+
+================================================================================
+STEP 3: COPY WEB FILES TO APACHE
+================================================================================
+
+Option A: Using Windows Explorer (Easiest)
+------------------------------------------
+1. Open File Explorer (Win+E)
+2. In left panel, go to: C:\projects\rlmss\web
+3. Select ALL files and folders:
+   - Press Ctrl+A (select all)
+4. Copy them:
+   - Press Ctrl+C
+5. Navigate to: C:\xampp\htdocs\
+6. Right-click in empty space
+7. Click "Paste"
+8. If prompted to confirm, click "Yes" or "Replace All"
+9. Wait for copy to complete (you'll see progress bar)
+10. Done! ✓
+
+Option B: Using PowerShell (With Verification)
+------------------------------------------
+1. Right-click Start → Windows PowerShell (Admin)
+2. Copy and paste this entire command:
+
+$source = "C:\projects\rlmss\web"
+$destination = "C:\xampp\htdocs\web"
+if (-not (Test-Path $source)) { Write-Host "ERROR: Source not found"; exit }
+Write-Host "Copying files..." -ForegroundColor Cyan
+Copy-Item -Path "$source\*" -Destination $destination -Recurse -Force
+if (Test-Path "$destination\index.php") {
+    Write-Host "SUCCESS: Files deployed" -ForegroundColor Green
+    Write-Host "Access: http://localhost:8080/web/index.php" -ForegroundColor Yellow
+} else {
+    Write-Host "ERROR: Deployment failed" -ForegroundColor Red
+}
+
+3. Press Enter
+4. If you see SUCCESS message in green, files were copied ✓
+5. If you see ERROR, troubleshoot below
+
+Option C: Using Command Prompt (Simple Copy)
+------------------------------------------
+1. Right-click Start → Command Prompt (Admin)
+2. Copy and paste this command:
+
+xcopy "C:\projects\rlmss\web\*" "C:\xampp\htdocs\web\" /E /I /Y
+
+3. Press Enter
+4. Wait for it to say "X file(s) copied"
+5. Done! ✓
+
+================================================================================
+STEP 4: VERIFY FILES WERE COPIED
+================================================================================
+
+1. Open File Explorer (Win+E)
+2. Navigate to: C:\xampp\htdocs\web\
+3. You should see these files/folders:
+   - ✓ index.php
+   - ✓ classes.php
+   - ✓ learners.php
+   - ✓ generate_pdf.php
+   - ✓ connection.php
+   - ✓ api/ (folder)
+   - ✓ assets/ (folder)
+   - ✓ README.md
+
+4. If you see all these, deployment was successful! ✓
+
+================================================================================
+STEP 5: TEST IN BROWSER
+================================================================================
+
+1. Open your web browser (Chrome, Firefox, Edge, etc.)
+2. Go to this URL:
+
+   http://localhost:8080/web/index.php
+
+3. You should see:
+   - A page titled "ARPL Portfolio Generator"
+   - 3 large colored cards for trades:
+     • Electrician (blue card)
+     • Bricklaying (orange card)
+     • Plumbing (red card)
+   - A "Continue to Classes" button at bottom
+
+4. If you see this, DEPLOYMENT IS SUCCESSFUL! ✓✓✓
+
+================================================================================
+STEP 6: TEST THE FULL WORKFLOW
+================================================================================
+
+1. On the trade selection page (http://localhost:8080/web/index.php):
+   - Click the "Electrician" card
+   - Click "Continue to Classes" button
+
+2. You should see a list of classes:
+   - "Electrician Class A"
+   - "Electrician Class B"
+   - etc.
+
+3. Click on a class (e.g., "Electrician Class A")
+4. You should see a list of learners in a table:
+   - Learner names
+   - ID numbers
+   - Status
+   - "Generate ARPL ▶" button
+
+5. If you see learners, the FULL DEPLOYMENT IS WORKING! ✓✓✓
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Problem: "Cannot find file" or "404 Not Found"
+------------------------------------------
+Solution:
+1. Check files are in correct location:
+   - Open File Explorer
+   - Go to C:\xampp\htdocs\web\
+   - Verify index.php exists there (NOT in rlmss folder)
+2. Restart Apache:
+   - XAMPP Control Panel → Stop Apache
+   - Wait 2 seconds
+   - Click Start Apache
+   - Try accessing URL again
+
+Problem: "Database connection failed"
+------------------------------------------
+Solution:
+1. Verify MySQL is running:
+   - XAMPP Control Panel → Check MySQL shows "Running"
+   - If not, click Start MySQL
+2. Check database configuration:
+   - The code uses database: rlmsrlmsco_ezxcmacd_rlms
+   - This should already be set up from your mobile app
+   - If you get connection error, your database may not exist
+
+Problem: "No trades showing" or blank page
+------------------------------------------
+Solution:
+1. Check browser console for errors:
+   - Press F12 on keyboard
+   - Click "Console" tab
+   - Look for red error messages
+2. Check browser cache:
+   - Press Ctrl+F5 to hard refresh (clears cache)
+3. Try different browser (Chrome, Firefox, Edge)
+
+Problem: Classes don't load when clicking trade
+------------------------------------------
+Solution:
+1. Check API is working:
+   - Open new tab
+   - Go to: http://localhost:8080/web/api/get_arpl_trades.php
+   - You should see JSON response with 3 trades
+   - If not, database connection is broken
+2. Check database tables exist:
+   - Make sure your RLMS database has "class" table
+   - If missing, data setup scripts may need to run
+
+Problem: Excel says "http://localhost:8080/rlmss/web/index.php does not exist"
+------------------------------------------
+IMPORTANT: You must use the CORRECT URL:
+   ❌ WRONG: http://localhost:8080/rlmss/web/index.php
+   ❌ WRONG: http://localhost:8080/projects/rlmss/web/index.php
+   ✓ CORRECT: http://localhost:8080/web/index.php
+
+Explanation:
+- Apache document root is C:\xampp\htdocs\
+- So http://localhost:8080/ maps to C:\xampp\htdocs\
+- Your files are in C:\xampp\htdocs\web\
+- Therefore the URL is http://localhost:8080/web/
+
+================================================================================
+VERIFICATION CHECKLIST
+================================================================================
+
+Before considering deployment complete, verify:
+
+☐ Step 1: Apache is running (green indicator in XAMPP)
+☐ Step 2: MySQL is running (green indicator in XAMPP)
+☐ Step 3: Files exist in C:\xampp\htdocs\web\
+☐ Step 4: Can access http://localhost:8080/web/index.php
+☐ Step 5: Trade selection page displays 3 trade cards
+☐ Step 6: Can select trade and see classes load
+☐ Step 7: Can select class and see learners in table
+☐ Step 8: Can see "Generate ARPL ▶" buttons next to learners
+
+If all ☑, DEPLOYMENT IS COMPLETE AND VERIFIED ✓✓✓
+
+================================================================================
+NEXT STEPS (Phase 3)
+================================================================================
+
+Once deployment is verified, the next phase is:
+
+1. PDF Generation Module Implementation
+   - Create web/generate_arpl_pdf.php
+   - Install mPDF library
+   - Implement 24-page portfolio template
+
+2. Testing
+   - Click "Generate ARPL ▶" button
+   - PDF should download automatically
+   - PDF should contain all 24 pages
+
+3. Refinement
+   - Fix any formatting issues
+   - Add document embedding
+   - Optimize performance
+
+================================================================================
+QUICK REFERENCE URLS
+================================================================================
+
+Main Portal:          http://localhost:8080/web/index.php
+Trade API Test:       http://localhost:8080/web/api/get_arpl_trades.php
+Existing App (ref):   http://localhost:8080/assessorReport2/
+
+================================================================================
+QUESTIONS?
+================================================================================
+
+If deployment fails or you need help:
+
+1. Check the files in C:\projects\rlmss\web\ exist
+2. Check the files were copied to C:\xampp\htdocs\web\
+3. Check Apache is running
+4. Check MySQL is running
+5. Try clearing browser cache (Ctrl+F5)
+6. Check PHP error logs in C:\xampp\apache\logs\
+
+Once verified, let me know and we'll proceed with Phase 3 (PDF generation)!
+
+================================================================================
+Created: July 10, 2026
+Status: Ready for Deployment

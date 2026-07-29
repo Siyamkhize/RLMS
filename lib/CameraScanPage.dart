@@ -50,7 +50,8 @@ class _CameraScanPageState extends State<CameraScanPage> {
       'Formative',
       'Summative',
       'FormativeRemedial',
-      'SummativeRemedial'
+      'SummativeRemedial',
+      'ARPL'
     ].contains(widget.type)) {
       print('Error: Invalid type ${widget.type}');
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -196,26 +197,53 @@ class _CameraScanPageState extends State<CameraScanPage> {
   Future<void> _uploadImages(
       List<String> imagePaths, String logbookText) async {
     try {
-      final uri = Uri.parse(AppConfig.buildUrl('save_metadata.php'));
+      final uri = Uri.parse(AppConfig.buildUrl(widget.type == 'ARPL'
+          ? 'arpl_save_metadata.php'
+          : 'save_metadata.php'));
       final request = http.MultipartRequest('POST', uri);
 
-      for (final path in imagePaths) {
-        final file = File(path);
+      // Extract unit standard ID for filename
+      String unitStandardId = 'UNKNOWN';
+      if (widget.unitStandard != null && widget.unitStandard!.isNotEmpty) {
+        RegExp idPattern = RegExp(r'(?:US|Unit\s*Standard\s*)?(\d{4,10})\b');
+        Match? match = idPattern.firstMatch(widget.unitStandard!);
+        if (match != null) {
+          unitStandardId = match.group(1)!;
+        } else {
+          String digits =
+              widget.unitStandard!.replaceAll(RegExp(r'[^0-9]'), '');
+          if (digits.isNotEmpty) {
+            unitStandardId = digits;
+          }
+        }
+      }
+
+      for (int i = 0; i < imagePaths.length; i++) {
+        final file = File(imagePaths[i]);
         if (await file.exists()) {
-          print('Uploading file: $path, Size: ${await file.length()} bytes');
-          // All types now use PDF from document scanner
+          print(
+              'Uploading file: ${imagePaths[i]}, Size: ${await file.length()} bytes');
+
+          // Generate standardized filename for server
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final sanitizedExercise = sanitizeFileName(widget.exercise);
+          final extension = 'pdf';
+          final standardizedName =
+              '${widget.type}_${unitStandardId}_${sanitizedExercise}_${timestamp}_$i.$extension';
+
           final contentType = MediaType('application', 'pdf');
           request.files.add(
             http.MultipartFile(
               'files[]',
               file.openRead(),
               await file.length(),
-              filename: file.path.split('/').last,
+              filename: standardizedName,
               contentType: contentType,
             ),
           );
+          print('Assigned filename: $standardizedName');
         } else {
-          print('Invalid file path for upload: $path');
+          print('Invalid file path for upload: ${imagePaths[i]}');
         }
       }
 
@@ -223,6 +251,7 @@ class _CameraScanPageState extends State<CameraScanPage> {
         'type': widget.type,
         'exercise': widget.exercise,
         'learnerID': widget.learnerID.toString(),
+        'unit_standard_name': (widget.unitStandard ?? '').trim(),
         if (widget.type == 'LogBook') 'logbook_text': logbookText,
       });
       print('Sending fields: ${request.fields}');
@@ -240,6 +269,11 @@ class _CameraScanPageState extends State<CameraScanPage> {
           final db = await dbHelper.database;
           final batch = db.batch();
           final timestamp = DateTime.now().toIso8601String();
+          final String uniqueExercise = (widget.unitStandard != null &&
+                  widget.unitStandard!.isNotEmpty &&
+                  !widget.exercise.contains(widget.unitStandard!))
+              ? '${widget.unitStandard} - ${widget.exercise}'
+              : widget.exercise;
 
           for (final path in imagePaths) {
             if (File(path).existsSync()) {
@@ -247,11 +281,11 @@ class _CameraScanPageState extends State<CameraScanPage> {
                 'poe',
                 {
                   'learnerID': widget.learnerID,
-                  'exercise': widget.exercise,
+                  'exercise': uniqueExercise,
                   'type': widget.type,
-                  'unitStandard': (widget.unitStandard ?? '').trim(),
                   'filePath': path,
                   'logbook_text': widget.type == 'LogBook' ? logbookText : '',
+                  'unitStandard': (widget.unitStandard ?? '').trim(),
                   'submitted_at': timestamp,
                   'synced': 1,
                 },
@@ -293,6 +327,28 @@ class _CameraScanPageState extends State<CameraScanPage> {
       final db = await dbHelper.database;
       final batch = db.batch();
       final dateFormatter = DateFormat('yyyy-MM-dd HH:mm:ss');
+      final String uniqueExercise = (widget.unitStandard != null &&
+              widget.unitStandard!.isNotEmpty &&
+              !widget.exercise.contains(widget.unitStandard!))
+          ? '${widget.unitStandard} - ${widget.exercise}'
+          : widget.exercise;
+
+      // Extract unit standard ID for filename
+      String unitStandardId = 'UNKNOWN';
+      if (widget.unitStandard != null && widget.unitStandard!.isNotEmpty) {
+        RegExp idPattern = RegExp(r'(?:US|Unit\s*Standard\s*)?(\d{4,10})\b');
+        Match? match = idPattern.firstMatch(widget.unitStandard!);
+        if (match != null) {
+          unitStandardId = match.group(1)!;
+        } else {
+          // Fallback: extract any digits or use a portion of the string
+          String digits =
+              widget.unitStandard!.replaceAll(RegExp(r'[^0-9]'), '');
+          if (digits.isNotEmpty) {
+            unitStandardId = digits;
+          }
+        }
+      }
 
       for (int i = 0; i < imagePaths.length; i++) {
         final file = File(imagePaths[i]);
@@ -302,7 +358,7 @@ class _CameraScanPageState extends State<CameraScanPage> {
           // All types now use PDF from document scanner
           final extension = 'pdf';
           final fileName =
-              '${widget.learnerID}_${sanitizedExercise}_${timestamp}_$i.$extension';
+              '${widget.type}_${unitStandardId}_${sanitizedExercise}_${timestamp}_$i.$extension';
           final savedPath = '${directory.path}/$fileName';
           await file.copy(savedPath);
           savedPaths.add(savedPath);
@@ -311,18 +367,18 @@ class _CameraScanPageState extends State<CameraScanPage> {
             'poe',
             {
               'learnerID': widget.learnerID,
-              'exercise': widget.exercise,
+              'exercise': uniqueExercise,
               'type': widget.type,
-              'unitStandard': (widget.unitStandard ?? '').trim(),
               'filePath': savedPath,
               'logbook_text': widget.type == 'LogBook' ? logbookText : '',
+              'unitStandard': (widget.unitStandard ?? '').trim(),
               'submitted_at': dateFormatter.format(DateTime.now()),
               'synced': 0,
             },
             conflictAlgorithm: ConflictAlgorithm.replace,
           );
           print(
-              'Local DB Insert: learnerID=${widget.learnerID}, exercise=${widget.exercise}, type=${widget.type}, logbook_text=$logbookText');
+              'Local DB Insert: learnerID=${widget.learnerID}, exercise=$uniqueExercise, type=${widget.type}, logbook_text=$logbookText');
         } else {
           print('Invalid file path for local save: ${imagePaths[i]}');
         }

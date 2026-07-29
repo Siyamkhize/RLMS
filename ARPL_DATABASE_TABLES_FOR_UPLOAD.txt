@@ -1,0 +1,72 @@
+ARPL DATABASE TABLES FOR UPLOAD
+Generated: 2026-07-13 07:54:45
+
+Total Tables: 26
+
+Core Tables (4 tables)
+───────────────────────────────
+  • arpl_poe
+    Main POE unified table (theory & practical papers)
+  • arpl_papers
+    Paper definitions and templates
+  • arpl_questions
+    Assessment questions for each paper
+  • arpl_trades
+    Trade definitions (Electrician, Bricklayer, Plumber)
+
+Competency Tables (7 tables)
+─────────────────────────────────────
+  • arpl_competency_scale
+    Rating scale (1-4 competency levels)
+  • arplappxb_electrician_activities
+    Electrician Appendix B activities
+  • arplappxb_bricklaying_activities
+    Bricklaying Appendix B activities
+  • arplappxb_plumbing_activities
+    Plumbing Appendix B activities
+  • arplappxe_electrician_activity_ratings
+    Electrician Appendix E ratings
+  • arplappxe_bricklaying_activity_ratings
+    Bricklaying Appendix E ratings
+  • arplappxb_activity_ratings
+    Activity ratings (Plumbing)
+
+Assessment Form Tables (7 tables)
+──────────────────────────────────────────
+  • arpl_appendix_c
+    Appendix C - Self Evaluation
+  • arpl_appendix_d
+    Appendix D - Practical Skills Assessment
+  • arpl_appendix_g
+    Appendix G - Assessment Agreement
+  • arpl_appendix_i
+    Appendix I - Access Recommendation (Generic)
+  • arplelectrician_access_recommendation
+    Appendix H - Electrician Access Recommendation
+  • arplbricklayer_access_recommendation
+    Appendix H - Bricklayer Access Recommendation
+  • arplplumber_access_recommendation
+    Appendix H - Plumber Access Recommendation
+
+Application & Work Experience (4 tables)
+─────────────────────────────────────────────────
+  • arpl_applications_v3
+    ARPL Application forms
+  • arpl_work_experience_v3
+    Work experience records
+  • arpl_references_v3
+    References provided
+  • arpl_qualifications_v3
+    Qualifications submitted
+
+Gap Analysis Tables (4 tables)
+───────────────────────────────────────
+  • gap_analysis_submissions
+    Gap analysis submissions
+  • gap_analysis_submission_items
+    Gap analysis line items
+  • gap_analysis_report
+    Gap analysis report templates
+  • arpl_bricklayer_gap_tasks
+    Bricklayer gap closure tasks
+

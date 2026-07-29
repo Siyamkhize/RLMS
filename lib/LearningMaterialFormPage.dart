@@ -106,7 +106,9 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
         final isZkConnected = await _fingerprintService.isSensorConnected();
         debugPrint('[SCANNER] ZKTeco result: $isZkConnected');
         if (isZkConnected == true) {
-          setState(() => activeScanner = 'zkteco');
+          if (mounted) {
+            setState(() => activeScanner = 'zkteco');
+          }
           debugPrint('[SCANNER] ✅ ZKTeco scanner detected');
           return;
         }
@@ -121,7 +123,9 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
             await _futronicService.isFutronicConnected();
         debugPrint('[SCANNER] Futronic result: $isFutronicConnected');
         if (isFutronicConnected == true) {
-          setState(() => activeScanner = 'futronic');
+          if (mounted) {
+            setState(() => activeScanner = 'futronic');
+          }
           debugPrint('[SCANNER] ✅ Futronic scanner detected');
           return;
         }
@@ -130,11 +134,15 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
       }
 
       // No scanner found
-      setState(() => activeScanner = 'none');
+      if (mounted) {
+        setState(() => activeScanner = 'none');
+      }
       debugPrint('[SCANNER] ⚠️ No fingerprint scanner detected');
     } catch (e) {
       debugPrint('[SCANNER] ❌ Error detecting scanner: $e');
-      setState(() => activeScanner = 'none');
+      if (mounted) {
+        setState(() => activeScanner = 'none');
+      }
     }
   }
 
@@ -187,24 +195,67 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
 
+      // Get today's date in YYYY-MM-DD format
+      final todayDate =
+          DateTime.now().toString().split(' ')[0]; // e.g., "2026-07-22"
+
       // Get clocked-in learners for this class today
+      // Using strftime for explicit date comparison (more reliable than DATE() function)
       final query = '''
         SELECT DISTINCT
           ld.LearnerID,
           ld.IDNumber,
           ld.Name,
           ld.Surname,
-          lc.clock_in_time
+          lc.clock_in_time,
+          lc.clock_out_time
         FROM learner_clocking lc
         INNER JOIN learnerdetails ld ON lc.LearnerID = ld.LearnerID
         WHERE ld.classID = ?
-          AND lc.clock_date = DATE('now')
+          AND strftime('%Y-%m-%d', lc.clock_date) = ?
           AND lc.clock_in_time IS NOT NULL
-          AND lc.clock_out_time IS NULL
         ORDER BY ld.Name
       ''';
 
-      final results = await db.rawQuery(query, [widget.classID]);
+      debugPrint('[MATERIALS] ═══════════════════════════════════════');
+      debugPrint('[MATERIALS] Executing query for classID: ${widget.classID}');
+      debugPrint('[MATERIALS] Today date: $todayDate');
+
+      final results = await db.rawQuery(query, [widget.classID, todayDate]);
+
+      debugPrint('[MATERIALS] Query returned ${results.length} rows');
+      if (results.isEmpty) {
+        debugPrint('[MATERIALS] ❌ No learners found for this class today');
+        debugPrint('[MATERIALS] Checking all clocking records for today...');
+
+        final testQuery = '''
+          SELECT 
+            lc.LearnerID, 
+            strftime('%Y-%m-%d', lc.clock_date) as clock_date_only,
+            lc.clock_in_time,
+            ld.classID,
+            ld.Name,
+            ld.Surname
+          FROM learner_clocking lc
+          LEFT JOIN learnerdetails ld ON lc.LearnerID = ld.LearnerID
+          WHERE strftime('%Y-%m-%d', lc.clock_date) = ?
+        ''';
+        final testResult = await db.rawQuery(testQuery, [todayDate]);
+        debugPrint(
+            '[MATERIALS] Total clocking records for today: ${testResult.length}');
+        for (var row in testResult) {
+          debugPrint(
+              '[MATERIALS]   - Learner ${row['LearnerID']} (${row['Name']} ${row['Surname']}), classID=${row['classID']}, clock_date=${row['clock_date_only']}');
+        }
+        debugPrint('[MATERIALS] Your classID filter: ${widget.classID}');
+      } else {
+        debugPrint('[MATERIALS] ✅ Found ${results.length} learners');
+        for (var row in results) {
+          debugPrint(
+              '[MATERIALS]   - ${row['Name']} ${row['Surname']} (ID: ${row['LearnerID']})');
+        }
+      }
+      debugPrint('[MATERIALS] ═══════════════════════════════════════');
 
       // Store all learners
       allLearners = results.map((row) {
@@ -217,7 +268,8 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
         };
       }).toList();
 
-      debugPrint('Fetched ${allLearners.length} clocked-in learners');
+      debugPrint(
+          '[LearningMaterialFormPage] Fetched ${allLearners.length} clocked-in learners for today');
 
       // Apply filtering based on selected material type
       await _filterLearnersByMaterialType();
@@ -389,19 +441,25 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
         final String? pathwayJson = firstRow['Project_pathway'];
         final String? siteQualId = firstRow['site_qual_id']?.toString();
 
+        debugPrint('[QUALIFICATION] pathwayJson: $pathwayJson');
+        debugPrint('[QUALIFICATION] siteQualId: $siteQualId');
+
         if (pathwayJson != null && pathwayJson.isNotEmpty) {
           try {
             final dynamic decoded = json.decode(pathwayJson);
             debugPrint(
-                '[QUALIFICATION] Successfully parsed Project_pathway JSON');
+                '[QUALIFICATION] Successfully parsed Project_pathway JSON: $decoded');
 
             if (decoded is List && decoded.isNotEmpty) {
               final firstPathway = decoded[0];
+              debugPrint('[QUALIFICATION] firstPathway: $firstPathway');
               if (firstPathway['qual_types'] != null &&
                   firstPathway['qual_types'] is List &&
                   firstPathway['qual_types'].isNotEmpty) {
                 final qualificationData =
                     firstPathway['qual_types'][0]['qualification'];
+                debugPrint(
+                    '[QUALIFICATION] qualificationData: $qualificationData');
 
                 if (qualificationData != null) {
                   final qualName = qualificationData['name']?.toString() ??
@@ -411,6 +469,8 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
                   if (qualificationData['unitStandards'] != null) {
                     final unitStandardsList =
                         qualificationData['unitStandards'];
+                    debugPrint(
+                        '[QUALIFICATION] unitStandardsList length: ${unitStandardsList.length}');
                     if (unitStandardsList is List &&
                         unitStandardsList.isNotEmpty) {
                       setState(() {
@@ -424,16 +484,27 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
                                 })
                             .toList();
                       });
+                      debugPrint(
+                          '[QUALIFICATION] Using unit standards from Project_pathway, count: ${unitStandards.length}');
                       return; // Success!
+                    } else {
+                      debugPrint(
+                          '[QUALIFICATION] unitStandardsList is not a list or is empty');
                     }
+                  } else {
+                    debugPrint(
+                        '[QUALIFICATION] No unitStandards key in qualificationData');
                   }
                 }
               }
             }
-          } catch (e) {
+          } catch (e, stackTrace) {
             debugPrint(
                 '[QUALIFICATION] Error parsing Project_pathway JSON: $e');
+            debugPrint('[QUALIFICATION] Stack trace: $stackTrace');
           }
+        } else {
+          debugPrint('[QUALIFICATION] pathwayJson is null or empty');
         }
 
         // Fallback: If JSON is missing or empty, try the unitstandard table
@@ -467,8 +538,9 @@ class _LearningMaterialFormPageState extends State<LearningMaterialFormPage> {
           }
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('Error fetching unit standards: $e');
+      debugPrint('Stack trace: $stackTrace');
     }
   }
 
@@ -1402,17 +1474,26 @@ class _UnitStandardsDialogState extends State<_UnitStandardsDialog> {
       // STRICTLY use internal LearnerID for database consistency
       final learnerIdentifier =
           widget.learner['LearnerID']?.toString() ?? widget.learner['IDNumber'];
+      final url = AppConfig.buildUrl(
+          'get_logistics_checkbox_status.php?classID=${widget.classID}&learnerID=$learnerIdentifier');
+      debugPrint('Loading existing from: $url');
       final response = await http.get(
-        Uri.parse(AppConfig.buildUrl(
-            'get_logistics_checkbox_status.php?classID=${widget.classID}&learnerID=$learnerIdentifier')),
+        Uri.parse(url),
       );
+
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        debugPrint('Decoded data: $data');
         if (data['success'] == true) {
           final checkboxStatus = data['checkboxStatus'] ?? {};
           final quantities = data['quantities'] ?? {};
           final representatives = data['representatives'] ?? {};
+
+          debugPrint('checkboxStatus: $checkboxStatus');
+          debugPrint('quantities: $quantities');
 
           setState(() {
             checkboxStatus.forEach((key, value) {
@@ -1429,11 +1510,17 @@ class _UnitStandardsDialogState extends State<_UnitStandardsDialog> {
             representatives.forEach((key, value) {
               existingUnitStandardRepresentatives[key] = value.toString();
             });
+
+            debugPrint(
+                'selectedUnitStandards after load: $selectedUnitStandards');
+            debugPrint(
+                'existingUnitStandardQuantities after load: $existingUnitStandardQuantities');
           });
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('Error loading existing submissions: $e');
+      debugPrint('Stack trace: $stackTrace');
     } finally {
       setState(() => isLoading = false);
     }
@@ -1849,127 +1936,151 @@ class _UnitStandardsDialogState extends State<_UnitStandardsDialog> {
                 ),
               )
             else
-              Expanded(
-                child: ListView.builder(
-                  itemCount: widget.unitStandards.length,
-                  itemBuilder: (context, index) {
-                    final us = widget.unitStandards[index];
-                    final usId = us['unitstandard_id'].toString();
-                    final usName = us['unit_standard_name'] ?? 'Unknown';
+              Builder(builder: (context) {
+                // Show ALL unit standards, don't hide any
+                final allUnitStandards = widget.unitStandards;
 
-                    final existingUS =
-                        existingUnitStandardQuantities[usId] ?? 0;
-                    final existingLG =
-                        existingUnitStandardQuantities['${usId}_LG'] ?? 0;
-                    final existingFORM =
-                        existingUnitStandardQuantities['${usId}_FORM'] ?? 0;
-                    final existingSUM =
-                        existingUnitStandardQuantities['${usId}_SUM'] ?? 0;
-
-                    // Check if all items for this unit standard are already received
-                    final allItemsReceived =
-                        existingLG > 0 && existingFORM > 0 && existingSUM > 0;
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Unit Standard
-                            _buildUnitStandardItem(
-                              usId: usId,
-                              usName: usName,
-                              itemType: 'Unit Standard',
-                              existing: existingUS,
-                              color: Colors.green,
-                            ),
-
-                            const SizedBox(height: 8),
-
-                            // Learner Guide
-                            Container(
-                              margin: const EdgeInsets.only(left: 20),
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: existingLG > 0
-                                    ? Colors.grey.shade200
-                                    : Colors.purple.shade50,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                    color: existingLG > 0
-                                        ? Colors.grey.shade400
-                                        : Colors.purple.shade200),
-                              ),
-                              child: _buildUnitStandardItem(
-                                usId: '${usId}_LG',
-                                usName: '$usId - Learner Guide',
-                                itemType: 'Learner Guide',
-                                existing: existingLG,
-                                color: existingLG > 0
-                                    ? Colors.grey
-                                    : Colors.purple,
-                              ),
-                            ),
-
-                            // Formative
-                            const SizedBox(height: 8),
-                            Container(
-                              margin: const EdgeInsets.only(left: 20),
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: existingFORM > 0
-                                    ? Colors.grey.shade200
-                                    : Colors.orange.shade50,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                    color: existingFORM > 0
-                                        ? Colors.grey.shade400
-                                        : Colors.orange.shade200),
-                              ),
-                              child: _buildUnitStandardItem(
-                                usId: '${usId}_FORM',
-                                usName: '$usId - Formative',
-                                itemType: 'Formative',
-                                existing: existingFORM,
-                                color: existingFORM > 0
-                                    ? Colors.grey
-                                    : Colors.orange,
-                              ),
-                            ),
-
-                            // Summative
-                            const SizedBox(height: 8),
-                            Container(
-                              margin: const EdgeInsets.only(left: 20),
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: existingSUM > 0
-                                    ? Colors.grey.shade200
-                                    : Colors.teal.shade50,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                    color: existingSUM > 0
-                                        ? Colors.grey.shade400
-                                        : Colors.teal.shade200),
-                              ),
-                              child: _buildUnitStandardItem(
-                                usId: '${usId}_SUM',
-                                usName: '$usId - Summative',
-                                itemType: 'Summative',
-                                existing: existingSUM,
-                                color:
-                                    existingSUM > 0 ? Colors.grey : Colors.teal,
-                              ),
-                            ),
-                          ],
+                return Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Text(
+                          'Unit Standards (${allUnitStandards.length})',
+                          style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue),
                         ),
                       ),
-                    );
-                  },
-                ),
-              ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: allUnitStandards.length,
+                          itemBuilder: (context, index) {
+                            final us = allUnitStandards[index];
+                            final usId = us['unitstandard_id'].toString();
+                            final usName =
+                                us['unit_standard_name'] ?? 'Unknown';
+
+                            final existingUS =
+                                existingUnitStandardQuantities[usId] ?? 0;
+                            final existingLG =
+                                existingUnitStandardQuantities['${usId}_LG'] ??
+                                    0;
+                            final existingFORM = existingUnitStandardQuantities[
+                                    '${usId}_FORM'] ??
+                                0;
+                            final existingSUM =
+                                existingUnitStandardQuantities['${usId}_SUM'] ??
+                                    0;
+
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Unit Standard
+                                    _buildUnitStandardItem(
+                                      usId: usId,
+                                      usName: usName,
+                                      itemType: 'Unit Standard',
+                                      existing: existingUS,
+                                      color: Colors.green,
+                                    ),
+
+                                    const SizedBox(height: 8),
+
+                                    // Learner Guide
+                                    Container(
+                                      margin: const EdgeInsets.only(left: 20),
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: existingLG > 0
+                                            ? Colors.grey.shade200
+                                            : Colors.purple.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                            color: existingLG > 0
+                                                ? Colors.grey.shade400
+                                                : Colors.purple.shade200),
+                                      ),
+                                      child: _buildUnitStandardItem(
+                                        usId: '${usId}_LG',
+                                        usName: '$usId - Learner Guide',
+                                        itemType: 'Learner Guide',
+                                        existing: existingLG,
+                                        color: existingLG > 0
+                                            ? Colors.grey
+                                            : Colors.purple,
+                                      ),
+                                    ),
+
+                                    // Formative
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      margin: const EdgeInsets.only(left: 20),
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: existingFORM > 0
+                                            ? Colors.grey.shade200
+                                            : Colors.orange.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                            color: existingFORM > 0
+                                                ? Colors.grey.shade400
+                                                : Colors.orange.shade200),
+                                      ),
+                                      child: _buildUnitStandardItem(
+                                        usId: '${usId}_FORM',
+                                        usName: '$usId - Formative',
+                                        itemType: 'Formative',
+                                        existing: existingFORM,
+                                        color: existingFORM > 0
+                                            ? Colors.grey
+                                            : Colors.orange,
+                                      ),
+                                    ),
+
+                                    // Summative
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      margin: const EdgeInsets.only(left: 20),
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: existingSUM > 0
+                                            ? Colors.grey.shade200
+                                            : Colors.teal.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                            color: existingSUM > 0
+                                                ? Colors.grey.shade400
+                                                : Colors.teal.shade200),
+                                      ),
+                                      child: _buildUnitStandardItem(
+                                        usId: '${usId}_SUM',
+                                        usName: '$usId - Summative',
+                                        itemType: 'Summative',
+                                        existing: existingSUM,
+                                        color: existingSUM > 0
+                                            ? Colors.grey
+                                            : Colors.teal,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
 
             // Submit Button
             const SizedBox(height: 16),
@@ -2094,22 +2205,20 @@ class _UnitStandardsDialogState extends State<_UnitStandardsDialog> {
               const SizedBox(width: 10),
               SizedBox(
                 width: 80,
-                child: DropdownButton<int>(
-                  isExpanded: true,
-                  value: currentQuantity,
-                  onChanged: (int? newValue) {
-                    if (newValue != null) {
-                      setState(() {
-                        unitStandardQuantities[usId] = newValue;
-                      });
-                    }
+                child: TextFormField(
+                  initialValue: currentQuantity.toString(),
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      unitStandardQuantities[usId] = int.tryParse(value) ?? 0;
+                    });
                   },
-                  items: List.generate(51, (index) => index).map((int value) {
-                    return DropdownMenuItem<int>(
-                      value: value,
-                      child: Text(value.toString()),
-                    );
-                  }).toList(),
                 ),
               ),
               if (existing > 0) ...[
@@ -2524,21 +2633,16 @@ class _PPEDialogState extends State<_PPEDialog> {
                               },
                             ),
                             const SizedBox(height: 12),
-                            DropdownButtonFormField<int>(
-                              value: contiSuitQuantity,
+                            TextFormField(
+                              initialValue: contiSuitQuantity.toString(),
+                              keyboardType: TextInputType.number,
                               decoration: const InputDecoration(
                                 labelText: 'Quantity',
                                 border: OutlineInputBorder(),
                               ),
-                              items: List.generate(11, (index) => index)
-                                  .map((qty) {
-                                return DropdownMenuItem(
-                                  value: qty,
-                                  child: Text(qty.toString()),
-                                );
-                              }).toList(),
                               onChanged: (value) {
-                                setState(() => contiSuitQuantity = value ?? 0);
+                                setState(() => contiSuitQuantity =
+                                    int.tryParse(value) ?? 0);
                               },
                             ),
                           ],
@@ -2577,21 +2681,16 @@ class _PPEDialogState extends State<_PPEDialog> {
                               },
                             ),
                             const SizedBox(height: 12),
-                            DropdownButtonFormField<int>(
-                              value: bootsQuantity,
+                            TextFormField(
+                              initialValue: bootsQuantity.toString(),
+                              keyboardType: TextInputType.number,
                               decoration: const InputDecoration(
                                 labelText: 'Quantity',
                                 border: OutlineInputBorder(),
                               ),
-                              items: List.generate(11, (index) => index)
-                                  .map((qty) {
-                                return DropdownMenuItem(
-                                  value: qty,
-                                  child: Text(qty.toString()),
-                                );
-                              }).toList(),
                               onChanged: (value) {
-                                setState(() => bootsQuantity = value ?? 0);
+                                setState(() =>
+                                    bootsQuantity = int.tryParse(value) ?? 0);
                               },
                             ),
                           ],

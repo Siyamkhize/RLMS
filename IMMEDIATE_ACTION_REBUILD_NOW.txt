@@ -1,0 +1,153 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║          ARPL TRADE DISPLAY BUG FIX - COMPLETE & READY                    ║
+║                                                                            ║
+║                    ✅ ALL CODE FIXES APPLIED                              ║
+║                    ✅ ALL MAPPINGS VERIFIED                               ║
+║                    ✅ READY FOR REBUILD                                   ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+IMMEDIATE ACTION REQUIRED
+═══════════════════════════════════════════════════════════════════════════
+
+1. REBUILD APK (5-10 minutes)
+   ─────────────────────────────────────────────────────────────────────
+   
+   Open Terminal and run:
+   
+   cd c:\projects\rlmss
+   flutter clean
+   flutter pub get
+   flutter build apk --release
+
+
+2. INSTALL ON TEST DEVICE
+   ─────────────────────────────────────────────────────────────────────
+   
+   adb uninstall com.rlmss.app
+   adb install build\app\outputs\flutter-apk\app-release.apk
+
+
+3. TEST CRITICAL SCENARIO (5 minutes)
+   ─────────────────────────────────────────────────────────────────────
+   
+   ✓ Login as BRICKLAYER user (classID 783)
+   ✓ Go to: Dashboard → ARPL Portfolio → ARPL Assessor
+   ✓ VERIFY: See Bricklayer questions (NOT Electrician)
+   ✓ VERIFY: Trade shows "Bricklayer"
+   ✓ VERIFY: OFO shows "641201"
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+WHAT WAS FIXED
+═════════════════════════════════════════════════════════════════════════════
+
+PROBLEM: Bricklayer users saw Electrician ARPL questions
+
+ROOT CAUSES FIXED:
+  1. Hardcoded defaults to Electrician (671101) - REMOVED ✅
+  2. Wrong OFO mappings (671102, 671103) - CORRECTED ✅
+  3. Silent fallbacks hiding data issues - CONVERTED TO ERRORS ✅
+
+FILES CHANGED:
+  • 7 Dart files (trade name mappings, defaults removed)
+  • 5 PHP files (endpoint routing, validation added)
+
+CORRECT OFO CODES NOW:
+  • 671101 = Electrician ✓
+  • 642601 = Plumber ✓ (was 671102)
+  • 641201 = Bricklayer ✓ (was 671103)
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+DETAILED DOCUMENTATION
+═════════════════════════════════════════════════════════════════════════════
+
+For complete details, read:
+  • ARPL_TRADE_DISPLAY_COMPLETE_FIX_JULY12_FINAL.md
+  • FINAL_ARPL_FIX_SESSION_JULY12_COMPLETED.md
+  • REBUILD_APK_FOR_ARPL_FIX.md
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+TEST CHECKLIST AFTER INSTALLATION
+═════════════════════════════════════════════════════════════════════════════
+
+CRITICAL (Do This First):
+  [ ] Login as Bricklayer (classID 783)
+  [ ] Navigate to ARPL Portfolio → ARPL Assessor
+  [ ] Verify: Shows Bricklayer questions (NOT Electrician)
+  [ ] Verify: Trade name displays "Bricklayer"
+  [ ] Verify: OFO code displays "641201"
+
+BASELINE (Ensure Nothing Broke):
+  [ ] Login as Electrician (classID 782)
+  [ ] Navigate to ARPL Portfolio → ARPL Assessor
+  [ ] Verify: Shows Electrician questions (as before)
+  [ ] Verify: Trade name displays "Electrician"
+  [ ] Verify: OFO code displays "671101"
+
+COMPREHENSIVE:
+  [ ] Test all appendices (B, D, E, F) for Bricklayer
+  [ ] No Electrician text should appear for Bricklayer user
+  [ ] Test offline mode
+  [ ] Test sync functionality
+  [ ] Check logs for any errors
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+SUMMARY OF CHANGES
+═════════════════════════════════════════════════════════════════════════════
+
+DART FILES FIXED (7 total):
+  1. ArplAssessorPage.dart - Removed ?? '671101' defaults
+  2. ArplToolkitViewerPage.dart - Fixed trade mappings
+  3. ArplToolkitRouter.dart - Corrected OFO codes
+  4. ArplToolkitUnifiedPage.dart - Fixed endpoints
+  5. ArplToolkitBricklayerPage.dart - Updated mappings
+  6. ArplToolkitPlumberPage.dart - Removed defaults
+  7. ArplAppendixEPage.dart - Made OFO required
+
+PHP FILES FIXED (5 total):
+  1. get_arpl_complete_data.php - Fixed trade function
+  2. save_arpl_appendix_f_assessment.php - Added validation
+  3. arpl_toolkit_dynamic.php - Added validation
+  4. get_arpl_toolkit_data.php - Verified ✓
+  5. get_arpl_trades.php - Updated docs
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+EXPECTED RESULT
+═════════════════════════════════════════════════════════════════════════════
+
+Before:  Bricklayer sees Electrician questions ❌
+After:   Bricklayer sees Bricklayer questions ✅
+
+Electrician still works as before: Electrician sees Electrician questions ✅
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+NO DATABASE CHANGES
+═════════════════════════════════════════════════════════════════════════════
+
+✓ This is CODE-ONLY FIX
+✓ No database migration needed
+✓ No data will be lost
+✓ Existing ARPL data remains intact
+✓ Backward compatible
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+STATUS: READY TO BUILD & TEST ✅
+
+Next: Run flutter build apk --release
+
+═════════════════════════════════════════════════════════════════════════════

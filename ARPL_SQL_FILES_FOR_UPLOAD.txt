@@ -1,0 +1,19 @@
+ARPL SQL FILES FOR UPLOAD
+Generated: 2026-07-13 07:54:45
+
+Total SQL Files: 13
+
+Run in this order:
+
+1. create_arpl_theory_papers.sql
+2. create_arpl_separate_tables.sql
+3. create_arpl_poe_unified_table.sql
+4. create_arpl_appendix_d_table.sql
+5. create_arpl_appendix_f_tables.sql
+6. create_bricklayer_appendix_tables.sql
+7. create_bricklayer_gap_closure_tables.sql
+8. create_plumber_access_recommendation.sql
+9. insert_questions_electrician_theory.sql
+10. insert_questions_electrician_practical.sql
+11. insert_questions_bricklayer_theory.sql
+12. insert_questions_bricklayer_practical.sql

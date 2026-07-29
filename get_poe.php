@@ -5,6 +5,10 @@ header("Access-Control-Allow-Headers: Content-Type");
 header("Content-Type: application/json");
 include('mobile/connection.php');
 
+// Timeout protection
+set_time_limit(60);
+ini_set('max_execution_time', 60);
+
 // Debug: Log $_GET and $_POST to inspect parameters
 file_put_contents('mobile/debug.log', "GET: " . print_r($_GET, true) . "\nPOST: " . print_r($_POST, true) . "\n", FILE_APPEND);
 
@@ -26,29 +30,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' || $_SERVER['REQUEST_METHOD'] == 'GET')
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $baseUrl = "$protocol://$host/assessorReport2/";
 
-    // 1. Fetch learner pathway and project ID
-    $learnerQuery = "
-        SELECT ld.LearnerID, pr.project_id, pr.Project_pathway
-        FROM learnerdetails ld 
-        LEFT JOIN class c ON ld.classID = c.classID 
-        LEFT JOIN sites s ON c.siteID = s.siteID 
-        LEFT JOIN project pr ON s.project_id = pr.project_id
-        WHERE ld.LearnerID = ?
-    ";
-    $stmt = $conn->prepare($learnerQuery);
-    $stmt->bind_param('i', $learnerID);
-    $stmt->execute();
-    $learnerInfo = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-
-    if (!$learnerInfo || !$learnerInfo['project_id']) {
-        echo json_encode(['error' => 'Learner or Project not found.']);
-        exit;
-    }
-
-    $projectId = $learnerInfo['project_id'];
-    $pathwayJson = json_decode($learnerInfo['Project_pathway'], true) ?? [];
-    
     // 1. Fetch learner pathway and project ID
     $learnerQuery = "
         SELECT ld.LearnerID, pr.project_id, pr.Project_pathway
@@ -135,10 +116,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' || $_SERVER['REQUEST_METHOD'] == 'GET')
     $query = "
         SELECT 
             a.unit_standard_id, a.assessment_type, a.question_number, a.specific_outcome, a.assessment_criteria, a.exercise, a.marks, a.question_type,
-            p.filePath, m.marks_scored, m.a_comment, m.comment, m.approval_status, m.moderator_status, m.moderator_comment, m.type as mark_type
+            p.filePath, m.marks_scored, m.comment, m.approval_status, m.moderator_status, m.moderator_comment, m.type as mark_type
         FROM assessments a
         LEFT JOIN poe p ON p.learnerID = ? 
-            AND (TRIM(REPLACE(REPLACE(REPLACE(p.exercise, '\r', ''), '\n', ''), ' ', '')) = TRIM(REPLACE(REPLACE(REPLACE(a.exercise, '\r', ''), '\n', ''), ' ', '')) OR p.exercise = a.exercise)
+            AND (TRIM(REPLACE(REPLACE(REPLACE(p.exercise, '\r', ''), '\n', ''), ' ', '')) = TRIM(REPLACE(REPLACE(REPLACE(a.exercise, '\r', ''), '\n', ''), ' ', '')) OR p.exercise = a.exercise OR p.exercise LIKE CONCAT('%', a.exercise, '%'))
             AND (
                 LOWER(p.type) = LOWER(CASE WHEN a.question_type = 'Practical' THEN 'LogBook' ELSE a.assessment_type END)
                 OR LOWER(p.type) = LOWER(CONCAT(CASE WHEN a.question_type = 'Practical' THEN 'LogBook' ELSE a.assessment_type END, 'Remedial'))
@@ -163,6 +144,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' || $_SERVER['REQUEST_METHOD'] == 'GET')
     while ($row = $result->fetch_assoc()) {
         $usId = (string)$row['unit_standard_id'];
         if (!isset($allowedUnitStandards[$usId])) continue;
+        
+        // Check if this POE file belongs to a different unit standard - if yes, skip it
+        $skipThisPoeFile = false;
+        if (!empty($row['filePath'])) {
+            // Extract all 4-10 digit numbers from filePath and exercise
+            $unitIdsInFile = [];
+            if (preg_match_all('/(^|[^0-9])([0-9]{4,10})([^0-9]|$)/', $row['filePath'], $matches)) {
+                $unitIdsInFile = array_merge($unitIdsInFile, $matches[2]);
+            }
+            if (!empty($row['exercise'])) {
+                if (preg_match_all('/(^|[^0-9])([0-9]{4,10})([^0-9]|$)/', $row['exercise'], $matches)) {
+                    $unitIdsInFile = array_merge($unitIdsInFile, $matches[2]);
+                }
+            }
+            $unitIdsInFile = array_unique($unitIdsInFile);
+            // If there are any unit IDs in the file/exercise and none of them match the current assessment's unit ID, skip this file
+            if (!empty($unitIdsInFile) && !in_array($usId, $unitIdsInFile)) {
+                $skipThisPoeFile = true;
+            }
+        }
 
         $pName = $allowedUnitStandards[$usId]['pathway'];
         $qName = $allowedUnitStandards[$usId]['qualification'];
@@ -176,7 +177,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' || $_SERVER['REQUEST_METHOD'] == 'GET')
         // If we already saw this question, check if we should update it
         if (isset($processedAssessments[$key])) {
             // Update filePath if this row has one and the previous didn't
-            if (empty($processedAssessments[$key]['filePath']) && !empty($row['filePath'])) {
+            if (empty($processedAssessments[$key]['filePath']) && !empty($row['filePath']) && !$skipThisPoeFile) {
                 foreach ($data['pathways'][$pName]['qualifications'][$qName]['unitstandards'][$usName][$type] as &$existing) {
                     if ($existing['question_number'] == $row['question_number'] && $existing['exercise'] == $row['exercise']) {
                         $existing['filePath'] = $row['filePath'];
@@ -195,7 +196,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' || $_SERVER['REQUEST_METHOD'] == 'GET')
                         // Prefer remedial mark if available, or if existing mark is empty
                         if ($isRemedial || !isset($existing['marks_scored']) || $existing['marks_scored'] === '') {
                             $existing['marks_scored'] = $row['marks_scored'];
-                            $existing['a_comment'] = $row['a_comment'];
                             $existing['comment'] = $row['comment'];
                             $existing['approval_status'] = $row['approval_status'];
                             $existing['moderator_status'] = $row['moderator_status'];
@@ -211,9 +211,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' || $_SERVER['REQUEST_METHOD'] == 'GET')
 
         $assessment = [
             'question_number' => $row['question_number'], 'specific_outcome' => $row['specific_outcome'], 'assessment_criteria' => $row['assessment_criteria'],
-            'exercise' => $row['exercise'], 'marks' => $row['marks'], 'filePath' => !empty($row['filePath']) ? $row['filePath'] : null,
-            'fileUrl' => !empty($row['filePath']) ? $baseUrl . 'mobile/' . ltrim($row['filePath'], '/') : null,
-            'marks_scored' => $row['marks_scored'], 'a_comment' => $row['a_comment'], 'comment' => $row['comment'],
+            'exercise' => $row['exercise'], 'marks' => $row['marks'], 
+            'filePath' => (!$skipThisPoeFile && !empty($row['filePath'])) ? $row['filePath'] : null,
+            'fileUrl' => (!$skipThisPoeFile && !empty($row['filePath'])) ? $baseUrl . 'mobile/' . ltrim($row['filePath'], '/') : null,
+            'marks_scored' => $row['marks_scored'], 'comment' => $row['comment'],
             'approval_status' => $row['approval_status'], 'moderator_status' => $row['moderator_status'], 'moderator_comment' => $row['moderator_comment'], 
             'question_type' => $row['question_type'], 'mark_type' => $row['mark_type'], 'type' => $row['assessment_type']
         ];
