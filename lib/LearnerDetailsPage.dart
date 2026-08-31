@@ -66,10 +66,21 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       SignatureController(penStrokeWidth: 2, penColor: Colors.black);
   final SignatureController _witnessSignatureController =
       SignatureController(penStrokeWidth: 2, penColor: Colors.black);
+
+  // Track whether signatures have already been saved to avoid duplicate saves
+  bool _learnerSignatureAlreadySaved = false;
+  bool _witnessSignatureAlreadySaved = false;
+
   final TextEditingController _learnerInitialsController =
       TextEditingController();
   final TextEditingController _witnessInitialsController =
       TextEditingController();
+
+  // Agreement eligibility state
+  bool _isAgreementEligible = false;
+  List<String> _agreementMissingRequirements = [];
+  List<Map<String, dynamic>> _agreementRequirementDetails = [];
+  bool _isCheckingEligibility = false;
   CameraController? _cameraController;
   late Map<String, TextEditingController> _controllers;
 
@@ -166,6 +177,15 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
     // Add listeners to controllers for real-time dropdown updates
     _setupControllerListeners();
+
+    // Add listener to check agreement eligibility when Agreement tab is selected
+    _tabController.addListener(() {
+      if (_tabController.index == 4 && !_tabController.indexIsChanging) {
+        // Agreement tab selected (index 4 = 5th tab)
+        print('[AGREEMENT_TAB] Agreement tab selected - checking eligibility');
+        _checkAgreementEligibility();
+      }
+    });
   }
 
   @override
@@ -835,6 +855,9 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
           });
           await fetchBankDetails();
           await fetchGuardianData();
+
+          // Check agreement eligibility after data is loaded
+          await _checkAgreementEligibility();
           return;
         }
       }
@@ -880,8 +903,19 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
             });
             print(
                 'Learner data fetched from online database: ${learnerData!.keys.toList()}');
+
+            // Update local database with server data to keep them in sync
+            print('[SYNC] Updating local database with server data...');
+            await DatabaseHelper()
+                .updateLearnerDetails(widget.learnerID, learnerData!);
+            print(
+                '[SYNC] Local database updated with signature: ${learnerData!['signature']}');
+
             await fetchBankDetails();
             await fetchGuardianData();
+
+            // Check agreement eligibility after data is loaded
+            await _checkAgreementEligibility();
             return;
           } else {
             print('Online fetch failed: ${jsonResponse['message']}');
@@ -928,6 +962,9 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
             'Learner data fetched from local database: ${learnerData!.keys.toList()}');
         await fetchBankDetails();
         await fetchGuardianData();
+
+        // Check agreement eligibility after data is loaded
+        await _checkAgreementEligibility();
       } else {
         setState(() {
           learnerData = {"message": "No learner data found"};
@@ -1164,8 +1201,19 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
     try {
       Map<String, dynamic> updateData = {};
 
+      // CRITICAL: Fields that should NEVER be updated through this function
+      // These have dedicated upload/save functions
+      const protectedFields = {
+        'signature',
+        'witness_signature',
+        'learner_initials',
+        'witness_initials',
+        'profile_image',
+      };
+
       _controllers.forEach((key, controller) {
         if (_dropdownOptions.containsKey(key)) return;
+        if (protectedFields.contains(key)) return; // Skip protected fields
 
         final text = controller.text.trim();
         if (text.isEmpty) return;
@@ -1275,37 +1323,53 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       // Handle learner signature
       final learnerSignatureBytes =
           await _learnerSignatureController.toPngBytes();
-      if (learnerSignatureBytes != null) {
+      if (learnerSignatureBytes != null && !_learnerSignatureAlreadySaved) {
+        print('[SIG_UPDATE] Saving learner signature from _updateData()...');
         final signaturePath = await _saveSignatureImage(
             learnerSignatureBytes, 'learner_signature');
         bool isConnected = await _checkConnectivity();
         if (isConnected) {
+          print('[SIG_UPDATE] Online - uploading learner signature...');
           await _uploadSignature(signaturePath, 'signature');
         } else {
+          print('[SIG_UPDATE] Offline - saving learner signature locally...');
           await DatabaseHelper().saveSignatureLocally(
               widget.learnerID, signaturePath, 'signature');
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Learner signature saved locally')),
           );
         }
+        _learnerSignatureAlreadySaved = true;
+      } else if (_learnerSignatureAlreadySaved) {
+        print('[SIG_UPDATE] Skipping learner signature - already saved');
+      } else {
+        print('[SIG_UPDATE] No learner signature data to save');
       }
 
       // Handle witness signature
       final witnessSignatureBytes =
           await _witnessSignatureController.toPngBytes();
-      if (witnessSignatureBytes != null) {
+      if (witnessSignatureBytes != null && !_witnessSignatureAlreadySaved) {
+        print('[SIG_UPDATE] Saving witness signature from _updateData()...');
         final signaturePath = await _saveSignatureImage(
             witnessSignatureBytes, 'witness_signature');
         bool isConnected = await _checkConnectivity();
         if (isConnected) {
+          print('[SIG_UPDATE] Online - uploading witness signature...');
           await _uploadSignature(signaturePath, 'witness_signature');
         } else {
+          print('[SIG_UPDATE] Offline - saving witness signature locally...');
           await DatabaseHelper().saveSignatureLocally(
               widget.learnerID, signaturePath, 'witness_signature');
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Witness signature saved locally')),
           );
         }
+        _witnessSignatureAlreadySaved = true;
+      } else if (_witnessSignatureAlreadySaved) {
+        print('[SIG_UPDATE] Skipping witness signature - already saved');
+      } else {
+        print('[SIG_UPDATE] No witness signature data to save');
       }
 
       // Handle learner initials
@@ -2526,6 +2590,8 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
   Widget _buildSignatureDisplay(String signatureField, String title) {
     String? signaturePath = learnerData?[signatureField]?.toString();
 
+    print('[SIG_DISPLAY] Building display for $signatureField: $signaturePath');
+
     if (signaturePath != null && signaturePath.isNotEmpty) {
       return FutureBuilder<String>(
         future: AppConfig.buildServeFileUrl(signaturePath),
@@ -2557,6 +2623,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
             );
           }
           final signatureUrl = snapshot.data!;
+          print('[SIG_DISPLAY] Loading signature from URL: $signatureUrl');
           return Container(
             height: 150,
             decoration: BoxDecoration(
@@ -2597,6 +2664,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         },
       );
     } else {
+      print('[SIG_DISPLAY] No signature path found for $signatureField');
       return Container(
         height: 150,
         decoration: BoxDecoration(
@@ -2720,25 +2788,358 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                       ),
                     ),
                     const SizedBox(height: 16),
+
+                    // Show eligibility status with all requirements
+                    if (_isCheckingEligibility)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.all(12.0),
+                        margin: const EdgeInsets.only(bottom: 16.0),
+                        decoration: BoxDecoration(
+                          color: _isAgreementEligible
+                              ? Colors.green.shade50
+                              : Colors.orange.shade50,
+                          border: Border.all(
+                            color: _isAgreementEligible
+                                ? Colors.green.shade300
+                                : Colors.orange.shade300,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  _isAgreementEligible
+                                      ? Icons.check_circle_outline
+                                      : Icons.info_outline,
+                                  color: _isAgreementEligible
+                                      ? Colors.green.shade700
+                                      : Colors.orange.shade700,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _isAgreementEligible
+                                      ? 'Agreement Ready'
+                                      : 'Agreement Not Available',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: _isAgreementEligible
+                                        ? Colors.green.shade900
+                                        : Colors.orange.shade900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Requirements Status:',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            // Display all requirements with their status
+                            if (_agreementRequirementDetails.isNotEmpty)
+                              ..._agreementRequirementDetails.map((detail) {
+                                bool isCompleted = detail['status'] ==
+                                    'complete'; // Fixed: was 'completed'
+                                String name = detail['name'] ?? '';
+                                String message = detail['message'] ?? '';
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(
+                                      left: 8.0, bottom: 6.0),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(
+                                        isCompleted
+                                            ? Icons.check_circle
+                                            : Icons.cancel,
+                                        color: isCompleted
+                                            ? Colors.green
+                                            : Colors.red,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              name,
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.grey[800],
+                                              ),
+                                            ),
+                                            if (message.isNotEmpty)
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                    top: 2.0),
+                                                child: Text(
+                                                  message,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: isCompleted
+                                                        ? Colors.green.shade700
+                                                        : Colors.red.shade700,
+                                                    fontStyle: FontStyle.italic,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList()
+                            else
+                              // Fallback to old format if details not available
+                              ..._agreementMissingRequirements
+                                  .map((requirement) => Padding(
+                                        padding: const EdgeInsets.only(
+                                            left: 8.0, bottom: 4.0),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.close,
+                                                color: Colors.red, size: 18),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                requirement,
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey[800],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ))
+                                  .toList(),
+                          ],
+                        ),
+                      ),
+
+                    // Current Signatures Display Section
+                    Card(
+                      elevation: 4,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Current Signatures',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey[800],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Learner Signature and Initials Row
+                            Row(
+                              children: [
+                                // Learner Signature
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            _isFieldCompleted('signature')
+                                                ? Icons.check_circle
+                                                : Icons.cancel,
+                                            color:
+                                                _isFieldCompleted('signature')
+                                                    ? Colors.green
+                                                    : Colors.grey,
+                                            size: 18,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Learner Signature',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.grey[700],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      _buildSignatureThumbnail('signature'),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                // Learner Initials
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            _isFieldCompleted(
+                                                    'learner_initials')
+                                                ? Icons.check_circle
+                                                : Icons.cancel,
+                                            color: _isFieldCompleted(
+                                                    'learner_initials')
+                                                ? Colors.green
+                                                : Colors.grey,
+                                            size: 18,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Learner Initials',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.grey[700],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      _buildSignatureThumbnail(
+                                          'learner_initials'),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 16),
+                            const Divider(),
+                            const SizedBox(height: 16),
+
+                            // Witness Signature and Initials Row
+                            Row(
+                              children: [
+                                // Witness Signature
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            _isFieldCompleted(
+                                                    'witness_signature')
+                                                ? Icons.check_circle
+                                                : Icons.cancel,
+                                            color: _isFieldCompleted(
+                                                    'witness_signature')
+                                                ? Colors.green
+                                                : Colors.grey,
+                                            size: 18,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Witness Signature',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.grey[700],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      _buildSignatureThumbnail(
+                                          'witness_signature'),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                // Witness Initials
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            _isFieldCompleted(
+                                                    'witness_initials')
+                                                ? Icons.check_circle
+                                                : Icons.cancel,
+                                            color: _isFieldCompleted(
+                                                    'witness_initials')
+                                                ? Colors.green
+                                                : Colors.grey,
+                                            size: 18,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Witness Initials',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.grey[700],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      _buildSignatureThumbnail(
+                                          'witness_initials'),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
                     Row(
                       children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _isAgreementComplete()
-                                ? _downloadAgreement
-                                : null,
-                            icon: const Icon(Icons.download),
-                            label: const Text('Download Agreement'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _isAgreementComplete()
-                                  ? Colors.green
-                                  : Colors.grey,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                        // Only show Download Agreement button if eligible
+                        if (_isAgreementEligible)
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _downloadAgreement,
+                              icon: const Icon(Icons.download),
+                              label: const Text('Download Agreement'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
+                        if (_isAgreementEligible) const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: _openSignaturePad,
@@ -2781,6 +3182,228 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         _isFieldCompleted('witness_initials');
   }
 
+  Widget _buildSignatureThumbnail(String field) {
+    // Check if this is an initials field (text) or signature field (image)
+    bool isInitialsField =
+        field == 'learner_initials' || field == 'witness_initials';
+
+    if (isInitialsField) {
+      // Display initials as text
+      String? initialsText = learnerData?[field]?.toString();
+      bool hasInitials = initialsText != null && initialsText.isNotEmpty;
+
+      return Container(
+        height: 80,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: hasInitials ? Colors.green.shade300 : Colors.grey.shade300,
+            width: 2,
+          ),
+          borderRadius: BorderRadius.circular(8),
+          color: hasInitials ? Colors.green.shade50 : Colors.grey.shade50,
+        ),
+        child: hasInitials
+            ? Center(
+                child: Text(
+                  initialsText!,
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green.shade700,
+                    letterSpacing: 2,
+                  ),
+                ),
+              )
+            : Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.text_fields,
+                        color: Colors.grey.shade400, size: 28),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Not captured',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+      );
+    }
+
+    // Display signature/witness_signature as image
+    String? signaturePath = learnerData?[field]?.toString();
+    bool hasSignature = signaturePath != null && signaturePath.isNotEmpty;
+
+    return Container(
+      height: 80,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: hasSignature ? Colors.green.shade300 : Colors.grey.shade300,
+          width: 2,
+        ),
+        borderRadius: BorderRadius.circular(8),
+        color: hasSignature ? Colors.green.shade50 : Colors.grey.shade50,
+      ),
+      child: hasSignature
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: FutureBuilder<String>(
+                future: AppConfig.buildServeFileUrl(signaturePath!),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    final imageUrl = snapshot.data!;
+                    print('[SIG_DISPLAY] Loading image from: $imageUrl');
+                    return Image.network(
+                      imageUrl,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        print('[SIG_DISPLAY] Error loading $field: $error');
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.error_outline,
+                                  color: Colors.red.shade300, size: 24),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Load error',
+                                style: TextStyle(
+                                  color: Colors.red.shade600,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  } else if (snapshot.hasError) {
+                    print(
+                        '[SIG_DISPLAY] Error building URL for $field: ${snapshot.error}');
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error_outline,
+                              color: Colors.red.shade300, size: 24),
+                          const SizedBox(height: 4),
+                          Text(
+                            'URL error',
+                            style: TextStyle(
+                              color: Colors.red.shade600,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  } else {
+                    return Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                      ),
+                    );
+                  }
+                },
+              ),
+            )
+          : Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.draw, color: Colors.grey.shade400, size: 28),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Not captured',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  /// Check if learner is eligible to download agreement
+  /// Requirements:
+  /// 1. Agreement document exists in stored_agreement_pdfs
+  /// 2. Profile complete (signature, initials, witness_signature, witness_initials)
+  /// 3. ID Document approved in learner_documents table
+  Future<void> _checkAgreementEligibility() async {
+    if (!mounted) return;
+
+    setState(() {
+      _isCheckingEligibility = true;
+    });
+
+    try {
+      print(
+          '[AGREEMENT_CHECK] Checking eligibility for learner: ${widget.learnerID}');
+
+      final response = await http.post(
+        Uri.parse(AppConfig.checkAgreementEligibilityUrl),
+        body: {'learner_id': widget.learnerID},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('[AGREEMENT_CHECK] Response: $data');
+
+        if (data['success'] == true) {
+          if (mounted) {
+            setState(() {
+              _isAgreementEligible = data['eligible'] == true;
+              _agreementMissingRequirements =
+                  List<String>.from(data['missing_requirements'] ?? []);
+              _agreementRequirementDetails = List<Map<String, dynamic>>.from(
+                  (data['requirement_details'] ?? [])
+                      .map((item) => Map<String, dynamic>.from(item)));
+              _isCheckingEligibility = false;
+            });
+          }
+
+          if (_isAgreementEligible) {
+            print(
+                '[AGREEMENT_CHECK] ✅ Learner is eligible to download agreement');
+          } else {
+            print(
+                '[AGREEMENT_CHECK] ❌ Learner NOT eligible. Missing: $_agreementMissingRequirements');
+          }
+        } else {
+          print('[AGREEMENT_CHECK] Error: ${data['error']}');
+          if (mounted) {
+            setState(() {
+              _isCheckingEligibility = false;
+            });
+          }
+        }
+      } else {
+        print('[AGREEMENT_CHECK] HTTP error: ${response.statusCode}');
+        if (mounted) {
+          setState(() {
+            _isCheckingEligibility = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('[AGREEMENT_CHECK] Exception: $e');
+      if (mounted) {
+        setState(() {
+          _isCheckingEligibility = false;
+        });
+      }
+    }
+  }
+
   Future<void> _downloadAgreement() async {
     try {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2799,47 +3422,85 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
   Future<void> _downloadAndSaveWordDocument() async {
     final downloadUrl =
-        '${AppConfig.newAgreementUrl}?LearnerID=${widget.learnerID}';
+        '${AppConfig.downloadAgreementPdfUrl}?learner_id=${widget.learnerID}';
     try {
-      print('Downloading agreement for LearnerID: ${widget.learnerID}');
+      print(
+          '[AGREEMENT_DOWNLOAD] Downloading PDF for LearnerID: ${widget.learnerID}');
+      print('[AGREEMENT_DOWNLOAD] URL: $downloadUrl');
+
       final response = await http.get(Uri.parse(downloadUrl));
+
       if (response.statusCode == 200) {
-        // Attempt to decode as JSON to check for error
-        try {
-          final jsonResponse = jsonDecode(response.body);
-          if (jsonResponse.containsKey('error')) {
-            print('Server error: ${jsonResponse['error']}');
+        // Check if response is JSON (error) or PDF (success)
+        final contentType = response.headers['content-type'] ?? '';
+
+        if (contentType.contains('application/json')) {
+          // Error response
+          try {
+            final jsonResponse = jsonDecode(response.body);
+            print(
+                '[AGREEMENT_DOWNLOAD] Server error: ${jsonResponse['error']}');
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
                     'Error: ${jsonResponse['error']}. Please contact support if this persists.'),
                 duration: const Duration(seconds: 5),
+                backgroundColor: Colors.red,
               ),
             );
             return;
+          } catch (e) {
+            print('[AGREEMENT_DOWNLOAD] Failed to parse error response: $e');
           }
-        } catch (e) {
-          // If not JSON (e.g., binary data like .docx), proceed with file handling
+        } else if (contentType.contains('application/pdf')) {
+          // PDF response - save and open
           final tempDir = await getTemporaryDirectory();
-          final fileName = 'learner_agreement_${widget.learnerID}.docx';
+          final fileName = 'learner_agreement_${widget.learnerID}.pdf';
           final tempFilePath = '${tempDir.path}/$fileName';
           final tempFile = File(tempFilePath);
           await tempFile.writeAsBytes(response.bodyBytes);
-          print('Agreement downloaded to: $tempFilePath');
+          print('[AGREEMENT_DOWNLOAD] PDF downloaded to: $tempFilePath');
+          print(
+              '[AGREEMENT_DOWNLOAD] File size: ${response.bodyBytes.length} bytes');
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Agreement downloaded successfully!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+
+          // Open the PDF
           await OpenFile.open(tempFilePath);
+        } else {
+          // Unknown content type
+          print('[AGREEMENT_DOWNLOAD] Unexpected content type: $contentType');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Unexpected response format from server'),
+              backgroundColor: Colors.orange,
+            ),
+          );
         }
       } else {
-        print('Failed to download agreement: HTTP ${response.statusCode}');
+        print('[AGREEMENT_DOWNLOAD] Failed with HTTP ${response.statusCode}');
+        print('[AGREEMENT_DOWNLOAD] Response body: ${response.body}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(
-                  'Failed to download agreement: Server error (${response.statusCode})')),
+                  'Failed to download agreement: Server error (${response.statusCode})'),
+              backgroundColor: Colors.red),
         );
       }
-    } catch (e) {
-      print('Error downloading agreement: $e');
+    } catch (e, stackTrace) {
+      print('[AGREEMENT_DOWNLOAD] Exception: $e');
+      print('[AGREEMENT_DOWNLOAD] Stack trace: $stackTrace');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error downloading agreement: $e')),
+        SnackBar(
+          content: Text('Error downloading agreement: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -2856,10 +3517,39 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
   }
 
   Future<void> _uploadSignature(String signaturePath, String fieldName) async {
+    print('[SIG_UPLOAD] ========================================');
+    print('[SIG_UPLOAD] STARTING UPLOAD PROCESS');
+    print('[SIG_UPLOAD] Field: $fieldName');
+    print('[SIG_UPLOAD] Path: $signaturePath');
+    print('[SIG_UPLOAD] LearnerID: ${widget.learnerID}');
+    print('[SIG_UPLOAD] ========================================');
+
     final imageName = signaturePath.split('/').last;
+
+    // Check if file actually exists
+    final file = File(signaturePath);
+    if (!await file.exists()) {
+      print('[SIG_UPLOAD] ❌ FILE NOT FOUND: $signaturePath');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Signature file not found: $imageName'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
     final imageBytes = await File(signaturePath).readAsBytes();
+    print('[SIG_UPLOAD] ✅ File loaded: ${imageBytes.length} bytes');
+
     try {
-      print('Uploading $fieldName for learner_id: ${widget.learnerID}');
+      print('[SIG_UPLOAD] Starting upload for $fieldName');
+      print('[SIG_UPLOAD] File: $imageName, Size: ${imageBytes.length} bytes');
+      print('[SIG_UPLOAD] URL: ${AppConfig.saveSignatureUrl}');
+      print('[SIG_UPLOAD] Learner ID: ${widget.learnerID}');
+
       var request = http.MultipartRequest(
         'POST',
         Uri.parse(AppConfig.saveSignatureUrl),
@@ -2870,38 +3560,59 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         filename: imageName,
       ));
       request.fields['learner_id'] = widget.learnerID.trim();
+
+      print('[SIG_UPLOAD] Sending request...');
       var response = await request.send();
       var responseBody = await response.stream.bytesToString();
-      print('$fieldName upload response: $responseBody');
+
+      print('[SIG_UPLOAD] Response status: ${response.statusCode}');
+      print('[SIG_UPLOAD] Response body: $responseBody');
+
       if (response.statusCode == 200) {
         var jsonResponse = jsonDecode(responseBody);
         if (jsonResponse['success']) {
-          print('$fieldName uploaded successfully');
+          print('[SIG_UPLOAD] ✅ $fieldName uploaded successfully');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('$fieldName uploaded successfully')),
+            );
+          }
         } else {
-          print('$fieldName upload failed: ${jsonResponse['message']}');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(
-                    'Failed to upload $fieldName: ${jsonResponse['message']}')),
-          );
+          print('[SIG_UPLOAD] ❌ Upload failed: ${jsonResponse['message']}');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                  content: Text(
+                      'Failed to upload $fieldName: ${jsonResponse['message']}'),
+                  backgroundColor: Colors.red),
+            );
+          }
           await DatabaseHelper()
               .saveSignatureLocally(widget.learnerID, signaturePath, fieldName);
         }
       } else {
-        print('Failed to upload $fieldName: HTTP ${response.statusCode}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  'Failed to upload $fieldName: Server error (${response.statusCode})')),
-        );
+        print('[SIG_UPLOAD] ❌ HTTP error ${response.statusCode}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(
+                    'Failed to upload $fieldName: Server error (${response.statusCode})'),
+                backgroundColor: Colors.red),
+          );
+        }
         await DatabaseHelper()
             .saveSignatureLocally(widget.learnerID, signaturePath, fieldName);
       }
-    } catch (e) {
-      print('Error uploading $fieldName: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error uploading $fieldName: $e')),
-      );
+    } catch (e, stackTrace) {
+      print('[SIG_UPLOAD] ❌ Exception: $e');
+      print('[SIG_UPLOAD] Stack trace: $stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Error uploading $fieldName: $e'),
+              backgroundColor: Colors.red),
+        );
+      }
       await DatabaseHelper()
           .saveSignatureLocally(widget.learnerID, signaturePath, fieldName);
     }
@@ -2973,23 +3684,95 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
           TextButton(
             onPressed: () async {
               if (controller.isNotEmpty) {
+                print(
+                    '[SIG_SAVE] Saving $fieldName from signature pad dialog...');
                 final signatureBytes = await controller.toPngBytes();
                 if (signatureBytes != null) {
                   final signaturePath =
                       await _saveSignatureImage(signatureBytes, fieldName);
                   bool isConnected = await _checkConnectivity();
                   if (isConnected) {
+                    print(
+                        '[SIG_SAVE] Online - uploading $fieldName to server...');
                     await _uploadSignature(signaturePath, fieldName);
+
+                    // Refresh data from server to get the updated signature filename
+                    print(
+                        '[DB_SYNC] Fetching updated learner data from server after signature save...');
+                    try {
+                      final response = await http.get(
+                        Uri.parse(
+                            '${AppConfig.learnerDetailsUrl}?LearnerID=${widget.learnerID}'),
+                      );
+                      if (response.statusCode == 200) {
+                        final jsonResponse = jsonDecode(response.body);
+                        if (jsonResponse['success'] == true) {
+                          final serverData =
+                              Map<String, dynamic>.from(jsonResponse['data']);
+                          print(
+                              '[DB_SYNC] Server data fetched: signature=${serverData['signature']}, witness_signature=${serverData['witness_signature']}');
+
+                          // Update local database with server data
+                          await DatabaseHelper().updateLearnerDetails(
+                              widget.learnerID, serverData);
+                          print(
+                              '[DB_SYNC] Local database updated with server data');
+
+                          // Update in-memory learnerData to reflect the saved signature
+                          setState(() {
+                            learnerData = serverData;
+                          });
+                          print(
+                              '[DB_SYNC] ✅ In-memory learnerData refreshed with signature: ${learnerData!['signature']}');
+                        } else {
+                          print(
+                              '[DB_SYNC] ⚠️ Failed to fetch from server: ${jsonResponse['message']}');
+                        }
+                      } else {
+                        print('[DB_SYNC] ⚠️ HTTP error ${response.statusCode}');
+                      }
+                    } catch (e) {
+                      print('[DB_SYNC] ⚠️ Exception during data refresh: $e');
+                    }
                   } else {
+                    print('[SIG_SAVE] Offline - saving $fieldName locally...');
                     await DatabaseHelper().saveSignatureLocally(
                         widget.learnerID, signaturePath, fieldName);
+
+                    // Refresh in-memory data from local database
+                    print(
+                        '[DB_SYNC] Refreshing in-memory data from local database...');
+                    final localData = await DatabaseHelper()
+                        .fetchLearnerByID(widget.learnerID);
+                    if (localData != null) {
+                      setState(() {
+                        learnerData = localData;
+                      });
+                      print(
+                          '[DB_SYNC] ✅ In-memory learnerData refreshed with $fieldName: ${learnerData![fieldName]}');
+                    }
+
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('$fieldName saved locally')),
                     );
                   }
                   saved = true;
+
+                  // Mark this signature as already saved to avoid duplicate saves
+                  if (fieldName == 'signature') {
+                    _learnerSignatureAlreadySaved = true;
+                    print(
+                        '[SIG_SAVE] Marked learner signature as already saved');
+                  } else if (fieldName == 'witness_signature') {
+                    _witnessSignatureAlreadySaved = true;
+                    print(
+                        '[SIG_SAVE] Marked witness signature as already saved');
+                  }
+
                   Navigator.pop(context);
                 }
+              } else {
+                print('[SIG_SAVE] Controller is empty for $fieldName');
               }
             },
             child: const Text('Save'),
@@ -3028,9 +3811,62 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
                 bool isConnected = await _checkConnectivity();
                 if (isConnected) {
                   await _uploadInitialsToServer(controller.text, fieldName);
+
+                  // Refresh data from server to get the updated initials
+                  print(
+                      '[DB_SYNC] Fetching updated learner data from server after initials save...');
+                  try {
+                    final response = await http.get(
+                      Uri.parse(
+                          '${AppConfig.learnerDetailsUrl}?LearnerID=${widget.learnerID}'),
+                    );
+                    if (response.statusCode == 200) {
+                      final jsonResponse = jsonDecode(response.body);
+                      if (jsonResponse['success'] == true) {
+                        final serverData =
+                            Map<String, dynamic>.from(jsonResponse['data']);
+                        print(
+                            '[DB_SYNC] Server data fetched: learner_initials=${serverData['learner_initials']}, witness_initials=${serverData['witness_initials']}');
+
+                        // Update local database with server data
+                        await DatabaseHelper()
+                            .updateLearnerDetails(widget.learnerID, serverData);
+                        print(
+                            '[DB_SYNC] Local database updated with server data');
+
+                        // Update in-memory learnerData
+                        setState(() {
+                          learnerData = serverData;
+                        });
+                        print(
+                            '[DB_SYNC] ✅ In-memory learnerData refreshed with $fieldName: ${learnerData![fieldName]}');
+                      } else {
+                        print(
+                            '[DB_SYNC] ⚠️ Failed to fetch from server: ${jsonResponse['message']}');
+                      }
+                    } else {
+                      print('[DB_SYNC] ⚠️ HTTP error ${response.statusCode}');
+                    }
+                  } catch (e) {
+                    print('[DB_SYNC] ⚠️ Exception during data refresh: $e');
+                  }
                 } else {
                   await DatabaseHelper().saveInitialsLocally(
                       widget.learnerID, controller.text, fieldName);
+
+                  // Refresh in-memory data from local database
+                  print(
+                      '[DB_SYNC] Refreshing in-memory data from local database...');
+                  final localData =
+                      await DatabaseHelper().fetchLearnerByID(widget.learnerID);
+                  if (localData != null) {
+                    setState(() {
+                      learnerData = localData;
+                    });
+                    print(
+                        '[DB_SYNC] ✅ In-memory learnerData refreshed with $fieldName: ${learnerData![fieldName]}');
+                  }
+
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('$fieldName saved locally')),
                   );
@@ -3045,15 +3881,6 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       ),
     );
     return saved;
-  }
-
-  Future<void> _openWitnessSignaturePad() async {
-    final witnessSignatureSaved = await _promptSignature(
-        'Witness Signature', _witnessSignatureController, 'witness_signature');
-    if (witnessSignatureSaved) {
-      await _promptInitials(
-          'Witness Initials', _witnessInitialsController, 'witness_initials');
-    }
   }
 
   Future<void> _openInitialsDialog() async {
@@ -3071,23 +3898,51 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
     if (signatureSaved) {
       await _promptInitials(
           'Learner Initials', _learnerInitialsController, 'learner_initials');
+
+      // Recheck agreement eligibility after learner signatures are saved
+      print(
+          '[AGREEMENT_CHECK] Rechecking eligibility after learner signatures saved');
+      await _checkAgreementEligibility();
+    }
+  }
+
+  Future<void> _openWitnessSignaturePad() async {
+    final witnessSignatureSaved = await _promptSignature(
+        'Witness Signature', _witnessSignatureController, 'witness_signature');
+    if (witnessSignatureSaved) {
+      await _promptInitials(
+          'Witness Initials', _witnessInitialsController, 'witness_initials');
+
+      // Recheck agreement eligibility after witness signatures are saved
+      print(
+          '[AGREEMENT_CHECK] Rechecking eligibility after witness signatures saved');
+      await _checkAgreementEligibility();
     }
   }
 
   Future<void> _uploadImage(String imagePath) async {
+    print('[IMG_UPLOAD] ========================================');
+    print('[IMG_UPLOAD] STARTING IMAGE UPLOAD PROCESS');
+    print('[IMG_UPLOAD] Path: $imagePath');
+    print('[IMG_UPLOAD] LearnerID: ${widget.learnerID}');
+    print('[IMG_UPLOAD] ========================================');
+
     try {
       // Validate image file exists and is readable
       final File imageFile = File(imagePath);
       if (!await imageFile.exists()) {
+        print('[IMG_UPLOAD] ❌ FILE NOT FOUND: $imagePath');
         throw Exception('Image file does not exist: $imagePath');
       }
 
       final int fileSize = await imageFile.length();
       if (fileSize == 0) {
+        print('[IMG_UPLOAD] ❌ FILE IS EMPTY');
         throw Exception('Image file is empty');
       }
 
-      print('Uploading image: $imagePath ($fileSize bytes)');
+      print('[IMG_UPLOAD] ✅ File loaded: $fileSize bytes');
+      print('[IMG_UPLOAD] URL: ${AppConfig.saveImageUrl}');
 
       final imageName = imagePath.split('/').last;
       final imageBytes = await imageFile.readAsBytes();
@@ -3105,22 +3960,26 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
 
       request.fields['learner_id'] = widget.learnerID.trim();
 
+      print('[IMG_UPLOAD] Sending request...');
+
       // Add timeout to prevent hanging
       var response = await request.send().timeout(
         const Duration(seconds: 30),
         onTimeout: () {
+          print('[IMG_UPLOAD] ❌ TIMEOUT after 30 seconds');
           throw Exception(
               'Upload timeout - please check your internet connection');
         },
       );
 
       var responseBody = await response.stream.bytesToString();
-      print('Image upload response: $responseBody');
+      print('[IMG_UPLOAD] Response status: ${response.statusCode}');
+      print('[IMG_UPLOAD] Response body: $responseBody');
 
       if (response.statusCode == 200) {
         var jsonResponse = jsonDecode(responseBody);
         if (jsonResponse['success']) {
-          print('Image uploaded successfully');
+          print('[IMG_UPLOAD] ✅ Image uploaded successfully');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -3130,7 +3989,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
             );
           }
         } else {
-          print('Image upload failed: ${jsonResponse['message']}');
+          print('[IMG_UPLOAD] ❌ Upload failed: ${jsonResponse['message']}');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -3143,7 +4002,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
           await saveImageLocally(imagePath);
         }
       } else {
-        print('Failed to upload image: HTTP ${response.statusCode}');
+        print('[IMG_UPLOAD] ❌ HTTP error ${response.statusCode}');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -3155,8 +4014,9 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
         }
         await saveImageLocally(imagePath);
       }
-    } catch (e) {
-      print('Error uploading image: $e');
+    } catch (e, stackTrace) {
+      print('[IMG_UPLOAD] ❌ Exception: $e');
+      print('[IMG_UPLOAD] Stack trace: $stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -3169,6 +4029,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
       // Try to save locally as fallback
       try {
         await saveImageLocally(imagePath);
+        print('[IMG_UPLOAD] ⚠️ Saved locally as fallback');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -3178,7 +4039,7 @@ class _LearnerDetailsPageState extends State<LearnerDetailsPage>
           );
         }
       } catch (localError) {
-        print('Error saving image locally: $localError');
+        print('[IMG_UPLOAD] ❌ Error saving locally: $localError');
       }
     }
   }
