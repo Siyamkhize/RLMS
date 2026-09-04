@@ -2552,29 +2552,75 @@ class _DashboardPageState extends State<DashboardPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Profile Avatar with Logo
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ClipOval(
-                      child: Image.asset(
-                        "assets/images/logo1.png",
+                  // Profile Avatar with Logo or Facilitator Image
+                  FutureBuilder<Map<String, dynamic>>(
+                    future: classData,
+                    builder: (context, snapshot) {
+                      final facilitatorImage =
+                          snapshot.data?['facilitator_image'];
+                      final hasImage = facilitatorImage != null &&
+                          facilitatorImage.toString().trim().isNotEmpty;
+
+                      return Container(
                         width: 64,
                         height: 64,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: hasImage
+                              ? Image.network(
+                                  'https://rlms.rlms.co.za/$facilitatorImage',
+                                  width: 64,
+                                  height: 64,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    // Fallback to logo if image fails to load
+                                    return Image.asset(
+                                      "assets/images/logo.png",
+                                      width: 64,
+                                      height: 64,
+                                      fit: BoxFit.cover,
+                                    );
+                                  },
+                                  loadingBuilder:
+                                      (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return Center(
+                                      child: CircularProgressIndicator(
+                                        value: loadingProgress
+                                                    .expectedTotalBytes !=
+                                                null
+                                            ? loadingProgress
+                                                    .cumulativeBytesLoaded /
+                                                loadingProgress
+                                                    .expectedTotalBytes!
+                                            : null,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                          Color(0xFF5B9BD5),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                )
+                              : Image.asset(
+                                  "assets/images/logo.png",
+                                  width: 64,
+                                  height: 64,
+                                  fit: BoxFit.cover,
+                                ),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 16),
                   // Facilitator Name
