@@ -2578,7 +2578,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         child: ClipOval(
                           child: hasImage
                               ? Image.network(
-                                  'https://rlms.rlms.co.za/$facilitatorImage',
+                                  'https://rlms.rlms.co.za/mobile/$facilitatorImage',
                                   width: 64,
                                   height: 64,
                                   fit: BoxFit.cover,
