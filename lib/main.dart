@@ -1798,7 +1798,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
-// Custom painter for decorative curved lines
+// Custom painter for decorative dot patterns
 class _CurvedLinesPainter extends CustomPainter {
   final Color color;
   final bool reverse;
@@ -1812,111 +1812,49 @@ class _CurvedLinesPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
+      ..style = PaintingStyle.fill;
 
-    final path1 = Path();
-    final path2 = Path();
-    final path3 = Path();
+    // Create scattered dot pattern
+    final dots = <Offset>[];
 
     if (reverse) {
-      // Bottom-left curves (going upward)
-      // Curve 1
-      path1.moveTo(size.width * 0.2, size.height * 0.9);
-      path1.quadraticBezierTo(
-        size.width * 0.4,
-        size.height * 0.7,
-        size.width * 0.6,
-        size.height * 0.8,
-      );
-      path1.quadraticBezierTo(
-        size.width * 0.75,
-        size.height * 0.85,
-        size.width * 0.9,
-        size.height * 0.7,
-      );
-
-      // Curve 2
-      path2.moveTo(size.width * 0.1, size.height * 0.75);
-      path2.quadraticBezierTo(
-        size.width * 0.35,
-        size.height * 0.55,
-        size.width * 0.55,
-        size.height * 0.65,
-      );
-      path2.quadraticBezierTo(
-        size.width * 0.7,
-        size.height * 0.72,
-        size.width * 0.85,
-        size.height * 0.55,
-      );
-
-      // Curve 3
-      path3.moveTo(size.width * 0.15, size.height * 0.6);
-      path3.quadraticBezierTo(
-        size.width * 0.3,
-        size.height * 0.45,
-        size.width * 0.5,
-        size.height * 0.5,
-      );
-      path3.quadraticBezierTo(
-        size.width * 0.65,
-        size.height * 0.54,
-        size.width * 0.8,
-        size.height * 0.4,
-      );
+      // Bottom-left dot pattern
+      dots.addAll([
+        Offset(size.width * 0.15, size.height * 0.75),
+        Offset(size.width * 0.25, size.height * 0.70),
+        Offset(size.width * 0.35, size.height * 0.80),
+        Offset(size.width * 0.10, size.height * 0.85),
+        Offset(size.width * 0.45, size.height * 0.75),
+        Offset(size.width * 0.20, size.height * 0.90),
+        Offset(size.width * 0.40, size.height * 0.65),
+        Offset(size.width * 0.30, size.height * 0.85),
+        Offset(size.width * 0.50, size.height * 0.80),
+        Offset(size.width * 0.15, size.height * 0.95),
+        Offset(size.width * 0.55, size.height * 0.70),
+        Offset(size.width * 0.60, size.height * 0.85),
+      ]);
     } else {
-      // Top-right curves (going downward)
-      // Curve 1
-      path1.moveTo(size.width * 0.1, size.height * 0.3);
-      path1.quadraticBezierTo(
-        size.width * 0.3,
-        size.height * 0.15,
-        size.width * 0.5,
-        size.height * 0.2,
-      );
-      path1.quadraticBezierTo(
-        size.width * 0.7,
-        size.height * 0.25,
-        size.width * 0.9,
-        size.height * 0.15,
-      );
-
-      // Curve 2
-      path2.moveTo(size.width * 0.15, size.height * 0.45);
-      path2.quadraticBezierTo(
-        size.width * 0.35,
-        size.height * 0.3,
-        size.width * 0.55,
-        size.height * 0.35,
-      );
-      path2.quadraticBezierTo(
-        size.width * 0.75,
-        size.height * 0.4,
-        size.width * 0.95,
-        size.height * 0.3,
-      );
-
-      // Curve 3
-      path3.moveTo(size.width * 0.2, size.height * 0.6);
-      path3.quadraticBezierTo(
-        size.width * 0.4,
-        size.height * 0.45,
-        size.width * 0.6,
-        size.height * 0.5,
-      );
-      path3.quadraticBezierTo(
-        size.width * 0.8,
-        size.height * 0.55,
-        size.width * 1.0,
-        size.height * 0.45,
-      );
+      // Top-right dot pattern
+      dots.addAll([
+        Offset(size.width * 0.70, size.height * 0.15),
+        Offset(size.width * 0.60, size.height * 0.20),
+        Offset(size.width * 0.80, size.height * 0.25),
+        Offset(size.width * 0.75, size.height * 0.10),
+        Offset(size.width * 0.50, size.height * 0.25),
+        Offset(size.width * 0.85, size.height * 0.15),
+        Offset(size.width * 0.65, size.height * 0.30),
+        Offset(size.width * 0.90, size.height * 0.20),
+        Offset(size.width * 0.55, size.height * 0.15),
+        Offset(size.width * 0.70, size.height * 0.35),
+        Offset(size.width * 0.95, size.height * 0.30),
+        Offset(size.width * 0.60, size.height * 0.10),
+      ]);
     }
 
-    canvas.drawPath(path1, paint);
-    canvas.drawPath(path2, paint..strokeWidth = 2.0);
-    canvas.drawPath(path3, paint..strokeWidth = 1.5);
+    // Draw small dots
+    for (final dot in dots) {
+      canvas.drawCircle(dot, 2.5, paint);
+    }
   }
 
   @override
