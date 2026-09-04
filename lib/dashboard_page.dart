@@ -1860,6 +1860,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
+      drawer: _buildModernDrawer(context),
       appBar: AppBar(
         title: const Text(
           'Dashboard',
@@ -1871,28 +1872,11 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.menu, color: Color(0xFF1A2332)),
-          onPressed: () {
-            showMenu(
-              context: context,
-              position: const RelativeRect.fromLTRB(100.0, 100.0, 0.0, 0.0),
-              items: [
-                _buildMenuItem(Icons.dashboard, 'Dashboard', 1),
-                _buildMenuItem(Icons.account_circle, 'Profile', 2),
-                _buildMenuItem(Icons.list, 'Learner List', 3),
-                _buildMenuItem(Icons.monitor, 'Learner Material', 4),
-                _buildMenuItem(Icons.monitor, 'Learning Material Form', 5),
-                _buildMenuItem(Icons.fingerprint, 'Fingerprint Clock In', 6),
-                _buildMenuItem(Icons.folder, 'POE Collection', 7),
-                _buildMenuItem(Icons.people, 'Attendance', 9),
-                _buildMenuItem(Icons.logout, 'Logout', 11),
-              ],
-              elevation: 8.0,
-            ).then((value) {
-              if (value != null) _handleMenuSelection(context, value);
-            });
-          },
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu, color: Color(0xFF1A2332)),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
         ),
         centerTitle: true,
         actions: [
@@ -2180,119 +2164,6 @@ class _DashboardPageState extends State<DashboardPage> {
         },
       ),
     );
-  }
-
-  PopupMenuItem<int> _buildMenuItem(IconData icon, String label, int value) {
-    return PopupMenuItem<int>(
-      value: value,
-      child: Row(
-        children: [
-          Icon(icon),
-          const SizedBox(width: 15),
-          Text(label),
-        ],
-      ),
-    );
-  }
-
-  void _handleMenuSelection(BuildContext context, int value) {
-    switch (value) {
-      case 1:
-        // Navigate to Dashboard
-        Navigator.pushNamed(context, '/dashboard');
-        break;
-      case 2:
-        // Navigate to Profile
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => FacilitatorProfile(
-              classID: widget.classID,
-            ),
-          ),
-        );
-        break;
-      case 3:
-        // Navigate to Learner List (Facilitator - with PPE Sizes button)
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => Learnerlistpage(
-              classID: widget.classID,
-              learners: [],
-            ),
-          ),
-        );
-        break;
-      case 4:
-        // Navigate to Learner Material
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => MaterialForm(
-              classID: widget.classID,
-            ),
-          ),
-        );
-        break;
-      case 5:
-        // Navigate to Learning Material Form Page
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => LearningMaterialFormPage(
-              classID: widget.classID,
-            ),
-          ),
-        );
-        break;
-      case 6:
-        // Navigate to ClockInPage
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ClockInPage(
-              classID: widget.classID,
-              learners: currentLearners,
-            ),
-          ),
-        );
-        break;
-      case 7:
-        // Navigate to POE Collection Page
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => POECollectionPage(
-              classID: widget.classID,
-            ),
-          ),
-        );
-        break;
-      case 9:
-        // Navigate to Attendance Page
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AttendancePage(
-              classID: widget.classID,
-            ),
-          ),
-        );
-        break;
-      case 10:
-        // Navigate to Facilitator Fingerprint Management
-        _navigateToFacilitatorFingerprints();
-        break;
-      case 11:
-        // Perform Logout
-        Navigator.of(context)
-            .pushNamedAndRemoveUntil('/login', (route) => false);
-        break;
-      default:
-        print('Unknown menu option: $value');
-        break;
-    }
   }
 
   /// Navigate to facilitator fingerprint management page
@@ -2657,6 +2528,324 @@ class _DashboardPageState extends State<DashboardPage> {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildModernDrawer(BuildContext context) {
+    return Drawer(
+      child: Container(
+        color: Colors.white,
+        child: Column(
+          children: [
+            // Header Section
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF5B9BD5), Color(0xFF4A8BC2)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Profile Avatar
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.person,
+                      color: Color(0xFF5B9BD5),
+                      size: 36,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Facilitator Name
+                  FutureBuilder<Map<String, dynamic>>(
+                    future: classData,
+                    builder: (context, snapshot) {
+                      final facilitatorName =
+                          snapshot.data?['facilitator_name'] ?? 'Facilitator';
+                      return Text(
+                        facilitatorName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Facilitator',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Menu Items
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  _buildDrawerItem(
+                    context,
+                    icon: Icons.home,
+                    title: 'Home',
+                    isActive: true,
+                    onTap: () {
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    icon: Icons.fingerprint,
+                    title: 'Clock In',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ClockInPage(
+                            classID: widget.classID,
+                            learners: currentLearners,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    icon: Icons.check_circle_outline,
+                    title: 'Attendance',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AttendancePage(
+                            classID: widget.classID,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    icon: Icons.folder_outlined,
+                    title: 'POE',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => POECollectionPage(
+                            classID: widget.classID,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    icon: Icons.people_outline,
+                    title: 'Learners',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => Learnerlistpage(
+                            classID: widget.classID,
+                            learners: [],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    icon: Icons.inventory_2_outlined,
+                    title: 'Materials',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => MaterialForm(
+                            classID: widget.classID,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    icon: Icons.description_outlined,
+                    title: 'Learning Materials',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => LearningMaterialFormPage(
+                            classID: widget.classID,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    icon: Icons.account_circle_outlined,
+                    title: 'Profile',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => FacilitatorProfile(
+                            classID: widget.classID,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    icon: Icons.sync,
+                    title: 'Sync',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Trigger sync
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Syncing data...'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 32),
+                  _buildDrawerItem(
+                    context,
+                    icon: Icons.logout,
+                    title: 'Logout',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.of(context)
+                          .pushNamedAndRemoveUntil('/login', (route) => false);
+                    },
+                  ),
+                ],
+              ),
+            ),
+            // Live Status Badge
+            Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF4CAF50).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: const Color(0xFF4CAF50).withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF4CAF50),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Live',
+                    style: TextStyle(
+                      color: Color(0xFF4CAF50),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    bool isActive = false,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          decoration: BoxDecoration(
+            color: isActive
+                ? const Color(0xFF5B9BD5).withOpacity(0.1)
+                : Colors.transparent,
+            border: Border(
+              left: BorderSide(
+                color: isActive ? const Color(0xFF5B9BD5) : Colors.transparent,
+                width: 4,
+              ),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                color: isActive
+                    ? const Color(0xFF5B9BD5)
+                    : const Color(0xFF6B7280),
+                size: 24,
+              ),
+              const SizedBox(width: 16),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                  color: isActive
+                      ? const Color(0xFF1A2332)
+                      : const Color(0xFF6B7280),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
