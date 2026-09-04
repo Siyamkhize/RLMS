@@ -2552,7 +2552,7 @@ class _DashboardPageState extends State<DashboardPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Profile Avatar with Logo or Facilitator Image
+                  // Profile Avatar with Facilitator Image or Person Icon
                   FutureBuilder<Map<String, dynamic>>(
                     future: classData,
                     builder: (context, snapshot) {
@@ -2583,12 +2583,11 @@ class _DashboardPageState extends State<DashboardPage> {
                                   height: 64,
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) {
-                                    // Fallback to logo if image fails to load
-                                    return Image.asset(
-                                      "assets/images/logo.png",
-                                      width: 64,
-                                      height: 64,
-                                      fit: BoxFit.cover,
+                                    // Fallback to person icon if image fails to load
+                                    return Icon(
+                                      Icons.person,
+                                      size: 36,
+                                      color: Color(0xFF5B9BD5),
                                     );
                                   },
                                   loadingBuilder:
@@ -2612,11 +2611,10 @@ class _DashboardPageState extends State<DashboardPage> {
                                     );
                                   },
                                 )
-                              : Image.asset(
-                                  "assets/images/logo.png",
-                                  width: 64,
-                                  height: 64,
-                                  fit: BoxFit.cover,
+                              : Icon(
+                                  Icons.person,
+                                  size: 36,
+                                  color: Color(0xFF5B9BD5),
                                 ),
                         ),
                       );
