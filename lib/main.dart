@@ -1022,30 +1022,30 @@ class _LoginPageState extends State<LoginPage> {
 
           SafeArea(
             child: SingleChildScrollView(
-              physics: const ClampingScrollPhysics(),
+              physics: const NeverScrollableScrollPhysics(),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 54),
+                padding: const EdgeInsets.symmetric(horizontal: 40),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     children: [
-                      const SizedBox(height: 42),
+                      const SizedBox(height: 24),
 
                       // Logo
                       SizedBox(
-                        width: 142,
-                        height: 142,
+                        width: 100,
+                        height: 100,
                         child: Center(
                           child: Image.asset(
                             "assets/images/logo.png",
-                            width: 136,
-                            height: 136,
+                            width: 95,
+                            height: 95,
                             fit: BoxFit.contain,
                           ),
                         ),
                       ),
 
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
 
                       // App title
                       const FittedBox(
@@ -1054,7 +1054,7 @@ class _LoginPageState extends State<LoginPage> {
                           'REMOTE LEARNER',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 26,
+                            fontSize: 22,
                             fontWeight: FontWeight.w800,
                             color: Color(0xFF15284A),
                             letterSpacing: 0.7,
@@ -1063,7 +1063,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
 
-                      const SizedBox(height: 13),
+                      const SizedBox(height: 6),
 
                       const FittedBox(
                         fit: BoxFit.scaleDown,
@@ -1071,16 +1071,16 @@ class _LoginPageState extends State<LoginPage> {
                           'MANAGEMENT SYSTEM',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 11,
                             fontWeight: FontWeight.w500,
                             color: Color(0xFF66B5E9),
-                            letterSpacing: 3.0,
+                            letterSpacing: 2.5,
                             height: 1.0,
                           ),
                         ),
                       ),
 
-                      const SizedBox(height: 88),
+                      const SizedBox(height: 30),
 
                       // Welcome text
                       const FittedBox(
@@ -1089,7 +1089,7 @@ class _LoginPageState extends State<LoginPage> {
                           'Welcome back',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 28,
+                            fontSize: 24,
                             fontWeight: FontWeight.w700,
                             color: Color(0xFF12284C),
                             height: 1.0,
@@ -1097,20 +1097,20 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
 
-                      const SizedBox(height: 22),
+                      const SizedBox(height: 8),
 
                       Text(
                         'Sign in to continue to your account',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: 13,
                           color: Colors.grey.shade600,
                           fontWeight: FontWeight.w400,
                           height: 1.1,
                         ),
                       ),
 
-                      const SizedBox(height: 66),
+                      const SizedBox(height: 24),
 
                       // Email field
                       _buildLoginField(
@@ -1120,7 +1120,7 @@ class _LoginPageState extends State<LoginPage> {
                         obscureText: false,
                       ),
 
-                      const SizedBox(height: 34),
+                      const SizedBox(height: 16),
 
                       // Password field
                       _buildLoginField(
@@ -1147,12 +1147,12 @@ class _LoginPageState extends State<LoginPage> {
                             value!.isEmpty ? 'Enter password' : null,
                       ),
 
-                      const SizedBox(height: 44),
+                      const SizedBox(height: 20),
 
                       // Login button
                       SizedBox(
                         width: double.infinity,
-                        height: 108,
+                        height: 52,
                         child: _isLoading
                             ? const Center(
                                 child: CircularProgressIndicator(
@@ -1169,13 +1169,13 @@ class _LoginPageState extends State<LoginPage> {
                                     begin: Alignment.centerLeft,
                                     end: Alignment.centerRight,
                                   ),
-                                  borderRadius: BorderRadius.circular(34),
+                                  borderRadius: BorderRadius.circular(26),
                                   boxShadow: [
                                     BoxShadow(
                                       color: const Color(0xFF5BA4DE)
                                           .withOpacity(0.25),
-                                      blurRadius: 18,
-                                      offset: const Offset(0, 9),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 8),
                                     ),
                                   ],
                                 ),
@@ -1187,7 +1187,7 @@ class _LoginPageState extends State<LoginPage> {
                                     shadowColor: Colors.transparent,
                                     elevation: 0,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(34),
+                                      borderRadius: BorderRadius.circular(26),
                                     ),
                                   ),
                                   child: Row(
@@ -1196,15 +1196,15 @@ class _LoginPageState extends State<LoginPage> {
                                       Text(
                                         'Login',
                                         style: TextStyle(
-                                          fontSize: 17,
+                                          fontSize: 16,
                                           fontWeight: FontWeight.w600,
                                           letterSpacing: 0.2,
                                         ),
                                       ),
-                                      SizedBox(width: 14),
+                                      SizedBox(width: 12),
                                       Icon(
                                         Icons.arrow_forward,
-                                        size: 30,
+                                        size: 24,
                                       ),
                                     ],
                                   ),
@@ -1212,7 +1212,7 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                       ),
 
-                      const SizedBox(height: 38),
+                      const SizedBox(height: 20),
 
                       // Divider
                       Container(
@@ -1221,19 +1221,19 @@ class _LoginPageState extends State<LoginPage> {
                         color: const Color(0xFFD8DCE2),
                       ),
 
-                      const SizedBox(height: 38),
+                      const SizedBox(height: 16),
 
                       // Connection status heading
                       Text(
                         'Connected',
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: Colors.grey.shade700,
                         ),
                       ),
 
-                      const SizedBox(height: 30),
+                      const SizedBox(height: 12),
 
                       // Wi-Fi status
                       _buildStatusPill(
@@ -1250,7 +1250,7 @@ class _LoginPageState extends State<LoginPage> {
                             : const Color(0xFF3C8740),
                       ),
 
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 10),
 
                       // Database status
                       _buildStatusPill(
@@ -1261,19 +1261,19 @@ class _LoginPageState extends State<LoginPage> {
                         textColor: const Color(0xFF236AA4),
                       ),
 
-                      const SizedBox(height: 48),
+                      const SizedBox(height: 20),
 
                       // Version
                       Text(
                         'v1.0.0',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11,
                           color: Colors.grey.shade400,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
 
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 16),
                     ],
                   ),
                 ),
@@ -1294,10 +1294,10 @@ class _LoginPageState extends State<LoginPage> {
     String? Function(String?)? validator,
   }) {
     return Container(
-      height: 96,
+      height: 56,
       decoration: BoxDecoration(
         color: const Color(0xFFF7FAFE),
-        borderRadius: BorderRadius.circular(23),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.025),
@@ -1312,52 +1312,52 @@ class _LoginPageState extends State<LoginPage> {
         validator:
             validator ?? (value) => value!.isEmpty ? 'Enter email' : null,
         style: const TextStyle(
-          fontSize: 16,
+          fontSize: 14,
           color: Color(0xFF26364D),
         ),
         decoration: InputDecoration(
           hintText: hintText,
           hintStyle: const TextStyle(
             color: Color(0xFFB8BBC0),
-            fontSize: 16,
+            fontSize: 14,
             fontWeight: FontWeight.w400,
           ),
           prefixIcon: Container(
-            width: 78,
+            width: 56,
             margin: const EdgeInsets.only(
               left: 0,
               top: 0,
               bottom: 0,
-              right: 17,
+              right: 12,
             ),
             decoration: BoxDecoration(
               color: const Color(0xFF5FA6DD),
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(23),
-                bottomLeft: Radius.circular(23),
-                topRight: Radius.circular(23),
-                bottomRight: Radius.circular(23),
+                topLeft: Radius.circular(18),
+                bottomLeft: Radius.circular(18),
+                topRight: Radius.circular(18),
+                bottomRight: Radius.circular(18),
               ),
             ),
             child: Icon(
               prefixIcon,
               color: Colors.white,
-              size: 29,
+              size: 22,
             ),
           ),
           prefixIconConstraints: const BoxConstraints(
-            minWidth: 78,
-            minHeight: 96,
+            minWidth: 56,
+            minHeight: 56,
           ),
           suffixIcon: suffixIcon,
           suffixIconConstraints: const BoxConstraints(
-            minWidth: 54,
-            minHeight: 96,
+            minWidth: 48,
+            minHeight: 56,
           ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 0,
-            vertical: 28,
+            vertical: 18,
           ),
           errorStyle: const TextStyle(height: 0, fontSize: 0),
         ),
@@ -1373,16 +1373,16 @@ class _LoginPageState extends State<LoginPage> {
     required Color textColor,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: backgroundColor,
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: iconBackgroundColor,
               shape: BoxShape.circle,
@@ -1390,15 +1390,15 @@ class _LoginPageState extends State<LoginPage> {
             child: Icon(
               icon,
               color: Colors.white,
-              size: 18,
+              size: 14,
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 10),
           Flexible(
             child: Text(
               text,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 12,
                 fontWeight: FontWeight.w500,
                 color: textColor,
               ),
