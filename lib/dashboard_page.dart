@@ -1859,12 +1859,20 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: const Text('Dashboard'),
+        title: const Text(
+          'Dashboard',
+          style: TextStyle(
+            color: Color(0xFF1A2332),
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         backgroundColor: Colors.white,
-        elevation: 1,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.menu, color: Colors.black),
+          icon: const Icon(Icons.menu, color: Color(0xFF1A2332)),
           onPressed: () {
             showMenu(
               context: context,
@@ -1877,9 +1885,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 _buildMenuItem(Icons.monitor, 'Learning Material Form', 5),
                 _buildMenuItem(Icons.fingerprint, 'Fingerprint Clock In', 6),
                 _buildMenuItem(Icons.folder, 'POE Collection', 7),
-                // _buildMenuItem(Icons.fingerprint, 'Contact Less Clock In', 8),
                 _buildMenuItem(Icons.people, 'Attendance', 9),
-                // _buildMenuItem(Icons.fingerprint_outlined, 'My Fingerprints', 9),
                 _buildMenuItem(Icons.logout, 'Logout', 11),
               ],
               elevation: 8.0,
@@ -1892,13 +1898,13 @@ class _DashboardPageState extends State<DashboardPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.fingerprint_outlined,
-                color: Colors.blue, size: 20),
+                color: Color(0xFF5B9BD5), size: 24),
             tooltip: 'Update Fingerprints',
             onPressed: _startFingerprintUpdate,
           ),
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.orange, size: 20),
-            tooltip: 'Re-enroll Fingerprints',
+            icon: const Icon(Icons.refresh, color: Color(0xFF5B9BD5), size: 24),
+            tooltip: 'Refresh',
             onPressed: _startFingerprintReEnrollment,
           ),
           const SizedBox(width: 8),
@@ -1945,39 +1951,229 @@ class _DashboardPageState extends State<DashboardPage> {
           final classInfo = snapshot.data!;
           final className = classInfo['class_name'] ?? 'N/A';
           final facilitatorName = classInfo['facilitator_name'] ?? 'N/A';
-          final classMax = classInfo['class_max']?.toString() ?? 'N/A';
-          final totalLearners =
-              classInfo['total_learners']?.toString() ?? 'N/A';
-          final attendance = classInfo['total_attendance']?.toString() ?? 'N/A';
-          final absent = classInfo['total_absent']?.toString() ?? 'N/A';
+          final classMax = classInfo['class_max']?.toString() ?? '0';
+          final totalLearners = classInfo['total_learners']?.toString() ?? '0';
+          final attendance = classInfo['total_attendance']?.toString() ?? '0';
+          final absent = classInfo['total_absent']?.toString() ?? '0';
           final siteName = classInfo['site_name'] ?? 'N/A';
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
-                // Site Information
-                Text(
-                  'Site: $siteName',
-                  style: const TextStyle(color: Colors.black, fontSize: 30),
+                // Class Details Card - Modern Design
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      // Header with progress circle
+                      Row(
+                        children: [
+                          // Circular Progress
+                          SizedBox(
+                            width: 80,
+                            height: 80,
+                            child: Stack(
+                              children: [
+                                Center(
+                                  child: SizedBox(
+                                    width: 70,
+                                    height: 70,
+                                    child: CircularProgressIndicator(
+                                      value: totalLearners != '0'
+                                          ? int.parse(attendance) /
+                                              int.parse(totalLearners)
+                                          : 0,
+                                      strokeWidth: 6,
+                                      backgroundColor: Colors.grey[200],
+                                      valueColor:
+                                          const AlwaysStoppedAnimation<Color>(
+                                        Color(0xFF4CAF50),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Center(
+                                  child: Text(
+                                    '$attendance/$totalLearners',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF1A2332),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 20),
+                          // Class Details
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Class Details',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF1A2332),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  className,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Facilitator: $facilitatorName',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      // Attendance Stats
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF4CAF50).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(
+                                        Icons.check_circle,
+                                        color: Color(0xFF4CAF50),
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        'Attendance',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          color: Color(0xFF4CAF50),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    attendance,
+                                    style: const TextStyle(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF4CAF50),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF5350).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(
+                                        Icons.cancel,
+                                        color: Color(0xFFEF5350),
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        'Absent',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          color: Color(0xFFEF5350),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    absent,
+                                    style: const TextStyle(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFFEF5350),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Additional Info
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Class Max: $classMax',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            'Total Learners: $totalLearners',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 30),
-                // Class Information Card
-                _buildInfoCard(
-                  context,
-                  title: 'Class Details',
-                  details: [
-                    'Class: $className',
-                    'Facilitator: $facilitatorName',
-                    'Class Max: $classMax',
-                    'Total Learners: $totalLearners',
-                    'Attendance: $attendance',
-                    'Absent: $absent',
-                  ],
-                ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 20),
                 // Biometric Section
                 _buildBiometricSection(context),
+                const SizedBox(height: 20),
+                // Bottom Navigation
+                _buildBottomNavigation(context),
               ],
             ),
           );
@@ -2225,87 +2421,283 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildBiometricSection(BuildContext context) {
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16.0),
-      ),
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // Biometric Tabs
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildTab(context, 'Fingerprint', true),
-                const SizedBox(width: 8),
-                _buildTab(context, 'Facial', false),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Biometric Options
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildBiometricOption(
-                    context, Icons.fingerprint, 'Fingerprint'),
-                const SizedBox(width: 16),
-                _buildBiometricOption(context, Icons.face, 'Facial'),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTab(BuildContext context, String label, bool isSelected) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.black : Colors.grey[300],
-          borderRadius: BorderRadius.circular(8.0),
-        ),
-        child: Center(
-          child: Text(
-            label.toUpperCase(),
-            style: TextStyle(
-              color: isSelected ? Colors.white : Colors.black,
-              fontWeight: FontWeight.bold,
-            ),
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
           ),
-        ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Biometric Tabs
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2196F3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Fingerprint',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0E0E0),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Facial',
+                      style: TextStyle(
+                        color: Color(0xFF757575),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          // Biometric Options
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    // Start 1:N fingerprint verification
+                    _startFingerprintClocking();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 32),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F7FA),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFF2196F3),
+                        width: 2,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF2196F3),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.fingerprint,
+                            size: 48,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Fingerprint',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1A2332),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    // Handle Facial recognition (not implemented)
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Facial recognition not implemented')),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 32),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F7FA),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFFE0E0E0),
+                        width: 2,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE0E0E0),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.face,
+                            size: 48,
+                            color: Color(0xFF757575),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Facial',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF757575),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildBiometricOption(
-      BuildContext context, IconData icon, String label) {
+  Widget _buildBottomNavigation(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 15,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildNavItem(
+            context,
+            icon: Icons.home,
+            label: 'Home',
+            isActive: true,
+            onTap: () {},
+          ),
+          _buildNavItem(
+            context,
+            icon: Icons.fingerprint,
+            label: 'Clock In',
+            isActive: false,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ClockInPage(
+                    classID: widget.classID,
+                    learners: currentLearners,
+                  ),
+                ),
+              );
+            },
+          ),
+          _buildNavItem(
+            context,
+            icon: Icons.check_circle_outline,
+            label: 'Attendance',
+            isActive: false,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AttendancePage(
+                    classID: widget.classID,
+                  ),
+                ),
+              );
+            },
+          ),
+          _buildNavItem(
+            context,
+            icon: Icons.folder_outlined,
+            label: 'POE',
+            isActive: false,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => POECollectionPage(
+                    classID: widget.classID,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavItem(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
-      onTap: () {
-        if (label == 'Fingerprint') {
-          // Start 1:N fingerprint verification
-          _startFingerprintClocking();
-        } else {
-          // Handle Facial recognition (not implemented)
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('$label recognition not implemented')),
-          );
-        }
-      },
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey, width: 2.0),
-          borderRadius: BorderRadius.circular(16.0),
+          color: isActive
+              ? const Color(0xFF5B9BD5).withOpacity(0.1)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 80, color: Colors.black),
-            const SizedBox(height: 8),
-            Text(label),
+            Icon(
+              icon,
+              color:
+                  isActive ? const Color(0xFF5B9BD5) : const Color(0xFF9E9E9E),
+              size: 24,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                color: isActive
+                    ? const Color(0xFF5B9BD5)
+                    : const Color(0xFF9E9E9E),
+              ),
+            ),
           ],
         ),
       ),
