@@ -2552,7 +2552,7 @@ class _DashboardPageState extends State<DashboardPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Profile Avatar
+                  // Profile Avatar with Logo
                   Container(
                     width: 64,
                     height: 64,
@@ -2567,10 +2567,13 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.person,
-                      color: Color(0xFF5B9BD5),
-                      size: 36,
+                    child: ClipOval(
+                      child: Image.asset(
+                        "assets/images/logo1.png",
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),

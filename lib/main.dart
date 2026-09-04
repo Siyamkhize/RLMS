@@ -970,11 +970,13 @@ class _LoginPageState extends State<LoginPage> {
                       ],
                     ),
                     child: Center(
-                      child: Image.asset(
-                        "assets/images/logo.png",
-                        width: 80,
-                        height: 80,
-                        fit: BoxFit.contain,
+                      child: ClipOval(
+                        child: Image.asset(
+                          "assets/images/logo1.png",
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
                   ),
