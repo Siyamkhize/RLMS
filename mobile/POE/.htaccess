@@ -1,0 +1,13 @@
+# Disable directory listing
+Options -Indexes
+
+# Allow PDF access (for your app)
+<FilesMatch "\.(pdf)$">
+    Require all granted
+    Header set Content-Type application/pdf
+</FilesMatch>
+
+# Deny access to all other file types
+<FilesMatch "\.(php|js|css|html|txt|sql|log|env|bak|zip|docx|xlsx|jpg|jpeg|png)$">
+    Require all denied
+</FilesMatch>

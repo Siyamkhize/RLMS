@@ -1,0 +1,670 @@
+<?php
+/**
+ * ARPL Toolkit Data API
+ * Returns complete toolkit data for a learner (all appendices)
+ * Trade-aware: Routes queries to trade-specific tables
+ * 
+ * Endpoint: POST mobile/get_arpl_toolkit_data.php
+ * 
+ * Request:
+ * {
+ *   "learnerID": 20286,
+ *   "classID": 782,
+ *   "ofoNumber": "671101",
+ *   "trade": "electrician"  // Optional: electrician, bricklayer, or plumber
+ * }
+ * 
+ * Response: Complete toolkit data including all appendices
+ */
+
+header('Content-Type: application/json');
+require_once 'connection.php';
+
+// ══════════════════════════════════════════════════════════
+// HELPER FUNCTIONS
+// ══════════════════════════════════════════════════════════
+function getTradeName($ofoNumber) {
+    $ofoMapping = [
+        '671101' => 'electrician',
+        '671102' => 'plumbing',
+        '671103' => 'bricklaying'
+    ];
+    return isset($ofoMapping[$ofoNumber]) ? $ofoMapping[$ofoNumber] : 'electrician';
+}
+
+function getTableName($appendix, $trade) {
+    if ($trade === 'electrician') {
+        $tables = [
+            'a' => 'arpl_appendix_a',
+            'c' => 'arpl_appendix_c',
+            'd' => 'arpl_appendix_d',
+            'f' => 'arpl_appendix_f',
+            'f_tasks' => 'arpl_appendix_f_practical_tasks',
+            'f_obs' => 'arpl_appendix_f_workplace_observations',
+            'g' => 'arpl_appendix_g',
+            'i' => 'arpl_appendix_i',
+            'j' => 'arpl_appendix_j'
+        ];
+    } elseif ($trade === 'bricklaying') {
+        // Note: appendix tables use 'bricklayer', activity tables use 'bricklaying'
+        $tables = [
+            'a' => 'arpl_appendix_a_bricklayer',
+            'c' => 'arpl_appendix_c_bricklayer',
+            'd' => 'arpl_appendix_d_bricklayer',
+            'f' => 'arpl_appendix_f_bricklayer',
+            'f_tasks' => 'arpl_appendix_f_practical_tasks_bricklayer',
+            'f_obs' => 'arpl_appendix_f_workplace_observations_bricklayer',
+            'g' => 'arpl_appendix_g_bricklayer',
+            'i' => 'arpl_appendix_i_bricklayer',
+            'j' => 'arpl_appendix_j_bricklayer'
+        ];
+    } elseif ($trade === 'plumbing') {
+        $tables = [
+            'a' => 'arpl_appendix_a_plumber',
+            'c' => 'arpl_appendix_c_plumber',
+            'd' => 'arpl_appendix_d_plumber',
+            'f' => 'arpl_appendix_f_plumber',
+            'f_tasks' => 'arpl_appendix_f_practical_tasks_plumber',
+            'f_obs' => 'arpl_appendix_f_workplace_observations_plumber',
+            'g' => 'arpl_appendix_g_plumber',
+            'i' => 'arpl_appendix_i_plumber',
+            'j' => 'arpl_appendix_j_plumber'
+        ];
+    } else {
+        return null;
+    }
+    return isset($tables[$appendix]) ? $tables[$appendix] : null;
+}
+
+try {
+    // Read JSON input from request body
+    $input = file_get_contents('php://input');
+    $data = json_decode($input, true);
+    
+    // Get request parameters (support JSON body, POST, and GET)
+    if ($data && isset($data['learnerID'])) {
+        $learnerID = intval($data['learnerID']);
+        $classID = isset($data['classID']) ? intval($data['classID']) : 0;
+        $ofoNumber = isset($data['ofoNumber']) ? $data['ofoNumber'] : null;
+        $trade = isset($data['trade']) ? $data['trade'] : null;
+    } else {
+        // Fallback to POST/GET parameters
+        $learnerID = isset($_POST['learnerID']) ? intval($_POST['learnerID']) : (isset($_GET['learnerID']) ? intval($_GET['learnerID']) : 0);
+        $classID = isset($_POST['classID']) ? intval($_POST['classID']) : (isset($_GET['classID']) ? intval($_GET['classID']) : 0);
+        $ofoNumber = isset($_POST['ofoNumber']) ? $_POST['ofoNumber'] : (isset($_GET['ofoNumber']) ? $_GET['ofoNumber'] : null);
+        $trade = isset($_POST['trade']) ? $_POST['trade'] : (isset($_GET['trade']) ? $_GET['trade'] : null);
+    }
+    
+    // ══════════════════════════════════════════════════════════
+    // FETCH OFO FROM CLASS'S TRADE IF NOT PROVIDED
+    // ══════════════════════════════════════════════════════════
+    if (!$ofoNumber || $ofoNumber === '671101') {
+        // Query class's trade to get OFO
+        if ($classID > 0) {
+            $stmt_trade = $conn->prepare("
+                SELECT t.ofo_number, t.trade_name
+                FROM class c
+                LEFT JOIN arpl_trades t ON c.trade_id = t.trade_id
+                WHERE c.classID = ?
+                LIMIT 1
+            ");
+            
+            if ($stmt_trade) {
+                $stmt_trade->bind_param("i", $classID);
+                $stmt_trade->execute();
+                $result_trade = $stmt_trade->get_result();
+                
+                if ($result_trade && $result_trade->num_rows > 0) {
+                    $row_trade = $result_trade->fetch_assoc();
+                    $tradeOfo = $row_trade['ofo_number'] ?? null;
+                    $tradeName = $row_trade['trade_name'] ?? null;
+                    
+                    // Use class trade's OFO if found
+                    if ($tradeOfo && ($tradeOfo !== '671101' || !$ofoNumber)) {
+                        $ofoNumber = $tradeOfo;
+                        if ($tradeName) {
+                            $trade = strtolower($tradeName);
+                        }
+                    }
+                }
+                $stmt_trade->close();
+            }
+        }
+        
+        // If still not found from class, try learner's qualification
+        if (!$ofoNumber || $ofoNumber === '671101') {
+            $stmt_ofo = $conn->prepare("
+                SELECT q.OFOcode 
+                FROM learnerdetails l
+                LEFT JOIN qualification q ON l.qualification_id = q.qualification_id
+                WHERE l.LearnerID = ?
+                LIMIT 1
+            ");
+            
+            if ($stmt_ofo) {
+                $stmt_ofo->bind_param("i", $learnerID);
+                $stmt_ofo->execute();
+                $result_ofo = $stmt_ofo->get_result();
+                
+                if ($result_ofo && $result_ofo->num_rows > 0) {
+                    $row_ofo = $result_ofo->fetch_assoc();
+                    $dbOfo = $row_ofo['OFOcode'] ?? null;
+                    
+                    // Use database OFO if found and different from what was passed
+                    if ($dbOfo && ($dbOfo !== '671101' || !$ofoNumber)) {
+                        $ofoNumber = $dbOfo;
+                    }
+                }
+                $stmt_ofo->close();
+            }
+        }
+    }
+    
+    // Default to electrician if still not set
+    if (!$ofoNumber) {
+        $ofoNumber = '671101';
+    }
+    
+    // Auto-detect trade from OFO if not provided
+    if (!$trade) {
+        $trade = getTradeName($ofoNumber);
+    }
+    
+    if ($learnerID <= 0) {
+        throw new Exception('Missing or invalid learnerID');
+    }
+    
+    $response = [
+        'status' => 'success',
+        'learnerID' => $learnerID,
+        'classID' => $classID,
+        'ofoNumber' => $ofoNumber,
+        'trade' => $trade
+    ];
+    
+    // ══════════════════════════════════════════════════════════
+    // LOAD LEARNER DETAILS
+    // ══════════════════════════════════════════════════════════
+    $stmt = $conn->prepare("
+        SELECT 
+            LearnerID, Title, Name, Surname, IDNumber, DateOfBirth,
+            PhoneNumber, Email, Gender, Race, Language,
+            AddressLine1, AddressLine2, AddressLine3, PostalCode,
+            SchoolName, SchoolCompletion, SchoolGrade
+        FROM learnerdetails
+        WHERE LearnerID = ?
+    ");
+    $stmt->bind_param('i', $learnerID);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $response['learner'] = $result->fetch_assoc();
+    $stmt->close();
+    
+    if (!$response['learner']) {
+        throw new Exception('Learner not found');
+    }
+    
+    // ══════════════════════════════════════════════════════════
+    // LOAD CLASS INFO
+    // ══════════════════════════════════════════════════════════
+    if ($classID > 0) {
+        $stmt = $conn->prepare("
+            SELECT c.className, c.classID, s.siteName
+            FROM class c
+            LEFT JOIN sites s ON c.siteID = s.siteID
+            WHERE c.classID = ?
+        ");
+        $stmt->bind_param('i', $classID);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $response['class_info'] = $result->fetch_assoc();
+        $stmt->close();
+    }
+    
+    // ══════════════════════════════════════════════════════════
+    // LOAD COMPETENCY SCALE (for interpreting ratings)
+    // ══════════════════════════════════════════════════════════
+    $stmt = $conn->prepare("
+        SELECT score, proficiency_level, description
+        FROM arpl_competency_scale
+        ORDER BY score ASC
+    ");
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $response['competency_scale'] = [];
+    while ($row = $result->fetch_assoc()) {
+        $response['competency_scale'][] = $row;
+    }
+    $stmt->close();
+    
+    // ══════════════════════════════════════════════════════════
+    // LOAD APPENDIX B DATA (Theory Assessment - Competency Ratings 1-5)
+    // ══════════════════════════════════════════════════════════
+    // Get trade-specific activities table
+    $appendixB_table = 'arplappxb_' . $trade . '_activities';
+    // Activity ratings table is SHARED for all trades (Appendix B)
+    $appendixB_ratings_table = 'arplappxb_activity_ratings';
+    
+    // Get all activities for this trade
+    $result = $conn->query("
+        SELECT activity_id, activity_number, activity_name
+        FROM " . $conn->real_escape_string($appendixB_table) . "
+        ORDER BY activity_number ASC
+    ");
+    if (!$result) {
+        throw new Exception('Database error: ' . $conn->error . ' | Table: ' . $appendixB_table);
+    }
+    $appendixB_activities = [];
+    while ($row = $result->fetch_assoc()) {
+        $appendixB_activities[] = $row;
+    }
+    
+    // Get saved ratings for this learner from trade-specific table
+    $sql = "
+        SELECT 
+            aar.activity_id,
+            aar.competency_scale_id as rating_score,
+            aar.comments,
+            aar.rating_date,
+            acs.proficiency_level,
+            acs.description as scale_description
+        FROM " . $conn->real_escape_string($appendixB_ratings_table) . " aar
+        LEFT JOIN arpl_competency_scale acs ON aar.competency_scale_id = acs.score
+        WHERE aar.learnerID = ?
+    ";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        throw new Exception('Database error: ' . $conn->error . ' | Table: ' . $appendixB_ratings_table);
+    }
+    $stmt->bind_param('i', $learnerID);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $ratingsMap = [];
+    while ($row = $result->fetch_assoc()) {
+        $ratingsMap[$row['activity_id']] = $row;
+    }
+    $stmt->close();
+    
+    // Combine activities with ratings
+    $response['appendixB'] = [];
+    foreach ($appendixB_activities as $activity) {
+        $activityData = $activity;
+        if (isset($ratingsMap[$activity['activity_id']])) {
+            $activityData['rating'] = $ratingsMap[$activity['activity_id']];
+            $activityData['has_rating'] = true;
+        } else {
+            $activityData['rating'] = null;
+            $activityData['has_rating'] = false;
+        }
+        $response['appendixB'][] = $activityData;
+    }
+    
+    // ══════════════════════════════════════════════════════════
+    // LOAD APPENDIX D DATA (Practical Skills - Yes/No responses)
+    // ══════════════════════════════════════════════════════════
+    $tableD = getTableName('d', $trade);
+    $stmt = null;
+    if ($tableD) {
+        $stmt = $conn->prepare("
+            SELECT * FROM `".$conn->real_escape_string($tableD)."`
+            WHERE learnerID = ?
+            ORDER BY id DESC
+            LIMIT 1
+        ");
+    }
+    
+    $appendixD = null;
+    if ($stmt) {
+        $stmt->bind_param('i', $learnerID);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $appendixD = $result->fetch_assoc();
+        $stmt->close();
+    }
+    
+    // Extract activity responses
+    $response['appendixD'] = [];
+    if ($appendixD) {
+        for ($i = 1; $i <= 22; $i++) {
+            $field = 'activity_' . $i;
+            if (isset($appendixD[$field])) {
+                $response['appendixD'][$field] = $appendixD[$field];
+            }
+        }
+        $response['appendixD']['saved_at'] = $appendixD['updated_at'] ?? $appendixD['created_at'] ?? null;
+    }
+    
+    // ══════════════════════════════════════════════════════════
+    // LOAD APPENDIX E DATA (Workplace Experience - Competency Ratings 1-5)
+    // ══════════════════════════════════════════════════════════
+    // Get trade-specific activities table
+    $appendixE_table = 'arplappxe_' . $trade . '_activities';
+    $appendixE_ratings_table = 'arplappxe_' . $trade . '_activity_ratings';
+    
+    // Get all activities for this trade
+    $stmt = $conn->prepare("
+        SELECT activity_id, activity_number, activity_name, ofo_number
+        FROM `".$conn->real_escape_string($appendixE_table)."`
+        WHERE ofo_number = ?
+        ORDER BY activity_number ASC
+    ");
+    $stmt->bind_param('s', $ofoNumber);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $appendixE_activities = [];
+    while ($row = $result->fetch_assoc()) {
+        $appendixE_activities[] = $row;
+    }
+    $stmt->close();
+    
+    // Get saved ratings for this learner from trade-specific table
+    $sql = "
+        SELECT 
+            activity_id,
+            competency_scale_id as rating_score,
+            comments,
+            rating_date
+        FROM `".$conn->real_escape_string($appendixE_ratings_table)."`
+        WHERE learnerID = ? AND ofo_number = ?
+    ";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param('is', $learnerID, $ofoNumber);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $ratingsMapE = [];
+    while ($row = $result->fetch_assoc()) {
+        $ratingsMapE[$row['activity_id']] = $row;
+    }
+    $stmt->close();
+    
+    // Combine activities with ratings
+    $response['appendixE'] = [];
+    foreach ($appendixE_activities as $activity) {
+        $activityData = $activity;
+        if (isset($ratingsMapE[$activity['activity_id']])) {
+            $activityData['rating'] = $ratingsMapE[$activity['activity_id']];
+            $activityData['has_rating'] = true;
+        } else {
+            $activityData['rating'] = null;
+            $activityData['has_rating'] = false;
+        }
+        $response['appendixE'][] = $activityData;
+    }
+    
+    // ══════════════════════════════════════════════════════════
+    // LOAD APPENDIX H DATA (Access Recommendation)
+    // ══════════════════════════════════════════════════════════
+    // Get ACR assessment items (4 components) - trade specific
+    $acrTable = 'appxh_acr' . $trade;
+    
+    $stmt = $conn->prepare("
+        SELECT ACRID, AssessmentType
+        FROM `".$conn->real_escape_string($acrTable)."`
+        ORDER BY ACRID
+    ");
+    if ($stmt) {
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $response['appendixH'] = ['items' => [], 'recommendations' => [], 'gap_standards' => []];
+        while ($row = $result->fetch_assoc()) {
+            $response['appendixH']['items'][] = $row;
+        }
+        $stmt->close();
+    } else {
+        $response['appendixH'] = ['items' => [], 'recommendations' => [], 'gap_standards' => []];
+    }
+    
+    // Get saved recommendations for this learner (trade-specific)
+    $recommendationTable = 'arpl' . $trade . '_access_recommendation';
+    
+    $stmt = $conn->prepare("
+        SELECT 
+            RecommendationID, LearnerID, ACRID, Trade, OFOCode,
+            Status, Remarks, CreatedAt, UpdatedAt
+        FROM `".$conn->real_escape_string($recommendationTable)."`
+        WHERE LearnerID = ?
+        ORDER BY CreatedAt DESC
+    ");
+    if ($stmt) {
+        $stmt->bind_param('i', $learnerID);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $response['appendixH']['recommendations'] = [];
+        while ($row = $result->fetch_assoc()) {
+            $response['appendixH']['recommendations'][] = $row;
+        }
+        $stmt->close();
+    }
+    
+    // Get gap analysis unit standards (if applicable)
+    $response['appendixH']['gap_standards'] = [];
+    $table_check = $conn->query("SHOW TABLES LIKE 'arpl_gap_analysis_unit_standards'");
+    if ($table_check && $table_check->num_rows > 0) {
+        $stmt = $conn->prepare("
+            SELECT * FROM arpl_gap_analysis_unit_standards
+            WHERE learner_id = ?
+            ORDER BY created_at DESC
+        ");
+        if ($stmt) {
+            $stmt->bind_param('i', $learnerID);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $response['appendixH']['gap_standards'][] = $row;
+            }
+            $stmt->close();
+        }
+    }
+    
+    // ══════════════════════════════════════════════════════════
+    // LOAD APPENDIX A DATA (Application Form)
+    // ══════════════════════════════════════════════════════════
+    $response['appendixA'] = null;
+    $tableA = getTableName('a', $trade);
+    if ($tableA) {
+        $table_check = $conn->query("SHOW TABLES LIKE '".$conn->real_escape_string($tableA)."'");
+        if ($table_check && $table_check->num_rows > 0) {
+            $stmt = $conn->prepare("
+                SELECT * FROM `".$conn->real_escape_string($tableA)."`
+                WHERE learnerID = ? AND ofo_number = ?
+                LIMIT 1
+            ");
+            if ($stmt) {
+                $stmt->bind_param('is', $learnerID, $ofoNumber);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $appendixA = $result->fetch_assoc();
+                $stmt->close();
+                
+                if ($appendixA) {
+                    // Decode JSON employment history
+                    if ($appendixA['employment_history']) {
+                        $appendixA['employment_history'] = json_decode($appendixA['employment_history'], true) ?? [];
+                    } else {
+                        $appendixA['employment_history'] = [];
+                    }
+                }
+                $response['appendixA'] = $appendixA;
+            }
+        }
+    }
+    
+    // ══════════════════════════════════════════════════════════
+    // LOAD APPENDIX C DATA (Trade Curriculum)
+    // ══════════════════════════════════════════════════════════
+    $response['appendixC'] = null;
+    $tableC = getTableName('c', $trade);
+    if ($tableC) {
+        $table_check = $conn->query("SHOW TABLES LIKE '".$conn->real_escape_string($tableC)."'");
+        if ($table_check && $table_check->num_rows > 0) {
+            $stmt = $conn->prepare("
+                SELECT * FROM `".$conn->real_escape_string($tableC)."`
+                WHERE learnerID = ? AND ofo_number = ?
+                LIMIT 1
+            ");
+            if ($stmt) {
+                $stmt->bind_param('is', $learnerID, $ofoNumber);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $response['appendixC'] = $result->fetch_assoc();
+                $stmt->close();
+            }
+        }
+    }
+    
+    // ══════════════════════════════════════════════════════════
+    // LOAD APPENDIX F DATA (Practical Assessment Evaluation)
+    // ══════════════════════════════════════════════════════════
+    $response['appendixF'] = null;
+    $tableF = getTableName('f', $trade);
+    $tableF_tasks = getTableName('f_tasks', $trade);
+    $tableF_obs = getTableName('f_obs', $trade);
+    
+    if ($tableF) {
+        $table_check = $conn->query("SHOW TABLES LIKE '".$conn->real_escape_string($tableF)."%'");
+        if ($table_check && $table_check->num_rows > 0) {
+            // Check if main table exists
+            $main_table_check = $conn->query("SHOW TABLES LIKE '".$conn->real_escape_string($tableF)."'");
+            if ($main_table_check && $main_table_check->num_rows > 0) {
+                // Get appendix F data
+                $stmt = $conn->prepare("
+                    SELECT * FROM `".$conn->real_escape_string($tableF)."`
+                    WHERE learnerID = ? AND ofo_number = ?
+                    LIMIT 1
+                ");
+                if ($stmt) {
+                    $stmt->bind_param('is', $learnerID, $ofoNumber);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    $appendixF = $result->fetch_assoc();
+                    $stmt->close();
+                    
+                    if ($appendixF) {
+                        // Get practical tasks
+                        $stmt = $conn->prepare("
+                            SELECT task_number, task_name, score, percentage
+                            FROM `".$conn->real_escape_string($tableF_tasks)."`
+                            WHERE learnerID = ? AND ofo_number = ?
+                            ORDER BY task_number ASC
+                        ");
+                        if ($stmt) {
+                            $stmt->bind_param('is', $learnerID, $ofoNumber);
+                            $stmt->execute();
+                            $result = $stmt->get_result();
+                            $appendixF['practical_tasks'] = [];
+                            while ($row = $result->fetch_assoc()) {
+                                $appendixF['practical_tasks'][] = $row;
+                            }
+                            $stmt->close();
+                        } else {
+                            $appendixF['practical_tasks'] = [];
+                        }
+                        
+                        // Get workplace observations
+                        $stmt = $conn->prepare("
+                            SELECT observation_number, task_observed, technical_knowledge, interpretation, team_work
+                            FROM `".$conn->real_escape_string($tableF_obs)."`
+                            WHERE learnerID = ? AND ofo_number = ?
+                            ORDER BY observation_number ASC
+                        ");
+                        if ($stmt) {
+                            $stmt->bind_param('is', $learnerID, $ofoNumber);
+                            $stmt->execute();
+                            $result = $stmt->get_result();
+                            $appendixF['workplace_observations'] = [];
+                            while ($row = $result->fetch_assoc()) {
+                                $appendixF['workplace_observations'][] = $row;
+                            }
+                            $stmt->close();
+                        } else {
+                            $appendixF['workplace_observations'] = [];
+                        }
+                    }
+                    $response['appendixF'] = $appendixF;
+                }
+            }
+        }
+    }
+    
+    // ══════════════════════════════════════════════════════════
+    // LOAD APPENDIX G DATA (Appeals Form)
+    // ══════════════════════════════════════════════════════════
+    $response['appendixG'] = null;
+    $tableG = getTableName('g', $trade);
+    if ($tableG) {
+        $table_check = $conn->query("SHOW TABLES LIKE '".$conn->real_escape_string($tableG)."'");
+        if ($table_check && $table_check->num_rows > 0) {
+            $stmt = $conn->prepare("
+                SELECT * FROM `".$conn->real_escape_string($tableG)."`
+                WHERE learnerID = ? AND ofo_number = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+            ");
+            if ($stmt) {
+                $stmt->bind_param('is', $learnerID, $ofoNumber);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $response['appendixG'] = $result->fetch_assoc();
+                $stmt->close();
+            }
+        }
+    }
+    
+    // ══════════════════════════════════════════════════════════
+    // LOAD APPENDIX I DATA (Statement of Results)
+    // ══════════════════════════════════════════════════════════
+    $response['appendixI'] = null;
+    $tableI = getTableName('i', $trade);
+    if ($tableI) {
+        $table_check = $conn->query("SHOW TABLES LIKE '".$conn->real_escape_string($tableI)."'");
+        if ($table_check && $table_check->num_rows > 0) {
+            $stmt = $conn->prepare("
+                SELECT * FROM `".$conn->real_escape_string($tableI)."`
+                WHERE learnerID = ? AND ofo_number = ?
+                LIMIT 1
+            ");
+            if ($stmt) {
+                $stmt->bind_param('is', $learnerID, $ofoNumber);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $response['appendixI'] = $result->fetch_assoc();
+                $stmt->close();
+            }
+        }
+    }
+    
+    // ══════════════════════════════════════════════════════════
+    // LOAD APPENDIX J DATA (Pre-Assessment Agreement)
+    // ══════════════════════════════════════════════════════════
+    $response['appendixJ'] = null;
+    $tableJ = getTableName('j', $trade);
+    if ($tableJ) {
+        $table_check = $conn->query("SHOW TABLES LIKE '".$conn->real_escape_string($tableJ)."'");
+        if ($table_check && $table_check->num_rows > 0) {
+            $stmt = $conn->prepare("
+                SELECT * FROM `".$conn->real_escape_string($tableJ)."`
+                WHERE learnerID = ? AND ofo_number = ?
+                LIMIT 1
+            ");
+            if ($stmt) {
+                $stmt->bind_param('is', $learnerID, $ofoNumber);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $response['appendixJ'] = $result->fetch_assoc();
+                $stmt->close();
+            }
+        }
+    }
+    
+    // Return success response
+    echo json_encode($response);
+    
+} catch (Exception $e) {
+    http_response_code(400);
+    echo json_encode([
+        'status' => 'error',
+        'message' => $e->getMessage(),
+        'error_details' => $e->getTraceAsString()
+    ]);
+}
+?>

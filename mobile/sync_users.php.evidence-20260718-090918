@@ -1,0 +1,81 @@
+<?php
+include 'connection.php';
+
+// Suppress PHP errors and warnings in the response
+error_reporting(0); // Turn off error reporting for users
+ini_set('display_errors', 0); // Disable displaying errors to the client
+
+// Set content type to JSON
+header('Content-Type: application/json');
+
+// --- Access control ---------------------------------------------------
+// This endpoint returns every user's email, role, and password hash.
+// Without some form of auth, anyone who finds this URL can pull that
+// data directly. Require a shared secret sent by the Flutter app.
+// Store the real value somewhere outside version control (e.g. an
+// environment variable or a config file that isn't web-accessible),
+// and set the same value as a header in the app's HTTP request.
+define('SYNC_API_KEY', 'REPLACE_WITH_A_LONG_RANDOM_SECRET');
+
+$providedKey = $_SERVER['HTTP_X_API_KEY'] ?? '';
+if (!hash_equals(SYNC_API_KEY, $providedKey)) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Unauthorized']);
+    exit;
+}
+// ------------------------------------------------------------------
+
+/**
+ * Mask an email address for display purposes only.
+ * Example: siyabonga@example.com -> si*****@example.com
+ */
+function mask_email($email) {
+    if (!$email || strpos($email, '@') === false) {
+        return $email; // not a valid email, leave as-is
+    }
+
+    list($local, $domain) = explode('@', $email, 2);
+    $visibleChars = min(2, strlen($local)); // show first 1-2 chars
+    $masked = substr($local, 0, $visibleChars) . str_repeat('*', max(strlen($local) - $visibleChars, 3));
+
+    return $masked . '@' . $domain;
+}
+
+// Query the database to fetch users, including the password hash for
+// offline-login support on the app side.
+$query = "SELECT userID, email, password, role FROM users";
+$stmt = $conn->prepare($query);
+
+try {
+    // Execute the statement
+    $stmt->execute();
+
+    // Get the result
+    $result = $stmt->get_result();
+
+    // Fetch users as an associative array
+    $users = [];
+    while ($row = $result->fetch_assoc()) {
+        // userID and role are left as-is. email and password are the
+        // real values from the database - password stays as the bcrypt
+        // hash already stored in the table (never plaintext), for the
+        // app to use in offline login checks. email_masked is an extra
+        // display-safe copy of the email if the UI needs to show it
+        // without exposing the full address.
+        $row['email_masked'] = mask_email($row['email']);
+        $users[] = $row;
+    }
+
+    // Return users as a JSON response
+    echo json_encode($users);
+} catch (Exception $e) {
+    // Handle database query failure
+    echo json_encode(['error' => 'Failed to retrieve data']);
+}
+
+// Close the statement
+$stmt->close();
+
+// Close the connection
+$conn->close();
+?>

@@ -1,0 +1,20 @@
+DirectoryIndex login.php
+
+Options -Indexes
+
+# Prevent access to sensitive files
+<FilesMatch "(^\.|\.env|connection\.php|database\.sql|\.bak|\.log)">
+    Require all denied
+</FilesMatch>
+
+# Block direct access to all PDFs, images, and documents (only accessible via app endpoints)
+<FilesMatch "\.(pdf|jpg|jpeg|png|docx|xlsx|zip)$">
+    Require all denied
+</FilesMatch>
+
+# Set secure headers
+<IfModule mod_headers.c>
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>

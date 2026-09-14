@@ -1,0 +1,101 @@
+# ==================================================
+# .htaccess Configuration - XAMPP & Production Compatible
+# Simplified version without PHP settings that cause errors
+# ==================================================
+
+# Prevent Directory Browsing
+Options -Indexes
+
+# ==================================================
+# FORCE HTTPS (Production Only - Disabled for local)
+# ==================================================
+
+# Uncomment these lines ONLY on production server after SSL is installed
+# <IfModule mod_rewrite.c>
+#     RewriteEngine On
+#     RewriteCond %{HTTPS} off
+#     RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# </IfModule>
+
+# ==================================================
+# SECURITY - Protect Sensitive Files
+# ==================================================
+
+# Block access to database connection file
+<Files "connection.php">
+    Require all denied
+</Files>
+
+# Block access to config files
+<Files "config.php">
+    Require all denied
+</Files>
+
+# Block access to .env files
+<Files ".env">
+    Require all denied
+</Files>
+
+# Block backup files
+<FilesMatch "\.(bak|backup|old|orig|save|swp|sql|log)$">
+    Require all denied
+</FilesMatch>
+
+# ==================================================
+# ALLOW ACCESS - PHP & Assets
+# ==================================================
+
+# Allow PHP files (authentication handled in PHP code)
+<FilesMatch "\.php$">
+    Require all granted
+</FilesMatch>
+
+# Allow static files
+<FilesMatch "\.(jpg|jpeg|png|gif|svg|css|js|ico|woff|woff2|ttf|eot|pdf|html|htm)$">
+    Require all granted
+</FilesMatch>
+
+# ==================================================
+# SECURITY HEADERS (Optional - may not work on all servers)
+# ==================================================
+
+<IfModule mod_headers.c>
+    # Prevent clickjacking
+    Header set X-Frame-Options "SAMEORIGIN"
+    
+    # Prevent MIME sniffing
+    Header set X-Content-Type-Options "nosniff"
+    
+    # XSS Protection
+    Header set X-XSS-Protection "1; mode=block"
+    
+    # Remove server info
+    Header unset X-Powered-By
+</IfModule>
+
+# ==================================================
+# UTF-8 ENCODING
+# ==================================================
+
+AddDefaultCharset UTF-8
+
+# ==================================================
+# NOTES FOR PRODUCTION
+# ==================================================
+# 
+# 1. ENABLE HTTPS REDIRECT:
+#    - Uncomment the RewriteEngine section above after SSL is installed
+# 
+# 2. SET FILE PERMISSIONS:
+#    sudo chown -R www-data:www-data /var/www/html/
+#    sudo chmod 644 /var/www/html/.htaccess
+#    sudo chmod 644 /var/www/html/*.php
+#    sudo chmod 600 /var/www/html/connection.php
+#    sudo chmod 755 /var/www/html/mobile/signatures/
+# 
+# 3. ENABLE APACHE MODULES:
+#    sudo a2enmod rewrite
+#    sudo a2enmod headers
+#    sudo systemctl restart apache2
+#
+

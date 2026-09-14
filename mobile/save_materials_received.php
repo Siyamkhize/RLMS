@@ -1,0 +1,40 @@
+<?php
+include 'connection.php';
+
+// Suppress PHP errors and warnings in the response
+error_reporting(0); // Turn off error reporting for users
+ini_set('display_errors', 0); // Disable displaying errors to the client
+
+// Set content type to JSON
+header('Content-Type: application/json');
+
+// Query the database to fetch users
+$query = "SELECT * FROM materials_received";
+$stmt = $conn->prepare($query);
+
+try {
+    // Execute the statement
+    $stmt->execute();
+    
+    // Get the result
+    $result = $stmt->get_result();
+    
+    // Fetch users as an associative array
+    $material = [];
+    while ($row = $result->fetch_assoc()) {
+        $material[] = $row;
+    }
+
+    // Return users as a JSON response
+    echo json_encode($users);
+} catch (Exception $e) {
+    // Handle database query failure
+    echo json_encode(['error' => 'Failed to retrieve data']);
+}
+
+// Close the statement
+$stmt->close();
+
+// Close the connection
+$conn->close();
+?>
