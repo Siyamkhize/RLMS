@@ -1,12 +1,15 @@
 name: "CodeQL Security Analysis"
 
+# Disabled temporarily due to Flutter Android build complexity
+# Re-enable once Android SDK environment is properly configured
 on:
-  push:
-    branches: [ "main", "development" ]
-  pull_request:
-    branches: [ "main", "development" ]
-  schedule:
-    - cron: '30 2 * * 1'  # Weekly on Mondays at 2:30 AM UTC
+  workflow_dispatch:  # Manual trigger only
+  # push:
+  #   branches: [ "main", "development" ]
+  # pull_request:
+  #   branches: [ "main", "development" ]
+  # schedule:
+  #   - cron: '30 2 * * 1'
 
 jobs:
   analyze:
