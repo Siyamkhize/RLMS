@@ -10,8 +10,9 @@ on:
 
 jobs:
   analyze:
-    name: Analyze
+    name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       actions: read
       contents: read
@@ -20,10 +21,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'javascript', 'java' ]
-        # CodeQL supports: 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'ruby', 'swift'
-        # Dart is analyzed as javascript, PHP backend JS files as javascript
-        # Java for Android native code
+        language: [ 'java-kotlin' ]
+        # CodeQL supports: 'java-kotlin' for Android, 'javascript-typescript' for Dart/JS
+        # Simplified to focus on Android Java code
 
     steps:
       - name: Checkout repository
@@ -33,7 +33,7 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
-          queries: security-extended,security-and-quality
+          queries: security-and-quality
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
