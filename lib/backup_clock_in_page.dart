@@ -1601,7 +1601,7 @@ class _BackupClockInPageState extends State<BackupClockInPage> {
           // Create multipart request
           final request = http.MultipartRequest(
             'POST',
-            Uri.parse(AppConfig.syncSignaturesUrl),
+            Uri.parse(AppConfig.signaturesUrl),
           );
 
           // Add filename parameter

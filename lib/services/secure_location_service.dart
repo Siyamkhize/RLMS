@@ -450,7 +450,7 @@ class SecureLocationService {
     };
   }
 
-  static Future<bool> verifyGeofenceOnServer({
+  static Future<Map<String, dynamic>> verifyGeofenceOnServer({
     required SecurePositionResult securePosition,
     required String classID,
     required String learnerID,
@@ -476,20 +476,36 @@ class SecureLocationService {
         final data = jsonDecode(response.body);
         if (data['success'] == true) {
           print('[SECURE_LOC] ✅ Server geofence verification passed');
-          return true;
+          return {
+            'success': true,
+            'distance': data['distance'],
+            'effective_radius': data['effective_radius'],
+          };
         } else {
           print(
             '[SECURE_LOC] ❌ Server geofence rejected: ${data['error']}',
           );
-          return false;
+          return {
+            'success': false,
+            'error': data['error'] ?? 'Geofence verification failed',
+            'distance': data['distance'],
+            'effective_radius': data['effective_radius'],
+          };
         }
       }
-      return false;
+      return {
+        'success': false,
+        'error': 'Server returned status ${response.statusCode}',
+      };
     } catch (e) {
       print('[SECURE_LOC] Server verification failed: $e');
-      return securePosition.isTrusted &&
+      final fallbackSuccess = securePosition.isTrusted &&
           !securePosition.isMockDetected &&
           securePosition.passedSanityCheck;
+      return {
+        'success': fallbackSuccess,
+        'error': fallbackSuccess ? null : 'Server connection failed: $e',
+      };
     }
   }
 
