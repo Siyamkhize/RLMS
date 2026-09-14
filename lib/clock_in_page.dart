@@ -3711,30 +3711,44 @@ class _ClockInPageState extends State<ClockInPage>
         .replaceAll(RegExp(r'\.pdf$'), '')
         .replaceAll(RegExp(r'\s+'), ' ');
 
-    if (await _checkConnectivity()) {
-      try {
-        final serverDocs = await _fetchServerDocuments(learnerId);
-        if (serverDocs != null) {
-          final existingDocs = serverDocs.toSet();
-          return _requiredDocuments
-              .where((requiredDoc) =>
-                  !existingDocs.contains(normalizeRequiredDoc(requiredDoc)))
-              .toList();
-        }
-      } catch (_) {}
-    }
-
     final dbHelper = DatabaseHelper();
     final localDocs = await dbHelper.fetchLearnerDocuments(learnerId);
-    final existingDocs = localDocs
+    final localExistingDocs = localDocs
         .map((doc) =>
             normalizeRequiredDoc(doc['documentName']?.toString() ?? ''))
         .toSet();
 
-    return _requiredDocuments
+    // CRITICAL FIX FOR OFFLINE CLOCKING:
+    // When online, verify against server (server is source of truth)
+    // When offline, trust local database completely (don't block users who have already uploaded documents)
+    if (await _checkConnectivity()) {
+      try {
+        final serverDocs = await _fetchServerDocuments(learnerId);
+        if (serverDocs != null) {
+          final serverExistingDocs = serverDocs.toSet();
+          // When online: check server first, then local database
+          final missingDocs = _requiredDocuments.where((requiredDoc) {
+            final normalized = normalizeRequiredDoc(requiredDoc);
+            return !serverExistingDocs.contains(normalized) &&
+                !localExistingDocs.contains(normalized);
+          }).toList();
+          print('[DOCUMENTS] ONLINE: Missing docs: $missingDocs');
+          return missingDocs;
+        }
+      } catch (e) {
+        print(
+            '[DOCUMENTS] ONLINE: Server check failed: $e - falling back to local');
+      }
+    }
+
+    // When offline OR server check failed: trust local database
+    final missingDocs = _requiredDocuments
         .where((requiredDoc) =>
-            !existingDocs.contains(normalizeRequiredDoc(requiredDoc)))
+            !localExistingDocs.contains(normalizeRequiredDoc(requiredDoc)))
         .toList();
+    print(
+        '[DOCUMENTS] OFFLINE: Missing docs: $missingDocs (based on local database only)');
+    return missingDocs;
   }
 
   Future<List<String>?> _fetchServerDocuments(String learnerId) async {

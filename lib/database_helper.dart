@@ -2923,6 +2923,7 @@ updated_at TIMESTAMP
       final facilitatorInfo = facilitatorData.first;
       final facilitatorName =
           '${facilitatorInfo['firstName']} ${facilitatorInfo['lastName']}';
+      final facilitatorImage = facilitatorInfo['f_profile'];
 
       // 4. Get total learners for the class
       final int totalLearners = await _getTotalLearners(classID);
@@ -2936,6 +2937,7 @@ updated_at TIMESTAMP
       return {
         'class_name': className,
         'facilitator_name': facilitatorName,
+        'facilitator_image': facilitatorImage,
         'class_max': classMax,
         'site_name': siteName,
         'total_learners': totalLearners,
@@ -7115,6 +7117,12 @@ GROUP BY p.project_id, p.Project_name, JSON_EXTRACT(p.project_pathway, '\$[0].na
       print('Error updating learner information locally: $e');
       throw Exception('Failed to update learner information locally: $e');
     }
+  }
+
+  // Alias for updateLearnerLocally for backward compatibility
+  Future<void> updateLearnerDetails(
+      String learnerID, Map<String, dynamic> updateData) async {
+    return updateLearnerLocally(learnerID, updateData);
   }
 
   // Save ZKTeco template (left or right)

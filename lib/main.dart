@@ -944,89 +944,467 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('RLMS Login'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              Image.asset(
-                "assets/images/logo.png",
-                width: MediaQuery.of(context).size.width * 0.5,
-                height: MediaQuery.of(context).size.height * 0.2,
-                fit: BoxFit.contain,
+      backgroundColor: const Color(0xFFF8FBFF),
+      body: Stack(
+        children: [
+          // Soft decorative background shapes matching the supplied design.
+          Positioned(
+            top: -90,
+            right: -85,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEAF5FF),
+                borderRadius: BorderRadius.circular(110),
               ),
-              const SizedBox(height: 20),
-              TextFormField(
-                controller: _usernameController,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  prefixIcon: Icon(Icons.person),
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) => value!.isEmpty ? 'Enter email' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  prefixIcon: const Icon(Icons.lock),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility
-                          : Icons.visibility_off,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _obscurePassword = !_obscurePassword;
-                      });
-                    },
-                  ),
-                  border: const OutlineInputBorder(),
-                ),
-                validator: (value) => value!.isEmpty ? 'Enter password' : null,
-              ),
-              const SizedBox(height: 24),
-              _isLoading
-                  ? const CircularProgressIndicator()
-                  : ElevatedButton(
-                      onPressed: _handleLogin,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 50, vertical: 15),
-                      ),
-                      child:
-                          const Text('Login', style: TextStyle(fontSize: 16)),
-                    ),
-              const SizedBox(height: 20),
-              Text(
-                _connectivityStatus,
-                style: TextStyle(
-                  color: _isOffline ? Colors.red : Colors.green,
-                  fontSize: 12,
-                ),
-              ),
-              Text(
-                _databaseStatus,
-                style: const TextStyle(
-                  color: Colors.blue,
-                  fontSize: 12,
-                ),
-              ),
-            ],
+            ),
           ),
+          Positioned(
+            top: 105,
+            right: -55,
+            child: Container(
+              width: 145,
+              height: 145,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F8FF),
+                borderRadius: BorderRadius.circular(75),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -75,
+            left: -70,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEAF6FF),
+                borderRadius: BorderRadius.circular(145),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 25,
+            left: -35,
+            child: Container(
+              width: 170,
+              height: 170,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF2F9FF),
+                borderRadius: BorderRadius.circular(90),
+              ),
+            ),
+          ),
+
+          // Decorative curved lines on top of circles
+          Positioned(
+            top: 20,
+            right: 20,
+            child: CustomPaint(
+              size: const Size(120, 120),
+              painter: _CurvedLinesPainter(
+                color: const Color(0xFFD5EDFF).withOpacity(0.6),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 80,
+            left: 30,
+            child: CustomPaint(
+              size: const Size(100, 100),
+              painter: _CurvedLinesPainter(
+                color: const Color(0xFFD5EDFF).withOpacity(0.5),
+                reverse: true,
+              ),
+            ),
+          ),
+
+          SafeArea(
+            child: SingleChildScrollView(
+              physics: const NeverScrollableScrollPhysics(),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 24),
+
+                      // Logo
+                      SizedBox(
+                        width: 100,
+                        height: 100,
+                        child: Center(
+                          child: Image.asset(
+                            "assets/images/logo.png",
+                            width: 95,
+                            height: 95,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // App title
+                      const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'REMOTE LEARNER',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF15284A),
+                            letterSpacing: 0.7,
+                            height: 1.0,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'MANAGEMENT SYSTEM',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF66B5E9),
+                            letterSpacing: 2.5,
+                            height: 1.0,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 30),
+
+                      // Welcome text
+                      const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'Welcome back',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF12284C),
+                            height: 1.0,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      Text(
+                        'Sign in to continue to your account',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w400,
+                          height: 1.1,
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Email field
+                      _buildLoginField(
+                        controller: _usernameController,
+                        hintText: 'Email',
+                        prefixIcon: Icons.person_outline,
+                        obscureText: false,
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Password field
+                      _buildLoginField(
+                        controller: _passwordController,
+                        hintText: 'Password',
+                        prefixIcon: Icons.lock_outline,
+                        obscureText: _obscurePassword,
+                        suffixIcon: IconButton(
+                          splashRadius: 22,
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            color: const Color(0xFFB7BBC1),
+                            size: 25,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                        ),
+                        validator: (value) =>
+                            value!.isEmpty ? 'Enter password' : null,
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Login button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: _isLoading
+                            ? const Center(
+                                child: CircularProgressIndicator(
+                                  color: Color(0xFF5BA4DE),
+                                ),
+                              )
+                            : DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFF5FA8DF),
+                                      Color(0xFF58A0D8),
+                                    ],
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(26),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF5BA4DE)
+                                          .withOpacity(0.25),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 8),
+                                    ),
+                                  ],
+                                ),
+                                child: ElevatedButton(
+                                  onPressed: _handleLogin,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.transparent,
+                                    foregroundColor: Colors.white,
+                                    shadowColor: Colors.transparent,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(26),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      Text(
+                                        'Login',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: 0.2,
+                                        ),
+                                      ),
+                                      SizedBox(width: 12),
+                                      Icon(
+                                        Icons.arrow_forward,
+                                        size: 24,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Divider
+                      Container(
+                        height: 1,
+                        width: double.infinity,
+                        color: const Color(0xFFD8DCE2),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Connection status heading
+                      Text(
+                        'Connected',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Wi-Fi status
+                      _buildStatusPill(
+                        backgroundColor: _isOffline
+                            ? const Color(0xFFFDEDED)
+                            : const Color(0xFFE9F8E9),
+                        iconBackgroundColor: _isOffline
+                            ? const Color(0xFFE45C5C)
+                            : const Color(0xFF4CAF50),
+                        icon: Icons.wifi,
+                        text: _connectivityStatus,
+                        textColor: _isOffline
+                            ? const Color(0xFFD94A4A)
+                            : const Color(0xFF3C8740),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // Database status
+                      _buildStatusPill(
+                        backgroundColor: const Color(0xFFE7F3FF),
+                        iconBackgroundColor: const Color(0xFF2695E2),
+                        icon: Icons.storage,
+                        text: _databaseStatus,
+                        textColor: const Color(0xFF236AA4),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Version
+                      Text(
+                        'v1.0.0',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade400,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoginField({
+    required TextEditingController controller,
+    required String hintText,
+    required IconData prefixIcon,
+    required bool obscureText,
+    Widget? suffixIcon,
+    String? Function(String?)? validator,
+  }) {
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FAFE),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.025),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: TextFormField(
+        controller: controller,
+        obscureText: obscureText,
+        validator:
+            validator ?? (value) => value!.isEmpty ? 'Enter email' : null,
+        style: const TextStyle(
+          fontSize: 14,
+          color: Color(0xFF26364D),
         ),
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: const TextStyle(
+            color: Color(0xFFB8BBC0),
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+          ),
+          prefixIcon: Container(
+            width: 56,
+            margin: const EdgeInsets.only(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              right: 12,
+            ),
+            decoration: BoxDecoration(
+              color: const Color(0xFF5FA6DD),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(18),
+                bottomLeft: Radius.circular(18),
+                topRight: Radius.circular(18),
+                bottomRight: Radius.circular(18),
+              ),
+            ),
+            child: Icon(
+              prefixIcon,
+              color: Colors.white,
+              size: 22,
+            ),
+          ),
+          prefixIconConstraints: const BoxConstraints(
+            minWidth: 56,
+            minHeight: 56,
+          ),
+          suffixIcon: suffixIcon,
+          suffixIconConstraints: const BoxConstraints(
+            minWidth: 48,
+            minHeight: 56,
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 0,
+            vertical: 18,
+          ),
+          errorStyle: const TextStyle(height: 0, fontSize: 0),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusPill({
+    required Color backgroundColor,
+    required Color iconBackgroundColor,
+    required IconData icon,
+    required String text,
+    required Color textColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconBackgroundColor,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              color: Colors.white,
+              size: 14,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: textColor,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1418,4 +1796,67 @@ class _LoginPageState extends State<LoginPage> {
       ),
     );
   }
+}
+
+// Custom painter for decorative dot patterns
+class _CurvedLinesPainter extends CustomPainter {
+  final Color color;
+  final bool reverse;
+
+  _CurvedLinesPainter({
+    required this.color,
+    this.reverse = false,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    // Create scattered dot pattern
+    final dots = <Offset>[];
+
+    if (reverse) {
+      // Bottom-left dot pattern
+      dots.addAll([
+        Offset(size.width * 0.15, size.height * 0.75),
+        Offset(size.width * 0.25, size.height * 0.70),
+        Offset(size.width * 0.35, size.height * 0.80),
+        Offset(size.width * 0.10, size.height * 0.85),
+        Offset(size.width * 0.45, size.height * 0.75),
+        Offset(size.width * 0.20, size.height * 0.90),
+        Offset(size.width * 0.40, size.height * 0.65),
+        Offset(size.width * 0.30, size.height * 0.85),
+        Offset(size.width * 0.50, size.height * 0.80),
+        Offset(size.width * 0.15, size.height * 0.95),
+        Offset(size.width * 0.55, size.height * 0.70),
+        Offset(size.width * 0.60, size.height * 0.85),
+      ]);
+    } else {
+      // Top-right dot pattern
+      dots.addAll([
+        Offset(size.width * 0.70, size.height * 0.15),
+        Offset(size.width * 0.60, size.height * 0.20),
+        Offset(size.width * 0.80, size.height * 0.25),
+        Offset(size.width * 0.75, size.height * 0.10),
+        Offset(size.width * 0.50, size.height * 0.25),
+        Offset(size.width * 0.85, size.height * 0.15),
+        Offset(size.width * 0.65, size.height * 0.30),
+        Offset(size.width * 0.90, size.height * 0.20),
+        Offset(size.width * 0.55, size.height * 0.15),
+        Offset(size.width * 0.70, size.height * 0.35),
+        Offset(size.width * 0.95, size.height * 0.30),
+        Offset(size.width * 0.60, size.height * 0.10),
+      ]);
+    }
+
+    // Draw small dots
+    for (final dot in dots) {
+      canvas.drawCircle(dot, 2.5, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
