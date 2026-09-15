@@ -64,6 +64,10 @@ class AppConfig {
   static String get saveSignatureUrl => '$baseUrl/save_signature.php';
   static String get saveInitialsUrl => '$baseUrl/save_initials.php';
   static String get newAgreementUrl => '$baseUrl/new_aggrement.php';
+  static String get checkAgreementEligibilityUrl =>
+      '$baseUrl/check_agreement_eligibility.php';
+  static String get downloadAgreementPdfUrl =>
+      '$baseUrl/download_agreement_pdf.php';
   static String get uploadImageUrl => '$baseUrl/upload_image.php';
   static String get learnerImagesUrl => '$baseUrl/learnerImages';
   static String get signaturesUrl => '$baseUrl/signatures';
